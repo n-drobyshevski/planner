@@ -65,7 +65,8 @@ export const ContextBackdrop = forwardRef<
         style={{ backgroundColor: color }}
       >
         <span className="truncate">{occ.title}</span>
-        <span className="shrink-0 font-normal opacity-90 tabular-nums">
+        {/* Drop the time range on phones (< md) to give the name room. */}
+        <span className="hidden shrink-0 font-normal opacity-90 tabular-nums md:inline">
           {format(occ.start, "h:mm")}–{format(occ.end, "h:mm a")}
         </span>
         {onMenu && (
