@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { FolderPlus, FolderMinus, Pencil, Trash2 } from "lucide-react";
 import { packDay } from "@/lib/layout/pack-day";
+import { enclosingContext } from "@/lib/calendar/contexts";
 import { msToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
 import { EventBlock } from "./event-block";
 import { ContextBackdrop } from "./context-backdrop";
@@ -12,6 +13,10 @@ import type { Occurrence } from "@/lib/types";
 
 const DAY_MS = 86_400_000;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+// Children that nest inside a context are indented so the context's tinted
+// frame stays visible around them — that's what reads as "inside the zone".
+const NEST_L = 14; // left gutter (px) exposing the context's accent edge
+const NEST_R = 6; // right margin (px)
 
 export function DayColumn({
   dayStart,
@@ -42,20 +47,6 @@ export function DayColumn({
 }) {
   const dayEnd = dayStart + DAY_MS;
 
-  // Timed children (normal events / task-blocks) — packed into columns as usual.
-  const segments = useMemo(
-    () =>
-      occurrences
-        .filter((o) => !o.allDay && o.kind !== "context" && o.start < dayEnd && o.end > dayStart)
-        .map((o) => ({
-          occ: o,
-          start: Math.max(o.start, dayStart),
-          end: Math.min(o.end, dayEnd),
-        })),
-    [occurrences, dayStart, dayEnd],
-  );
-  const packed = useMemo(() => packDay(segments), [segments]);
-
   // Timed context backdrops — drawn behind the children, NOT packed.
   const contextSegs = useMemo(
     () =>
@@ -68,6 +59,41 @@ export function DayColumn({
         })),
     [occurrences, dayStart, dayEnd],
   );
+
+  // Timed children (normal events / task-blocks). A child whose start falls
+  // inside a context nests in it (indented within the backdrop); the rest are
+  // "free" and span the full column. Each group is packed on its own so a
+  // nested event never shares columns with a free one.
+  const { segments, packed, nestedFlags } = useMemo(() => {
+    const ctxOccs = contextSegs.map((s) => s.occ);
+    const segs = occurrences
+      .filter((o) => !o.allDay && o.kind !== "context" && o.start < dayEnd && o.end > dayStart)
+      .map((o) => ({
+        occ: o,
+        start: Math.max(o.start, dayStart),
+        end: Math.min(o.end, dayEnd),
+      }));
+
+    const nestId = segs.map(
+      (s) => enclosingContext(ctxOccs, s.occ.start)?.eventId ?? null,
+    );
+    const nested = nestId.map((id) => id !== null);
+
+    // Pack each nesting group independently (key: context id or "" for free).
+    const groups = new Map<string, number[]>();
+    segs.forEach((_, i) => {
+      const k = nestId[i] ?? "";
+      const arr = groups.get(k);
+      if (arr) arr.push(i);
+      else groups.set(k, [i]);
+    });
+    const cols = new Array<ReturnType<typeof packDay>[number]>(segs.length);
+    for (const idxs of groups.values()) {
+      const sub = packDay(idxs.map((i) => segs[i]));
+      idxs.forEach((i, j) => (cols[i] = sub[j]));
+    }
+    return { segments: segs, packed: cols, nestedFlags: nested };
+  }, [occurrences, dayStart, dayEnd, contextSegs]);
 
   // Distinct contexts visible in this window, for the "Add to context" submenu.
   const contextChoices = useMemo(() => {
@@ -147,6 +173,15 @@ export function DayColumn({
       {segments.map((seg, i) => {
         const p = packed[i];
         const taskId = seg.occ.taskId;
+        // Nested children are indented within the column so the context's
+        // tinted frame shows around them; free events keep the full width.
+        const nested = nestedFlags[i];
+        const left = nested
+          ? `calc(${p.leftPct}% + ${NEST_L}px)`
+          : `calc(${p.leftPct}% + 1px)`;
+        const width = nested
+          ? `calc(${p.widthPct}% - ${NEST_L + NEST_R}px)`
+          : `calc(${p.widthPct}% - 3px)`;
         return (
           <ItemContextMenu
             key={seg.occ.key}
@@ -177,8 +212,8 @@ export function DayColumn({
               style={{
                 top: msToY(seg.start, dayStart),
                 height: durationToHeight(seg.start, seg.end),
-                left: `calc(${p.leftPct}% + 1px)`,
-                width: `calc(${p.widthPct}% - 3px)`,
+                left,
+                width,
               }}
             />
           </ItemContextMenu>

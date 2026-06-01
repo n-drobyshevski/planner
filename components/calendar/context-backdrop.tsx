@@ -37,9 +37,11 @@ export const ContextBackdrop = forwardRef<
       data-occ-key={occ.key}
       style={{
         ...style,
-        // Translucent fill + a solid left accent so the zone reads as a label,
-        // not a solid event. color-mix keeps it tinted in light & dark themes.
-        backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)`,
+        // Translucent fill + a framed border (solid left accent) so the zone
+        // reads as a container its children sit inside, not a solid event.
+        // color-mix keeps it tinted in light & dark themes.
+        backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
         borderLeft: `3px solid ${color}`,
       }}
       className={cn(
