@@ -31,4 +31,15 @@ describe("RecurrenceEditor — daily weekday filter", () => {
     expect(screen.queryByRole("spinbutton")).toBeNull();
     expect(screen.getByRole("button", { name: "Mo" })).toBeInTheDocument();
   });
+
+  it("weekly with days selected still shows the interval input", () => {
+    const weekly: RecurrenceForm = {
+      freq: "WEEKLY",
+      interval: 2,
+      byWeekday: [0, 2],
+      end: { type: "never" },
+    };
+    render(<RecurrenceEditor value={weekly} onChange={vi.fn()} startMs={START} />);
+    expect(screen.getByRole("spinbutton")).toBeInTheDocument();
+  });
 });
