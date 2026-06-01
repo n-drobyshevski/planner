@@ -82,13 +82,21 @@ function fromUntilBasic(s: string): number {
 export function buildRRule(form: RecurrenceForm | null): string | null {
   if (form === null) return null;
 
+  // BYDAY applies to weekly recurrences and to daily recurrences used as a
+  // weekday filter ("every weekday", "Mon/Wed/Fri").
+  const hasDays =
+    (form.freq === "WEEKLY" || form.freq === "DAILY") && form.byWeekday.length > 0;
+
   const parts: string[] = [`FREQ=${form.freq}`];
 
-  if (form.interval > 1) {
+  // A daily weekday filter is really a weekly cadence; INTERVAL would mean
+  // "every N days" and drift off the chosen weekdays, so we omit it there.
+  const emitInterval = form.interval > 1 && !(form.freq === "DAILY" && hasDays);
+  if (emitInterval) {
     parts.push(`INTERVAL=${form.interval}`);
   }
 
-  if (form.freq === "WEEKLY" && form.byWeekday.length > 0) {
+  if (hasDays) {
     const days = [...form.byWeekday]
       .sort((a, b) => a - b)
       .map((idx) => WEEKDAYS[idx].toString());

@@ -140,14 +140,34 @@ describe("buildRRule", () => {
     expect(buildRRule(form)).toBe("FREQ=DAILY;COUNT=10");
   });
 
-  it("does not emit BYDAY for non-weekly even if byWeekday is set", () => {
+  it("daily with weekdays -> FREQ=DAILY;BYDAY (interval omitted)", () => {
     const form: RecurrenceForm = {
       freq: "DAILY",
+      interval: 1,
+      byWeekday: [0, 2, 4],
+      end: { type: "never" },
+    };
+    expect(buildRRule(form)).toBe("FREQ=DAILY;BYDAY=MO,WE,FR");
+  });
+
+  it("daily with weekdays drops INTERVAL even when interval > 1", () => {
+    const form: RecurrenceForm = {
+      freq: "DAILY",
+      interval: 3,
+      byWeekday: [0],
+      end: { type: "never" },
+    };
+    expect(buildRRule(form)).toBe("FREQ=DAILY;BYDAY=MO");
+  });
+
+  it("monthly does not emit BYDAY even if byWeekday is set", () => {
+    const form: RecurrenceForm = {
+      freq: "MONTHLY",
       interval: 1,
       byWeekday: [0, 1],
       end: { type: "never" },
     };
-    expect(buildRRule(form)).toBe("FREQ=DAILY");
+    expect(buildRRule(form)).toBe("FREQ=MONTHLY");
   });
 
   it("weekly with empty byWeekday omits BYDAY", () => {
