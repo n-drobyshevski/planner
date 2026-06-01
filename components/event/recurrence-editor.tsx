@@ -67,22 +67,24 @@ export function RecurrenceEditor({
 
       {value && (
         <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
-          <div className="flex items-end gap-2">
-            <Field className="w-24">
-              <FieldLabel>Every</FieldLabel>
-              <Input
-                type="number"
-                min={1}
-                value={value.interval}
-                onChange={(e) =>
-                  onChange({ ...value, interval: Math.max(1, Number(e.target.value) || 1) })
-                }
-              />
-            </Field>
-            <span className="pb-2.5 text-sm text-muted-foreground">{UNIT[value.freq]}</span>
-          </div>
+          {!(value.freq === "DAILY" && value.byWeekday.length > 0) && (
+            <div className="flex items-end gap-2">
+              <Field className="w-24">
+                <FieldLabel>Every</FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  value={value.interval}
+                  onChange={(e) =>
+                    onChange({ ...value, interval: Math.max(1, Number(e.target.value) || 1) })
+                  }
+                />
+              </Field>
+              <span className="pb-2.5 text-sm text-muted-foreground">{UNIT[value.freq]}</span>
+            </div>
+          )}
 
-          {value.freq === "WEEKLY" && (
+          {(value.freq === "WEEKLY" || value.freq === "DAILY") && (
             <Field>
               <FieldLabel>On days</FieldLabel>
               <ToggleGroup
