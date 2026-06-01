@@ -5,6 +5,7 @@ import { TimeField, normalizeTime } from "@/components/ui/time-field";
 describe("normalizeTime", () => {
   it("normalizes loose input to HH:mm", () => {
     expect(normalizeTime("9")).toBe("09:00");
+    expect(normalizeTime("0")).toBe("00:00");
     expect(normalizeTime("9:5")).toBe("09:05");
     expect(normalizeTime("900")).toBe("09:00");
     expect(normalizeTime("0900")).toBe("09:00");
