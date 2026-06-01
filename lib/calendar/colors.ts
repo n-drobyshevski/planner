@@ -4,12 +4,13 @@ import type { Occurrence, Category, Member } from "@/lib/types";
 const SHARED_FALLBACK = "#b45309"; // amber
 const PERSONAL_FALLBACK = "#c0492a"; // coral
 
-/** Resolve the display color for an occurrence: category color, else member/shared. */
+/** Resolve the display color for an occurrence: own color, else category, else member/shared. */
 export function resolveOccurrenceColor(
   occ: Occurrence,
   categories: Map<string, Category>,
   members: Map<string, Member>,
 ): string {
+  if (occ.color) return occ.color; // per-item override wins
   if (occ.categoryId) {
     const c = categories.get(occ.categoryId);
     if (c) return c.color;

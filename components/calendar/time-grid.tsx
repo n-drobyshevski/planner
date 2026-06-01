@@ -2,8 +2,10 @@
 
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
+import { Pencil, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import {
   HOUR_PX,
   SLOT_MIN,
@@ -32,6 +34,8 @@ interface Props {
   onSelect: (o: Occurrence) => void;
   onCreateRange: (startMs: number, endMs: number) => void;
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
+  onChangeColor: (occ: Occurrence, color: string | null) => void;
+  onDeleteEvent: (occ: Occurrence) => void;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
   /** Drop a backlog task onto a slot to schedule a default 1h block. */
@@ -80,6 +84,8 @@ export function TimeGrid({
   onSelect,
   onCreateRange,
   onReschedule,
+  onChangeColor,
+  onDeleteEvent,
   taskDoneById,
   onToggleTaskDone,
   onScheduleTask,
@@ -419,18 +425,34 @@ export function TimeGrid({
             return (
               <div key={d} className="flex min-w-0 flex-1 flex-col gap-1 border-l p-1">
                 {items.map((o) => (
-                  <button
+                  <ItemContextMenu
                     key={o.key}
-                    type="button"
-                    onClick={() => onSelect(o)}
-                    style={{ backgroundColor: colorOf(o) }}
-                    className={cn(
-                      "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium text-white",
-                      selectedKey === o.key && "ring-2 ring-foreground",
-                    )}
+                    mobileSheet={false}
+                    title={o.title}
+                    color={o.color}
+                    onColorChange={(c) => onChangeColor(o, c)}
+                    actions={[
+                      { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                      {
+                        label: "Delete",
+                        icon: Trash2,
+                        destructive: true,
+                        onSelect: () => onDeleteEvent(o),
+                      },
+                    ]}
                   >
-                    {o.title}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(o)}
+                      style={{ backgroundColor: colorOf(o) }}
+                      className={cn(
+                        "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium text-white",
+                        selectedKey === o.key && "ring-2 ring-foreground",
+                      )}
+                    >
+                      {o.title}
+                    </button>
+                  </ItemContextMenu>
                 ))}
               </div>
             );
@@ -478,6 +500,9 @@ export function TimeGrid({
                 occurrences={occurrences}
                 colorOf={colorOf}
                 selectedKey={selectedKey}
+                onSelect={onSelect}
+                onChangeColor={onChangeColor}
+                onDeleteEvent={onDeleteEvent}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
               />

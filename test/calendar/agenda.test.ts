@@ -22,6 +22,7 @@ function occ(start: number, title: string, opts: Partial<Occurrence> = {}): Occu
     description: null,
     location: null,
     categoryId: null,
+    color: null,
     ownerId: "m",
     scope: "shared",
     visibility: "shared",

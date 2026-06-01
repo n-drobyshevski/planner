@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { TaskCard } from "./task-card";
+import { TaskContextMenu } from "./task-context-menu";
 import type { Member, TaskRow, TaskStatus } from "@/lib/types";
 
 const SECTIONS: { status: TaskStatus; title: string }[] = [
@@ -17,6 +18,8 @@ export interface TaskListProps {
   progressOf?: (t: TaskRow) => { done: number; total: number } | null;
   onOpen: (t: TaskRow) => void;
   onToggleDone: (t: TaskRow) => void;
+  onChangeColor: (t: TaskRow, color: string | null) => void;
+  onDelete: (t: TaskRow) => void;
 }
 
 export function TaskList({
@@ -26,6 +29,8 @@ export function TaskList({
   progressOf,
   onOpen,
   onToggleDone,
+  onChangeColor,
+  onDelete,
 }: TaskListProps) {
   const groups = useMemo(
     () =>
@@ -53,15 +58,23 @@ export function TaskList({
           ) : (
             <div className="flex flex-col gap-2">
               {g.items.map((t) => (
-                <TaskCard
+                <TaskContextMenu
                   key={t.id}
                   task={t}
-                  color={colorOf(t)}
-                  assignee={t.assigneeId ? members.get(t.assigneeId) ?? null : null}
-                  progress={progressOf?.(t) ?? null}
                   onOpen={() => onOpen(t)}
                   onToggleDone={() => onToggleDone(t)}
-                />
+                  onDelete={() => onDelete(t)}
+                  onChangeColor={(c) => onChangeColor(t, c)}
+                >
+                  <TaskCard
+                    task={t}
+                    color={colorOf(t)}
+                    assignee={t.assigneeId ? members.get(t.assigneeId) ?? null : null}
+                    progress={progressOf?.(t) ?? null}
+                    onOpen={() => onOpen(t)}
+                    onToggleDone={() => onToggleDone(t)}
+                  />
+                </TaskContextMenu>
               ))}
             </div>
           )}

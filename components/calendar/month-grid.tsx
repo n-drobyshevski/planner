@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { forwardRef, useMemo } from "react";
 import { format, isSameMonth } from "date-fns";
+import { Pencil, Trash2 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import { packMonthWeek, occurrencesOnDay, type MonthItem } from "@/lib/layout/pack-month";
 import type { Occurrence } from "@/lib/types";
 
@@ -20,6 +22,8 @@ interface CommonProps {
   selectedKey: string | null;
   onSelect: (o: Occurrence) => void;
   onPickDay: (ms: number) => void;
+  onChangeColor: (o: Occurrence, color: string | null) => void;
+  onDeleteEvent: (o: Occurrence) => void;
 }
 
 export function MonthGrid({
@@ -62,6 +66,8 @@ function WeekRow({
   selectedKey,
   onSelect,
   onPickDay,
+  onChangeColor,
+  onDeleteEvent,
 }: CommonProps & { dayStarts: number[] }) {
   const layout = useMemo(
     () => packMonthWeek(occurrences, dayStarts, MAX_LANES),
@@ -107,13 +113,29 @@ function WeekRow({
             {layout.items
               .filter((it) => it.lane === lane)
               .map((it) => (
-                <MonthItemEl
+                <ItemContextMenu
                   key={it.occ.key}
-                  item={it}
-                  color={colorOf(it.occ)}
-                  selected={selectedKey === it.occ.key}
-                  onSelect={onSelect}
-                />
+                  mobileSheet={false}
+                  title={it.occ.title}
+                  color={it.occ.color}
+                  onColorChange={(c) => onChangeColor(it.occ, c)}
+                  actions={[
+                    { label: "Edit", icon: Pencil, onSelect: () => onSelect(it.occ) },
+                    {
+                      label: "Delete",
+                      icon: Trash2,
+                      destructive: true,
+                      onSelect: () => onDeleteEvent(it.occ),
+                    },
+                  ]}
+                >
+                  <MonthItemEl
+                    item={it}
+                    color={colorOf(it.occ)}
+                    selected={selectedKey === it.occ.key}
+                    onSelect={onSelect}
+                  />
+                </ItemContextMenu>
               ))}
           </div>
         ))}
@@ -137,17 +159,15 @@ function WeekRow({
   );
 }
 
-function MonthItemEl({
-  item,
-  color,
-  selected,
-  onSelect,
-}: {
-  item: MonthItem;
-  color: string;
-  selected: boolean;
-  onSelect: (o: Occurrence) => void;
-}) {
+const MonthItemEl = forwardRef<
+  HTMLButtonElement,
+  {
+    item: MonthItem;
+    color: string;
+    selected: boolean;
+    onSelect: (o: Occurrence) => void;
+  } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onSelect">
+>(function MonthItemEl({ item, color, selected, onSelect, ...rest }, ref) {
   const style: React.CSSProperties = {
     gridColumn: `${item.colStart + 1} / ${item.colEnd + 2}`,
   };
@@ -155,6 +175,7 @@ function MonthItemEl({
   if (item.isBar) {
     return (
       <button
+        ref={ref}
         type="button"
         style={{ ...style, backgroundColor: color }}
         onClick={() => onSelect(item.occ)}
@@ -162,6 +183,7 @@ function MonthItemEl({
           "pointer-events-auto mx-1 truncate rounded px-1.5 text-left text-xs leading-5 text-white",
           selected && "ring-2 ring-foreground",
         )}
+        {...rest}
       >
         {item.occ.title}
       </button>
@@ -170,6 +192,7 @@ function MonthItemEl({
 
   return (
     <button
+      ref={ref}
       type="button"
       style={style}
       onClick={() => onSelect(item.occ)}
@@ -177,6 +200,7 @@ function MonthItemEl({
         "pointer-events-auto mx-1 flex items-center gap-1 truncate rounded px-1 text-left text-xs leading-5 hover:bg-accent",
         selected && "ring-2 ring-foreground",
       )}
+      {...rest}
     >
       <span
         className="size-1.5 shrink-0 rounded-full"
@@ -185,7 +209,7 @@ function MonthItemEl({
       <span className="truncate text-foreground">{item.occ.title}</span>
     </button>
   );
-}
+});
 
 function MoreButton({
   day,

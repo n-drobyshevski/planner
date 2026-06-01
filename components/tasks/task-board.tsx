@@ -23,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TaskContextMenu } from "./task-context-menu";
 import {
   Empty,
   EmptyDescription,
@@ -66,6 +67,8 @@ export interface TaskBoardProps {
   onToggleDone: (t: TaskRow) => void;
   onMove: (t: TaskRow, status: TaskStatus, position: number) => void;
   onNew: (status: TaskStatus) => void;
+  onChangeColor: (t: TaskRow, color: string | null) => void;
+  onDelete: (t: TaskRow) => void;
 }
 
 export function TaskBoard({
@@ -77,6 +80,8 @@ export function TaskBoard({
   onToggleDone,
   onMove,
   onNew,
+  onChangeColor,
+  onDelete,
 }: TaskBoardProps) {
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const source = useMemo(() => buildColumns(tasks), [tasks]);
@@ -199,6 +204,8 @@ export function TaskBoard({
                 progress={progressOf?.(task) ?? null}
                 onOpen={() => onOpen(task)}
                 onToggleDone={() => onToggleDone(task)}
+                onChangeColor={(c) => onChangeColor(task, c)}
+                onDelete={() => onDelete(task)}
               />
             );
           })
@@ -313,23 +320,33 @@ function SortableCard(props: {
   progress: { done: number; total: number } | null;
   onOpen: () => void;
   onToggleDone: () => void;
+  onChangeColor: (color: string | null) => void;
+  onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: props.task.id });
   return (
-    <TaskCard
-      ref={setNodeRef}
+    <TaskContextMenu
       task={props.task}
-      color={props.color}
-      assignee={props.assignee}
-      progress={props.progress}
       onOpen={props.onOpen}
       onToggleDone={props.onToggleDone}
-      dragging={isDragging}
-      showHandle
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      dragProps={{ ...attributes, ...listeners }}
-    />
+      onDelete={props.onDelete}
+      onChangeColor={props.onChangeColor}
+    >
+      <TaskCard
+        ref={setNodeRef}
+        task={props.task}
+        color={props.color}
+        assignee={props.assignee}
+        progress={props.progress}
+        onOpen={props.onOpen}
+        onToggleDone={props.onToggleDone}
+        dragging={isDragging}
+        showHandle
+        style={{ transform: CSS.Transform.toString(transform), transition }}
+        dragProps={{ ...attributes, ...listeners }}
+      />
+    </TaskContextMenu>
   );
 }
 

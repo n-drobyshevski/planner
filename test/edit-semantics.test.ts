@@ -24,6 +24,7 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     location: "Room A",
     scope: "shared",
     visibility: "shared",
+    color: null,
     allDay: false,
     start: baseStart,
     end: baseEnd,

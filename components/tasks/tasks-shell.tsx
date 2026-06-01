@@ -14,6 +14,16 @@ import { TaskBoard } from "./task-board";
 import { TaskList } from "./task-list";
 import { TaskDialog } from "./task-dialog";
 import { ScheduleTaskDialog } from "./schedule-task-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { TaskRow, TaskStatus } from "@/lib/types";
 
 type EditorState =
@@ -31,6 +41,7 @@ export function TasksShell({
   const [view, setView] = useState<TasksView>(initialView);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [scheduling, setScheduling] = useState<TaskRow | null>(null);
+  const [deleting, setDeleting] = useState<TaskRow | null>(null);
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
   const autoApplied = useRef(false);
@@ -115,6 +126,8 @@ export function TasksShell({
             onToggleDone={(t) => void mutations.toggleDone(t)}
             onMove={(t, status, position) => void mutations.move(t, status, position)}
             onNew={(status) => setEditor({ mode: "create", status })}
+            onChangeColor={(t, color) => void mutations.update(t.id, { color })}
+            onDelete={(t) => setDeleting(t)}
           />
         ) : (
           <TaskList
@@ -124,6 +137,8 @@ export function TasksShell({
             progressOf={progressFor}
             onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
             onToggleDone={(t) => void mutations.toggleDone(t)}
+            onChangeColor={(t, color) => void mutations.update(t.id, { color })}
+            onDelete={(t) => setDeleting(t)}
           />
         )}
       </main>
@@ -165,6 +180,30 @@ export function TasksShell({
           defaultStartMs={scheduling.dueAt ?? undefined}
         />
       )}
+
+      <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the task, its subtasks, and any blocks it placed on the
+              calendar. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleting) void mutations.remove(deleting.id);
+                setDeleting(null);
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

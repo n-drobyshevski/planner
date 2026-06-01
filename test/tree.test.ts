@@ -18,6 +18,7 @@ function mk(p: Partial<TaskRow> & { id: string }): TaskRow {
     description: null,
     scope: "shared",
     visibility: "shared",
+    color: null,
     status: "todo" as TaskStatus,
     priority: null,
     dueAt: null,
