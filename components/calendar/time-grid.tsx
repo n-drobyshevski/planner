@@ -36,6 +36,8 @@ interface Props {
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
+  onAssignContext?: (occ: Occurrence, contextId: string) => void;
+  onRemoveContext?: (occ: Occurrence) => void;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
   /** Drop a backlog task onto a slot to schedule a default 1h block. */
@@ -86,6 +88,8 @@ export function TimeGrid({
   onReschedule,
   onChangeColor,
   onDeleteEvent,
+  onAssignContext,
+  onRemoveContext,
   taskDoneById,
   onToggleTaskDone,
   onScheduleTask,
@@ -103,7 +107,9 @@ export function TimeGrid({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [armed, setArmed] = useState(false);
 
-  const allDay = occurrences.filter((o) => o.allDay);
+  // Contexts are timed backdrops in the grid body; never show them all-day
+  // (all-day contexts are deferred — they'd otherwise render as a flat chip).
+  const allDay = occurrences.filter((o) => o.allDay && o.kind !== "context");
   const byKey = useMemo(
     () => new Map(occurrences.map((o) => [o.key, o])),
     [occurrences],
@@ -503,6 +509,8 @@ export function TimeGrid({
                 onSelect={onSelect}
                 onChangeColor={onChangeColor}
                 onDeleteEvent={onDeleteEvent}
+                onAssignContext={onAssignContext}
+                onRemoveContext={onRemoveContext}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
               />

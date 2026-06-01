@@ -25,6 +25,8 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     scope: "shared",
     visibility: "shared",
     color: null,
+    kind: "event",
+    contextId: null,
     allDay: false,
     start: baseStart,
     end: baseEnd,

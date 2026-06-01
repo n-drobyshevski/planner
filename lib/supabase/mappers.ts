@@ -58,6 +58,8 @@ export function mapEvent(r: Row): EventRow {
     scope: r.scope as EventRow["scope"],
     visibility: r.visibility as EventRow["visibility"],
     color: (r.color as string | null) ?? null,
+    kind: (r.kind as EventRow["kind"] | null) ?? "event",
+    contextId: (r.context_id as string | null) ?? null,
     allDay: Boolean(r.all_day),
     start: toMs(r.starts_at),
     end: toMs(r.ends_at),
@@ -122,6 +124,8 @@ export interface EventInput {
   scope: EventRow["scope"];
   visibility: EventRow["visibility"];
   color?: string | null;
+  kind?: EventRow["kind"];
+  contextId?: string | null;
   allDay?: boolean;
   start: number;
   end: number;
@@ -142,6 +146,8 @@ export function eventInputToRow(input: EventInput): Row {
     scope: input.scope,
     visibility: input.visibility,
     color: input.color ?? null,
+    kind: input.kind ?? "event",
+    context_id: input.contextId ?? null,
     all_day: input.allDay ?? false,
     starts_at: toIso(input.start),
     ends_at: toIso(input.end),
@@ -162,6 +168,8 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("scope" in patch) row.scope = patch.scope;
   if ("visibility" in patch) row.visibility = patch.visibility;
   if ("color" in patch) row.color = patch.color ?? null;
+  if ("kind" in patch) row.kind = patch.kind;
+  if ("contextId" in patch) row.context_id = patch.contextId ?? null;
   if ("allDay" in patch) row.all_day = patch.allDay;
   if ("start" in patch && patch.start != null) row.starts_at = toIso(patch.start);
   if ("end" in patch && patch.end != null) row.ends_at = toIso(patch.end);

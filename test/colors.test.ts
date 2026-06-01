@@ -37,6 +37,8 @@ function occ(over: Partial<Occurrence>): Occurrence {
     location: null,
     categoryId: null,
     color: null,
+    kind: "event",
+    contextId: null,
     ownerId: "m1",
     scope: "personal",
     visibility: "shared",

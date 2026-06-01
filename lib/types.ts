@@ -5,6 +5,8 @@ export type Scope = "shared" | "personal";
 export type Visibility = "private" | "shared";
 export type OverrideType = "cancel" | "modify";
 export type TaskStatus = "todo" | "in_progress" | "done";
+/** A normal calendar event vs. a "context" time-block container. */
+export type EventKind = "event" | "context";
 
 /** Appearance preferences, stored per member. Mirror the DB CHECK constraints. */
 export type ThemePreference = "light" | "dark" | "system";
@@ -52,6 +54,10 @@ export interface EventRow {
   visibility: Visibility;
   /** per-item color override (hex); null = derive from category/member/scope */
   color: string | null;
+  /** 'event' (normal) or 'context' (a time-block container) */
+  kind: EventKind;
+  /** parent context this event is grouped under (master id); null = none */
+  contextId: string | null;
   allDay: boolean;
   /** master / first-occurrence start, epoch ms */
   start: number;
@@ -128,6 +134,10 @@ export interface Occurrence {
   categoryId: string | null;
   /** per-item color override (hex), carried from the master event; null = derived */
   color: string | null;
+  /** 'event' (normal) or 'context' (a time-block container) */
+  kind: EventKind;
+  /** parent context this occurrence is grouped under (master id); null = none */
+  contextId: string | null;
   ownerId: string;
   scope: Scope;
   visibility: Visibility;

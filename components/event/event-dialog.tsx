@@ -37,10 +37,18 @@ import {
   ceilToStep,
   DAY_IN_MS,
 } from "@/lib/datetime/local";
-import type { Category, EventRow, Occurrence, Scope, Visibility } from "@/lib/types";
+import type {
+  Category,
+  EventKind,
+  EventRow,
+  Occurrence,
+  Scope,
+  Visibility,
+} from "@/lib/types";
 import type { EventInput } from "@/lib/supabase/mappers";
 
 interface FormState {
+  itemKind: EventKind;
   title: string;
   description: string;
   location: string;
@@ -50,6 +58,7 @@ interface FormState {
   endDate: string;
   endTime: string;
   categoryId: string; // "none" | id
+  contextId: string; // "none" | context master id
   scope: Scope;
   visibility: Visibility;
   recurrence: RecurrenceForm | null;
@@ -62,15 +71,28 @@ export interface EventDialogProps {
   workspaceId: string;
   currentMemberId: string;
   categories: Category[];
+  /** Context master events the user may file an event under. */
+  contexts?: { id: string; title: string }[];
   event?: EventRow | null;
   occurrence?: Occurrence | null;
   defaultStart?: number;
   defaultEnd?: number;
+  /** Pre-selected context when creating an event inside a context backdrop. */
+  defaultContextId?: string | null;
 }
 
 export function EventDialog(props: EventDialogProps) {
-  const { open, onOpenChange, mode, workspaceId, currentMemberId, categories, event, occurrence } =
-    props;
+  const {
+    open,
+    onOpenChange,
+    mode,
+    workspaceId,
+    currentMemberId,
+    categories,
+    contexts = [],
+    event,
+    occurrence,
+  } = props;
   const mutations = useEventMutations(workspaceId);
 
   const [form, setForm] = useState<FormState>(() => buildInitial(props));
@@ -91,6 +113,7 @@ export function EventDialog(props: EventDialogProps) {
     setForm((f) => ({ ...f, [k]: v }));
 
   const isRecurringEdit = mode === "edit" && Boolean(event?.rrule);
+  const isContext = form.itemKind === "context";
 
   const usableCategories = categories.filter(
     (c) => c.ownerId === null || c.ownerId === currentMemberId,
@@ -134,13 +157,17 @@ export function EventDialog(props: EventDialogProps) {
       const input: EventInput = {
         workspaceId,
         ownerId: currentMemberId,
-        categoryId: form.categoryId === "none" ? null : form.categoryId,
+        kind: form.itemKind,
+        // Contexts never nest; a normal event files under the selected context.
+        contextId:
+          isContext || form.contextId === "none" ? null : form.contextId,
+        categoryId: isContext || form.categoryId === "none" ? null : form.categoryId,
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
         scope: form.scope,
         visibility: form.scope === "shared" ? "shared" : form.visibility,
-        allDay: form.allDay,
+        allDay: isContext ? false : form.allDay,
         start,
         end,
         timeZone: localTimeZone(),
@@ -161,13 +188,17 @@ export function EventDialog(props: EventDialogProps) {
     setPending(true);
     finish(
       await mutations.updateSingle(event.id, {
-        categoryId: form.categoryId === "none" ? null : form.categoryId,
+        categoryId: isContext || form.categoryId === "none" ? null : form.categoryId,
+        // Only normal events carry a context link; leave a context's own untouched.
+        ...(isContext
+          ? {}
+          : { contextId: form.contextId === "none" ? null : form.contextId }),
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
         scope: form.scope,
         visibility: form.scope === "shared" ? "shared" : form.visibility,
-        allDay: form.allDay,
+        allDay: isContext ? false : form.allDay,
         start,
         end,
         rrule: buildRRule(form.recurrence),
@@ -248,31 +279,57 @@ export function EventDialog(props: EventDialogProps) {
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>
-              {mode === "create" ? "New event" : "Edit event"}
+              {mode === "create"
+                ? isContext
+                  ? "New context"
+                  : "New event"
+                : isContext
+                  ? "Edit context"
+                  : "Edit event"}
             </ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
 
           <ResponsiveDialogBody>
           <FieldGroup>
+            {mode === "create" && (
+              <Field>
+                <FieldLabel>Type</FieldLabel>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={form.itemKind}
+                  onValueChange={(v) => v && set("itemKind", v as EventKind)}
+                  className="justify-start"
+                >
+                  <ToggleGroupItem value="event">Event</ToggleGroupItem>
+                  <ToggleGroupItem value="context">Context</ToggleGroupItem>
+                </ToggleGroup>
+              </Field>
+            )}
+
             <Field>
-              <FieldLabel htmlFor="ev-title">Title</FieldLabel>
+              <FieldLabel htmlFor="ev-title">
+                {isContext ? "Name" : "Title"}
+              </FieldLabel>
               <Input
                 id="ev-title"
                 value={form.title}
                 onChange={(e) => set("title", e.target.value)}
-                placeholder="Add a title"
+                placeholder={isContext ? "Name this context (e.g. Work)" : "Add a title"}
                 autoFocus
               />
             </Field>
 
-            <Field orientation="horizontal">
-              <Switch
-                id="ev-allday"
-                checked={form.allDay}
-                onCheckedChange={(v) => set("allDay", v)}
-              />
-              <FieldLabel htmlFor="ev-allday">All day</FieldLabel>
-            </Field>
+            {!isContext && (
+              <Field orientation="horizontal">
+                <Switch
+                  id="ev-allday"
+                  checked={form.allDay}
+                  onCheckedChange={(v) => set("allDay", v)}
+                />
+                <FieldLabel htmlFor="ev-allday">All day</FieldLabel>
+              </Field>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <Field>
@@ -316,24 +373,47 @@ export function EventDialog(props: EventDialogProps) {
               )}
             </div>
 
-            <Field>
-              <FieldLabel>Category</FieldLabel>
-              <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="No category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="none">No category</SelectItem>
-                    {usableCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
+            {!isContext && (
+              <Field>
+                <FieldLabel>Category</FieldLabel>
+                <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="none">No category</SelectItem>
+                      {usableCategories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+
+            {!isContext && contexts.length > 0 && (
+              <Field>
+                <FieldLabel>Context</FieldLabel>
+                <Select value={form.contextId} onValueChange={(v) => set("contextId", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No context" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="none">No context</SelectItem>
+                      {contexts.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.title || "Untitled"}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
 
             <Field>
               <FieldLabel>Calendar</FieldLabel>
@@ -426,9 +506,10 @@ function recurrenceEndsAt(form: RecurrenceForm | null): number | null {
 }
 
 function buildInitial(props: EventDialogProps): FormState {
-  const { mode, event, occurrence, defaultStart, defaultEnd } = props;
+  const { mode, event, occurrence, defaultStart, defaultEnd, defaultContextId } = props;
   if (mode === "edit" && event && occurrence) {
     return {
+      itemKind: event.kind,
       title: occurrence.title,
       description: occurrence.description ?? "",
       location: occurrence.location ?? "",
@@ -438,6 +519,7 @@ function buildInitial(props: EventDialogProps): FormState {
       endDate: msToDateInput(occurrence.allDay ? occurrence.end - 1 : occurrence.end),
       endTime: msToTimeInput(occurrence.end),
       categoryId: occurrence.categoryId ?? "none",
+      contextId: event.contextId ?? "none",
       scope: event.scope,
       visibility: event.visibility,
       recurrence: parseRRule(event.rrule),
@@ -446,6 +528,7 @@ function buildInitial(props: EventDialogProps): FormState {
   const start = defaultStart ?? ceilToStep(Date.now(), 30);
   const end = defaultEnd ?? start + 3_600_000;
   return {
+    itemKind: "event",
     title: "",
     description: "",
     location: "",
@@ -455,6 +538,7 @@ function buildInitial(props: EventDialogProps): FormState {
     endDate: msToDateInput(end),
     endTime: msToTimeInput(end),
     categoryId: "none",
+    contextId: defaultContextId ?? "none",
     scope: "shared",
     visibility: "shared",
     recurrence: null,

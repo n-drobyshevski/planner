@@ -20,6 +20,8 @@ export interface CanvasProps {
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
+  onAssignContext?: (occ: Occurrence, contextId: string) => void;
+  onRemoveContext?: (occ: Occurrence) => void;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
   onScheduleTask?: (taskId: string, startMs: number, endMs: number) => void;
@@ -41,12 +43,21 @@ export function CalendarCanvas(props: CanvasProps) {
     onReschedule,
     onChangeColor,
     onDeleteEvent,
+    onAssignContext,
+    onRemoveContext,
     taskDoneById,
     onToggleTaskDone,
     onScheduleTask,
     error,
   } = props;
   const today = useMemo(() => startOfDay(new Date()).getTime(), []);
+
+  // The month grid's tiny cells can't show a time-block backdrop usefully, so
+  // contexts are filtered out there. Agenda keeps them (as badged rows).
+  const monthOccurrences = useMemo(
+    () => occurrences.filter((o) => o.kind !== "context"),
+    [occurrences],
+  );
 
   if (error) {
     return (
@@ -76,7 +87,7 @@ export function CalendarCanvas(props: CanvasProps) {
     return (
       <MonthGrid
         days={days}
-        occurrences={occurrences}
+        occurrences={monthOccurrences}
         today={today}
         focusedMs={focusedMs}
         colorOf={colorOf}
@@ -101,6 +112,8 @@ export function CalendarCanvas(props: CanvasProps) {
       onReschedule={onReschedule}
       onChangeColor={onChangeColor}
       onDeleteEvent={onDeleteEvent}
+      onAssignContext={onAssignContext}
+      onRemoveContext={onRemoveContext}
       taskDoneById={taskDoneById}
       onToggleTaskDone={onToggleTaskDone}
       onScheduleTask={onScheduleTask}

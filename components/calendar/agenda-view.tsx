@@ -173,7 +173,14 @@ const AgendaRow = forwardRef<
         aria-hidden
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{occ.title}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="truncate font-medium">{occ.title}</span>
+          {occ.kind === "context" && (
+            <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Context
+            </span>
+          )}
+        </span>
         {occ.location && (
           <span className="block truncate text-xs text-muted-foreground">
             {occ.location}

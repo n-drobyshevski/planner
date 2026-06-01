@@ -16,6 +16,22 @@ describe("packDay", () => {
     expect(packDay([])).toEqual([]);
   });
 
+  it("context backdrops must be pre-filtered (never packed with children)", () => {
+    // A context spans the whole day; if it reached packDay it would collide
+    // with every child and force a 2-column layout. day-column filters it out
+    // (kind !== "context"), so the children pack exactly as if it weren't there.
+    const children = [iv(9, 0, 10, 0)];
+    const withContextFilteredOut = packDay(children);
+    expect(withContextFilteredOut[0]).toMatchObject({
+      colCount: 1,
+      leftPct: 0,
+      widthPct: 100,
+    });
+    // Regression guard: had the 9–17 context been included, colCount would be 2.
+    const ifContextLeaked = packDay([iv(9, 0, 17, 0), ...children]);
+    expect(ifContextLeaked[1].colCount).toBe(2);
+  });
+
   it("single -> left0 width100", () => {
     const res = packDay([iv(9, 0, 10, 0)]);
     expect(res).toHaveLength(1);

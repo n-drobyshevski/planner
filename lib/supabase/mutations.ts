@@ -81,6 +81,25 @@ export async function deleteEvent(sb: SupabaseClient, id: string): Promise<void>
   if (error) throw error;
 }
 
+/** Group an event under a context (or move it to a different one). */
+export function assignToContext(
+  sb: SupabaseClient,
+  eventId: string,
+  contextId: string,
+  expectedUpdatedAt?: number,
+): Promise<EventRow> {
+  return updateEvent(sb, eventId, { contextId }, expectedUpdatedAt);
+}
+
+/** Detach an event from its context (the event stays on the calendar). */
+export function removeFromContext(
+  sb: SupabaseClient,
+  eventId: string,
+  expectedUpdatedAt?: number,
+): Promise<EventRow> {
+  return updateEvent(sb, eventId, { contextId: null }, expectedUpdatedAt);
+}
+
 // --- Recurring edits -------------------------------------------------------
 
 /** Apply a cancel/modify override for a single occurrence (this-occurrence edit). */
