@@ -1,8 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 
 async function signIn(page: Page, name: "Alex" | "Sam") {
-  await page.goto("/select-profile");
-  await page.getByRole("button", { name: `Continue as ${name}` }).click();
+  await page.goto("/login");
+  await page.getByLabel("Name").fill(name);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/calendar**");
   await expect(page.getByText("Coffee together").first()).toBeVisible({ timeout: 25_000 });
 }

@@ -4,8 +4,7 @@ import { getSupabaseConfig, isSupabaseConfigured } from "./env";
 
 /**
  * Refresh the Supabase session cookie on each request and gate routes:
- * unauthenticated -> /select-profile; authenticated on "/" or /select-profile
- * -> /calendar.
+ * unauthenticated -> /login; authenticated on "/" or /login -> /calendar.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -52,11 +51,11 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const onAuthRoute = path === "/select-profile";
+  const onAuthRoute = path === "/login";
 
   if (!user && !onAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/select-profile";
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
   if (user && (onAuthRoute || path === "/")) {
