@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
@@ -38,6 +38,8 @@ interface Props {
   onDeleteEvent: (occ: Occurrence) => void;
   onAssignContext?: (occ: Occurrence, contextId: string) => void;
   onRemoveContext?: (occ: Occurrence) => void;
+  /** Owner-only editability; non-editable blocks are select-only (read-only overlay). */
+  canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
   /** Drop a backlog task onto a slot to schedule a default 1h block. */
@@ -63,6 +65,8 @@ interface Drag {
   startMin?: number;
   curDayIndex?: number;
   curStartMin?: number;
+  /** another member's block: select-only, never moves/resizes */
+  readonly?: boolean;
   // resize
   edge?: "start" | "end";
   endMin?: number;
@@ -90,6 +94,7 @@ export function TimeGrid({
   onDeleteEvent,
   onAssignContext,
   onRemoveContext,
+  canEdit,
   taskDoneById,
   onToggleTaskDone,
   onScheduleTask,
@@ -145,6 +150,7 @@ export function TimeGrid({
     if (!occKey) return; // long-press on empty space is a no-op on touch
     const occ = byKey.get(occKey);
     if (!occ) return;
+    if (!canEdit(occ)) return; // another member's block: read-only, no move
     const dayIndex = dayIndexOfMs(occ.start);
     const g = geom(clientX, clientY);
     const sMin = minutesIn(occ.start, dayIndex);
@@ -201,6 +207,25 @@ export function TimeGrid({
 
     const g = geom(e.clientX, e.clientY);
     colsRef.current?.setPointerCapture(e.pointerId);
+
+    // Another member's block (read-only overlay): a plain click selects it; no
+    // move or resize is ever started.
+    const blockOcc = blockEl ? byKey.get(blockEl.dataset.occKey!) : undefined;
+    if (blockEl && blockOcc && !canEdit(blockOcc)) {
+      const dayIndex = dayIndexOfMs(blockOcc.start);
+      dragRef.current = {
+        kind: "move",
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+        dayIndex,
+        occKey: blockOcc.key,
+        durationMin: (blockOcc.end - blockOcc.start) / 60_000,
+        readonly: true,
+      };
+      return;
+    }
 
     if (handle && blockEl) {
       const occ = byKey.get(blockEl.dataset.occKey!);
@@ -267,6 +292,7 @@ export function TimeGrid({
     }
     const d = dragRef.current;
     if (!d || e.pointerId !== d.pointerId) return;
+    if (d.readonly) return; // read-only block: never preview a move
     if (!d.moved && (Math.abs(e.clientX - d.startX) > 4 || Math.abs(e.clientY - d.startY) > 4)) {
       d.moved = true;
     }
@@ -346,7 +372,7 @@ export function TimeGrid({
     } else if (d.kind === "move") {
       const occ = byKey.get(d.occKey!);
       if (!occ) return;
-      if (!d.moved || d.durationMin! > 1440) {
+      if (!d.moved || d.readonly || d.durationMin! > 1440) {
         onSelect(occ);
         return;
       }
@@ -435,17 +461,21 @@ export function TimeGrid({
                     key={o.key}
                     mobileSheet={false}
                     title={o.title}
-                    color={o.color}
-                    onColorChange={(c) => onChangeColor(o, c)}
-                    actions={[
-                      { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
-                      {
-                        label: "Delete",
-                        icon: Trash2,
-                        destructive: true,
-                        onSelect: () => onDeleteEvent(o),
-                      },
-                    ]}
+                    color={canEdit(o) ? o.color : undefined}
+                    onColorChange={canEdit(o) ? (c) => onChangeColor(o, c) : undefined}
+                    actions={
+                      canEdit(o)
+                        ? [
+                            { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                            {
+                              label: "Delete",
+                              icon: Trash2,
+                              destructive: true,
+                              onSelect: () => onDeleteEvent(o),
+                            },
+                          ]
+                        : [{ label: "Open", icon: Eye, onSelect: () => onSelect(o) }]
+                    }
                   >
                     <button
                       type="button"
@@ -512,6 +542,7 @@ export function TimeGrid({
                 onDeleteEvent={onDeleteEvent}
                 onAssignContext={onAssignContext}
                 onRemoveContext={onRemoveContext}
+                canEdit={canEdit}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
               />

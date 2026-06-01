@@ -155,8 +155,7 @@ export function splitThisAndFuture(
     description:
       patch.description !== undefined ? patch.description : event.description,
     location: patch.location !== undefined ? patch.location : event.location,
-    scope: event.scope,
-    visibility: event.visibility,
+    isPrivate: event.isPrivate,
     color: event.color,
     kind: event.kind,
     contextId: event.contextId,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { FolderPlus, FolderMinus, Pencil, Trash2 } from "lucide-react";
+import { FolderPlus, FolderMinus, Pencil, Trash2, Eye } from "lucide-react";
 import { packDay } from "@/lib/layout/pack-day";
 import { enclosingContext } from "@/lib/calendar/contexts";
 import { msToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
@@ -30,6 +30,7 @@ export function DayColumn({
   onDeleteEvent,
   onAssignContext,
   onRemoveContext,
+  canEdit,
   taskDoneById,
   onToggleTaskDone,
 }: {
@@ -45,6 +46,8 @@ export function DayColumn({
   onDeleteEvent: (o: Occurrence) => void;
   onAssignContext?: (o: Occurrence, contextId: string) => void;
   onRemoveContext?: (o: Occurrence) => void;
+  /** Owner-only editability; non-editable occurrences are read-only overlays. */
+  canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
 }) {
@@ -126,36 +129,44 @@ export function DayColumn({
       ))}
 
       {/* Context backdrops (z-0), behind the event blocks. */}
-      {contextSegs.map((seg) => (
-        <ItemContextMenu
-          key={seg.occ.key}
-          title={seg.occ.title}
-          color={seg.occ.color}
-          onColorChange={(c) => onChangeColor(seg.occ, c)}
-          actions={[
-            { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
-            {
-              label: "Delete",
-              icon: Trash2,
-              destructive: true,
-              onSelect: () => onDeleteEvent(seg.occ),
-            },
-          ]}
-        >
-          <ContextBackdrop
-            occ={seg.occ}
-            color={colorOf(seg.occ)}
-            selected={selectedKey === seg.occ.key}
-            singleColumn={singleColumn}
-            style={{
-              top: msToY(seg.start, dayStart),
-              height: durationToHeight(seg.start, seg.end),
-              left: 1,
-              right: 1,
-            }}
-          />
-        </ItemContextMenu>
-      ))}
+      {contextSegs.map((seg) => {
+        const editable = canEdit(seg.occ);
+        return (
+          <ItemContextMenu
+            key={seg.occ.key}
+            title={seg.occ.title}
+            color={editable ? seg.occ.color : undefined}
+            onColorChange={editable ? (c) => onChangeColor(seg.occ, c) : undefined}
+            actions={
+              editable
+                ? [
+                    { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
+                    {
+                      label: "Delete",
+                      icon: Trash2,
+                      destructive: true,
+                      onSelect: () => onDeleteEvent(seg.occ),
+                    },
+                  ]
+                : [{ label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) }]
+            }
+          >
+            <ContextBackdrop
+              occ={seg.occ}
+              color={colorOf(seg.occ)}
+              selected={selectedKey === seg.occ.key}
+              singleColumn={singleColumn}
+              editable={editable}
+              style={{
+                top: msToY(seg.start, dayStart),
+                height: durationToHeight(seg.start, seg.end),
+                left: 1,
+                right: 1,
+              }}
+            />
+          </ItemContextMenu>
+        );
+      })}
 
       {segments.map((seg, i) => {
         const p = packed[i];
@@ -169,27 +180,33 @@ export function DayColumn({
         const width = nested
           ? `calc(${p.widthPct}% - ${NEST_L + NEST_R}px)`
           : `calc(${p.widthPct}% - 3px)`;
+        const editable = canEdit(seg.occ);
         return (
           <ItemContextMenu
             key={seg.occ.key}
             title={seg.occ.title}
-            color={seg.occ.color}
-            onColorChange={(c) => onChangeColor(seg.occ, c)}
-            actions={[
-              { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
-              ...contextActions(seg.occ),
-              {
-                label: "Delete",
-                icon: Trash2,
-                destructive: true,
-                onSelect: () => onDeleteEvent(seg.occ),
-              },
-            ]}
+            color={editable ? seg.occ.color : undefined}
+            onColorChange={editable ? (c) => onChangeColor(seg.occ, c) : undefined}
+            actions={
+              editable
+                ? [
+                    { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
+                    ...contextActions(seg.occ),
+                    {
+                      label: "Delete",
+                      icon: Trash2,
+                      destructive: true,
+                      onSelect: () => onDeleteEvent(seg.occ),
+                    },
+                  ]
+                : [{ label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) }]
+            }
           >
             <EventBlock
               occ={seg.occ}
               color={colorOf(seg.occ)}
               selected={selectedKey === seg.occ.key}
+              editable={editable}
               taskDone={taskId ? taskDoneById?.get(taskId) ?? false : undefined}
               onToggleTaskDone={
                 taskId && onToggleTaskDone

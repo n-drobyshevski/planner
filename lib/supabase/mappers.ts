@@ -55,8 +55,7 @@ export function mapEvent(r: Row): EventRow {
     title: r.title as string,
     description: (r.description as string | null) ?? null,
     location: (r.location as string | null) ?? null,
-    scope: r.scope as EventRow["scope"],
-    visibility: r.visibility as EventRow["visibility"],
+    isPrivate: Boolean(r.is_private),
     color: (r.color as string | null) ?? null,
     kind: (r.kind as EventRow["kind"] | null) ?? "event",
     contextId: (r.context_id as string | null) ?? null,
@@ -82,8 +81,7 @@ export function mapTask(r: Row): TaskRow {
     categoryId: (r.category_id as string | null) ?? null,
     title: r.title as string,
     description: (r.description as string | null) ?? null,
-    scope: r.scope as TaskRow["scope"],
-    visibility: r.visibility as TaskRow["visibility"],
+    isPrivate: Boolean(r.is_private),
     color: (r.color as string | null) ?? null,
     status: r.status as TaskRow["status"],
     priority: (r.priority as number | null) ?? null,
@@ -121,8 +119,7 @@ export interface EventInput {
   title: string;
   description?: string | null;
   location?: string | null;
-  scope: EventRow["scope"];
-  visibility: EventRow["visibility"];
+  isPrivate?: boolean;
   color?: string | null;
   kind?: EventRow["kind"];
   contextId?: string | null;
@@ -143,8 +140,7 @@ export function eventInputToRow(input: EventInput): Row {
     title: input.title,
     description: input.description ?? null,
     location: input.location ?? null,
-    scope: input.scope,
-    visibility: input.visibility,
+    is_private: input.isPrivate ?? false,
     color: input.color ?? null,
     kind: input.kind ?? "event",
     context_id: input.contextId ?? null,
@@ -165,8 +161,7 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("title" in patch) row.title = patch.title;
   if ("description" in patch) row.description = patch.description ?? null;
   if ("location" in patch) row.location = patch.location ?? null;
-  if ("scope" in patch) row.scope = patch.scope;
-  if ("visibility" in patch) row.visibility = patch.visibility;
+  if ("isPrivate" in patch) row.is_private = patch.isPrivate ?? false;
   if ("color" in patch) row.color = patch.color ?? null;
   if ("kind" in patch) row.kind = patch.kind;
   if ("contextId" in patch) row.context_id = patch.contextId ?? null;
@@ -192,8 +187,7 @@ export interface TaskInput {
   categoryId?: string | null;
   title: string;
   description?: string | null;
-  scope: TaskRow["scope"];
-  visibility: TaskRow["visibility"];
+  isPrivate?: boolean;
   color?: string | null;
   status?: TaskRow["status"];
   priority?: number | null;
@@ -212,8 +206,7 @@ export function taskInputToRow(input: TaskInput): Row {
     category_id: input.categoryId ?? null,
     title: input.title,
     description: input.description ?? null,
-    scope: input.scope,
-    visibility: input.visibility,
+    is_private: input.isPrivate ?? false,
     color: input.color ?? null,
     status: input.status ?? "todo",
     priority: input.priority ?? null,
@@ -232,8 +225,7 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("categoryId" in patch) row.category_id = patch.categoryId ?? null;
   if ("title" in patch) row.title = patch.title;
   if ("description" in patch) row.description = patch.description ?? null;
-  if ("scope" in patch) row.scope = patch.scope;
-  if ("visibility" in patch) row.visibility = patch.visibility;
+  if ("isPrivate" in patch) row.is_private = patch.isPrivate ?? false;
   if ("color" in patch) row.color = patch.color ?? null;
   if ("status" in patch) row.status = patch.status;
   if ("priority" in patch) row.priority = patch.priority ?? null;

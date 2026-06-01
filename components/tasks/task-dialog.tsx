@@ -37,14 +37,7 @@ import { Trash2, Loader2, CalendarPlus } from "lucide-react";
 import { SubtaskEditor } from "./subtask-editor";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { msToDateInput, dateInputToMs } from "@/lib/datetime/local";
-import type {
-  Category,
-  Member,
-  Scope,
-  TaskRow,
-  TaskStatus,
-  Visibility,
-} from "@/lib/types";
+import type { Category, Member, TaskRow, TaskStatus } from "@/lib/types";
 import type { TaskInput } from "@/lib/supabase/mappers";
 
 interface FormState {
@@ -52,8 +45,7 @@ interface FormState {
   description: string;
   assigneeId: string; // "none" | memberId
   categoryId: string; // "none" | id
-  scope: Scope;
-  visibility: Visibility;
+  isPrivate: boolean;
   priority: string; // "none" | "1" | "2" | "3"
   dueDate: string; // "" | yyyy-MM-dd
   status: TaskStatus;
@@ -107,8 +99,7 @@ export function TaskDialog(props: TaskDialogProps) {
       categoryId: form.categoryId === "none" ? null : form.categoryId,
       title: form.title.trim(),
       description: form.description.trim() || null,
-      scope: form.scope,
-      visibility: form.scope === "shared" ? ("shared" as const) : form.visibility,
+      isPrivate: form.isPrivate,
       priority: form.priority === "none" ? null : Number(form.priority),
       dueAt: form.dueDate ? dateInputToMs(form.dueDate) : null,
       status: form.status,
@@ -274,30 +265,14 @@ export function TaskDialog(props: TaskDialogProps) {
               </Field>
             )}
 
-            <Field>
-              <FieldLabel>Calendar</FieldLabel>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={form.scope}
-                onValueChange={(v) => v && set("scope", v as Scope)}
-                className="justify-start"
-              >
-                <ToggleGroupItem value="shared">Shared</ToggleGroupItem>
-                <ToggleGroupItem value="personal">Personal</ToggleGroupItem>
-              </ToggleGroup>
+            <Field orientation="horizontal">
+              <Switch
+                id="task-private"
+                checked={form.isPrivate}
+                onCheckedChange={(v) => set("isPrivate", v)}
+              />
+              <FieldLabel htmlFor="task-private">Private (only you can see this)</FieldLabel>
             </Field>
-
-            {form.scope === "personal" && (
-              <Field orientation="horizontal">
-                <Switch
-                  id="task-private"
-                  checked={form.visibility === "private"}
-                  onCheckedChange={(v) => set("visibility", v ? "private" : "shared")}
-                />
-                <FieldLabel htmlFor="task-private">Private to me</FieldLabel>
-              </Field>
-            )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </FieldGroup>
@@ -384,8 +359,7 @@ function buildInitial(props: TaskDialogProps): FormState {
       description: task.description ?? "",
       assigneeId: task.assigneeId ?? "none",
       categoryId: task.categoryId ?? "none",
-      scope: task.scope,
-      visibility: task.visibility,
+      isPrivate: task.isPrivate,
       priority: task.priority ? String(task.priority) : "none",
       dueDate: task.dueAt != null ? msToDateInput(task.dueAt) : "",
       status: task.status,
@@ -396,8 +370,7 @@ function buildInitial(props: TaskDialogProps): FormState {
     description: "",
     assigneeId: "none",
     categoryId: "none",
-    scope: "shared",
-    visibility: "shared",
+    isPrivate: false,
     priority: "none",
     dueDate: "",
     status: defaultStatus ?? "todo",

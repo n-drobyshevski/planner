@@ -23,7 +23,7 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Trash2, Loader2 } from "lucide-react";
+import { Lock, Trash2, Loader2 } from "lucide-react";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { RecurrenceScopePrompt, type RecurrenceScope } from "./recurrence-scope-prompt";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
@@ -37,14 +37,7 @@ import {
   ceilToStep,
   DAY_IN_MS,
 } from "@/lib/datetime/local";
-import type {
-  Category,
-  EventKind,
-  EventRow,
-  Occurrence,
-  Scope,
-  Visibility,
-} from "@/lib/types";
+import type { Category, EventKind, EventRow, Occurrence } from "@/lib/types";
 import type { EventInput } from "@/lib/supabase/mappers";
 
 interface FormState {
@@ -59,8 +52,7 @@ interface FormState {
   endTime: string;
   categoryId: string; // "none" | id
   contextId: string; // "none" | context master id
-  scope: Scope;
-  visibility: Visibility;
+  isPrivate: boolean;
   recurrence: RecurrenceForm | null;
 }
 
@@ -79,6 +71,10 @@ export interface EventDialogProps {
   defaultEnd?: number;
   /** Pre-selected context when creating an event inside a context backdrop. */
   defaultContextId?: string | null;
+  /** View-only: another member's item — disable inputs and hide save/delete. */
+  readOnly?: boolean;
+  /** Owner's name, shown in the read-only banner. */
+  ownerName?: string;
 }
 
 export function EventDialog(props: EventDialogProps) {
@@ -92,6 +88,8 @@ export function EventDialog(props: EventDialogProps) {
     contexts = [],
     event,
     occurrence,
+    readOnly = false,
+    ownerName,
   } = props;
   const mutations = useEventMutations(workspaceId);
 
@@ -165,8 +163,7 @@ export function EventDialog(props: EventDialogProps) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
-        scope: form.scope,
-        visibility: form.scope === "shared" ? "shared" : form.visibility,
+        isPrivate: form.isPrivate,
         allDay: isContext ? false : form.allDay,
         start,
         end,
@@ -196,8 +193,7 @@ export function EventDialog(props: EventDialogProps) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
-        scope: form.scope,
-        visibility: form.scope === "shared" ? "shared" : form.visibility,
+        isPrivate: form.isPrivate,
         allDay: isContext ? false : form.allDay,
         start,
         end,
@@ -306,6 +302,15 @@ export function EventDialog(props: EventDialogProps) {
           </ResponsiveDialogHeader>
 
           <ResponsiveDialogBody>
+          {readOnly && (
+            <div className="mb-3 flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <Lock className="size-4 shrink-0" />
+              <span>
+                Read-only · {ownerName ? `${ownerName}'s calendar` : "another calendar"}
+              </span>
+            </div>
+          )}
+          <fieldset disabled={readOnly} className="contents">
           <FieldGroup>
             {mode === "create" && (
               <Field>
@@ -431,30 +436,14 @@ export function EventDialog(props: EventDialogProps) {
               </Field>
             )}
 
-            <Field>
-              <FieldLabel>Calendar</FieldLabel>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={form.scope}
-                onValueChange={(v) => v && set("scope", v as Scope)}
-                className="justify-start"
-              >
-                <ToggleGroupItem value="shared">Shared</ToggleGroupItem>
-                <ToggleGroupItem value="personal">Personal</ToggleGroupItem>
-              </ToggleGroup>
+            <Field orientation="horizontal">
+              <Switch
+                id="ev-private"
+                checked={form.isPrivate}
+                onCheckedChange={(v) => set("isPrivate", v)}
+              />
+              <FieldLabel htmlFor="ev-private">Private (only you can see this)</FieldLabel>
             </Field>
-
-            {form.scope === "personal" && (
-              <Field orientation="horizontal">
-                <Switch
-                  id="ev-private"
-                  checked={form.visibility === "private"}
-                  onCheckedChange={(v) => set("visibility", v ? "private" : "shared")}
-                />
-                <FieldLabel htmlFor="ev-private">Private to me</FieldLabel>
-              </Field>
-            )}
 
             <Field>
               <FieldLabel>Location</FieldLabel>
@@ -482,26 +471,35 @@ export function EventDialog(props: EventDialogProps) {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </FieldGroup>
+          </fieldset>
           </ResponsiveDialogBody>
 
           <ResponsiveDialogFooter className="sm:justify-between">
-            {mode === "edit" ? (
-              <Button variant="ghost" onClick={onDelete} disabled={pending} className="text-destructive">
-                <Trash2 data-icon="inline-start" />
-                Delete
+            {readOnly ? (
+              <Button variant="outline" onClick={() => onOpenChange(false)} className="ml-auto">
+                Close
               </Button>
             ) : (
-              <span />
+              <>
+                {mode === "edit" ? (
+                  <Button variant="ghost" onClick={onDelete} disabled={pending} className="text-destructive">
+                    <Trash2 data-icon="inline-start" />
+                    Delete
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+                    Cancel
+                  </Button>
+                  <Button onClick={onSave} disabled={pending}>
+                    {pending && <Loader2 data-icon="inline-start" className="animate-spin" />}
+                    {mode === "create" ? "Create" : "Save"}
+                  </Button>
+                </div>
+              </>
             )}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
-                Cancel
-              </Button>
-              <Button onClick={onSave} disabled={pending}>
-                {pending && <Loader2 data-icon="inline-start" className="animate-spin" />}
-                {mode === "create" ? "Create" : "Save"}
-              </Button>
-            </div>
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
       </ResponsiveDialog>
@@ -536,8 +534,7 @@ function buildInitial(props: EventDialogProps): FormState {
       endTime: msToTimeInput(occurrence.end),
       categoryId: occurrence.categoryId ?? "none",
       contextId: event.contextId ?? "none",
-      scope: event.scope,
-      visibility: event.visibility,
+      isPrivate: event.isPrivate,
       recurrence: parseRRule(event.rrule),
     };
   }
@@ -555,8 +552,7 @@ function buildInitial(props: EventDialogProps): FormState {
     endTime: msToTimeInput(end),
     categoryId: "none",
     contextId: defaultContextId ?? "none",
-    scope: "shared",
-    visibility: "shared",
+    isPrivate: false,
     recurrence: null,
   };
 }

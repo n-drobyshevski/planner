@@ -39,7 +39,6 @@ import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import type { Member, Category } from "@/lib/types";
 
-const SHARED_COLOR = "#b45309";
 const PALETTE = ["#c0492a", "#0f766e", "#b45309", "#15803d", "#0369a1", "#be185d", "#7c3aed"];
 
 interface FiltersProps {
@@ -96,13 +95,41 @@ const ToggleRow = React.forwardRef<
 });
 
 /**
+ * A non-toggle calendar row (the signed-in member's own calendar, which is
+ * always shown). The colour dot is a legend; the row still hosts the right-click
+ * / ⋮ menu for rename + recolor.
+ */
+const LegendRow = React.forwardRef<
+  HTMLDivElement,
+  { color: string; label: string; onMenu?: () => void } & React.HTMLAttributes<HTMLDivElement>
+>(function LegendRow({ color, label, onMenu, className, ...rest }, ref) {
+  return (
+    <div
+      ref={ref}
+      className={cn("flex items-center rounded-md hover:bg-sidebar-accent", className)}
+      {...rest}
+    >
+      <span className="flex min-h-11 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm md:min-h-0">
+        <span
+          className="size-3.5 shrink-0 rounded-[4px]"
+          style={{ backgroundColor: color }}
+        />
+        <span className="truncate">{label}</span>
+      </span>
+      {onMenu && <ItemMenuButton onMenu={onMenu} className="mr-1 size-9" />}
+    </div>
+  );
+});
+
+/**
  * Layer + category filter controls, shared by the desktop sidebar and the
  * mobile bottom sheet so the two presentations never drift apart.
  *
- * Each row carries a right-click (desktop) / long-press ⋮ (mobile) menu:
- *  - calendars: "show only this" / "show all"; the signed-in member's own row
- *    also gets rename + recolor (RLS restricts member edits to the self row);
- *  - categories: rename, recolor, show-only/show-all, and delete.
+ * My own calendar is always shown; other members are overlaid onto it only when
+ * toggled on. Each row carries a right-click (desktop) / long-press ⋮ (mobile)
+ * menu: the signed-in member's own row gets rename + recolor (RLS restricts
+ * member edits to the self row); categories get rename, recolor,
+ * show-only/show-all, and delete.
  */
 export function CalendarFiltersContent({
   workspaceId,
@@ -110,30 +137,18 @@ export function CalendarFiltersContent({
   members,
   categories,
 }: FiltersProps) {
-  const hiddenLayers = useUiStore((s) => s.hiddenLayers);
+  const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
-  const toggleLayer = useUiStore((s) => s.toggleLayer);
+  const toggleOverlay = useUiStore((s) => s.toggleOverlay);
   const toggleCategory = useUiStore((s) => s.toggleCategory);
-  const setHiddenLayers = useUiStore((s) => s.setHiddenLayers);
   const setHiddenCategoryIds = useUiStore((s) => s.setHiddenCategoryIds);
   const mutations = useSidebarMutations();
 
   const [renaming, setRenaming] = React.useState<RenameTarget | null>(null);
   const [deleting, setDeleting] = React.useState<{ id: string; name: string } | null>(null);
 
-  const layerIds = React.useMemo(
-    () => ["shared", ...members.map((m) => m.id)],
-    [members],
-  );
-
-  const layerVisibility = (id: string): ItemAction[] => [
-    {
-      label: "Show only this",
-      icon: Focus,
-      onSelect: () => setHiddenLayers(new Set(layerIds.filter((l) => l !== id))),
-    },
-    { label: "Show all", icon: Eye, onSelect: () => setHiddenLayers(new Set()) },
-  ];
+  const ownMember = members.find((m) => m.id === currentMemberId) ?? null;
+  const otherMembers = members.filter((m) => m.id !== currentMemberId);
 
   const categoryVisibility = (id: string): ItemAction[] => [
     {
@@ -151,50 +166,44 @@ export function CalendarFiltersContent({
     <>
       <section className="flex flex-col gap-0.5">
         <h3 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Calendars
+          My calendar
         </h3>
-        <ItemContextMenu title="Shared" actions={layerVisibility("shared")}>
-          <ToggleRow
-            color={SHARED_COLOR}
-            label="Shared"
-            active={!hiddenLayers.has("shared")}
-            onToggle={() => toggleLayer("shared")}
-          />
-        </ItemContextMenu>
-        {members.map((m) => {
-          const own = m.id === currentMemberId;
-          return (
-            <ItemContextMenu
-              key={m.id}
-              title={m.name}
-              color={own ? m.color : undefined}
-              onColorChange={
-                own ? (c) => c && void mutations.recolorMember(m.id, c) : undefined
-              }
-              actions={[
-                ...(own
-                  ? [
-                      {
-                        label: "Rename",
-                        icon: SquarePen,
-                        onSelect: () =>
-                          setRenaming({ kind: "member", id: m.id, name: m.name }),
-                      },
-                    ]
-                  : []),
-                ...layerVisibility(m.id),
-              ]}
-            >
-              <ToggleRow
-                color={m.color}
-                label={m.name}
-                active={!hiddenLayers.has(m.id)}
-                onToggle={() => toggleLayer(m.id)}
-              />
-            </ItemContextMenu>
-          );
-        })}
+        {ownMember && (
+          <ItemContextMenu
+            title={ownMember.name}
+            color={ownMember.color}
+            onColorChange={(c) => c && void mutations.recolorMember(ownMember.id, c)}
+            actions={[
+              {
+                label: "Rename",
+                icon: SquarePen,
+                onSelect: () =>
+                  setRenaming({ kind: "member", id: ownMember.id, name: ownMember.name }),
+              },
+            ]}
+          >
+            {/* Own calendar is always shown ("my normal view"); the dot is just a colour legend. */}
+            <LegendRow color={ownMember.color} label={ownMember.name} />
+          </ItemContextMenu>
+        )}
       </section>
+
+      {otherMembers.length > 0 && (
+        <section className="flex flex-col gap-0.5">
+          <h3 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Other calendars
+          </h3>
+          {otherMembers.map((m) => (
+            <ToggleRow
+              key={m.id}
+              color={m.color}
+              label={m.name}
+              active={overlayMemberIds.has(m.id)}
+              onToggle={() => toggleOverlay(m.id)}
+            />
+          ))}
+        </section>
+      )}
 
       <section className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between px-2 pb-1">

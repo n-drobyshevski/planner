@@ -2,7 +2,7 @@
 
 import { forwardRef, useMemo } from "react";
 import { format, isSameMonth } from "date-fns";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
@@ -24,6 +24,8 @@ interface CommonProps {
   onPickDay: (ms: number) => void;
   onChangeColor: (o: Occurrence, color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
+  /** Owner-only editability; non-editable occurrences are read-only overlays. */
+  canEdit: (o: Occurrence) => boolean;
 }
 
 export function MonthGrid({
@@ -68,6 +70,7 @@ function WeekRow({
   onPickDay,
   onChangeColor,
   onDeleteEvent,
+  canEdit,
 }: CommonProps & { dayStarts: number[] }) {
   const layout = useMemo(
     () => packMonthWeek(occurrences, dayStarts, MAX_LANES),
@@ -117,17 +120,21 @@ function WeekRow({
                   key={it.occ.key}
                   mobileSheet={false}
                   title={it.occ.title}
-                  color={it.occ.color}
-                  onColorChange={(c) => onChangeColor(it.occ, c)}
-                  actions={[
-                    { label: "Edit", icon: Pencil, onSelect: () => onSelect(it.occ) },
-                    {
-                      label: "Delete",
-                      icon: Trash2,
-                      destructive: true,
-                      onSelect: () => onDeleteEvent(it.occ),
-                    },
-                  ]}
+                  color={canEdit(it.occ) ? it.occ.color : undefined}
+                  onColorChange={canEdit(it.occ) ? (c) => onChangeColor(it.occ, c) : undefined}
+                  actions={
+                    canEdit(it.occ)
+                      ? [
+                          { label: "Edit", icon: Pencil, onSelect: () => onSelect(it.occ) },
+                          {
+                            label: "Delete",
+                            icon: Trash2,
+                            destructive: true,
+                            onSelect: () => onDeleteEvent(it.occ),
+                          },
+                        ]
+                      : [{ label: "Open", icon: Eye, onSelect: () => onSelect(it.occ) }]
+                  }
                 >
                   <MonthItemEl
                     item={it}

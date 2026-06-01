@@ -1,10 +1,13 @@
 import type { Occurrence, Category, Member } from "@/lib/types";
 
-// Fallbacks when an event has no category (all WCAG-AA on white text).
-const SHARED_FALLBACK = "#b45309"; // amber
-const PERSONAL_FALLBACK = "#c0492a"; // coral
+// Fallback when an event has no category and its owner can't be resolved.
+const FALLBACK = "#c0492a"; // coral (WCAG-AA on white text)
 
-/** Resolve the display color for an occurrence: own color, else category, else member/shared. */
+/**
+ * Resolve the display color for an occurrence: per-item override, else category,
+ * else its owner's calendar color. The owner color makes each member's calendar
+ * read as its own color when overlaid (Google-Calendar style).
+ */
 export function resolveOccurrenceColor(
   occ: Occurrence,
   categories: Map<string, Category>,
@@ -15,6 +18,5 @@ export function resolveOccurrenceColor(
     const c = categories.get(occ.categoryId);
     if (c) return c.color;
   }
-  if (occ.scope === "shared") return SHARED_FALLBACK;
-  return members.get(occ.ownerId)?.color ?? PERSONAL_FALLBACK;
+  return members.get(occ.ownerId)?.color ?? FALLBACK;
 }

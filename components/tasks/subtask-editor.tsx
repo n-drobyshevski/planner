@@ -96,8 +96,7 @@ export function SubtaskEditor({
       assigneeId: parent.assigneeId,
       categoryId: parent.categoryId,
       title,
-      scope: parent.scope,
-      visibility: parent.visibility,
+      isPrivate: parent.isPrivate,
       position: Date.now(),
     };
     setDraft("");

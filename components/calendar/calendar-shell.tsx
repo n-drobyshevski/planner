@@ -130,25 +130,30 @@ export function CalendarShell({
   const selectedKey = useUiStore((s) => s.selectedEventKey);
   const setSelected = useUiStore((s) => s.setSelectedEventKey);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
-  const hiddenLayers = useUiStore((s) => s.hiddenLayers);
+  const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const backlogOpen = useUiStore((s) => s.taskBacklogOpen);
   const setBacklogOpen = useUiStore((s) => s.setTaskBacklogOpen);
 
   const viewerId = workspace.data?.currentMember?.id ?? "";
+  // Only my own calendar is editable; overlaid members' items are read-only.
+  const canEditOcc = useMemo(
+    () => (o: Occurrence) => o.ownerId === viewerId,
+    [viewerId],
+  );
   const visible = useMemo(
-    () => filterVisible(occurrences, { viewerId, hiddenCategoryIds, hiddenLayers }),
-    [occurrences, viewerId, hiddenCategoryIds, hiddenLayers],
+    () => filterVisible(occurrences, { viewerId, overlayMemberIds, hiddenCategoryIds }),
+    [occurrences, viewerId, overlayMemberIds, hiddenCategoryIds],
   );
   // Same visibility filter for the neighbour panes (display-only).
   const prevVisible = useMemo(
-    () => filterVisible(prevWin.occurrences, { viewerId, hiddenCategoryIds, hiddenLayers }),
-    [prevWin.occurrences, viewerId, hiddenCategoryIds, hiddenLayers],
+    () => filterVisible(prevWin.occurrences, { viewerId, overlayMemberIds, hiddenCategoryIds }),
+    [prevWin.occurrences, viewerId, overlayMemberIds, hiddenCategoryIds],
   );
   const nextVisible = useMemo(
-    () => filterVisible(nextWin.occurrences, { viewerId, hiddenCategoryIds, hiddenLayers }),
-    [nextWin.occurrences, viewerId, hiddenCategoryIds, hiddenLayers],
+    () => filterVisible(nextWin.occurrences, { viewerId, overlayMemberIds, hiddenCategoryIds }),
+    [nextWin.occurrences, viewerId, overlayMemberIds, hiddenCategoryIds],
   );
 
   const memberMap = useMemo(
@@ -181,15 +186,18 @@ export function CalendarShell({
     [tasks],
   );
   const childrenByParent = useMemo(() => groupByParent(tasks), [tasks]);
+  // The backlog rail is for scheduling your OWN tasks; others' tasks (now
+  // returned by RLS as non-private) aren't schedulable from here.
   const backlogTasks = (childrenByParent.get(null) ?? []).filter(
-    (t) => t.status !== "done",
+    (t) => t.status !== "done" && t.ownerId === viewerId,
   );
   const [scheduling, setScheduling] = useState<TaskRow | null>(null);
   const [deletingTask, setDeletingTask] = useState<TaskRow | null>(null);
 
   function onToggleTaskDone(taskId: string) {
     const t = tasksById.get(taskId);
-    if (t) void taskMutations.toggleDone(t);
+    // Only complete your own tasks; others' calendars are read-only.
+    if (t && t.ownerId === viewerId) void taskMutations.toggleDone(t);
   }
   function onScheduleTask(taskId: string, start: number, end: number) {
     const t = tasksById.get(taskId);
@@ -244,17 +252,21 @@ export function CalendarShell({
     });
   }
   function onAssignContext(occ: Occurrence, contextId: string) {
+    if (!canEditOcc(occ)) return;
     void mutations.assignContext(occ.eventId, contextId);
   }
   function onRemoveContext(occ: Occurrence) {
+    if (!canEditOcc(occ)) return;
     void mutations.removeContext(occ.eventId);
   }
   /** Recolor an event (series-level: writes the master row's color). */
   function onChangeEventColor(occ: Occurrence, color: string | null) {
+    if (!canEditOcc(occ)) return;
     const ev = events.find((e) => e.id === occ.eventId);
     if (ev) void mutations.updateSingle(ev.id, { color });
   }
   function onDeleteEvent(occ: Occurrence) {
+    if (!canEditOcc(occ)) return;
     const ev = events.find((e) => e.id === occ.eventId);
     if (!ev) return;
     if (ev.rrule) setPendingDelete({ event: ev, occurrence: occ });
@@ -284,6 +296,7 @@ export function CalendarShell({
     );
   }
   function onReschedule(occ: Occurrence, start: number, end: number) {
+    if (!canEditOcc(occ)) return;
     const ev = events.find((e) => e.id === occ.eventId);
     if (!ev) return;
     if (!ev.rrule) {
@@ -397,6 +410,7 @@ export function CalendarShell({
                   occurrences={prevVisible}
                   focusedMs={prevFocus}
                   colorOf={colorOf}
+                  canEdit={canEditOcc}
                   taskDoneById={taskDoneById}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || prevWin.isLoading}
@@ -410,6 +424,7 @@ export function CalendarShell({
                   occurrences={nextVisible}
                   focusedMs={nextFocus}
                   colorOf={colorOf}
+                  canEdit={canEditOcc}
                   taskDoneById={taskDoneById}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || nextWin.isLoading}
@@ -432,6 +447,7 @@ export function CalendarShell({
                 onDeleteEvent={onDeleteEvent}
                 onAssignContext={onAssignContext}
                 onRemoveContext={onRemoveContext}
+                canEdit={canEditOcc}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
                 onScheduleTask={onScheduleTask}
@@ -473,6 +489,12 @@ export function CalendarShell({
           defaultStart={editor.mode === "create" ? editor.defaultStart : undefined}
           defaultEnd={editor.mode === "create" ? editor.defaultEnd : undefined}
           defaultContextId={editor.mode === "create" ? editor.defaultContextId : undefined}
+          readOnly={editor.mode === "edit" && editor.event.ownerId !== viewerId}
+          ownerName={
+            editor.mode === "edit"
+              ? memberMap.get(editor.event.ownerId)?.name
+              : undefined
+          }
         />
       )}
 

@@ -10,8 +10,8 @@ interface UiState {
   sidebarOpen: boolean;
   /** category ids explicitly hidden from the calendar */
   hiddenCategoryIds: Set<string>;
-  /** layers toggled off: "shared" or a memberId */
-  hiddenLayers: Set<string>;
+  /** other members' calendars overlaid onto my view (memberIds); own is always shown */
+  overlayMemberIds: Set<string>;
   /** task selected for editing (tasks views) */
   selectedTaskId: string | null;
   /** the "Unscheduled tasks" rail on the calendar (T4) */
@@ -20,11 +20,12 @@ interface UiState {
   setSelectedEventKey: (key: string | null) => void;
   setSidebarOpen: (open: boolean) => void;
   toggleCategory: (id: string) => void;
-  toggleLayer: (layer: string) => void;
+  /** Overlay / un-overlay another member's calendar. */
+  toggleOverlay: (memberId: string) => void;
   /** Replace the whole hidden-categories set (e.g. "show only this" / "show all"). */
   setHiddenCategoryIds: (next: Set<string>) => void;
-  /** Replace the whole hidden-layers set (e.g. "show only this" / "show all"). */
-  setHiddenLayers: (next: Set<string>) => void;
+  /** Replace the whole overlaid-members set. */
+  setOverlayMemberIds: (next: Set<string>) => void;
   setSelectedTaskId: (id: string | null) => void;
   setTaskBacklogOpen: (open: boolean) => void;
 }
@@ -33,7 +34,7 @@ export const useUiStore = create<UiState>((set) => ({
   selectedEventKey: null,
   sidebarOpen: true,
   hiddenCategoryIds: new Set(),
-  hiddenLayers: new Set(),
+  overlayMemberIds: new Set(),
   selectedTaskId: null,
   taskBacklogOpen: false,
 
@@ -48,13 +49,13 @@ export const useUiStore = create<UiState>((set) => ({
       else next.add(id);
       return { hiddenCategoryIds: next };
     }),
-  toggleLayer: (layer) =>
+  toggleOverlay: (memberId) =>
     set((s) => {
-      const next = new Set(s.hiddenLayers);
-      if (next.has(layer)) next.delete(layer);
-      else next.add(layer);
-      return { hiddenLayers: next };
+      const next = new Set(s.overlayMemberIds);
+      if (next.has(memberId)) next.delete(memberId);
+      else next.add(memberId);
+      return { overlayMemberIds: next };
     }),
   setHiddenCategoryIds: (hiddenCategoryIds) => set({ hiddenCategoryIds }),
-  setHiddenLayers: (hiddenLayers) => set({ hiddenLayers }),
+  setOverlayMemberIds: (overlayMemberIds) => set({ overlayMemberIds }),
 }));

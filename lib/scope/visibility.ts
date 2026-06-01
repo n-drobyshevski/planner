@@ -1,61 +1,49 @@
-// Scope/visibility + client layer/category filtering (pure).
+// Scope/visibility + client overlay/category filtering (pure).
 // Times are epoch milliseconds (UTC); intervals are half-open [start,end).
+//
+// Sharing model: every item belongs to one member's calendar (its owner) and is
+// shared (visible to the workspace) by default. An item flagged `isPrivate` is
+// visible only to its owner. Editing is owner-only; other members' calendars are
+// overlaid read-only. RLS enforces the same rules server-side.
 
-import type { Occurrence, Scope, Visibility } from "@/lib/types";
+import type { Occurrence } from "@/lib/types";
 
-/**
- * Whether a viewer is allowed to SEE an event/occurrence.
- * Shared-scope items are visible to everyone; an owner always sees their own;
- * a personal item explicitly shared (visibility==='shared') is visible to all.
- */
+/** Whether a viewer may SEE an item: the owner always can; others only if it's not private. */
 export function canSee(
-  e: { scope: Scope; visibility: Visibility; ownerId: string },
+  e: { isPrivate: boolean; ownerId: string },
   viewerId: string,
 ): boolean {
-  return (
-    e.scope === "shared" ||
-    e.ownerId === viewerId ||
-    (e.scope === "personal" && e.visibility === "shared")
-  );
+  return e.ownerId === viewerId || !e.isPrivate;
+}
+
+/** Whether a viewer may EDIT an item: only its owner. */
+export function canEdit(e: { ownerId: string }, viewerId: string): boolean {
+  return e.ownerId === viewerId;
+}
+
+/** The display layer (calendar) an item belongs to: always its owner. */
+export function layerOf(e: { ownerId: string }): string {
+  return e.ownerId;
 }
 
 /**
- * Whether a viewer is allowed to EDIT an event/occurrence.
- * Shared-scope items are editable by anyone; otherwise only the owner.
- */
-export function canEdit(
-  e: { scope: Scope; ownerId: string },
-  viewerId: string,
-): boolean {
-  return e.scope === "shared" || e.ownerId === viewerId;
-}
-
-/**
- * The display layer an item belongs to: the literal 'shared' layer for
- * shared-scope items, otherwise the owner's id (a per-member layer).
- */
-export function layerOf(e: { scope: Scope; ownerId: string }): string {
-  return e.scope === "shared" ? "shared" : e.ownerId;
-}
-
-/**
- * Filter occurrences for a given viewer, applying client-side layer and
- * category hiding. Keep `o` iff the viewer can see it, its layer is not
- * hidden, and its category (when set) is not hidden.
+ * Filter occurrences for the calendar view. Keep `o` iff it belongs to the
+ * viewer's own calendar OR an explicitly-overlaid member's calendar, and its
+ * category (when set) isn't hidden. The viewer's own calendar is always shown;
+ * other members appear only when toggled on in the sidebar.
  */
 export function filterVisible(
   occ: Occurrence[],
   args: {
     viewerId: string;
+    overlayMemberIds: Set<string>;
     hiddenCategoryIds: Set<string>;
-    hiddenLayers: Set<string>;
   },
 ): Occurrence[] {
-  const { viewerId, hiddenCategoryIds, hiddenLayers } = args;
+  const { viewerId, overlayMemberIds, hiddenCategoryIds } = args;
   return occ.filter(
     (o) =>
-      canSee(o, viewerId) &&
-      !hiddenLayers.has(layerOf(o)) &&
+      (o.ownerId === viewerId || overlayMemberIds.has(o.ownerId)) &&
       !(o.categoryId !== null && hiddenCategoryIds.has(o.categoryId)),
   );
 }
