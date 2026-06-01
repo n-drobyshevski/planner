@@ -270,15 +270,21 @@ export function CalendarShell({
     setPendingReschedule(null);
     if (!p) return;
     const patch = { start: p.start, end: p.end };
+    // Re-derive context by overlap (series-level). "this" only moves a single
+    // occurrence, so it leaves series membership alone (it still nests visually);
+    // "future"/"all" re-file the affected series. Contexts never get a context_id.
+    const ctxId =
+      p.event.kind === "context" ? undefined : contextIdForRange(contextOccs, p.start);
     if (scope === "this") {
       void mutations.editThis(p.event, p.occurrence.occurrenceDate, patch);
     } else if (scope === "future") {
-      void mutations.editFuture(p.event, p.occurrence.occurrenceDate, patch);
+      void mutations.editFuture(p.event, p.occurrence.occurrenceDate, patch, ctxId);
     } else {
       const delta = p.start - p.occurrence.start;
       void mutations.updateSingle(p.event.id, {
         start: p.event.start + delta,
         end: p.event.end + delta,
+        ...(ctxId === undefined ? {} : { contextId: ctxId }),
       });
     }
   }

@@ -54,8 +54,16 @@ export function useEventMutations(workspaceId: string | undefined) {
         }),
         "This event updated",
       ),
-    editFuture: (event: EventRow, occurrenceMs: number, patch: OccurrencePatch) =>
-      run(m.splitSeries(sb, event, occurrenceMs, patch), "This and future updated"),
+    editFuture: (
+      event: EventRow,
+      occurrenceMs: number,
+      patch: OccurrencePatch,
+      contextId?: string | null,
+    ) =>
+      run(
+        m.splitSeries(sb, event, occurrenceMs, patch, contextId),
+        "This and future updated",
+      ),
     editAll: (event: EventRow, patch: OccurrencePatch) =>
       run(m.updateAll(sb, event, patch), "All events updated"),
 

@@ -227,10 +227,25 @@ export function EventDialog(props: EventDialogProps) {
     setScopePrompt(null);
     setPending(true);
 
+    // Context membership is series-level (a master column, no per-occurrence
+    // form). "this"/"future"/"all" govern time/content; the selected context is
+    // applied to the relevant series independently.
+    const selectedContextId = form.contextId === "none" ? null : form.contextId;
+    const ctxChanged = !isContext && selectedContextId !== (event.contextId ?? null);
+
     if (scope === "this") {
+      // Per-occurrence time edit can't carry context, so file the series too.
+      if (ctxChanged) void mutations.updateSingle(event.id, { contextId: selectedContextId });
       finish(await mutations.editThis(event, occurrence.occurrenceDate, patch));
     } else if (scope === "future") {
-      finish(await mutations.editFuture(event, occurrence.occurrenceDate, patch));
+      finish(
+        await mutations.editFuture(
+          event,
+          occurrence.occurrenceDate,
+          patch,
+          ctxChanged ? selectedContextId : undefined,
+        ),
+      );
     } else {
       // all: shift the whole series by the same delta + update fields + rrule.
       const delta = start - occurrence.start;
@@ -240,6 +255,7 @@ export function EventDialog(props: EventDialogProps) {
           description: patch.description,
           location: patch.location,
           categoryId: patch.categoryId,
+          ...(isContext ? {} : { contextId: selectedContextId }),
           allDay: form.allDay,
           start: event.start + delta,
           end: event.end + delta,
