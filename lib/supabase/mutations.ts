@@ -234,6 +234,19 @@ export async function updateMember(
   if (error) throw error;
 }
 
+/**
+ * Set (hash) or clear (null) the member's PIN. RLS (members_update_self) scopes
+ * it to the signed-in member's own row.
+ */
+export async function updateMemberPin(
+  sb: SupabaseClient,
+  id: string,
+  pinHash: string | null,
+): Promise<void> {
+  const { error } = await sb.from("members").update({ pin_hash: pinHash }).eq("id", id);
+  if (error) throw error;
+}
+
 /** Update the signed-in member's appearance preferences. RLS (members_update_self) scopes it. */
 export async function updateMemberPreferences(
   sb: SupabaseClient,
