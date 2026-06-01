@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
-import { format } from "date-fns";
+import { formatTime } from "@/lib/datetime/format";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
 import type { Occurrence } from "@/lib/types";
@@ -91,7 +91,7 @@ export const ContextBackdrop = forwardRef<
             !singleColumn && "hidden md:inline",
           )}
         >
-          {format(occ.start, "h:mm")}–{format(occ.end, "h:mm a")}
+          {formatTime(occ.start)}–{formatTime(occ.end)}
         </span>
         {onMenu && (
           <ItemMenuButton

@@ -2,6 +2,7 @@
 
 import { forwardRef, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
+import { formatTime } from "@/lib/datetime/format";
 import { CalendarDays, Pencil, Trash2, Eye } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
 import { cn } from "@/lib/utils";
@@ -197,7 +198,7 @@ const AgendaRow = forwardRef<
         )}
       </span>
       <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-        {occ.allDay ? "All day" : format(occ.start, "h:mm a")}
+        {occ.allDay ? "All day" : formatTime(occ.start)}
       </span>
       {onMenu && (
         <ItemMenuButton onMenu={onMenu} className="-mr-1 text-muted-foreground" />

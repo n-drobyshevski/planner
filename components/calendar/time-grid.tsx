@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
+import { formatTime } from "@/lib/datetime/format";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -136,7 +137,7 @@ export function TimeGrid({
     return ms < days[0] ? 0 : days.length - 1;
   };
   const timeLabel = (dayIndex: number, min: number) =>
-    format(days[dayIndex] + min * 60_000, "h:mm");
+    formatTime(days[dayIndex] + min * 60_000);
 
   // Touch: arm a move-drag once the long-press timer (set in onPointerDown)
   // fires on an event. Until then the grid scrolls normally.
@@ -504,7 +505,7 @@ export function TimeGrid({
             {HOURS.map((h) => (
               <div key={h} style={{ height: HOUR_PX }} className="relative">
                 <span className="absolute -top-2 right-2 text-xs text-muted-foreground tabular-nums">
-                  {h === 0 ? "" : format(new Date(2000, 0, 1, h), "h a")}
+                  {h === 0 ? "" : format(new Date(2000, 0, 1, h), "HH:mm")}
                 </span>
               </div>
             ))}

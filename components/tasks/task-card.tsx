@@ -1,7 +1,8 @@
 "use client";
 
 import { forwardRef } from "react";
-import { format, isBefore, startOfDay } from "date-fns";
+import { isBefore, startOfDay } from "date-fns";
+import { formatDayMonth } from "@/lib/datetime/format";
 import { CalendarClock, Flag, GripVertical, Lock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -124,7 +125,7 @@ export const TaskCard = forwardRef<
                 )}
               >
                 <CalendarClock className="size-3.5" />
-                {format(task.dueAt, "MMM d")}
+                {formatDayMonth(task.dueAt)}
               </span>
             )}
             {prio && (

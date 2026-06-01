@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
-import { format } from "date-fns";
+import { formatTime } from "@/lib/datetime/format";
 import { CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
@@ -93,7 +93,7 @@ export const EventBlock = forwardRef<
         )}
       </div>
       <span className="truncate text-[11px] leading-tight opacity-90 tabular-nums">
-        {format(occ.start, "h:mm")}–{format(occ.end, "h:mm a")}
+        {formatTime(occ.start)}–{formatTime(occ.end)}
       </span>
       {editable && (
         <>

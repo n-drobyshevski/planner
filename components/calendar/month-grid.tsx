@@ -2,6 +2,7 @@
 
 import { forwardRef, useMemo } from "react";
 import { format, isSameMonth } from "date-fns";
+import { formatTime } from "@/lib/datetime/format";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -92,7 +93,7 @@ function WeekRow({
               key={d}
               role="button"
               tabIndex={0}
-              aria-label={`Create event on ${format(d, "MMMM d")}`}
+              aria-label={`Create event on ${format(d, "d MMMM")}`}
               onClick={() => onCreateDay(d)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -107,7 +108,7 @@ function WeekRow({
             >
               <button
                 type="button"
-                aria-label={`Go to ${format(d, "MMMM d")}`}
+                aria-label={`Go to ${format(d, "d MMMM")}`}
                 onClick={(e) => {
                   // The day number navigates to Day view; don't also create.
                   e.stopPropagation();
@@ -269,7 +270,7 @@ function MoreButton({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-2">
         <div className="mb-1 px-1 text-xs font-medium text-muted-foreground">
-          {format(day, "EEEE, MMM d")}
+          {format(day, "EEEE, d MMM")}
         </div>
         <div className="flex flex-col gap-0.5">
           {items.map((o) => (
@@ -289,7 +290,7 @@ function MoreButton({
               <span className="truncate">{o.title}</span>
               {!o.allDay && (
                 <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {format(o.start, "h:mm a")}
+                  {formatTime(o.start)}
                 </span>
               )}
             </button>

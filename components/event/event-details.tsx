@@ -1,6 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
 import {
   AlignLeft,
   CalendarDays,
@@ -28,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ColorSwatchPicker } from "@/components/shared/color-swatch-picker";
-import { formatOccurrenceWhen } from "@/lib/datetime/format";
+import { formatOccurrenceWhen, formatDayMonth } from "@/lib/datetime/format";
 import { parseRRule, summarizeRecurrence } from "@/lib/recurrence/rrule-build";
 import type { EventRow, Occurrence, TaskRow } from "@/lib/types";
 
@@ -137,7 +136,7 @@ export function EventDetails({
                   <span>Task · {TASK_STATUS_LABEL[task.status]}</span>
                   {task.dueAt != null && (
                     <span className="text-muted-foreground tabular-nums">
-                      Due {format(task.dueAt, "MMM d")}
+                      Due {formatDayMonth(task.dueAt)}
                     </span>
                   )}
                   {isOwn && onToggleTaskDone && (
