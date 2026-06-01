@@ -2,15 +2,11 @@ import type { TaskRow, Category, Member } from "@/lib/types";
 
 // Mirrors lib/calendar/colors.ts so tasks and their scheduled blocks read the
 // same. Own color wins; else category color; else the assignee/owner member
-// color; else the shared-amber fallback.
-const SHARED_FALLBACK = "#b45309"; // amber
-const PERSONAL_FALLBACK = "#c0492a"; // coral
+// color; else a generic fallback.
+const FALLBACK = "#c0492a"; // coral
 
 export function resolveTaskColor(
-  task: Pick<
-    TaskRow,
-    "color" | "categoryId" | "scope" | "ownerId" | "assigneeId"
-  >,
+  task: Pick<TaskRow, "color" | "categoryId" | "ownerId" | "assigneeId">,
   categories: Map<string, Category>,
   members: Map<string, Member>,
 ): string {
@@ -19,7 +15,6 @@ export function resolveTaskColor(
     const c = categories.get(task.categoryId);
     if (c) return c.color;
   }
-  if (task.scope === "shared") return SHARED_FALLBACK;
   const memberId = task.assigneeId ?? task.ownerId;
-  return members.get(memberId)?.color ?? PERSONAL_FALLBACK;
+  return members.get(memberId)?.color ?? FALLBACK;
 }

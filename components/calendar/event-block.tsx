@@ -24,12 +24,14 @@ export const EventBlock = forwardRef<
     color: string;
     style: React.CSSProperties;
     selected: boolean;
+    /** false = another member's item: no drag/resize/toggle (view-only overlay) */
+    editable?: boolean;
     taskDone?: boolean;
     onToggleTaskDone?: () => void;
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
 >(function EventBlock(
-  { occ, color, style, selected, taskDone, onToggleTaskDone, onMenu, ...rest },
+  { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, onMenu, ...rest },
   ref,
 ) {
   const isTask = occ.taskId != null && onToggleTaskDone != null;
@@ -39,30 +41,40 @@ export const EventBlock = forwardRef<
       data-occ-key={occ.key}
       style={{ ...style, backgroundColor: color }}
       className={cn(
-        "absolute z-10 flex cursor-grab touch-none flex-col overflow-hidden rounded-md px-1.5 py-1 text-left text-xs text-white shadow-soft select-none",
+        "absolute z-10 flex touch-none flex-col overflow-hidden rounded-md px-1.5 py-1 text-left text-xs text-white shadow-soft select-none",
+        editable ? "cursor-grab" : "cursor-pointer",
         selected && "z-20 ring-2 ring-foreground",
       )}
       {...rest}
     >
       <div className="flex items-start gap-1">
-        {isTask && (
-          <button
-            type="button"
-            aria-label={taskDone ? "Mark task not done" : "Mark task done"}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleTaskDone?.();
-            }}
-            className="mt-px shrink-0 cursor-pointer text-white/90 hover:text-white"
-          >
-            {taskDone ? (
-              <CheckCircle2 className="size-3.5" />
-            ) : (
-              <Circle className="size-3.5" />
-            )}
-          </button>
-        )}
+        {isTask &&
+          (editable ? (
+            <button
+              type="button"
+              aria-label={taskDone ? "Mark task not done" : "Mark task done"}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleTaskDone?.();
+              }}
+              className="mt-px shrink-0 cursor-pointer text-white/90 hover:text-white"
+            >
+              {taskDone ? (
+                <CheckCircle2 className="size-3.5" />
+              ) : (
+                <Circle className="size-3.5" />
+              )}
+            </button>
+          ) : (
+            <span className="mt-px shrink-0 text-white/90" aria-hidden>
+              {taskDone ? (
+                <CheckCircle2 className="size-3.5" />
+              ) : (
+                <Circle className="size-3.5" />
+              )}
+            </span>
+          ))}
         <span
           className={cn(
             "truncate font-semibold leading-tight",
@@ -81,14 +93,18 @@ export const EventBlock = forwardRef<
       <span className="truncate text-[11px] leading-tight opacity-90 tabular-nums">
         {format(occ.start, "h:mm")}–{format(occ.end, "h:mm a")}
       </span>
-      <span
-        data-resize="start"
-        className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
-      />
-      <span
-        data-resize="end"
-        className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
-      />
+      {editable && (
+        <>
+          <span
+            data-resize="start"
+            className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
+          />
+          <span
+            data-resize="end"
+            className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+          />
+        </>
+      )}
     </div>
   );
 });

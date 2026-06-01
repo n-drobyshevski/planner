@@ -1,8 +1,6 @@
 // Shared domain types. Times are epoch milliseconds (UTC) inside the app;
 // the data layer converts to/from Postgres `timestamptz` at the boundary.
 
-export type Scope = "shared" | "personal";
-export type Visibility = "private" | "shared";
 export type OverrideType = "cancel" | "modify";
 export type TaskStatus = "todo" | "in_progress" | "done";
 /** A normal calendar event vs. a "context" time-block container. */
@@ -50,9 +48,9 @@ export interface EventRow {
   title: string;
   description: string | null;
   location: string | null;
-  scope: Scope;
-  visibility: Visibility;
-  /** per-item color override (hex); null = derive from category/member/scope */
+  /** true = only the owner can see it; false (default) = shared with the workspace */
+  isPrivate: boolean;
+  /** per-item color override (hex); null = derive from category/owner */
   color: string | null;
   /** 'event' (normal) or 'context' (a time-block container) */
   kind: EventKind;
@@ -84,9 +82,9 @@ export interface TaskRow {
   categoryId: string | null;
   title: string;
   description: string | null;
-  scope: Scope;
-  visibility: Visibility;
-  /** per-item color override (hex); null = derive from category/member/scope */
+  /** true = only the owner can see it; false (default) = shared with the workspace */
+  isPrivate: boolean;
+  /** per-item color override (hex); null = derive from category/owner */
   color: string | null;
   status: TaskStatus;
   /** 0..3 priority; null = none */
@@ -139,8 +137,8 @@ export interface Occurrence {
   /** parent context this occurrence is grouped under (master id); null = none */
   contextId: string | null;
   ownerId: string;
-  scope: Scope;
-  visibility: Visibility;
+  /** true = only the owner can see it; false (default) = shared */
+  isPrivate: boolean;
   /** when set, this occurrence is a scheduled block of a task */
   taskId: string | null;
   isRecurring: boolean;

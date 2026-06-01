@@ -22,12 +22,16 @@ export interface CanvasProps {
   onDeleteEvent: (occ: Occurrence) => void;
   onAssignContext?: (occ: Occurrence, contextId: string) => void;
   onRemoveContext?: (occ: Occurrence) => void;
+  /** Whether an occurrence is editable (owner-only); others are read-only overlays. */
+  canEdit?: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
   onScheduleTask?: (taskId: string, startMs: number, endMs: number) => void;
   loading: boolean;
   error: boolean;
 }
+
+const ALWAYS_EDITABLE = () => true;
 
 export function CalendarCanvas(props: CanvasProps) {
   const {
@@ -45,6 +49,7 @@ export function CalendarCanvas(props: CanvasProps) {
     onDeleteEvent,
     onAssignContext,
     onRemoveContext,
+    canEdit = ALWAYS_EDITABLE,
     taskDoneById,
     onToggleTaskDone,
     onScheduleTask,
@@ -78,6 +83,7 @@ export function CalendarCanvas(props: CanvasProps) {
         onSelect={onSelect}
         onChangeColor={onChangeColor}
         onDeleteEvent={onDeleteEvent}
+        canEdit={canEdit}
         loading={props.loading}
       />
     );
@@ -96,6 +102,7 @@ export function CalendarCanvas(props: CanvasProps) {
         onPickDay={onPickDay}
         onChangeColor={onChangeColor}
         onDeleteEvent={onDeleteEvent}
+        canEdit={canEdit}
       />
     );
   }
@@ -114,6 +121,7 @@ export function CalendarCanvas(props: CanvasProps) {
       onDeleteEvent={onDeleteEvent}
       onAssignContext={onAssignContext}
       onRemoveContext={onRemoveContext}
+      canEdit={canEdit}
       taskDoneById={taskDoneById}
       onToggleTaskDone={onToggleTaskDone}
       onScheduleTask={onScheduleTask}

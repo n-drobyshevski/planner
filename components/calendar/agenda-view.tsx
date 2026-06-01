@@ -2,7 +2,7 @@
 
 import { forwardRef, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
-import { CalendarDays, Pencil, Trash2 } from "lucide-react";
+import { CalendarDays, Pencil, Trash2, Eye } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +28,8 @@ interface Props {
   onSelect: (o: Occurrence) => void;
   onChangeColor: (o: Occurrence, color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
+  /** Owner-only editability; non-editable occurrences are read-only overlays. */
+  canEdit: (o: Occurrence) => boolean;
   loading?: boolean;
 }
 
@@ -45,6 +47,7 @@ export function AgendaView({
   onSelect,
   onChangeColor,
   onDeleteEvent,
+  canEdit,
   loading,
 }: Props) {
   const groups = useMemo(() => groupByDay(occurrences), [occurrences]);
@@ -103,17 +106,21 @@ export function AgendaView({
                   <li key={o.key}>
                     <ItemContextMenu
                       title={o.title}
-                      color={o.color}
-                      onColorChange={(c) => onChangeColor(o, c)}
-                      actions={[
-                        { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
-                        {
-                          label: "Delete",
-                          icon: Trash2,
-                          destructive: true,
-                          onSelect: () => onDeleteEvent(o),
-                        },
-                      ]}
+                      color={canEdit(o) ? o.color : undefined}
+                      onColorChange={canEdit(o) ? (c) => onChangeColor(o, c) : undefined}
+                      actions={
+                        canEdit(o)
+                          ? [
+                              { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                              {
+                                label: "Delete",
+                                icon: Trash2,
+                                destructive: true,
+                                onSelect: () => onDeleteEvent(o),
+                              },
+                            ]
+                          : [{ label: "Open", icon: Eye, onSelect: () => onSelect(o) }]
+                      }
                     >
                       <AgendaRow
                         occ={o}

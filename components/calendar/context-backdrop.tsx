@@ -31,10 +31,12 @@ export const ContextBackdrop = forwardRef<
     /** Day view (one wide column) keeps the time range even on phones; the
         narrow multi-column week/3day grids drop it below md to save space. */
     singleColumn?: boolean;
+    /** false = another member's context: no move/resize (view-only overlay) */
+    editable?: boolean;
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
 >(function ContextBackdrop(
-  { occ, color, style, selected, singleColumn, onMenu, ...rest },
+  { occ, color, style, selected, singleColumn, editable = true, onMenu, ...rest },
   ref,
 ) {
   return (
@@ -54,20 +56,28 @@ export const ContextBackdrop = forwardRef<
       )}
       {...rest}
     >
-      {/* Resize handles (thin, interactive) at the very top/bottom edges. */}
-      <span
-        data-resize="start"
-        className="pointer-events-auto absolute inset-x-0 top-0 z-20 h-1.5 cursor-ns-resize"
-      />
-      <span
-        data-resize="end"
-        className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 h-1.5 cursor-ns-resize"
-      />
+      {/* Resize handles (thin, interactive) at the very top/bottom edges —
+          omitted for another member's read-only context. */}
+      {editable && (
+        <>
+          <span
+            data-resize="start"
+            className="pointer-events-auto absolute inset-x-0 top-0 z-20 h-1.5 cursor-ns-resize"
+          />
+          <span
+            data-resize="end"
+            className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 h-1.5 cursor-ns-resize"
+          />
+        </>
+      )}
 
       {/* Title bar: full-width header that makes the zone read as a labelled
           container, and doubles as the move / menu handle. */}
       <div
-        className="pointer-events-auto flex cursor-grab items-center gap-1 px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight text-white select-none"
+        className={cn(
+          "pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight text-white select-none",
+          editable ? "cursor-grab" : "cursor-pointer",
+        )}
         style={{ backgroundColor: color }}
       >
         <span className="truncate">{occ.title}</span>

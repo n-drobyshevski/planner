@@ -104,11 +104,16 @@ export const TaskCard = forwardRef<
           {task.title}
         </span>
 
-        {(task.dueAt != null || prio || progress?.total || blocked || task.visibility === "private") && (
+        {(task.dueAt != null || prio || progress?.total || blocked || task.isPrivate) && (
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             {blocked && (
               <Badge variant="outline" className="gap-1 text-muted-foreground">
                 <Lock /> Blocked
+              </Badge>
+            )}
+            {task.isPrivate && (
+              <Badge variant="outline" className="gap-1 text-muted-foreground">
+                <Lock /> Private
               </Badge>
             )}
             {task.dueAt != null && (

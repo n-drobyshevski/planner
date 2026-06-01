@@ -22,8 +22,7 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     title: "Standup",
     description: "Daily sync",
     location: "Room A",
-    scope: "shared",
-    visibility: "shared",
+    isPrivate: false,
     color: null,
     kind: "event",
     contextId: null,
@@ -181,9 +180,8 @@ describe("splitThisAndFuture", () => {
     expect(parsed.count ?? null).toBeNull();
     expect(newSeries.recurrenceEndsAt).toBeNull();
 
-    // inherits scope / visibility / owner / timeZone
-    expect(newSeries.scope).toBe(event.scope);
-    expect(newSeries.visibility).toBe(event.visibility);
+    // inherits privacy / owner / timeZone
+    expect(newSeries.isPrivate).toBe(event.isPrivate);
     expect(newSeries.ownerId).toBe(event.ownerId);
     expect(newSeries.timeZone).toBe(event.timeZone);
     expect(newSeries.workspaceId).toBe(event.workspaceId);
