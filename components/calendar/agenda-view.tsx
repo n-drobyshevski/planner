@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { forwardRef, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Pencil, Trash2 } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
 import { cn } from "@/lib/utils";
 import {
@@ -13,6 +13,11 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ItemContextMenu,
+  ItemMenuButton,
+  type MenuableProps,
+} from "@/components/shared/item-context-menu";
 import type { Occurrence } from "@/lib/types";
 
 interface Props {
@@ -21,6 +26,8 @@ interface Props {
   colorOf: (o: Occurrence) => string;
   selectedKey: string | null;
   onSelect: (o: Occurrence) => void;
+  onChangeColor: (o: Occurrence, color: string | null) => void;
+  onDeleteEvent: (o: Occurrence) => void;
   loading?: boolean;
 }
 
@@ -36,6 +43,8 @@ export function AgendaView({
   colorOf,
   selectedKey,
   onSelect,
+  onChangeColor,
+  onDeleteEvent,
   loading,
 }: Props) {
   const groups = useMemo(() => groupByDay(occurrences), [occurrences]);
@@ -92,34 +101,27 @@ export function AgendaView({
               <ul className="flex min-w-0 flex-1 flex-col gap-1.5">
                 {g.items.map((o) => (
                   <li key={o.key}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(o)}
-                      aria-pressed={selectedKey === o.key}
-                      className={cn(
-                        "flex min-h-11 w-full items-center gap-3 rounded-lg border bg-card px-3 py-2 text-left shadow-soft transition-colors active:bg-accent",
-                        selectedKey === o.key && "ring-2 ring-ring",
-                      )}
+                    <ItemContextMenu
+                      title={o.title}
+                      color={o.color}
+                      onColorChange={(c) => onChangeColor(o, c)}
+                      actions={[
+                        { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          destructive: true,
+                          onSelect: () => onDeleteEvent(o),
+                        },
+                      ]}
                     >
-                      <span
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: colorOf(o) }}
-                        aria-hidden
+                      <AgendaRow
+                        occ={o}
+                        color={colorOf(o)}
+                        selected={selectedKey === o.key}
+                        onSelect={() => onSelect(o)}
                       />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">
-                          {o.title}
-                        </span>
-                        {o.location && (
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {o.location}
-                          </span>
-                        )}
-                      </span>
-                      <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                        {o.allDay ? "All day" : format(o.start, "h:mm a")}
-                      </span>
-                    </button>
+                    </ItemContextMenu>
                   </li>
                 ))}
               </ul>
@@ -130,6 +132,63 @@ export function AgendaView({
     </div>
   );
 }
+
+/**
+ * One agenda row. A div (not a button) so it can host the ⋮ menu button on
+ * mobile without nesting interactive elements; keyboard-activatable via Enter/
+ * Space. Forwards ref/props so it can be a ContextMenu trigger on desktop.
+ */
+const AgendaRow = forwardRef<
+  HTMLDivElement,
+  {
+    occ: Occurrence;
+    color: string;
+    selected: boolean;
+    onSelect: () => void;
+  } & MenuableProps &
+    Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect">
+>(function AgendaRow({ occ, color, selected, onSelect, onMenu, ...rest }, ref) {
+  return (
+    <div
+      ref={ref}
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      aria-pressed={selected}
+      className={cn(
+        "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg border bg-card px-3 py-2 text-left shadow-soft transition-colors active:bg-accent",
+        selected && "ring-2 ring-ring",
+      )}
+      {...rest}
+    >
+      <span
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{occ.title}</span>
+        {occ.location && (
+          <span className="block truncate text-xs text-muted-foreground">
+            {occ.location}
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+        {occ.allDay ? "All day" : format(occ.start, "h:mm a")}
+      </span>
+      {onMenu && (
+        <ItemMenuButton onMenu={onMenu} className="-mr-1 text-muted-foreground" />
+      )}
+    </div>
+  );
+});
 
 function AgendaSkeleton() {
   return (

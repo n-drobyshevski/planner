@@ -148,6 +148,7 @@ export async function splitSeries(
     location: newSeries.location,
     scope: newSeries.scope,
     visibility: newSeries.visibility,
+    color: newSeries.color,
     allDay: newSeries.allDay,
     start: newSeries.start,
     end: newSeries.end,

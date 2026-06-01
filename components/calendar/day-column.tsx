@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { packDay } from "@/lib/layout/pack-day";
 import { msToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
 import { EventBlock } from "./event-block";
 import { NowLine } from "./now-line";
+import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import type { Occurrence } from "@/lib/types";
 
 const DAY_MS = 86_400_000;
@@ -16,6 +18,9 @@ export function DayColumn({
   isToday,
   colorOf,
   selectedKey,
+  onSelect,
+  onChangeColor,
+  onDeleteEvent,
   taskDoneById,
   onToggleTaskDone,
 }: {
@@ -24,6 +29,9 @@ export function DayColumn({
   isToday: boolean;
   colorOf: (o: Occurrence) => string;
   selectedKey: string | null;
+  onSelect: (o: Occurrence) => void;
+  onChangeColor: (o: Occurrence, color: string | null) => void;
+  onDeleteEvent: (o: Occurrence) => void;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
 }) {
@@ -55,24 +63,39 @@ export function DayColumn({
         const p = packed[i];
         const taskId = seg.occ.taskId;
         return (
-          <EventBlock
+          <ItemContextMenu
             key={seg.occ.key}
-            occ={seg.occ}
-            color={colorOf(seg.occ)}
-            selected={selectedKey === seg.occ.key}
-            taskDone={taskId ? taskDoneById?.get(taskId) ?? false : undefined}
-            onToggleTaskDone={
-              taskId && onToggleTaskDone
-                ? () => onToggleTaskDone(taskId)
-                : undefined
-            }
-            style={{
-              top: msToY(seg.start, dayStart),
-              height: durationToHeight(seg.start, seg.end),
-              left: `calc(${p.leftPct}% + 1px)`,
-              width: `calc(${p.widthPct}% - 3px)`,
-            }}
-          />
+            title={seg.occ.title}
+            color={seg.occ.color}
+            onColorChange={(c) => onChangeColor(seg.occ, c)}
+            actions={[
+              { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
+              {
+                label: "Delete",
+                icon: Trash2,
+                destructive: true,
+                onSelect: () => onDeleteEvent(seg.occ),
+              },
+            ]}
+          >
+            <EventBlock
+              occ={seg.occ}
+              color={colorOf(seg.occ)}
+              selected={selectedKey === seg.occ.key}
+              taskDone={taskId ? taskDoneById?.get(taskId) ?? false : undefined}
+              onToggleTaskDone={
+                taskId && onToggleTaskDone
+                  ? () => onToggleTaskDone(taskId)
+                  : undefined
+              }
+              style={{
+                top: msToY(seg.start, dayStart),
+                height: durationToHeight(seg.start, seg.end),
+                left: `calc(${p.leftPct}% + 1px)`,
+                width: `calc(${p.widthPct}% - 3px)`,
+              }}
+            />
+          </ItemContextMenu>
         );
       })}
       {isToday && <NowLine dayStart={dayStart} />}

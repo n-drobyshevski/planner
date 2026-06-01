@@ -157,6 +157,7 @@ export function splitThisAndFuture(
     location: patch.location !== undefined ? patch.location : event.location,
     scope: event.scope,
     visibility: event.visibility,
+    color: event.color,
     allDay: patch.allDay !== undefined ? patch.allDay : event.allDay,
     start: newStart,
     end: newEnd,

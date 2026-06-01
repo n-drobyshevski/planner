@@ -25,6 +25,7 @@ function makeEvent(p: Partial<EventRow> = {}): EventRow {
     location: null,
     scope: "shared",
     visibility: "shared",
+    color: null,
     allDay: false,
     start: berlin(2026, 2, 27, 9),
     end: berlin(2026, 2, 27, 10),
@@ -68,6 +69,12 @@ describe("expandEvent — single", () => {
     const e = makeEvent({ start: berlin(2026, 2, 20, 9), end: berlin(2026, 2, 20, 10) });
     const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 2, 28, 0) };
     expect(expandEvent(e, [], win)).toHaveLength(0);
+  });
+
+  it("carries the event's own color onto the occurrence", () => {
+    const e = makeEvent({ color: "#abcdef" });
+    const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 2, 28, 0) };
+    expect(expandEvent(e, [], win)[0].color).toBe("#abcdef");
   });
 });
 
@@ -116,6 +123,18 @@ describe("expandEvent — recurring", () => {
     expect(mod.title).toBe("Moved");
     expect(mod.start).toBe(berlin(2026, 2, 28, 14));
     expect(mod.isException).toBe(true);
+  });
+
+  it("keeps the series color on every occurrence, incl. a modify-exception", () => {
+    const e = makeEvent({ rrule: "FREQ=DAILY", color: "#abcdef" });
+    const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 3, 1, 0) };
+    const target = berlin(2026, 2, 28, 9);
+    const occ = expandEvent(
+      e,
+      [ov({ occurrenceDate: target, type: "modify", title: "Moved" })],
+      win,
+    );
+    expect(occ.every((o) => o.color === "#abcdef")).toBe(true);
   });
 
   it("surfaces a modify whose new time is dragged into the window", () => {

@@ -14,6 +14,7 @@ function mk(id: string, status: TaskStatus): TaskRow {
     description: null,
     scope: "shared",
     visibility: "shared",
+    color: null,
     status,
     priority: null,
     dueAt: null,

@@ -50,6 +50,8 @@ export interface EventRow {
   location: string | null;
   scope: Scope;
   visibility: Visibility;
+  /** per-item color override (hex); null = derive from category/member/scope */
+  color: string | null;
   allDay: boolean;
   /** master / first-occurrence start, epoch ms */
   start: number;
@@ -78,6 +80,8 @@ export interface TaskRow {
   description: string | null;
   scope: Scope;
   visibility: Visibility;
+  /** per-item color override (hex); null = derive from category/member/scope */
+  color: string | null;
   status: TaskStatus;
   /** 0..3 priority; null = none */
   priority: number | null;
@@ -122,6 +126,8 @@ export interface Occurrence {
   description: string | null;
   location: string | null;
   categoryId: string | null;
+  /** per-item color override (hex), carried from the master event; null = derived */
+  color: string | null;
   ownerId: string;
   scope: Scope;
   visibility: Visibility;

@@ -57,6 +57,7 @@ export function mapEvent(r: Row): EventRow {
     location: (r.location as string | null) ?? null,
     scope: r.scope as EventRow["scope"],
     visibility: r.visibility as EventRow["visibility"],
+    color: (r.color as string | null) ?? null,
     allDay: Boolean(r.all_day),
     start: toMs(r.starts_at),
     end: toMs(r.ends_at),
@@ -81,6 +82,7 @@ export function mapTask(r: Row): TaskRow {
     description: (r.description as string | null) ?? null,
     scope: r.scope as TaskRow["scope"],
     visibility: r.visibility as TaskRow["visibility"],
+    color: (r.color as string | null) ?? null,
     status: r.status as TaskRow["status"],
     priority: (r.priority as number | null) ?? null,
     dueAt: toMsOrNull(r.due_at),
@@ -119,6 +121,7 @@ export interface EventInput {
   location?: string | null;
   scope: EventRow["scope"];
   visibility: EventRow["visibility"];
+  color?: string | null;
   allDay?: boolean;
   start: number;
   end: number;
@@ -138,6 +141,7 @@ export function eventInputToRow(input: EventInput): Row {
     location: input.location ?? null,
     scope: input.scope,
     visibility: input.visibility,
+    color: input.color ?? null,
     all_day: input.allDay ?? false,
     starts_at: toIso(input.start),
     ends_at: toIso(input.end),
@@ -157,6 +161,7 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("location" in patch) row.location = patch.location ?? null;
   if ("scope" in patch) row.scope = patch.scope;
   if ("visibility" in patch) row.visibility = patch.visibility;
+  if ("color" in patch) row.color = patch.color ?? null;
   if ("allDay" in patch) row.all_day = patch.allDay;
   if ("start" in patch && patch.start != null) row.starts_at = toIso(patch.start);
   if ("end" in patch && patch.end != null) row.ends_at = toIso(patch.end);
@@ -181,6 +186,7 @@ export interface TaskInput {
   description?: string | null;
   scope: TaskRow["scope"];
   visibility: TaskRow["visibility"];
+  color?: string | null;
   status?: TaskRow["status"];
   priority?: number | null;
   dueAt?: number | null;
@@ -200,6 +206,7 @@ export function taskInputToRow(input: TaskInput): Row {
     description: input.description ?? null,
     scope: input.scope,
     visibility: input.visibility,
+    color: input.color ?? null,
     status: input.status ?? "todo",
     priority: input.priority ?? null,
     due_at: toIsoOrNull(input.dueAt ?? null),
@@ -219,6 +226,7 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("description" in patch) row.description = patch.description ?? null;
   if ("scope" in patch) row.scope = patch.scope;
   if ("visibility" in patch) row.visibility = patch.visibility;
+  if ("color" in patch) row.color = patch.color ?? null;
   if ("status" in patch) row.status = patch.status;
   if ("priority" in patch) row.priority = patch.priority ?? null;
   if ("dueAt" in patch) row.due_at = toIsoOrNull(patch.dueAt ?? null);

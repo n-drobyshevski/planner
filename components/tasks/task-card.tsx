@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
 import type { Member, TaskRow } from "@/lib/types";
 
 const PRIORITY: Record<number, { label: string; variant: "destructive" | "secondary" | "outline" }> = {
@@ -33,7 +34,10 @@ export interface TaskCardProps {
   className?: string;
 }
 
-export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(function TaskCard(
+export const TaskCard = forwardRef<
+  HTMLDivElement,
+  TaskCardProps & MenuableProps & React.HTMLAttributes<HTMLDivElement>
+>(function TaskCard(
   {
     task,
     color,
@@ -47,6 +51,8 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(function TaskC
     style,
     dragProps,
     className,
+    onMenu,
+    ...rest
   },
   ref,
 ) {
@@ -67,6 +73,7 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(function TaskC
         className,
       )}
       {...dragProps}
+      {...rest}
     >
       {showHandle && (
         <GripVertical
@@ -138,6 +145,13 @@ export const TaskCard = forwardRef<HTMLDivElement, TaskCardProps>(function TaskC
             {assignee.name.slice(0, 1).toUpperCase()}
           </AvatarFallback>
         </Avatar>
+      )}
+
+      {onMenu && (
+        <ItemMenuButton
+          onMenu={onMenu}
+          className="mt-0.5 text-muted-foreground hover:text-foreground"
+        />
       )}
     </div>
   );

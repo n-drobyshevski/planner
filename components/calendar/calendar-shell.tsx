@@ -45,6 +45,11 @@ interface PendingReschedule {
   end: number;
 }
 
+interface PendingDelete {
+  event: EventRow;
+  occurrence: Occurrence;
+}
+
 export function CalendarShell({
   initialView,
   initialDate,
@@ -68,6 +73,7 @@ export function CalendarShell({
     useWindowEvents(workspace.data?.workspaceId, win);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const mutations = useEventMutations(workspace.data?.workspaceId);
   const qc = useQueryClient();
 
@@ -157,6 +163,29 @@ export function CalendarShell({
   }
   function onCreateRange(start: number, end: number) {
     setEditor({ mode: "create", defaultStart: start, defaultEnd: end });
+  }
+  /** Recolor an event (series-level: writes the master row's color). */
+  function onChangeEventColor(occ: Occurrence, color: string | null) {
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (ev) void mutations.updateSingle(ev.id, { color });
+  }
+  function onDeleteEvent(occ: Occurrence) {
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev) return;
+    if (ev.rrule) setPendingDelete({ event: ev, occurrence: occ });
+    else void mutations.remove(ev.id);
+  }
+  function onDeleteScope(scope: RecurrenceScope) {
+    const p = pendingDelete;
+    setPendingDelete(null);
+    if (!p) return;
+    if (scope === "this") {
+      void mutations.deleteThis(p.event, p.occurrence.occurrenceDate);
+    } else if (scope === "future") {
+      void mutations.deleteFuture(p.event, p.occurrence.occurrenceDate);
+    } else {
+      void mutations.deleteAll(p.event.id);
+    }
   }
   /** Optimistically patch a single event's time in the current window cache. */
   function optimisticMove(eventId: string, start: number, end: number) {
@@ -260,6 +289,8 @@ export function CalendarShell({
           onPickDay={pickDay}
           onCreateRange={onCreateRange}
           onReschedule={onReschedule}
+          onChangeColor={onChangeEventColor}
+          onDeleteEvent={onDeleteEvent}
           taskDoneById={taskDoneById}
           onToggleTaskDone={onToggleTaskDone}
           onScheduleTask={onScheduleTask}
@@ -302,6 +333,13 @@ export function CalendarShell({
         onOpenChange={(o) => !o && setPendingReschedule(null)}
         mode="edit"
         onChoose={onRescheduleScope}
+      />
+
+      <RecurrenceScopePrompt
+        open={pendingDelete !== null}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        mode="delete"
+        onChoose={onDeleteScope}
       />
 
       {scheduling && workspace.data && (

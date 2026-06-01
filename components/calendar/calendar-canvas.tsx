@@ -18,6 +18,8 @@ export interface CanvasProps {
   onPickDay: (ms: number) => void;
   onCreateRange: (startMs: number, endMs: number) => void;
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
+  onChangeColor: (occ: Occurrence, color: string | null) => void;
+  onDeleteEvent: (occ: Occurrence) => void;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
   onScheduleTask?: (taskId: string, startMs: number, endMs: number) => void;
@@ -37,6 +39,8 @@ export function CalendarCanvas(props: CanvasProps) {
     onPickDay,
     onCreateRange,
     onReschedule,
+    onChangeColor,
+    onDeleteEvent,
     taskDoneById,
     onToggleTaskDone,
     onScheduleTask,
@@ -61,6 +65,8 @@ export function CalendarCanvas(props: CanvasProps) {
         colorOf={colorOf}
         selectedKey={selectedKey}
         onSelect={onSelect}
+        onChangeColor={onChangeColor}
+        onDeleteEvent={onDeleteEvent}
         loading={props.loading}
       />
     );
@@ -77,6 +83,8 @@ export function CalendarCanvas(props: CanvasProps) {
         selectedKey={selectedKey}
         onSelect={onSelect}
         onPickDay={onPickDay}
+        onChangeColor={onChangeColor}
+        onDeleteEvent={onDeleteEvent}
       />
     );
   }
@@ -91,6 +99,8 @@ export function CalendarCanvas(props: CanvasProps) {
       onSelect={onSelect}
       onCreateRange={onCreateRange}
       onReschedule={onReschedule}
+      onChangeColor={onChangeColor}
+      onDeleteEvent={onDeleteEvent}
       taskDoneById={taskDoneById}
       onToggleTaskDone={onToggleTaskDone}
       onScheduleTask={onScheduleTask}
