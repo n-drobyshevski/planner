@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { format, parse, isValid } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,17 +34,22 @@ export function DatePicker({
   "aria-label"?: string;
   className?: string;
 }) {
+  const [open, setOpen] = useState(false);
   const selected = parseIso(value);
+  const label =
+    ariaLabel && selected
+      ? `${ariaLabel}, ${format(selected, "dd/MM/yyyy")}`
+      : ariaLabel;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}
           type="button"
           variant="outline"
           disabled={disabled}
-          aria-label={ariaLabel}
+          aria-label={label}
           className={cn(
             "w-full justify-start font-normal tabular-nums",
             !selected && "text-muted-foreground",
@@ -62,7 +68,10 @@ export function DatePicker({
           weekStartsOn={1}
           autoFocus
           onSelect={(d) => {
-            if (d) onChange(format(d, "yyyy-MM-dd"));
+            if (d) {
+              onChange(format(d, "yyyy-MM-dd"));
+              setOpen(false);
+            }
           }}
         />
         {clearable && value && (
@@ -72,7 +81,10 @@ export function DatePicker({
               variant="ghost"
               size="sm"
               className="w-full"
-              onClick={() => onChange("")}
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
             >
               Clear
             </Button>
