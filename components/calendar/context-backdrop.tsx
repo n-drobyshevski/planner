@@ -37,33 +37,32 @@ export const ContextBackdrop = forwardRef<
       data-occ-key={occ.key}
       style={{
         ...style,
-        // Translucent fill + a framed border (solid left accent) so the zone
-        // reads as a container its children sit inside, not a solid event.
-        // color-mix keeps it tinted in light & dark themes.
-        backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
-        borderLeft: `3px solid ${color}`,
+        // A clearly framed, translucent container: solid border in the context
+        // color + a faint fill, so its events visibly sit inside the zone.
+        backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`,
+        border: `1.5px solid ${color}`,
       }}
       className={cn(
         "pointer-events-none absolute z-0 overflow-hidden rounded-lg",
-        selected && "ring-2 ring-foreground",
+        selected && "ring-2 ring-foreground ring-offset-1",
       )}
       {...rest}
     >
       {/* Resize handles (thin, interactive) at the very top/bottom edges. */}
       <span
         data-resize="start"
-        className="pointer-events-auto absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
+        className="pointer-events-auto absolute inset-x-0 top-0 z-20 h-1.5 cursor-ns-resize"
       />
       <span
         data-resize="end"
-        className="pointer-events-auto absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+        className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 h-1.5 cursor-ns-resize"
       />
 
-      {/* Label handle: grab here to move / select the context. */}
+      {/* Title bar: full-width header that makes the zone read as a labelled
+          container, and doubles as the move / menu handle. */}
       <div
-        className="pointer-events-auto flex max-w-full cursor-grab items-center gap-1 self-start rounded-br-lg rounded-tl-md px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight select-none"
-        style={{ backgroundColor: color, color: "white" }}
+        className="pointer-events-auto flex cursor-grab items-center gap-1 px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight text-white select-none"
+        style={{ backgroundColor: color }}
       >
         <span className="truncate">{occ.title}</span>
         <span className="shrink-0 font-normal opacity-90 tabular-nums">
@@ -72,7 +71,7 @@ export const ContextBackdrop = forwardRef<
         {onMenu && (
           <ItemMenuButton
             onMenu={onMenu}
-            className="-mr-0.5 ml-0.5 text-white/90 hover:text-white"
+            className="-mr-0.5 ml-auto text-white/90 hover:text-white"
           />
         )}
       </div>
