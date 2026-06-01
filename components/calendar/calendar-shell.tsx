@@ -294,12 +294,16 @@ export function CalendarShell({
   const days = useMemo(() => getVisibleDays(view, focusedDate), [view, focusedDate]);
   const label = formatRangeLabel(view, focusedDate);
 
-  // Swipe the canvas left/right to page the view — only on Agenda/Month, where
-  // there's no horizontal/vertical-scroll conflict with the time grid.
+  // Swipe the canvas left/right to page to the next/previous period. In the
+  // time-grid views (day/week/3day) a gesture that begins on an event block is
+  // left alone, so long-press-dragging an event between days never doubles as a
+  // page turn. Agenda/Month have no draggable blocks, so nothing to exclude.
+  const timeGridView = view === "day" || view === "week" || view === "3day";
   const swipe = useSwipe({
-    enabled: mounted && (view === "agenda" || view === "month"),
+    enabled: mounted,
     onSwipeLeft: () => go(1),
     onSwipeRight: () => go(-1),
+    ignoreSelector: timeGridView ? "[data-occ-key]" : undefined,
   });
 
   // On a phone, the dense grids are hard to scan — default to the Agenda list

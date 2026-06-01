@@ -6,6 +6,12 @@ interface SwipeOptions {
   /** Minimum horizontal distance (px) to count as a swipe. */
   threshold?: number;
   enabled?: boolean;
+  /**
+   * Gestures that begin on an element matching this selector (or a descendant
+   * of one) are left alone. Used so dragging an event inside the time grid —
+   * which always starts on an event block — never doubles as a page swipe.
+   */
+  ignoreSelector?: string;
 }
 
 /**
@@ -20,6 +26,7 @@ export function useSwipe({
   onSwipeRight,
   threshold = 60,
   enabled = true,
+  ignoreSelector,
 }: SwipeOptions) {
   const start = React.useRef<{ x: number; y: number; id: number } | null>(null);
 
@@ -28,6 +35,7 @@ export function useSwipe({
   return {
     onPointerDown: (e: React.PointerEvent) => {
       if (e.pointerType !== "touch") return;
+      if (ignoreSelector && (e.target as Element).closest(ignoreSelector)) return;
       start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
     },
     onPointerUp: (e: React.PointerEvent) => {
