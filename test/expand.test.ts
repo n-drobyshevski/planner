@@ -26,6 +26,8 @@ function makeEvent(p: Partial<EventRow> = {}): EventRow {
     scope: "shared",
     visibility: "shared",
     color: null,
+    kind: "event",
+    contextId: null,
     allDay: false,
     start: berlin(2026, 2, 27, 9),
     end: berlin(2026, 2, 27, 10),
@@ -69,6 +71,16 @@ describe("expandEvent — single", () => {
     const e = makeEvent({ start: berlin(2026, 2, 20, 9), end: berlin(2026, 2, 20, 10) });
     const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 2, 28, 0) };
     expect(expandEvent(e, [], win)).toHaveLength(0);
+  });
+
+  it("carries kind and contextId onto the occurrence", () => {
+    const ctx = makeEvent({ kind: "context" });
+    const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 2, 28, 0) };
+    const o = expandEvent(ctx, [], win)[0];
+    expect(o.kind).toBe("context");
+
+    const child = makeEvent({ contextId: "ctx-1" });
+    expect(expandEvent(child, [], win)[0].contextId).toBe("ctx-1");
   });
 
   it("carries the event's own color onto the occurrence", () => {
@@ -135,6 +147,27 @@ describe("expandEvent — recurring", () => {
       win,
     );
     expect(occ.every((o) => o.color === "#abcdef")).toBe(true);
+  });
+
+  it("keeps kind/contextId on every occurrence, incl. a modify-exception", () => {
+    const e = makeEvent({ rrule: "FREQ=DAILY", kind: "context" });
+    const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 3, 1, 0) };
+    const target = berlin(2026, 2, 28, 9);
+    const occ = expandEvent(
+      e,
+      [ov({ occurrenceDate: target, type: "modify", title: "Moved" })],
+      win,
+    );
+    expect(occ.length).toBeGreaterThan(0);
+    expect(occ.every((o) => o.kind === "context")).toBe(true);
+
+    const child = makeEvent({ rrule: "FREQ=DAILY", contextId: "ctx-1" });
+    const childOcc = expandEvent(
+      child,
+      [ov({ occurrenceDate: target, type: "modify", title: "Moved" })],
+      win,
+    );
+    expect(childOcc.every((o) => o.contextId === "ctx-1")).toBe(true);
   });
 
   it("surfaces a modify whose new time is dragged into the window", () => {

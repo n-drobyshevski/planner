@@ -76,6 +76,10 @@ function baseOccurrence(
     // the master's color. Per-occurrence color would need an overrides.color
     // column — out of scope, so applyOverride deliberately leaves color alone.
     color: event.color,
+    // kind and contextId are series-level, like color: every occurrence inherits
+    // the master's, and applyOverride leaves them alone (no override columns).
+    kind: event.kind,
+    contextId: event.contextId,
     ownerId: event.ownerId,
     scope: event.scope,
     visibility: event.visibility,

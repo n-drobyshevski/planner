@@ -39,6 +39,11 @@ export function useEventMutations(workspaceId: string | undefined) {
       run(m.updateEvent(sb, id, patch), "Event updated"),
     remove: (id: string) => run(m.deleteEvent(sb, id), "Event deleted"),
 
+    assignContext: (eventId: string, contextId: string) =>
+      run(m.assignToContext(sb, eventId, contextId), "Added to context"),
+    removeContext: (eventId: string) =>
+      run(m.removeFromContext(sb, eventId), "Removed from context"),
+
     editThis: (event: EventRow, occurrenceMs: number, patch: OccurrencePatch) =>
       run(
         m.applyOverride(sb, workspaceId!, {

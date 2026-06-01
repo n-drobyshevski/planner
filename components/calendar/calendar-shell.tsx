@@ -8,6 +8,11 @@ import { getWindow, getVisibleDays, navigate } from "@/lib/datetime/window";
 import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { filterVisible } from "@/lib/scope/visibility";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
+import {
+  contextOccurrences,
+  enclosingContext,
+  contextIdForRange,
+} from "@/lib/calendar/contexts";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent } from "@/lib/tasks/tree";
 import { localTimeZone } from "@/lib/datetime/local";
@@ -45,7 +50,12 @@ import {
 import type { CalendarView, EventRow, Occurrence, TaskRow } from "@/lib/types";
 
 type EditorState =
-  | { mode: "create"; defaultStart: number; defaultEnd: number }
+  | {
+      mode: "create";
+      defaultStart: number;
+      defaultEnd: number;
+      defaultContextId: string | null;
+    }
   | { mode: "edit"; event: EventRow; occurrence: Occurrence };
 
 interface PendingReschedule {
@@ -84,6 +94,7 @@ export function CalendarShell({
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deletingContext, setDeletingContext] = useState<EventRow | null>(null);
   const mutations = useEventMutations(workspace.data?.workspaceId);
   const qc = useQueryClient();
 
@@ -113,6 +124,13 @@ export function CalendarShell({
   const colorOf = useMemo(
     () => (o: Occurrence) => resolveOccurrenceColor(o, categoryMap, memberMap),
     [categoryMap, memberMap],
+  );
+  // Context backdrops (expanded occurrences) for create-inside / move re-eval,
+  // and the master list of contexts for the dialog's "Context" selector.
+  const contextOccs = useMemo(() => contextOccurrences(occurrences), [occurrences]);
+  const contextList = useMemo(
+    () => events.filter((e) => e.kind === "context").map((e) => ({ id: e.id, title: e.title })),
+    [events],
   );
   const taskColorOf = (t: TaskRow) => resolveTaskColor(t, categoryMap, memberMap);
 
@@ -164,7 +182,12 @@ export function CalendarShell({
   }
   function openNew() {
     const s = focusedDate + 9 * 3_600_000; // 9am on the focused day
-    setEditor({ mode: "create", defaultStart: s, defaultEnd: s + 3_600_000 });
+    setEditor({
+      mode: "create",
+      defaultStart: s,
+      defaultEnd: s + 3_600_000,
+      defaultContextId: null,
+    });
   }
   function openEdit(occ: Occurrence) {
     const ev = events.find((e) => e.id === occ.eventId);
@@ -173,7 +196,20 @@ export function CalendarShell({
     setEditor({ mode: "edit", event: ev, occurrence: occ });
   }
   function onCreateRange(start: number, end: number) {
-    setEditor({ mode: "create", defaultStart: start, defaultEnd: end });
+    // Drawing inside a context auto-assigns the new event to it.
+    const ctx = enclosingContext(contextOccs, start);
+    setEditor({
+      mode: "create",
+      defaultStart: start,
+      defaultEnd: end,
+      defaultContextId: ctx?.eventId ?? null,
+    });
+  }
+  function onAssignContext(occ: Occurrence, contextId: string) {
+    void mutations.assignContext(occ.eventId, contextId);
+  }
+  function onRemoveContext(occ: Occurrence) {
+    void mutations.removeContext(occ.eventId);
   }
   /** Recolor an event (series-level: writes the master row's color). */
   function onChangeEventColor(occ: Occurrence, color: string | null) {
@@ -184,6 +220,7 @@ export function CalendarShell({
     const ev = events.find((e) => e.id === occ.eventId);
     if (!ev) return;
     if (ev.rrule) setPendingDelete({ event: ev, occurrence: occ });
+    else if (ev.kind === "context") setDeletingContext(ev);
     else void mutations.remove(ev.id);
   }
   function onDeleteScope(scope: RecurrenceScope) {
@@ -213,7 +250,17 @@ export function CalendarShell({
     if (!ev) return;
     if (!ev.rrule) {
       optimisticMove(ev.id, start, end);
-      void mutations.updateSingle(ev.id, { start, end });
+      // Re-derive context membership from overlap on every move (backdrop model).
+      // Contexts themselves never get a context_id; recurring events skip this.
+      if (ev.kind === "context") {
+        void mutations.updateSingle(ev.id, { start, end });
+      } else {
+        void mutations.updateSingle(ev.id, {
+          start,
+          end,
+          contextId: contextIdForRange(contextOccs, start),
+        });
+      }
     } else {
       setPendingReschedule({ event: ev, occurrence: occ, start, end });
     }
@@ -303,6 +350,8 @@ export function CalendarShell({
           onReschedule={onReschedule}
           onChangeColor={onChangeEventColor}
           onDeleteEvent={onDeleteEvent}
+          onAssignContext={onAssignContext}
+          onRemoveContext={onRemoveContext}
           taskDoneById={taskDoneById}
           onToggleTaskDone={onToggleTaskDone}
           onScheduleTask={onScheduleTask}
@@ -337,10 +386,12 @@ export function CalendarShell({
           workspaceId={workspace.data.workspaceId}
           currentMemberId={workspace.data.currentMember.id}
           categories={workspace.data.categories}
+          contexts={contextList}
           event={editor.mode === "edit" ? editor.event : null}
           occurrence={editor.mode === "edit" ? editor.occurrence : null}
           defaultStart={editor.mode === "create" ? editor.defaultStart : undefined}
           defaultEnd={editor.mode === "create" ? editor.defaultEnd : undefined}
+          defaultContextId={editor.mode === "create" ? editor.defaultContextId : undefined}
         />
       )}
 
@@ -396,6 +447,33 @@ export function CalendarShell({
           onDelete={(t) => setDeletingTask(t)}
         />
       )}
+
+      <AlertDialog
+        open={deletingContext !== null}
+        onOpenChange={(o) => !o && setDeletingContext(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this context?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The events inside it stay on your calendar — only the time-block
+              grouping is removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingContext) void mutations.remove(deletingContext.id);
+                setDeletingContext(null);
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={deletingTask !== null}

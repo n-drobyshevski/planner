@@ -27,9 +27,12 @@ import { ColorSwatchPicker } from "./color-swatch-picker";
 
 export interface ItemAction {
   label: string;
-  onSelect: () => void;
+  /** Omitted for a pure submenu parent (its `submenu` items carry the handlers). */
+  onSelect?: () => void;
   icon?: LucideIcon;
   destructive?: boolean;
+  /** Nested actions; rendered as a submenu (desktop) / inline group (mobile). */
+  submenu?: ItemAction[];
 }
 
 /** A child leaf (EventBlock, TaskCard, …) that can host the mobile ⋮ affordance. */
@@ -99,12 +102,33 @@ export function ItemContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-44">
-        {nonDestructive.map((a) => (
-          <ContextMenuItem key={a.label} onSelect={a.onSelect}>
-            {a.icon && <a.icon />}
-            {a.label}
-          </ContextMenuItem>
-        ))}
+        {nonDestructive.map((a) =>
+          a.submenu ? (
+            <ContextMenuSub key={a.label}>
+              <ContextMenuSubTrigger>
+                {a.icon && <a.icon />}
+                {a.label}
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="min-w-40">
+                {a.submenu.map((s) => (
+                  <ContextMenuItem
+                    key={s.label}
+                    variant={s.destructive ? "destructive" : undefined}
+                    onSelect={s.onSelect}
+                  >
+                    {s.icon && <s.icon />}
+                    {s.label}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          ) : (
+            <ContextMenuItem key={a.label} onSelect={a.onSelect}>
+              {a.icon && <a.icon />}
+              {a.label}
+            </ContextMenuItem>
+          ),
+        )}
         {onColorChange && (
           <ContextMenuSub>
             <ContextMenuSubTrigger>Color</ContextMenuSubTrigger>
@@ -168,6 +192,36 @@ export function ItemActionSheet({
           <div className="flex flex-col gap-1">
             {actions.map((a) => {
               const Icon = a.icon;
+              // A submenu parent becomes a small labelled group of buttons.
+              if (a.submenu) {
+                return (
+                  <div key={a.label} className="flex flex-col gap-1">
+                    <span className="px-3 pt-1 text-xs font-medium text-muted-foreground">
+                      {a.label}
+                    </span>
+                    {a.submenu.map((s) => {
+                      const SIcon = s.icon;
+                      return (
+                        <Button
+                          key={s.label}
+                          variant="ghost"
+                          className={cn(
+                            "h-11 justify-start pl-5",
+                            s.destructive && "text-destructive hover:text-destructive",
+                          )}
+                          onClick={() => {
+                            s.onSelect?.();
+                            close();
+                          }}
+                        >
+                          {SIcon && <SIcon data-icon="inline-start" />}
+                          {s.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                );
+              }
               return (
                 <Button
                   key={a.label}
@@ -177,7 +231,7 @@ export function ItemActionSheet({
                     a.destructive && "text-destructive hover:text-destructive",
                   )}
                   onClick={() => {
-                    a.onSelect();
+                    a.onSelect?.();
                     close();
                   }}
                 >

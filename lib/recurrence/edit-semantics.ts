@@ -158,6 +158,8 @@ export function splitThisAndFuture(
     scope: event.scope,
     visibility: event.visibility,
     color: event.color,
+    kind: event.kind,
+    contextId: event.contextId,
     allDay: patch.allDay !== undefined ? patch.allDay : event.allDay,
     start: newStart,
     end: newEnd,
