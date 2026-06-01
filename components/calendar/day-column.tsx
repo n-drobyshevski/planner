@@ -22,6 +22,7 @@ export function DayColumn({
   dayStart,
   occurrences,
   isToday,
+  singleColumn,
   colorOf,
   selectedKey,
   onSelect,
@@ -35,6 +36,8 @@ export function DayColumn({
   dayStart: number;
   occurrences: Occurrence[];
   isToday: boolean;
+  /** True in day view — its one wide column keeps the context time range on phones. */
+  singleColumn?: boolean;
   colorOf: (o: Occurrence) => string;
   selectedKey: string | null;
   onSelect: (o: Occurrence) => void;
@@ -143,6 +146,7 @@ export function DayColumn({
             occ={seg.occ}
             color={colorOf(seg.occ)}
             selected={selectedKey === seg.occ.key}
+            singleColumn={singleColumn}
             style={{
               top: msToY(seg.start, dayStart),
               height: durationToHeight(seg.start, seg.end),

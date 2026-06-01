@@ -503,6 +503,7 @@ export function TimeGrid({
                 key={d}
                 dayStart={d}
                 isToday={d === today}
+                singleColumn={days.length === 1}
                 occurrences={occurrences}
                 colorOf={colorOf}
                 selectedKey={selectedKey}
