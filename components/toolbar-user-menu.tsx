@@ -14,7 +14,7 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/calendar/theme-toggle";
-import { signOutAction } from "@/app/select-profile/actions";
+import { signOutAction } from "@/app/login/actions";
 import type { Member } from "@/lib/types";
 
 /** Theme toggle + profile menu, shared by the calendar and tasks toolbars. */

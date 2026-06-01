@@ -14,7 +14,7 @@ import type { AccentId, SurfaceTone } from "@/lib/types";
 /**
  * Read the signed-in member's accent/tone server-side so we can set the matching
  * <html> data attributes in the initial HTML — no color flash on load. Falls back
- * to defaults when signed out (e.g. /select-profile) or on any error.
+ * to defaults when signed out (e.g. /login) or on any error.
  */
 async function getAppearance(): Promise<{ accent: AccentId; tone: SurfaceTone }> {
   try {

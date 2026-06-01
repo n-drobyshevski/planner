@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { ViewSwitcher } from "./view-switcher";
 import { AppNav } from "@/components/app-nav";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
-import { signOutAction } from "@/app/select-profile/actions";
+import { signOutAction } from "@/app/login/actions";
 import type { CalendarView } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import type { WorkspaceData } from "@/lib/hooks/use-workspace";
