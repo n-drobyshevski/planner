@@ -68,6 +68,9 @@ function baseOccurrence(
     start,
     end,
     allDay: event.allDay,
+    // Series-level, like color/kind/contextId: every occurrence inherits the
+    // master's inactive flag; applyOverride leaves it alone (no override column).
+    inactive: event.inactive,
     title: event.title,
     description: event.description,
     location: event.location,

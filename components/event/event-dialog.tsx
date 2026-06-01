@@ -46,6 +46,7 @@ interface FormState {
   description: string;
   location: string;
   allDay: boolean;
+  inactive: boolean;
   startDate: string;
   startTime: string;
   endDate: string;
@@ -165,6 +166,7 @@ export function EventDialog(props: EventDialogProps) {
         location: form.location.trim() || null,
         isPrivate: form.isPrivate,
         allDay: isContext ? false : form.allDay,
+        inactive: form.inactive,
         start,
         end,
         timeZone: localTimeZone(),
@@ -195,6 +197,7 @@ export function EventDialog(props: EventDialogProps) {
         location: form.location.trim() || null,
         isPrivate: form.isPrivate,
         allDay: isContext ? false : form.allDay,
+        inactive: form.inactive,
         start,
         end,
         rrule: buildRRule(form.recurrence),
@@ -217,6 +220,7 @@ export function EventDialog(props: EventDialogProps) {
       location: form.location.trim() || null,
       categoryId: form.categoryId === "none" ? null : form.categoryId,
       allDay: form.allDay,
+      inactive: form.inactive,
       start,
       end,
     };
@@ -253,6 +257,7 @@ export function EventDialog(props: EventDialogProps) {
           categoryId: patch.categoryId,
           ...(isContext ? {} : { contextId: selectedContextId }),
           allDay: form.allDay,
+          inactive: form.inactive,
           start: event.start + delta,
           end: event.end + delta,
           rrule: buildRRule(form.recurrence),
@@ -351,6 +356,15 @@ export function EventDialog(props: EventDialogProps) {
                 <FieldLabel htmlFor="ev-allday">All day</FieldLabel>
               </Field>
             )}
+
+            <Field orientation="horizontal">
+              <Switch
+                id="ev-inactive"
+                checked={form.inactive}
+                onCheckedChange={(v) => set("inactive", v)}
+              />
+              <FieldLabel htmlFor="ev-inactive">Inactive (grayed out)</FieldLabel>
+            </Field>
 
             <div className="grid grid-cols-2 gap-3">
               <Field>
@@ -528,6 +542,7 @@ function buildInitial(props: EventDialogProps): FormState {
       description: occurrence.description ?? "",
       location: occurrence.location ?? "",
       allDay: occurrence.allDay,
+      inactive: occurrence.inactive,
       startDate: msToDateInput(occurrence.start),
       startTime: msToTimeInput(occurrence.start),
       endDate: msToDateInput(occurrence.allDay ? occurrence.end - 1 : occurrence.end),
@@ -546,6 +561,7 @@ function buildInitial(props: EventDialogProps): FormState {
     description: "",
     location: "",
     allDay: false,
+    inactive: false,
     startDate: msToDateInput(start),
     startTime: msToTimeInput(start),
     endDate: msToDateInput(end),

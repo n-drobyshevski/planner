@@ -44,6 +44,7 @@ export const EventBlock = forwardRef<
         "absolute z-10 flex touch-none flex-col overflow-hidden rounded-md px-1.5 py-1 text-left text-xs text-white shadow-soft select-none",
         editable ? "cursor-grab" : "cursor-pointer",
         selected && "z-20 ring-2 ring-foreground",
+        occ.inactive && "opacity-55 grayscale",
       )}
       {...rest}
     >

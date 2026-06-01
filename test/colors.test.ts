@@ -32,6 +32,7 @@ function occ(over: Partial<Occurrence>): Occurrence {
     start: 1,
     end: 2,
     allDay: false,
+    inactive: false,
     title: "t",
     description: null,
     location: null,

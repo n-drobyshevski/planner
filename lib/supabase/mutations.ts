@@ -175,6 +175,7 @@ export async function splitSeries(
     kind: newSeries.kind,
     contextId: newContextId !== undefined ? newContextId : newSeries.contextId,
     allDay: newSeries.allDay,
+    inactive: newSeries.inactive,
     start: newSeries.start,
     end: newSeries.end,
     timeZone: newSeries.timeZone,

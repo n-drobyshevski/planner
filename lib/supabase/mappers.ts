@@ -60,6 +60,7 @@ export function mapEvent(r: Row): EventRow {
     kind: (r.kind as EventRow["kind"] | null) ?? "event",
     contextId: (r.context_id as string | null) ?? null,
     allDay: Boolean(r.all_day),
+    inactive: Boolean(r.inactive),
     start: toMs(r.starts_at),
     end: toMs(r.ends_at),
     timeZone: r.time_zone as string,
@@ -124,6 +125,7 @@ export interface EventInput {
   kind?: EventRow["kind"];
   contextId?: string | null;
   allDay?: boolean;
+  inactive?: boolean;
   start: number;
   end: number;
   timeZone: string;
@@ -145,6 +147,7 @@ export function eventInputToRow(input: EventInput): Row {
     kind: input.kind ?? "event",
     context_id: input.contextId ?? null,
     all_day: input.allDay ?? false,
+    inactive: input.inactive ?? false,
     starts_at: toIso(input.start),
     ends_at: toIso(input.end),
     time_zone: input.timeZone,
@@ -166,6 +169,7 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("kind" in patch) row.kind = patch.kind;
   if ("contextId" in patch) row.context_id = patch.contextId ?? null;
   if ("allDay" in patch) row.all_day = patch.allDay;
+  if ("inactive" in patch) row.inactive = patch.inactive;
   if ("start" in patch && patch.start != null) row.starts_at = toIso(patch.start);
   if ("end" in patch && patch.end != null) row.ends_at = toIso(patch.end);
   if ("timeZone" in patch) row.time_zone = patch.timeZone;

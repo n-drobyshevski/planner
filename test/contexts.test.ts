@@ -13,6 +13,7 @@ function occ(over: Partial<Occurrence> & Pick<Occurrence, "start" | "end">): Occ
     eventId: "e",
     occurrenceDate: over.start,
     allDay: false,
+    inactive: false,
     title: "t",
     description: null,
     location: null,

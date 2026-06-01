@@ -27,6 +27,7 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     kind: "event",
     contextId: null,
     allDay: false,
+    inactive: false,
     start: baseStart,
     end: baseEnd,
     timeZone: "America/New_York",
@@ -138,6 +139,14 @@ describe("editAll", () => {
     expect(result.allDay).toBe(false);
   });
 
+  it("carries the inactive flag (series-level)", () => {
+    expect(editAll(makeEvent({ inactive: false }), { inactive: true }).inactive).toBe(true);
+    // falsy false must still be treated as a real patch, not absent
+    expect(editAll(makeEvent({ inactive: true }), { inactive: false }).inactive).toBe(false);
+    // absent => not in the patch result
+    expect("inactive" in editAll(makeEvent(), {})).toBe(false);
+  });
+
   it("returns an empty object for an empty patch", () => {
     const event = makeEvent();
     expect(editAll(event, {})).toEqual({});
@@ -193,6 +202,16 @@ describe("splitThisAndFuture", () => {
 
     const child = makeEvent({ contextId: "ctx-1" });
     expect(splitThisAndFuture(child, fromOccurrenceMs, {}).newSeries.contextId).toBe("ctx-1");
+  });
+
+  it("inherits the inactive flag from the master, and lets the patch override it", () => {
+    const inactiveEvent = makeEvent({ inactive: true });
+    expect(
+      splitThisAndFuture(inactiveEvent, fromOccurrenceMs, {}).newSeries.inactive,
+    ).toBe(true);
+    expect(
+      splitThisAndFuture(inactiveEvent, fromOccurrenceMs, { inactive: false }).newSeries.inactive,
+    ).toBe(false);
   });
 
   it("does not include id/createdAt/updatedAt on the new series", () => {

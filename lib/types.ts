@@ -57,6 +57,8 @@ export interface EventRow {
   /** parent context this event is grouped under (master id); null = none */
   contextId: string | null;
   allDay: boolean;
+  /** when true, the event is de-emphasized (grayed out) in the calendar, e.g. sleep hours */
+  inactive: boolean;
   /** master / first-occurrence start, epoch ms */
   start: number;
   /** master / first-occurrence end, epoch ms */
@@ -126,6 +128,8 @@ export interface Occurrence {
   start: number;
   end: number;
   allDay: boolean;
+  /** inherited from the event: when true, render this occurrence grayed out */
+  inactive: boolean;
   title: string;
   description: string | null;
   location: string | null;

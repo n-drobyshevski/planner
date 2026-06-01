@@ -28,6 +28,7 @@ function makeEvent(p: Partial<EventRow> = {}): EventRow {
     kind: "event",
     contextId: null,
     allDay: false,
+    inactive: false,
     start: berlin(2026, 2, 27, 9),
     end: berlin(2026, 2, 27, 10),
     timeZone: TZ,
@@ -55,6 +56,26 @@ function ov(p: Partial<OverrideRow> & Pick<OverrideRow, "occurrenceDate" | "type
     ...p,
   };
 }
+
+describe("expandEvent — inactive flag", () => {
+  const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 3, 1, 0) };
+
+  it("propagates inactive=true to a single occurrence", () => {
+    const occ = expandEvent(makeEvent({ inactive: true }), [], win);
+    expect(occ).toHaveLength(1);
+    expect(occ[0].inactive).toBe(true);
+  });
+
+  it("propagates inactive to every occurrence of a recurring series", () => {
+    const occ = expandEvent(makeEvent({ rrule: "FREQ=DAILY", inactive: true }), [], win);
+    expect(occ.length).toBeGreaterThan(1);
+    expect(occ.every((o) => o.inactive)).toBe(true);
+  });
+
+  it("defaults to active (inactive=false) occurrences", () => {
+    expect(expandEvent(makeEvent(), [], win)[0].inactive).toBe(false);
+  });
+});
 
 describe("expandEvent — single", () => {
   it("includes an event intersecting the window", () => {

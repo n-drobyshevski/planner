@@ -189,6 +189,7 @@ const MonthItemEl = forwardRef<
         className={cn(
           "pointer-events-auto mx-1 truncate rounded px-1.5 text-left text-xs leading-5 text-white",
           selected && "ring-2 ring-foreground",
+          item.occ.inactive && "opacity-55 grayscale",
         )}
         {...rest}
       >
@@ -206,6 +207,7 @@ const MonthItemEl = forwardRef<
       className={cn(
         "pointer-events-auto mx-1 flex items-center gap-1 truncate rounded px-1 text-left text-xs leading-5 hover:bg-accent",
         selected && "ring-2 ring-foreground",
+        item.occ.inactive && "opacity-55 grayscale",
       )}
       {...rest}
     >
@@ -252,7 +254,10 @@ function MoreButton({
               key={o.key}
               type="button"
               onClick={() => onSelect(o)}
-              className="flex items-center gap-1.5 truncate rounded px-1.5 py-1 text-left text-sm hover:bg-accent"
+              className={cn(
+                "flex items-center gap-1.5 truncate rounded px-1.5 py-1 text-left text-sm hover:bg-accent",
+                o.inactive && "opacity-55 grayscale",
+              )}
             >
               <span
                 className="size-2 shrink-0 rounded-full"

@@ -13,6 +13,7 @@ function occ(over: Partial<Occurrence>): Occurrence {
     start: 1000,
     end: 2000,
     allDay: false,
+    inactive: false,
     title: "t",
     description: null,
     location: null,

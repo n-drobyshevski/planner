@@ -17,6 +17,7 @@ export interface OccurrencePatch {
   start?: number;
   end?: number;
   allDay?: boolean;
+  inactive?: boolean;
 }
 
 /** Description of an override row to upsert for one occurrence of a recurring event. */
@@ -68,6 +69,7 @@ export function editAll(
   if (patch.location !== undefined) out.location = patch.location;
   if (patch.categoryId !== undefined) out.categoryId = patch.categoryId;
   if (patch.allDay !== undefined) out.allDay = patch.allDay;
+  if (patch.inactive !== undefined) out.inactive = patch.inactive;
 
   const hasStart = patch.start !== undefined;
   const hasEnd = patch.end !== undefined;
@@ -160,6 +162,7 @@ export function splitThisAndFuture(
     kind: event.kind,
     contextId: event.contextId,
     allDay: patch.allDay !== undefined ? patch.allDay : event.allDay,
+    inactive: patch.inactive !== undefined ? patch.inactive : event.inactive,
     start: newStart,
     end: newEnd,
     timeZone: event.timeZone,
