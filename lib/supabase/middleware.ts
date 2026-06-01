@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSupabaseConfig, isSupabaseConfigured } from "./env";
 
 /**
  * Refresh the Supabase session cookie on each request and gate routes:
@@ -9,9 +10,25 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // If Supabase isn't configured for this environment (e.g. env vars set only
+  // for Production on Vercel, so Preview deploys have none), don't 500 every
+  // route from the proxy. Pass the request through with a legible warning;
+  // routes that genuinely need data surface their own clear error.
+  if (!isSupabaseConfigured()) {
+    console.error(
+      "[proxy] Skipping auth gating: Supabase env vars are missing for this " +
+        "environment. Set NEXT_PUBLIC_SUPABASE_URL and " +
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY in the Vercel project settings for all " +
+        "environments (Production, Preview, Development).",
+    );
+    return response;
+  }
+
+  const { url: supabaseUrl, anonKey } = getSupabaseConfig();
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    anonKey,
     {
       cookies: {
         getAll() {
