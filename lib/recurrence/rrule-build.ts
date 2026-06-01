@@ -1,6 +1,7 @@
 // Map a recurrence form <-> RFC5545 RRULE string (NO DTSTART line).
 // Times are epoch milliseconds (UTC). byWeekday uses 0=Mon..6=Sun.
 
+import { format } from "date-fns";
 import { RRule, type Options, Weekday } from "rrule";
 
 export type Freq = "DAILY" | "WEEKLY" | "MONTHLY";
@@ -130,6 +131,42 @@ export function parseRRule(rrule: string | null): RecurrenceForm | null {
   }
 
   return { freq, interval, byWeekday, end };
+}
+
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const FREQ_ADVERB: Record<Freq, string> = {
+  DAILY: "daily",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+};
+const FREQ_UNIT: Record<Freq, string> = {
+  DAILY: "day",
+  WEEKLY: "week",
+  MONTHLY: "month",
+};
+
+/** Short human sentence for a recurrence form, e.g. "Repeats weekly on Mon, Wed, until Jun 30, 2026". */
+export function summarizeRecurrence(form: RecurrenceForm): string {
+  let out =
+    form.interval > 1
+      ? `Repeats every ${form.interval} ${FREQ_UNIT[form.freq]}s`
+      : `Repeats ${FREQ_ADVERB[form.freq]}`;
+
+  if (form.freq === "WEEKLY" && form.byWeekday.length > 0) {
+    const days = [...form.byWeekday]
+      .sort((a, b) => a - b)
+      .map((i) => WEEKDAY_LABELS[i])
+      .join(", ");
+    out += ` on ${days}`;
+  }
+
+  if (form.end.type === "until") {
+    out += `, until ${format(form.end.dateMs, "MMM d, yyyy")}`;
+  } else if (form.end.type === "count") {
+    out += `, ${form.end.count} times`;
+  }
+
+  return out;
 }
 
 function weekdayToIndex(w: unknown): number | null {

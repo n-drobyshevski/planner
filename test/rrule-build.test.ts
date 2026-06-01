@@ -2,8 +2,45 @@ import { describe, it, expect } from "vitest";
 import {
   buildRRule,
   parseRRule,
+  summarizeRecurrence,
   type RecurrenceForm,
 } from "@/lib/recurrence/rrule-build";
+
+describe("summarizeRecurrence", () => {
+  it("weekly on a single day", () => {
+    expect(
+      summarizeRecurrence({ freq: "WEEKLY", interval: 1, byWeekday: [0], end: { type: "never" } }),
+    ).toBe("Repeats weekly on Mon");
+  });
+
+  it("every N weeks on multiple days", () => {
+    expect(
+      summarizeRecurrence({ freq: "WEEKLY", interval: 2, byWeekday: [2, 0], end: { type: "never" } }),
+    ).toBe("Repeats every 2 weeks on Mon, Wed");
+  });
+
+  it("daily with an until date", () => {
+    expect(
+      summarizeRecurrence({
+        freq: "DAILY",
+        interval: 1,
+        byWeekday: [],
+        end: { type: "until", dateMs: new Date(2026, 5, 30).getTime() },
+      }),
+    ).toBe("Repeats daily, until Jun 30, 2026");
+  });
+
+  it("monthly with a count", () => {
+    expect(
+      summarizeRecurrence({
+        freq: "MONTHLY",
+        interval: 1,
+        byWeekday: [],
+        end: { type: "count", count: 5 },
+      }),
+    ).toBe("Repeats monthly, 5 times");
+  });
+});
 
 describe("buildRRule", () => {
   it("returns null for null form", () => {

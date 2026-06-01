@@ -1,9 +1,37 @@
 import { describe, it, expect } from "vitest";
 import {
   formatRangeLabel,
+  formatOccurrenceWhen,
   parseViewParam,
   isCalendarViewParam,
 } from "@/lib/datetime/format";
+
+describe("formatOccurrenceWhen", () => {
+  // June 1 2026 is a Monday. Local Date construction keeps these tz-stable.
+  it("all-day single day", () => {
+    const start = new Date(2026, 5, 1).getTime();
+    const end = new Date(2026, 5, 2).getTime();
+    expect(formatOccurrenceWhen(start, end, true)).toBe("Mon, Jun 1 · All day");
+  });
+
+  it("all-day multi day (exclusive end)", () => {
+    const start = new Date(2026, 5, 1).getTime();
+    const end = new Date(2026, 5, 5).getTime();
+    expect(formatOccurrenceWhen(start, end, true)).toBe("Jun 1 – Jun 4");
+  });
+
+  it("timed within one day", () => {
+    const start = new Date(2026, 5, 1, 9, 0).getTime();
+    const end = new Date(2026, 5, 1, 9, 30).getTime();
+    expect(formatOccurrenceWhen(start, end, false)).toBe("Mon, Jun 1 · 9:00 – 9:30 AM");
+  });
+
+  it("timed across midnight", () => {
+    const start = new Date(2026, 5, 1, 23, 0).getTime();
+    const end = new Date(2026, 5, 2, 1, 0).getTime();
+    expect(formatOccurrenceWhen(start, end, false)).toBe("Jun 1, 11:00 PM – Jun 2, 1:00 AM");
+  });
+});
 
 // May 31 2026 is a Sunday; default week start is Monday (weekStartsOn=1).
 // Strings depend only on the local calendar date, so they are timezone-stable.
