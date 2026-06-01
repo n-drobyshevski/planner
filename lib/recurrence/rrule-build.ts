@@ -91,8 +91,10 @@ export function buildRRule(form: RecurrenceForm | null): string | null {
 
   // A daily weekday filter is really a weekly cadence; INTERVAL would mean
   // "every N days" and drift off the chosen weekdays, so we omit it there.
-  const emitInterval = form.interval > 1 && !(form.freq === "DAILY" && hasDays);
-  if (emitInterval) {
+  // Callers should pass interval 1 in that case; a stale interval > 1 is
+  // intentionally ignored.
+  const showInterval = form.interval > 1 && !(form.freq === "DAILY" && hasDays);
+  if (showInterval) {
     parts.push(`INTERVAL=${form.interval}`);
   }
 

@@ -182,6 +182,16 @@ describe("buildRRule", () => {
     expect(buildRRule(form)).toBe("FREQ=DAILY;BYDAY=MO");
   });
 
+  it("daily with all seven days -> FREQ=DAILY;BYDAY=MO..SU (no INTERVAL)", () => {
+    const form: RecurrenceForm = {
+      freq: "DAILY",
+      interval: 1,
+      byWeekday: [6, 5, 4, 3, 2, 1, 0],
+      end: { type: "never" },
+    };
+    expect(buildRRule(form)).toBe("FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR,SA,SU");
+  });
+
   it("monthly does not emit BYDAY even if byWeekday is set", () => {
     const form: RecurrenceForm = {
       freq: "MONTHLY",
