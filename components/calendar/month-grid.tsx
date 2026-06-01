@@ -22,6 +22,8 @@ interface CommonProps {
   selectedKey: string | null;
   onSelect: (o: Occurrence) => void;
   onPickDay: (ms: number) => void;
+  /** Click on an empty day cell: create a new event on that day. */
+  onCreateDay: (ms: number) => void;
   onChangeColor: (o: Occurrence, color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
   /** Owner-only editability; non-editable occurrences are read-only overlays. */
@@ -68,6 +70,7 @@ function WeekRow({
   selectedKey,
   onSelect,
   onPickDay,
+  onCreateDay,
   onChangeColor,
   onDeleteEvent,
   canEdit,
@@ -87,11 +90,29 @@ function WeekRow({
           return (
             <div
               key={d}
-              className={cn("min-w-0 border-l", !inMonth && "bg-muted/40")}
+              role="button"
+              tabIndex={0}
+              aria-label={`Create event on ${format(d, "MMMM d")}`}
+              onClick={() => onCreateDay(d)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onCreateDay(d);
+                }
+              }}
+              className={cn(
+                "min-w-0 cursor-pointer border-l",
+                !inMonth && "bg-muted/40",
+              )}
             >
               <button
                 type="button"
-                onClick={() => onPickDay(d)}
+                aria-label={`Go to ${format(d, "MMMM d")}`}
+                onClick={(e) => {
+                  // The day number navigates to Day view; don't also create.
+                  e.stopPropagation();
+                  onPickDay(d);
+                }}
                 className={cn(
                   "m-1 flex size-6 items-center justify-center rounded-full text-xs tabular-nums hover:bg-accent",
                   isToday &&

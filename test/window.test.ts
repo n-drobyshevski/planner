@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { getWindow, getVisibleDays, navigate } from "@/lib/datetime/window";
-import { startOfDay, getTime, addDays } from "date-fns";
+import { getWindow, getVisibleDays, navigate, defaultCreateDay } from "@/lib/datetime/window";
+import { startOfDay, startOfMonth, getTime, addDays } from "date-fns";
 
 // A fixed reference instant: 2026-05-31 (a Sunday) plus an afternoon offset so
 // we exercise the startOfDay normalization. Using local-time construction keeps
@@ -193,5 +193,39 @@ describe("navigate", () => {
 
     expect(new Date(fwd).getMonth()).not.toBe(new Date(start).getMonth());
     expect(new Date(back).getMonth()).not.toBe(new Date(start).getMonth());
+  });
+});
+
+describe("defaultCreateDay", () => {
+  it("month -> first of the focused month (startOfDay)", () => {
+    const result = defaultCreateDay("month", focused);
+    expect(result).toBe(getTime(startOfMonth(focused)));
+    expect(new Date(result).getDate()).toBe(1);
+    expect(new Date(result).getMonth()).toBe(4); // May
+    expect(isStartOfDay(result)).toBe(true);
+  });
+
+  it("month ignores weekStartsOn (always the 1st)", () => {
+    expect(defaultCreateDay("month", focused, { weekStartsOn: 0 })).toBe(
+      getTime(startOfMonth(focused)),
+    );
+  });
+
+  it("week -> first visible day (Monday by default)", () => {
+    const result = defaultCreateDay("week", focused);
+    expect(result).toBe(getVisibleDays("week", focused)[0]);
+    expect(new Date(result).getDay()).toBe(1); // Monday
+  });
+
+  it("week respects weekStartsOn=0 (Sunday)", () => {
+    const result = defaultCreateDay("week", focused, { weekStartsOn: 0 });
+    expect(result).toBe(getVisibleDays("week", focused, { weekStartsOn: 0 })[0]);
+    expect(new Date(result).getDay()).toBe(0); // Sunday
+  });
+
+  it("day / 3day / agenda -> startOfDay of the focused day", () => {
+    for (const view of ["day", "3day", "agenda"] as const) {
+      expect(defaultCreateDay(view, focused)).toBe(getTime(startOfDay(focused)));
+    }
   });
 });

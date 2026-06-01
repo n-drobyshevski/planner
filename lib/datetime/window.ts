@@ -105,6 +105,22 @@ export function getVisibleDays(
 }
 
 /**
+ * The startOfDay-aligned ms that a "New event" (the header "+" or a month-cell
+ * create) should default to for the current view: month -> the 1st of the
+ * focused month; every other view -> the first visible day (week => Monday).
+ */
+export function defaultCreateDay(
+  view: CalendarView,
+  focusedMs: number,
+  opts?: WindowOpts,
+): number {
+  // For month, getVisibleDays[0] is the grid start (can be in the previous
+  // month), so default to the actual 1st instead.
+  if (view === "month") return getTime(startOfMonth(focusedMs));
+  return getVisibleDays(view, focusedMs, opts)[0];
+}
+
+/**
  * Navigate the focused day by one unit of the view in direction `dir`.
  * day => +/-1 day, 3day => +/-3 days, week => +/-1 week, month => +/-1 month;
  * dir 0 unchanged.

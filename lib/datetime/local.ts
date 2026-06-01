@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, startOfDay, getTime } from "date-fns";
 
 const DAY_MS = 86_400_000;
 
@@ -37,4 +37,18 @@ export function localTimeZone(): string {
 export function ceilToStep(ms: number, stepMin: number): number {
   const step = stepMin * 60_000;
   return Math.ceil(ms / step) * step;
+}
+
+/**
+ * Default start instant for a new event defaulted to a whole day: if `dayMs` is
+ * today, the next 30-minute slot from `now`; otherwise 9:00 local on that day.
+ * The caller adds the duration. `now` is injectable for tests.
+ *
+ * Edge: late at night `ceilToStep` can roll to 00:00 the next day — the same
+ * accepted behavior as the event dialog's buildInitial fallback.
+ */
+export function defaultStartOnDay(dayMs: number, now: number = Date.now()): number {
+  return dayMs === getTime(startOfDay(now))
+    ? ceilToStep(now, 30)
+    : dayMs + 9 * 3_600_000;
 }

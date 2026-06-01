@@ -17,6 +17,8 @@ export interface CanvasProps {
   onSelect: (o: Occurrence) => void;
   onPickDay: (ms: number) => void;
   onCreateRange: (startMs: number, endMs: number) => void;
+  /** Month-view: create an event on a whole day (empty-cell click). */
+  onCreateDay: (ms: number) => void;
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
@@ -44,6 +46,7 @@ export function CalendarCanvas(props: CanvasProps) {
     onSelect,
     onPickDay,
     onCreateRange,
+    onCreateDay,
     onReschedule,
     onChangeColor,
     onDeleteEvent,
@@ -100,6 +103,7 @@ export function CalendarCanvas(props: CanvasProps) {
         selectedKey={selectedKey}
         onSelect={onSelect}
         onPickDay={onPickDay}
+        onCreateDay={onCreateDay}
         onChangeColor={onChangeColor}
         onDeleteEvent={onDeleteEvent}
         canEdit={canEdit}

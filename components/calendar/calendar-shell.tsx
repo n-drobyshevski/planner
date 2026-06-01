@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { startOfDay } from "date-fns";
-import { getWindow, getVisibleDays, navigate } from "@/lib/datetime/window";
+import { getWindow, getVisibleDays, navigate, defaultCreateDay } from "@/lib/datetime/window";
 import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { filterVisible } from "@/lib/scope/visibility";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/calendar/contexts";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent } from "@/lib/tasks/tree";
-import { localTimeZone } from "@/lib/datetime/local";
+import { localTimeZone, defaultStartOnDay } from "@/lib/datetime/local";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useWindowEvents, useWorkspaceRealtime } from "@/lib/hooks/use-window-events";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
@@ -79,6 +79,7 @@ const DISPLAY_ONLY = {
   onSelect: NOOP,
   onPickDay: NOOP,
   onCreateRange: NOOP,
+  onCreateDay: NOOP,
   onReschedule: NOOP,
   onChangeColor: NOOP,
   onDeleteEvent: NOOP,
@@ -229,13 +230,10 @@ export function CalendarShell({
     pushUrl("day", ms);
   }
   function openNew() {
-    const s = focusedDate + 9 * 3_600_000; // 9am on the focused day
-    setEditor({
-      mode: "create",
-      defaultStart: s,
-      defaultEnd: s + 3_600_000,
-      defaultContextId: null,
-    });
+    // Default to the first day of the visible timeframe (1st of month / Monday
+    // of the week / focused day), at the next 30-min slot if today else 9am.
+    const s = defaultStartOnDay(defaultCreateDay(view, focusedDate));
+    onCreateRange(s, s + 3_600_000);
   }
   function openEdit(occ: Occurrence) {
     const ev = events.find((e) => e.id === occ.eventId);
@@ -259,6 +257,11 @@ export function CalendarShell({
       defaultEnd: end,
       defaultContextId: ctx?.eventId ?? null,
     });
+  }
+  /** Month-view empty-cell create: default time on the clicked day, 1h long. */
+  function createOnDay(dayMs: number) {
+    const s = defaultStartOnDay(dayMs);
+    onCreateRange(s, s + 3_600_000);
   }
   function onAssignContext(occ: Occurrence, contextId: string) {
     if (!canEditOcc(occ)) return;
@@ -451,6 +454,7 @@ export function CalendarShell({
                 onSelect={openDetails}
                 onPickDay={pickDay}
                 onCreateRange={onCreateRange}
+                onCreateDay={createOnDay}
                 onReschedule={onReschedule}
                 onChangeColor={onChangeEventColor}
                 onDeleteEvent={onDeleteEvent}
