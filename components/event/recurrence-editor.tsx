@@ -67,8 +67,9 @@ export function RecurrenceEditor({
 
       {value &&
         (() => {
-          // Daily-with-days is a weekly cadence; the interval is meaningless there
-          // (mirrors showInterval in buildRRule / summarizeRecurrence).
+          // Daily-with-days is a weekly cadence, so we hide the interval input.
+          // Same DAILY+days gate as buildRRule/summarizeRecurrence — except those
+          // also guard interval > 1 for output; here we always show the input.
           const showInterval = !(value.freq === "DAILY" && value.byWeekday.length > 0);
           return (
             <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
