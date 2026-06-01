@@ -174,7 +174,7 @@ const MonthItemEl = forwardRef<
     selected: boolean;
     onSelect: (o: Occurrence) => void;
   } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onSelect">
->(function MonthItemEl({ item, color, selected, onSelect, ...rest }, ref) {
+>(function MonthItemEl({ item, color, selected, onSelect, className, ...rest }, ref) {
   const style: React.CSSProperties = {
     gridColumn: `${item.colStart + 1} / ${item.colEnd + 2}`,
   };
@@ -190,6 +190,7 @@ const MonthItemEl = forwardRef<
           "pointer-events-auto mx-1 truncate rounded px-1.5 text-left text-xs leading-5 text-white",
           selected && "ring-2 ring-foreground",
           item.occ.inactive && "opacity-55 grayscale",
+          className,
         )}
         {...rest}
       >
@@ -208,6 +209,7 @@ const MonthItemEl = forwardRef<
         "pointer-events-auto mx-1 flex items-center gap-1 truncate rounded px-1 text-left text-xs leading-5 hover:bg-accent",
         selected && "ring-2 ring-foreground",
         item.occ.inactive && "opacity-55 grayscale",
+        className,
       )}
       {...rest}
     >

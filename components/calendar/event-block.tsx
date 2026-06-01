@@ -31,7 +31,7 @@ export const EventBlock = forwardRef<
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
 >(function EventBlock(
-  { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, onMenu, ...rest },
+  { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, onMenu, className, ...rest },
   ref,
 ) {
   const isTask = occ.taskId != null && onToggleTaskDone != null;
@@ -45,6 +45,7 @@ export const EventBlock = forwardRef<
         editable ? "cursor-grab" : "cursor-pointer",
         selected && "z-20 ring-2 ring-foreground",
         occ.inactive && "opacity-55 grayscale",
+        className,
       )}
       {...rest}
     >

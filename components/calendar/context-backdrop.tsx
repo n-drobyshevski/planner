@@ -36,7 +36,7 @@ export const ContextBackdrop = forwardRef<
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
 >(function ContextBackdrop(
-  { occ, color, style, selected, singleColumn, editable = true, onMenu, ...rest },
+  { occ, color, style, selected, singleColumn, editable = true, onMenu, className, ...rest },
   ref,
 ) {
   return (
@@ -54,6 +54,7 @@ export const ContextBackdrop = forwardRef<
         "pointer-events-none absolute z-0 overflow-hidden rounded-lg",
         selected && "ring-2 ring-foreground ring-offset-1",
         occ.inactive && "opacity-55 grayscale",
+        className,
       )}
       {...rest}
     >
