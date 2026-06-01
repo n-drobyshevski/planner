@@ -31,6 +31,7 @@ import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
 import { CalendarFiltersSheet } from "@/components/sidebar/calendar-filters-sheet";
 import { EventDialog } from "@/components/event/event-dialog";
+import { EventDetails } from "@/components/event/event-details";
 import { TaskBacklogRail, TaskBacklogSheet } from "@/components/tasks/task-backlog-rail";
 import { ScheduleTaskDialog } from "@/components/tasks/schedule-task-dialog";
 import {
@@ -121,6 +122,7 @@ export function CalendarShell({
   const nextWin = useWindowEvents(wsId, winNext);
   const pagerRef = useRef<CalendarPagerHandle>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [details, setDetails] = useState<{ event: EventRow; occurrence: Occurrence } | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deletingContext, setDeletingContext] = useState<EventRow | null>(null);
@@ -240,6 +242,13 @@ export function CalendarShell({
     if (!ev) return;
     setSelected(occ.key);
     setEditor({ mode: "edit", event: ev, occurrence: occ });
+  }
+  /** Click opens a read-only details panel; editing is one step further (its Edit button). */
+  function openDetails(occ: Occurrence) {
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev) return;
+    setSelected(occ.key);
+    setDetails({ event: ev, occurrence: occ });
   }
   function onCreateRange(start: number, end: number) {
     // Drawing inside a context auto-assigns the new event to it.
@@ -439,7 +448,7 @@ export function CalendarShell({
                 focusedMs={focusedDate}
                 colorOf={colorOf}
                 selectedKey={selectedKey}
-                onSelect={openEdit}
+                onSelect={openDetails}
                 onPickDay={pickDay}
                 onCreateRange={onCreateRange}
                 onReschedule={onReschedule}
@@ -472,6 +481,52 @@ export function CalendarShell({
           />
         )}
       </div>
+
+      {details && (
+        <EventDetails
+          open
+          onOpenChange={(o) => !o && setDetails(null)}
+          occurrence={details.occurrence}
+          event={details.event}
+          color={colorOf(details.occurrence)}
+          categoryName={
+            details.occurrence.categoryId
+              ? categoryMap.get(details.occurrence.categoryId)?.name ?? null
+              : null
+          }
+          contextName={
+            details.occurrence.contextId
+              ? contextList.find((c) => c.id === details.occurrence.contextId)?.title ?? null
+              : null
+          }
+          ownerName={memberMap.get(details.occurrence.ownerId)?.name ?? "Unknown"}
+          isOwn={canEditOcc(details.occurrence)}
+          task={
+            details.occurrence.taskId ? tasksById.get(details.occurrence.taskId) ?? null : null
+          }
+          taskDone={
+            details.occurrence.taskId
+              ? taskDoneById.get(details.occurrence.taskId) ?? false
+              : undefined
+          }
+          onEdit={() => {
+            const occ = details.occurrence;
+            setDetails(null);
+            openEdit(occ);
+          }}
+          onDelete={() => {
+            const occ = details.occurrence;
+            setDetails(null);
+            onDeleteEvent(occ);
+          }}
+          onChangeColor={(c) => onChangeEventColor(details.occurrence, c)}
+          onToggleTaskDone={
+            details.occurrence.taskId
+              ? () => onToggleTaskDone(details.occurrence.taskId!)
+              : undefined
+          }
+        />
+      )}
 
       {editor && workspace.data?.currentMember && (
         <EventDialog
