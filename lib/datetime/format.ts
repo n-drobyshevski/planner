@@ -2,29 +2,49 @@ import { format, isSameDay } from "date-fns";
 import type { CalendarView } from "@/lib/types";
 import { getVisibleDays } from "@/lib/datetime/window";
 
-/** Human label for the current view + focused date (e.g. "Jun 1 – 7, 2026"). */
+/** 24-hour time, e.g. "09:00". */
+export function formatTime(ms: number): string {
+  return format(ms, "HH:mm");
+}
+
+/** Day then month, e.g. "1 Jun". */
+export function formatDayMonth(ms: number): string {
+  return format(ms, "d MMM");
+}
+
+/** Weekday, day, month, e.g. "Mon, 1 Jun". */
+export function formatWeekdayDayMonth(ms: number): string {
+  return format(ms, "EEE, d MMM");
+}
+
+/** Day, month, year, e.g. "1 Jun 2026". */
+export function formatDayMonthYear(ms: number): string {
+  return format(ms, "d MMM yyyy");
+}
+
+/** Human label for the current view + focused date (e.g. "25 – 31 May 2026"). */
 export function formatRangeLabel(view: CalendarView, focusedMs: number): string {
-  if (view === "day") return format(focusedMs, "EEEE, MMM d, yyyy");
+  if (view === "day") return format(focusedMs, "EEEE, d MMM yyyy");
   if (view === "month") return format(focusedMs, "MMMM yyyy");
   // Agenda is a rolling list from the focused day — label it by that month.
   if (view === "agenda") return format(focusedMs, "MMMM yyyy");
 
-  // Range views (week, 3day): span the actual visible days.
+  // Range views (week, 3day): span the actual visible days, day-before-month.
   const days = getVisibleDays(view, focusedMs);
   const start = days[0];
   const end = days[days.length - 1];
-  const sameMonth = format(start, "MMM") === format(end, "MMM");
-  const left = format(start, "MMM d");
-  const right = sameMonth ? format(end, "d, yyyy") : format(end, "MMM d, yyyy");
+  const sameMonth = format(start, "MMM yyyy") === format(end, "MMM yyyy");
+  const left = sameMonth ? format(start, "d") : format(start, "d MMM");
+  const right = format(end, "d MMM yyyy");
   return `${left} – ${right}`;
 }
 
 /**
  * Human label for a single occurrence's date + time, for the details view:
- *  - all-day, one day:   "Mon, Jun 1 · All day"
- *  - all-day, multi-day: "Jun 1 – Jun 4"   (end is exclusive midnight)
- *  - timed, same day:    "Mon, Jun 1 · 9:00 – 9:30 AM"
- *  - timed, across days: "Jun 1, 9:00 AM – Jun 2, 10:00 AM"
+ *  - all-day, one day:   "Mon, 1 Jun · All day"
+ *  - all-day, multi-day: "1 Jun – 4 Jun"   (end is exclusive midnight)
+ *  - timed, same day:    "Mon, 1 Jun · 09:00 – 09:30"
+ *  - timed, across days: "1 Jun, 23:00 – 2 Jun, 01:00"
  */
 export function formatOccurrenceWhen(
   start: number,
@@ -34,13 +54,13 @@ export function formatOccurrenceWhen(
   if (allDay) {
     const lastDay = end - 1; // exclusive end → inclusive last day
     return isSameDay(start, lastDay)
-      ? `${format(start, "EEE, MMM d")} · All day`
-      : `${format(start, "MMM d")} – ${format(lastDay, "MMM d")}`;
+      ? `${formatWeekdayDayMonth(start)} · All day`
+      : `${formatDayMonth(start)} – ${formatDayMonth(lastDay)}`;
   }
   if (isSameDay(start, end)) {
-    return `${format(start, "EEE, MMM d")} · ${format(start, "h:mm")} – ${format(end, "h:mm a")}`;
+    return `${formatWeekdayDayMonth(start)} · ${formatTime(start)} – ${formatTime(end)}`;
   }
-  return `${format(start, "MMM d, h:mm a")} – ${format(end, "MMM d, h:mm a")}`;
+  return `${formatDayMonth(start)}, ${formatTime(start)} – ${formatDayMonth(end)}, ${formatTime(end)}`;
 }
 
 /** URL date param helpers. */

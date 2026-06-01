@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   formatRangeLabel,
   formatOccurrenceWhen,
+  formatTime,
+  formatDayMonth,
+  formatWeekdayDayMonth,
+  formatDayMonthYear,
   parseViewParam,
   isCalendarViewParam,
 } from "@/lib/datetime/format";
@@ -11,25 +15,25 @@ describe("formatOccurrenceWhen", () => {
   it("all-day single day", () => {
     const start = new Date(2026, 5, 1).getTime();
     const end = new Date(2026, 5, 2).getTime();
-    expect(formatOccurrenceWhen(start, end, true)).toBe("Mon, Jun 1 · All day");
+    expect(formatOccurrenceWhen(start, end, true)).toBe("Mon, 1 Jun · All day");
   });
 
   it("all-day multi day (exclusive end)", () => {
     const start = new Date(2026, 5, 1).getTime();
     const end = new Date(2026, 5, 5).getTime();
-    expect(formatOccurrenceWhen(start, end, true)).toBe("Jun 1 – Jun 4");
+    expect(formatOccurrenceWhen(start, end, true)).toBe("1 Jun – 4 Jun");
   });
 
   it("timed within one day", () => {
     const start = new Date(2026, 5, 1, 9, 0).getTime();
     const end = new Date(2026, 5, 1, 9, 30).getTime();
-    expect(formatOccurrenceWhen(start, end, false)).toBe("Mon, Jun 1 · 9:00 – 9:30 AM");
+    expect(formatOccurrenceWhen(start, end, false)).toBe("Mon, 1 Jun · 09:00 – 09:30");
   });
 
   it("timed across midnight", () => {
     const start = new Date(2026, 5, 1, 23, 0).getTime();
     const end = new Date(2026, 5, 2, 1, 0).getTime();
-    expect(formatOccurrenceWhen(start, end, false)).toBe("Jun 1, 11:00 PM – Jun 2, 1:00 AM");
+    expect(formatOccurrenceWhen(start, end, false)).toBe("1 Jun, 23:00 – 2 Jun, 01:00");
   });
 });
 
@@ -39,7 +43,7 @@ const focused = new Date(2026, 4, 31, 15, 30, 45, 123).getTime();
 
 describe("formatRangeLabel", () => {
   it("day view shows the full weekday + date", () => {
-    expect(formatRangeLabel("day", focused)).toBe("Sunday, May 31, 2026");
+    expect(formatRangeLabel("day", focused)).toBe("Sunday, 31 May 2026");
   });
 
   it("month view shows month + year", () => {
@@ -47,11 +51,27 @@ describe("formatRangeLabel", () => {
   });
 
   it("week view spans Mon–Sun of the focused week (unchanged)", () => {
-    expect(formatRangeLabel("week", focused)).toBe("May 25 – 31, 2026");
+    expect(formatRangeLabel("week", focused)).toBe("25 – 31 May 2026");
   });
 
   it("3day view spans exactly the focused day → +2 days, crossing the month", () => {
-    expect(formatRangeLabel("3day", focused)).toBe("May 31 – Jun 2, 2026");
+    expect(formatRangeLabel("3day", focused)).toBe("31 May – 2 Jun 2026");
+  });
+});
+
+describe("formatters", () => {
+  it("formatTime is 24-hour HH:mm", () => {
+    expect(formatTime(new Date(2026, 5, 1, 9, 0).getTime())).toBe("09:00");
+    expect(formatTime(new Date(2026, 5, 1, 18, 5).getTime())).toBe("18:05");
+  });
+  it("formatDayMonth is day-before-month", () => {
+    expect(formatDayMonth(new Date(2026, 5, 1).getTime())).toBe("1 Jun");
+  });
+  it("formatWeekdayDayMonth", () => {
+    expect(formatWeekdayDayMonth(new Date(2026, 5, 1).getTime())).toBe("Mon, 1 Jun");
+  });
+  it("formatDayMonthYear", () => {
+    expect(formatDayMonthYear(new Date(2026, 5, 1).getTime())).toBe("1 Jun 2026");
   });
 });
 
