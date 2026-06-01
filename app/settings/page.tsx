@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ProfileSettings } from "@/components/settings/profile-settings";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
 
 export const metadata: Metadata = {
@@ -19,7 +20,8 @@ export default function SettingsPage() {
         </Button>
         <h1 className="font-heading text-lg font-medium">Settings</h1>
       </header>
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <main className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+        <ProfileSettings />
         <AppearanceSettings />
       </main>
     </div>
