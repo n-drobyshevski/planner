@@ -1,6 +1,7 @@
 "use client";
 
-import { CalendarPlus, GripVertical } from "lucide-react";
+import * as React from "react";
+import { CalendarPlus, GripVertical, CheckCircle2, Circle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -10,6 +11,12 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  ItemContextMenu,
+  ItemMenuButton,
+  type MenuableProps,
+} from "@/components/shared/item-context-menu";
+import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-width";
 import { cn } from "@/lib/utils";
 import type { Member, TaskRow } from "@/lib/types";
 
@@ -18,19 +25,97 @@ interface BacklogProps {
   colorOf: (t: TaskRow) => string;
   members: Map<string, Member>;
   onSchedule: (t: TaskRow) => void;
+  onToggleDone: (t: TaskRow) => void;
+  onChangeColor: (t: TaskRow, color: string | null) => void;
+  onDelete: (t: TaskRow) => void;
 }
+
+/** A backlog task row: drag source + assignee + Schedule, with a context menu. */
+const BacklogCard = React.forwardRef<
+  HTMLDivElement,
+  {
+    task: TaskRow;
+    color: string;
+    assignee: Member | null;
+    draggable: boolean;
+    onSchedule: () => void;
+  } & MenuableProps &
+    React.HTMLAttributes<HTMLDivElement>
+>(function BacklogCard(
+  { task, color, assignee, draggable, onSchedule, onMenu, className, ...rest },
+  ref,
+) {
+  return (
+    <div
+      ref={ref}
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (e) => {
+              e.dataTransfer.setData("text/task-id", task.id);
+              e.dataTransfer.setData("text/plain", task.title);
+              e.dataTransfer.effectAllowed = "copy";
+            }
+          : undefined
+      }
+      style={{ borderInlineStartColor: color }}
+      className={cn(
+        "group flex min-h-11 items-center gap-1.5 rounded-md border border-l-4 bg-card p-2 text-sm shadow-soft md:min-h-0",
+        draggable && "cursor-grab active:cursor-grabbing",
+        className,
+      )}
+      {...rest}
+    >
+      {draggable && (
+        <GripVertical className="size-4 shrink-0 text-muted-foreground/40" />
+      )}
+      <span className="min-w-0 flex-1 truncate">{task.title}</span>
+      {assignee && (
+        <Avatar className="size-5 shrink-0" title={assignee.name}>
+          <AvatarFallback
+            style={{ backgroundColor: assignee.color, color: "#fff" }}
+            className="text-[9px] font-semibold"
+          >
+            {assignee.name.slice(0, 1).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-8 shrink-0"
+        aria-label={`Schedule ${task.title}`}
+        onClick={onSchedule}
+      >
+        <CalendarPlus className="size-4" />
+      </Button>
+      {onMenu && (
+        <ItemMenuButton
+          onMenu={onMenu}
+          className="size-8 text-muted-foreground hover:text-foreground"
+        />
+      )}
+    </div>
+  );
+});
 
 /**
  * The list of open tasks, shared by the desktop rail and the mobile sheet. On
  * desktop the cards are HTML5 drag sources (drop on the grid to schedule); on
  * touch, dragging onto a grid is impractical, so the per-card Schedule button
  * is the (only) path and the grip/drag affordance is dropped.
+ *
+ * Each card carries a right-click (desktop) / long-press ⋮ (mobile) menu:
+ * Schedule, mark done/not done, recolor, and delete.
  */
 function BacklogList({
   tasks,
   colorOf,
   members,
   onSchedule,
+  onToggleDone,
+  onChangeColor,
+  onDelete,
   draggable,
 }: BacklogProps & { draggable: boolean }) {
   if (tasks.length === 0) {
@@ -44,59 +129,51 @@ function BacklogList({
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-2">
       {tasks.map((t) => {
         const assignee = t.assigneeId ? members.get(t.assigneeId) ?? null : null;
+        const done = t.status === "done";
         return (
-          <div
+          <ItemContextMenu
             key={t.id}
-            draggable={draggable}
-            onDragStart={
-              draggable
-                ? (e) => {
-                    e.dataTransfer.setData("text/task-id", t.id);
-                    e.dataTransfer.setData("text/plain", t.title);
-                    e.dataTransfer.effectAllowed = "copy";
-                  }
-                : undefined
-            }
-            style={{ borderInlineStartColor: colorOf(t) }}
-            className={cn(
-              "group flex min-h-11 items-center gap-1.5 rounded-md border border-l-4 bg-card p-2 text-sm shadow-soft md:min-h-0",
-              draggable && "cursor-grab active:cursor-grabbing",
-            )}
+            title={t.title}
+            color={t.color}
+            onColorChange={(c) => onChangeColor(t, c)}
+            actions={[
+              { label: "Schedule…", icon: CalendarPlus, onSelect: () => onSchedule(t) },
+              {
+                label: done ? "Mark not done" : "Mark done",
+                icon: done ? Circle : CheckCircle2,
+                onSelect: () => onToggleDone(t),
+              },
+              { label: "Delete", icon: Trash2, destructive: true, onSelect: () => onDelete(t) },
+            ]}
           >
-            {draggable && (
-              <GripVertical className="size-4 shrink-0 text-muted-foreground/40" />
-            )}
-            <span className="min-w-0 flex-1 truncate">{t.title}</span>
-            {assignee && (
-              <Avatar className="size-5 shrink-0" title={assignee.name}>
-                <AvatarFallback
-                  style={{ backgroundColor: assignee.color, color: "#fff" }}
-                  className="text-[9px] font-semibold"
-                >
-                  {assignee.name.slice(0, 1).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0"
-              aria-label={`Schedule ${t.title}`}
-              onClick={() => onSchedule(t)}
-            >
-              <CalendarPlus className="size-4" />
-            </Button>
-          </div>
+            <BacklogCard
+              task={t}
+              color={colorOf(t)}
+              assignee={assignee}
+              draggable={draggable}
+              onSchedule={() => onSchedule(t)}
+            />
+          </ItemContextMenu>
         );
       })}
     </div>
   );
 }
 
-/** Desktop-only right rail. Hidden on phones (< md) — see TaskBacklogSheet. */
-export function TaskBacklogRail(props: BacklogProps) {
+/**
+ * Desktop-only right rail. Hidden on phones (< md) — see TaskBacklogSheet. Drag
+ * the inner edge to resize; the width is remembered per device + per user.
+ */
+export function TaskBacklogRail({
+  userKey,
+  ...props
+}: BacklogProps & { userKey: string | undefined }) {
+  const { width, beginResize } = useSidebarWidth("right", userKey);
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-l bg-sidebar md:flex">
+    <aside
+      style={{ width }}
+      className="relative hidden shrink-0 flex-col border-l bg-sidebar md:flex"
+    >
       <div className="border-b px-3 py-2">
         <h3 className="font-heading text-sm font-semibold">Tasks</h3>
         <p className="text-xs text-muted-foreground">
@@ -104,6 +181,7 @@ export function TaskBacklogRail(props: BacklogProps) {
         </p>
       </div>
       <BacklogList {...props} draggable />
+      <SidebarResizeHandle side="right" onPointerDown={beginResize} />
     </aside>
   );
 }

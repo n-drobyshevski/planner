@@ -32,6 +32,16 @@ import {
   RecurrenceScopePrompt,
   type RecurrenceScope,
 } from "@/components/event/recurrence-scope-prompt";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { CalendarView, EventRow, Occurrence, TaskRow } from "@/lib/types";
 
 type EditorState =
@@ -119,6 +129,7 @@ export function CalendarShell({
     (t) => t.status !== "done",
   );
   const [scheduling, setScheduling] = useState<TaskRow | null>(null);
+  const [deletingTask, setDeletingTask] = useState<TaskRow | null>(null);
 
   function onToggleTaskDone(taskId: string) {
     const t = tasksById.get(taskId);
@@ -304,10 +315,14 @@ export function CalendarShell({
         </main>
         {backlogOpen && workspace.data && (
           <TaskBacklogRail
+            userKey={viewerId}
             tasks={backlogTasks}
             colorOf={taskColorOf}
             members={memberMap}
             onSchedule={(t) => setScheduling(t)}
+            onToggleDone={(t) => void taskMutations.toggleDone(t)}
+            onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c })}
+            onDelete={(t) => setDeletingTask(t)}
           />
         )}
       </div>
@@ -376,8 +391,38 @@ export function CalendarShell({
             setScheduling(t);
             setBacklogOpen(false);
           }}
+          onToggleDone={(t) => void taskMutations.toggleDone(t)}
+          onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c })}
+          onDelete={(t) => setDeletingTask(t)}
         />
       )}
+
+      <AlertDialog
+        open={deletingTask !== null}
+        onOpenChange={(o) => !o && setDeletingTask(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the task, its subtasks, and any blocks it placed on the
+              calendar. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingTask) void taskMutations.remove(deletingTask.id);
+                setDeletingTask(null);
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

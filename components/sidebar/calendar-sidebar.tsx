@@ -33,6 +33,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { createCategory } from "@/lib/supabase/mutations";
 import { useSidebarMutations } from "@/lib/hooks/use-sidebar-mutations";
+import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-width";
 import { qk } from "@/lib/supabase/query-keys";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
@@ -276,12 +277,20 @@ export function CalendarFiltersContent({
 
 /**
  * Desktop-only left rail. Hidden on phones (< md), where the same controls are
- * presented as a bottom sheet (see CalendarFiltersSheet).
+ * presented as a bottom sheet (see CalendarFiltersSheet). Drag the inner edge to
+ * resize; the width is remembered per device + per user.
  */
 export function CalendarSidebar(props: FiltersProps) {
+  const { width, beginResize } = useSidebarWidth("left", props.currentMemberId);
   return (
-    <aside className="hidden w-60 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-sidebar p-3 md:flex">
-      <CalendarFiltersContent {...props} />
+    <aside
+      style={{ width }}
+      className="relative hidden shrink-0 flex-col border-r bg-sidebar md:flex"
+    >
+      <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-3">
+        <CalendarFiltersContent {...props} />
+      </div>
+      <SidebarResizeHandle side="left" onPointerDown={beginResize} />
     </aside>
   );
 }
