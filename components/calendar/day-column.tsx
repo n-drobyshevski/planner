@@ -60,10 +60,11 @@ export function DayColumn({
     [occurrences, dayStart, dayEnd],
   );
 
-  // Timed children (normal events / task-blocks). A child whose start falls
-  // inside a context nests in it (indented within the backdrop); the rest are
-  // "free" and span the full column. Each group is packed on its own so a
-  // nested event never shares columns with a free one.
+  // Timed children (normal events / task-blocks). ALL children are packed
+  // together in one pass so overlapping events always share columns and never
+  // collide — packing per-group would let a free and a nested event both claim
+  // full width and overlap. `nestedFlags` (start inside a context) only drives a
+  // small indent so the context's frame stays visible around its events.
   const { segments, packed, nestedFlags } = useMemo(() => {
     const ctxOccs = contextSegs.map((s) => s.occ);
     const segs = occurrences
@@ -73,26 +74,8 @@ export function DayColumn({
         start: Math.max(o.start, dayStart),
         end: Math.min(o.end, dayEnd),
       }));
-
-    const nestId = segs.map(
-      (s) => enclosingContext(ctxOccs, s.occ.start)?.eventId ?? null,
-    );
-    const nested = nestId.map((id) => id !== null);
-
-    // Pack each nesting group independently (key: context id or "" for free).
-    const groups = new Map<string, number[]>();
-    segs.forEach((_, i) => {
-      const k = nestId[i] ?? "";
-      const arr = groups.get(k);
-      if (arr) arr.push(i);
-      else groups.set(k, [i]);
-    });
-    const cols = new Array<ReturnType<typeof packDay>[number]>(segs.length);
-    for (const idxs of groups.values()) {
-      const sub = packDay(idxs.map((i) => segs[i]));
-      idxs.forEach((i, j) => (cols[i] = sub[j]));
-    }
-    return { segments: segs, packed: cols, nestedFlags: nested };
+    const nested = segs.map((s) => enclosingContext(ctxOccs, s.occ.start) !== null);
+    return { segments: segs, packed: packDay(segs), nestedFlags: nested };
   }, [occurrences, dayStart, dayEnd, contextSegs]);
 
   // Distinct contexts visible in this window, for the "Add to context" submenu.
