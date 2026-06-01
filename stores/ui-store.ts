@@ -21,6 +21,10 @@ interface UiState {
   setSidebarOpen: (open: boolean) => void;
   toggleCategory: (id: string) => void;
   toggleLayer: (layer: string) => void;
+  /** Replace the whole hidden-categories set (e.g. "show only this" / "show all"). */
+  setHiddenCategoryIds: (next: Set<string>) => void;
+  /** Replace the whole hidden-layers set (e.g. "show only this" / "show all"). */
+  setHiddenLayers: (next: Set<string>) => void;
   setSelectedTaskId: (id: string | null) => void;
   setTaskBacklogOpen: (open: boolean) => void;
 }
@@ -51,4 +55,6 @@ export const useUiStore = create<UiState>((set) => ({
       else next.add(layer);
       return { hiddenLayers: next };
     }),
+  setHiddenCategoryIds: (hiddenCategoryIds) => set({ hiddenCategoryIds }),
+  setHiddenLayers: (hiddenLayers) => set({ hiddenLayers }),
 }));

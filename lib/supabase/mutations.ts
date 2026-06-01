@@ -216,6 +216,24 @@ export interface MemberPreferencesPatch {
   surfaceTone?: SurfaceTone;
 }
 
+/**
+ * Update a member's identity (name / accent color). RLS (members_update_self)
+ * restricts this to the signed-in member's own row, so the partner's calendar
+ * stays read-only from the sidebar.
+ */
+export async function updateMember(
+  sb: SupabaseClient,
+  id: string,
+  patch: { name?: string; color?: string },
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.name != null) row.name = patch.name;
+  if (patch.color != null) row.color = patch.color;
+  if (Object.keys(row).length === 0) return;
+  const { error } = await sb.from("members").update(row).eq("id", id);
+  if (error) throw error;
+}
+
 /** Update the signed-in member's appearance preferences. RLS (members_update_self) scopes it. */
 export async function updateMemberPreferences(
   sb: SupabaseClient,
