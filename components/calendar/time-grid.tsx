@@ -505,7 +505,7 @@ export function TimeGrid({
             {HOURS.map((h) => (
               <div key={h} style={{ height: HOUR_PX }} className="relative">
                 <span className="absolute -top-2 right-2 text-xs text-muted-foreground tabular-nums">
-                  {h === 0 ? "" : format(new Date(2000, 0, 1, h), "HH:mm")}
+                  {h === 0 ? "" : format(new Date(2000, 0, 1, h), "HH")}
                 </span>
               </div>
             ))}
