@@ -40,6 +40,28 @@ describe("summarizeRecurrence", () => {
       }),
     ).toBe("Repeats monthly, 5 times");
   });
+
+  it("daily on specific weekdays", () => {
+    expect(
+      summarizeRecurrence({
+        freq: "DAILY",
+        interval: 1,
+        byWeekday: [0, 2, 4],
+        end: { type: "never" },
+      }),
+    ).toBe("Repeats daily on Mon, Wed, Fri");
+  });
+
+  it("daily on weekdays ignores interval in the summary", () => {
+    expect(
+      summarizeRecurrence({
+        freq: "DAILY",
+        interval: 3,
+        byWeekday: [0],
+        end: { type: "never" },
+      }),
+    ).toBe("Repeats daily on Mon");
+  });
 });
 
 describe("buildRRule", () => {

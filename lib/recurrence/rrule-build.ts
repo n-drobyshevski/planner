@@ -155,12 +155,16 @@ const FREQ_UNIT: Record<Freq, string> = {
 
 /** Short human sentence for a recurrence form, e.g. "Repeats weekly on Mon, Wed, until Jun 30, 2026". */
 export function summarizeRecurrence(form: RecurrenceForm): string {
-  let out =
-    form.interval > 1
-      ? `Repeats every ${form.interval} ${FREQ_UNIT[form.freq]}s`
-      : `Repeats ${FREQ_ADVERB[form.freq]}`;
+  const hasDays =
+    (form.freq === "WEEKLY" || form.freq === "DAILY") && form.byWeekday.length > 0;
+  // Daily-with-days has no meaningful interval (see buildRRule): render it plain.
+  const showInterval = form.interval > 1 && !(form.freq === "DAILY" && hasDays);
 
-  if (form.freq === "WEEKLY" && form.byWeekday.length > 0) {
+  let out = showInterval
+    ? `Repeats every ${form.interval} ${FREQ_UNIT[form.freq]}s`
+    : `Repeats ${FREQ_ADVERB[form.freq]}`;
+
+  if (hasDays) {
     const days = [...form.byWeekday]
       .sort((a, b) => a - b)
       .map((i) => WEEKDAY_LABELS[i])
