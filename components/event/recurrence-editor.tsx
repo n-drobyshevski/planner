@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { msToDateInput, dateInputToMs } from "@/lib/datetime/local";
 import type { Freq, RecurrenceForm } from "@/lib/recurrence/rrule-build";
@@ -142,12 +143,12 @@ export function RecurrenceEditor({
                   </Select>
 
                   {value.end.type === "until" && (
-                    <Input
-                      type="date"
+                    <DatePicker
                       value={msToDateInput(value.end.dateMs)}
-                      onChange={(e) =>
-                        onChange({ ...value, end: { type: "until", dateMs: dateInputToMs(e.target.value) } })
+                      onChange={(v) =>
+                        onChange({ ...value, end: { type: "until", dateMs: dateInputToMs(v) } })
                       }
+                      aria-label="Repeat until date"
                       className="w-40"
                     />
                   )}

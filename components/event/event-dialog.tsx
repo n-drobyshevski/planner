@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Lock, Trash2, Loader2 } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { RecurrenceScopePrompt, type RecurrenceScope } from "./recurrence-scope-prompt";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
@@ -369,19 +371,19 @@ export function EventDialog(props: EventDialogProps) {
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel>Starts</FieldLabel>
-                <Input
-                  type="date"
+                <DatePicker
                   value={form.startDate}
-                  onChange={(e) => set("startDate", e.target.value)}
+                  onChange={(v) => set("startDate", v)}
+                  aria-label="Start date"
                 />
               </Field>
               {!form.allDay && (
                 <Field>
                   <FieldLabel>&nbsp;</FieldLabel>
-                  <Input
-                    type="time"
+                  <TimeField
                     value={form.startTime}
-                    onChange={(e) => set("startTime", e.target.value)}
+                    onChange={(v) => set("startTime", v)}
+                    aria-label="Start time"
                   />
                 </Field>
               )}
@@ -390,19 +392,19 @@ export function EventDialog(props: EventDialogProps) {
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel>Ends</FieldLabel>
-                <Input
-                  type="date"
+                <DatePicker
                   value={form.endDate}
-                  onChange={(e) => set("endDate", e.target.value)}
+                  onChange={(v) => set("endDate", v)}
+                  aria-label="End date"
                 />
               </Field>
               {!form.allDay && (
                 <Field>
                   <FieldLabel>&nbsp;</FieldLabel>
-                  <Input
-                    type="time"
+                  <TimeField
                     value={form.endTime}
-                    onChange={(e) => set("endTime", e.target.value)}
+                    onChange={(v) => set("endTime", v)}
+                    aria-label="End time"
                   />
                 </Field>
               )}

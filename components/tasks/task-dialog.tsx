@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -239,11 +240,12 @@ export function TaskDialog(props: TaskDialogProps) {
 
               <Field>
                 <FieldLabel htmlFor="task-due">Due date</FieldLabel>
-                <Input
+                <DatePicker
                   id="task-due"
-                  type="date"
                   value={form.dueDate}
-                  onChange={(e) => set("dueDate", e.target.value)}
+                  onChange={(v) => set("dueDate", v)}
+                  clearable
+                  aria-label="Due date"
                 />
               </Field>
             </div>

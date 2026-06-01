@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimeField } from "@/components/ui/time-field";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -140,20 +142,20 @@ export function ScheduleTaskDialog({
           <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor="sched-date">Date</FieldLabel>
-              <Input
+              <DatePicker
                 id="sched-date"
-                type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={setDate}
+                aria-label="Date"
               />
             </Field>
             <Field>
               <FieldLabel htmlFor="sched-time">Start</FieldLabel>
-              <Input
+              <TimeField
                 id="sched-time"
-                type="time"
                 value={time}
-                onChange={(e) => setTime(e.target.value)}
+                onChange={setTime}
+                aria-label="Start"
               />
             </Field>
           </div>
