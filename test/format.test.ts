@@ -57,6 +57,13 @@ describe("formatRangeLabel", () => {
   it("3day view spans exactly the focused day → +2 days, crossing the month", () => {
     expect(formatRangeLabel("3day", focused)).toBe("31 May – 2 Jun 2026");
   });
+
+  it("week range spanning a year boundary shows both months and the end year", () => {
+    // Week of Thu 31 Dec 2026 → Mon 28 Dec 2026 … Sun 3 Jan 2027.
+    expect(formatRangeLabel("week", new Date(2026, 11, 31).getTime())).toBe(
+      "28 Dec – 3 Jan 2027",
+    );
+  });
 });
 
 describe("formatters", () => {
@@ -66,12 +73,15 @@ describe("formatters", () => {
   });
   it("formatDayMonth is day-before-month", () => {
     expect(formatDayMonth(new Date(2026, 5, 1).getTime())).toBe("1 Jun");
+    expect(formatDayMonth(new Date(2026, 5, 15).getTime())).toBe("15 Jun");
   });
   it("formatWeekdayDayMonth", () => {
     expect(formatWeekdayDayMonth(new Date(2026, 5, 1).getTime())).toBe("Mon, 1 Jun");
+    expect(formatWeekdayDayMonth(new Date(2026, 5, 15).getTime())).toBe("Mon, 15 Jun");
   });
   it("formatDayMonthYear", () => {
     expect(formatDayMonthYear(new Date(2026, 5, 1).getTime())).toBe("1 Jun 2026");
+    expect(formatDayMonthYear(new Date(2026, 5, 15).getTime())).toBe("15 Jun 2026");
   });
 });
 
