@@ -6,6 +6,7 @@ import {
   formatDayMonth,
   formatWeekdayDayMonth,
   formatDayMonthYear,
+  formatDuration,
   parseViewParam,
   isCalendarViewParam,
 } from "@/lib/datetime/format";
@@ -82,6 +83,23 @@ describe("formatters", () => {
   it("formatDayMonthYear", () => {
     expect(formatDayMonthYear(new Date(2026, 5, 1).getTime())).toBe("1 Jun 2026");
     expect(formatDayMonthYear(new Date(2026, 5, 15).getTime())).toBe("15 Jun 2026");
+  });
+});
+
+describe("formatDuration", () => {
+  it("renders minutes under an hour", () => {
+    expect(formatDuration(0)).toBe("0m");
+    expect(formatDuration(45 * 60_000)).toBe("45m");
+  });
+  it("omits minutes on whole hours", () => {
+    expect(formatDuration(2 * 3_600_000)).toBe("2h");
+  });
+  it("combines hours and minutes", () => {
+    expect(formatDuration(3 * 3_600_000 + 30 * 60_000)).toBe("3h 30m");
+  });
+  it("rounds to the nearest minute and clamps negatives to 0m", () => {
+    expect(formatDuration(89_000)).toBe("1m"); // 1m29s → 1m
+    expect(formatDuration(-5_000)).toBe("0m");
   });
 });
 

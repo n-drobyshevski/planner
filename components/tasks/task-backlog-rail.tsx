@@ -1,7 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { CalendarPlus, GripVertical, CheckCircle2, Circle, Trash2 } from "lucide-react";
+import {
+  CalendarPlus,
+  GripVertical,
+  CheckCircle2,
+  Circle,
+  Trash2,
+  ListTodo,
+  ChartColumnBig,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -11,11 +19,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ItemContextMenu,
   ItemMenuButton,
   type MenuableProps,
 } from "@/components/shared/item-context-menu";
+import { UsageTab, type UsageTabProps } from "@/components/analytics/usage-tab";
 import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-width";
 import { cn } from "@/lib/utils";
 import type { Member, TaskRow } from "@/lib/types";
@@ -163,24 +173,50 @@ function BacklogList({
 /**
  * Desktop-only right rail. Hidden on phones (< md) — see TaskBacklogSheet. Drag
  * the inner edge to resize; the width is remembered per device + per user.
+ *
+ * Two tabs: the unscheduled-task backlog and an "Insights" analytics panel for
+ * the calendar's currently selected timeframe (see UsageTab). The mobile sheet
+ * stays tasks-only.
  */
 export function TaskBacklogRail({
   userKey,
+  analytics,
   ...props
-}: BacklogProps & { userKey: string | undefined }) {
+}: BacklogProps & { userKey: string | undefined; analytics: UsageTabProps }) {
   const { width, beginResize } = useSidebarWidth("right", userKey);
+  const [tab, setTab] = React.useState<"tasks" | "insights">("tasks");
   return (
     <aside
       style={{ width }}
       className="relative hidden shrink-0 flex-col border-l bg-sidebar md:flex"
     >
-      <div className="border-b px-3 py-2">
-        <h3 className="font-heading text-sm font-semibold">Tasks</h3>
-        <p className="text-xs text-muted-foreground">
-          Drag onto the week or day grid to schedule, or use Schedule for options.
-        </p>
-      </div>
-      <BacklogList {...props} draggable />
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as "tasks" | "insights")}
+        className="flex min-h-0 flex-1 flex-col gap-0"
+      >
+        <div className="border-b px-3 py-2">
+          <TabsList className="w-full">
+            <TabsTrigger value="tasks">
+              <ListTodo />
+              Tasks
+            </TabsTrigger>
+            <TabsTrigger value="insights">
+              <ChartColumnBig />
+              Insights
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="tasks" className="flex min-h-0 flex-1 flex-col">
+          <p className="px-3 pt-2 text-xs text-muted-foreground">
+            Drag onto the week or day grid to schedule, or use Schedule for options.
+          </p>
+          <BacklogList {...props} draggable />
+        </TabsContent>
+        <TabsContent value="insights" className="flex min-h-0 flex-1 flex-col">
+          <UsageTab {...analytics} />
+        </TabsContent>
+      </Tabs>
       <SidebarResizeHandle side="right" onPointerDown={beginResize} />
     </aside>
   );

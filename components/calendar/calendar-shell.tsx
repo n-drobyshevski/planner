@@ -482,6 +482,16 @@ export function CalendarShell({
             onToggleDone={(t) => void taskMutations.toggleDone(t)}
             onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c })}
             onDelete={(t) => setDeletingTask(t)}
+            analytics={{
+              occurrences: visible,
+              view,
+              focusedDate,
+              days,
+              window: win,
+              categories: categoryMap,
+              members: memberMap,
+              overlayActive: overlayMemberIds.size > 0,
+            }}
           />
         )}
       </div>

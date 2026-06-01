@@ -63,6 +63,19 @@ export function formatOccurrenceWhen(
   return `${formatDayMonth(start)}, ${formatTime(start)} – ${formatDayMonth(end)}, ${formatTime(end)}`;
 }
 
+/**
+ * Human-friendly duration from milliseconds, rounded to the nearest minute:
+ * "0m", "45m", "2h", "3h 30m". Negative input clamps to "0m".
+ */
+export function formatDuration(ms: number): string {
+  const totalMin = Math.max(0, Math.round(ms / 60_000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 /** URL date param helpers. */
 export function toDateParam(ms: number): string {
   return format(ms, "yyyy-MM-dd");
