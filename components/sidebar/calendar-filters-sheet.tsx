@@ -18,12 +18,14 @@ export function CalendarFiltersSheet({
   open,
   onOpenChange,
   workspaceId,
+  currentMemberId,
   members,
   categories,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: string;
+  currentMemberId: string;
   members: Member[];
   categories: Category[];
 }) {
@@ -39,6 +41,7 @@ export function CalendarFiltersSheet({
         <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-safe">
           <CalendarFiltersContent
             workspaceId={workspaceId}
+            currentMemberId={currentMemberId}
             members={members}
             categories={categories}
           />

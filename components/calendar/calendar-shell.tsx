@@ -272,6 +272,7 @@ export function CalendarShell({
         {sidebarOpen && workspace.data && (
           <CalendarSidebar
             workspaceId={workspace.data.workspaceId}
+            currentMemberId={viewerId}
             members={workspace.data.members}
             categories={workspace.data.categories}
           />
@@ -358,6 +359,7 @@ export function CalendarShell({
           open={filtersOpen}
           onOpenChange={setFiltersOpen}
           workspaceId={workspace.data.workspaceId}
+          currentMemberId={viewerId}
           members={workspace.data.members}
           categories={workspace.data.categories}
         />

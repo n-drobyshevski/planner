@@ -62,8 +62,10 @@ export function ItemContextMenu({
   /** shown as the sheet header on mobile */
   title?: string;
   actions: ItemAction[];
-  color: string | null;
-  onColorChange: (color: string | null) => void;
+  /** current own color (hex) or null; omit (with onColorChange) to hide the picker */
+  color?: string | null;
+  /** when omitted, the Color submenu / sheet section is not rendered */
+  onColorChange?: (color: string | null) => void;
   /** set false to skip the mobile sheet (desktop right-click only) */
   mobileSheet?: boolean;
   children: React.ReactElement;
@@ -103,16 +105,18 @@ export function ItemContextMenu({
             {a.label}
           </ContextMenuItem>
         ))}
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>Color</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="p-2">
-            <ColorSwatchPicker
-              value={color}
-              onSelect={onColorChange}
-              className="max-w-44"
-            />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
+        {onColorChange && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>Color</ContextMenuSubTrigger>
+            <ContextMenuSubContent className="p-2">
+              <ColorSwatchPicker
+                value={color ?? null}
+                onSelect={onColorChange}
+                className="max-w-44"
+              />
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
         {destructive.length > 0 && <ContextMenuSeparator />}
         {destructive.map((a) => (
           <ContextMenuItem key={a.label} variant="destructive" onSelect={a.onSelect}>
@@ -138,8 +142,8 @@ export function ItemActionSheet({
   onOpenChange: (open: boolean) => void;
   title?: string;
   actions: ItemAction[];
-  color: string | null;
-  onColorChange: (color: string | null) => void;
+  color?: string | null;
+  onColorChange?: (color: string | null) => void;
 }) {
   const close = () => onOpenChange(false);
   return (
@@ -149,16 +153,18 @@ export function ItemActionSheet({
           <ResponsiveDialogTitle>{title ?? "Options"}</ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody className="flex flex-col gap-4 py-3 pb-6">
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Color</span>
-            <ColorSwatchPicker
-              value={color}
-              onSelect={(c) => {
-                onColorChange(c);
-                close();
-              }}
-            />
-          </div>
+          {onColorChange && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Color</span>
+              <ColorSwatchPicker
+                value={color ?? null}
+                onSelect={(c) => {
+                  onColorChange(c);
+                  close();
+                }}
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             {actions.map((a) => {
               const Icon = a.icon;
