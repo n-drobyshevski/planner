@@ -277,6 +277,7 @@ describe("round-trips", () => {
   const forms: RecurrenceForm[] = [
     { freq: "DAILY", interval: 1, byWeekday: [], end: { type: "never" } },
     { freq: "DAILY", interval: 2, byWeekday: [], end: { type: "never" } },
+    { freq: "DAILY", interval: 1, byWeekday: [0, 2, 4], end: { type: "never" } },
     {
       freq: "WEEKLY",
       interval: 1,
@@ -420,6 +421,7 @@ describe("build -> parse inverse from the string side", () => {
   const strings: readonly string[] = [
     "FREQ=DAILY",
     "FREQ=DAILY;INTERVAL=2",
+    "FREQ=DAILY;BYDAY=MO,WE,FR",
     "FREQ=WEEKLY;BYDAY=MO,WE,FR",
     "FREQ=WEEKLY;INTERVAL=2;BYDAY=SU",
     "FREQ=MONTHLY",
