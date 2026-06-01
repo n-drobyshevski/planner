@@ -27,7 +27,7 @@ describe("summarizeRecurrence", () => {
         byWeekday: [],
         end: { type: "until", dateMs: new Date(2026, 5, 30).getTime() },
       }),
-    ).toBe("Repeats daily, until Jun 30, 2026");
+    ).toBe("Repeats daily, until 30 Jun 2026");
   });
 
   it("monthly with a count", () => {

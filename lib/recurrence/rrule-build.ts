@@ -155,7 +155,7 @@ const FREQ_UNIT: Record<Freq, string> = {
   MONTHLY: "month",
 };
 
-/** Short human sentence for a recurrence form, e.g. "Repeats weekly on Mon, Wed, until Jun 30, 2026". */
+/** Short human sentence for a recurrence form, e.g. "Repeats weekly on Mon, Wed, until 30 Jun 2026". */
 export function summarizeRecurrence(form: RecurrenceForm): string {
   const hasDays =
     (form.freq === "WEEKLY" || form.freq === "DAILY") && form.byWeekday.length > 0;
@@ -175,7 +175,7 @@ export function summarizeRecurrence(form: RecurrenceForm): string {
   }
 
   if (form.end.type === "until") {
-    out += `, until ${format(form.end.dateMs, "MMM d, yyyy")}`;
+    out += `, until ${format(form.end.dateMs, "d MMM yyyy")}`;
   } else if (form.end.type === "count") {
     out += `, ${form.end.count} times`;
   }
