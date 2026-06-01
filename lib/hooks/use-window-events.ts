@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchWindow } from "@/lib/supabase/queries";
 import { subscribeWorkspace } from "@/lib/supabase/realtime";
@@ -10,8 +10,28 @@ import { expandEvents } from "@/lib/recurrence/expand";
 import type { EventRow, Occurrence, TimeWindow } from "@/lib/types";
 
 /**
- * Fetch events + overrides for a visible window, expand them into occurrences,
- * and live-invalidate on any realtime change in the workspace.
+ * Live-invalidate the workspace's event queries on any realtime change. Split
+ * out of `useWindowEvents` so the calendar can fetch several windows at once
+ * (the prev/current/next swipe panes) without opening duplicate realtime
+ * channels — call this once per screen, then `useWindowEvents` per window.
+ */
+export function useWorkspaceRealtime(workspaceId: string | undefined) {
+  const qc = useQueryClient();
+  const sb = createClient();
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    return subscribeWorkspace(sb, workspaceId, () => {
+      qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
+    });
+  }, [workspaceId, qc, sb]);
+}
+
+/**
+ * Fetch events + overrides for a visible window and expand them into
+ * occurrences. `keepPreviousData` holds the last window's results during a
+ * refetch so the view never flashes empty while paging. Pair with
+ * `useWorkspaceRealtime` for live updates.
  */
 export function useWindowEvents(
   workspaceId: string | undefined,
@@ -22,15 +42,7 @@ export function useWindowEvents(
   isLoading: boolean;
   isError: boolean;
 } {
-  const qc = useQueryClient();
   const sb = createClient();
-
-  useEffect(() => {
-    if (!workspaceId) return;
-    return subscribeWorkspace(sb, workspaceId, () => {
-      qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
-    });
-  }, [workspaceId, qc, sb]);
 
   const query = useQuery({
     queryKey: workspaceId
@@ -38,6 +50,7 @@ export function useWindowEvents(
       : ["events", "disabled"],
     enabled: Boolean(workspaceId),
     queryFn: () => fetchWindow(sb, workspaceId as string, win),
+    placeholderData: keepPreviousData,
   });
 
   const occurrences = useMemo<Occurrence[]>(
