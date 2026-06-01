@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useTasks } from "@/lib/hooks/use-tasks";
@@ -19,11 +20,36 @@ type EditorState =
   | { mode: "create"; status?: TaskStatus }
   | { mode: "edit"; taskId: string };
 
-export function TasksShell({ initialView }: { initialView: TasksView }) {
+export function TasksShell({
+  initialView,
+  viewFromUrl,
+}: {
+  initialView: TasksView;
+  viewFromUrl: boolean;
+}) {
   const router = useRouter();
   const [view, setView] = useState<TasksView>(initialView);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [scheduling, setScheduling] = useState<TaskRow | null>(null);
+  const isMobile = useIsMobile();
+  const [mounted, setMounted] = useState(false);
+  const autoApplied = useRef(false);
+
+  useEffect(() => setMounted(true), []);
+
+  // Phones default to the List view (the board's 3 columns don't fit) unless
+  // the URL pinned a view. Run in an effect (not render-phase) so the
+  // conditional setState can't trip rules-of-hooks; ref-guarded so a later
+  // manual switch isn't clobbered. The URL stays clean; the first manual switch
+  // syncs it.
+  useEffect(() => {
+    if (autoApplied.current) return;
+    if (!viewFromUrl && isMobile) {
+      autoApplied.current = true;
+      setView("list");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on first mobile detection
+  }, [isMobile, viewFromUrl]);
 
   const workspace = useWorkspace();
   const workspaceId = workspace.data?.workspaceId;
@@ -68,7 +94,9 @@ export function TasksShell({ initialView }: { initialView: TasksView }) {
       />
 
       <main className="min-h-0 flex-1 overflow-hidden">
-        {error ? (
+        {!mounted ? (
+          <div className="h-full" />
+        ) : error ? (
           <Centered>
             Couldn&apos;t load your tasks. Make sure the database schema is applied
             and seeded.

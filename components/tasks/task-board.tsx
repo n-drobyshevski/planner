@@ -5,7 +5,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
   useDroppable,
   useSensor,
@@ -30,7 +31,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { TaskCard } from "./task-card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { positionBetween } from "@/lib/tasks/ordering";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useSwipe } from "@/hooks/use-swipe";
 import type { Member, TaskRow, TaskStatus } from "@/lib/types";
 
 const COLUMNS: { status: TaskStatus; title: string }[] = [
@@ -78,6 +82,16 @@ export function TaskBoard({
   const source = useMemo(() => buildColumns(tasks), [tasks]);
   const [items, setItems] = useState<Columns>(source);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeStatus, setActiveStatus] = useState<TaskStatus>("todo");
+  const isMobile = useIsMobile();
+  const statusOrder: TaskStatus[] = ["todo", "in_progress", "done"];
+  const swipe = useSwipe({
+    enabled: isMobile,
+    onSwipeLeft: () =>
+      setActiveStatus((s) => statusOrder[Math.min(statusOrder.indexOf(s) + 1, 2)]),
+    onSwipeRight: () =>
+      setActiveStatus((s) => statusOrder[Math.max(statusOrder.indexOf(s) - 1, 0)]),
+  });
 
   // Resync from server data when it changes and we're not mid-drag. Done during
   // render (React's "adjust state on prop change" pattern) rather than in an
@@ -88,8 +102,11 @@ export function TaskBoard({
     setItems(source);
   }
 
+  // Mouse drags immediately (5px); touch requires a 200ms long-press so the
+  // board can still be scrolled and swiped between columns on a phone.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -155,6 +172,41 @@ export function TaskBoard({
     if (task) onMove(task, overC, positionBetween(before, after));
   }
 
+  const renderColumn = (col: { status: TaskStatus; title: string }) => (
+    <Column
+      key={col.status}
+      status={col.status}
+      title={col.title}
+      count={items[col.status].length}
+      onNew={() => onNew(col.status)}
+    >
+      <SortableContext
+        items={items[col.status]}
+        strategy={verticalListSortingStrategy}
+      >
+        {items[col.status].length === 0 ? (
+          <EmptyColumn />
+        ) : (
+          items[col.status].map((id) => {
+            const task = byId.get(id);
+            if (!task) return null;
+            return (
+              <SortableCard
+                key={id}
+                task={task}
+                color={colorOf(task)}
+                assignee={task.assigneeId ? members.get(task.assigneeId) ?? null : null}
+                progress={progressOf?.(task) ?? null}
+                onOpen={() => onOpen(task)}
+                onToggleDone={() => onToggleDone(task)}
+              />
+            );
+          })
+        )}
+      </SortableContext>
+    </Column>
+  );
+
   const activeTask = activeId ? byId.get(activeId) : null;
 
   return (
@@ -164,42 +216,31 @@ export function TaskBoard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      <div className="grid h-full grid-cols-1 gap-3 overflow-x-auto p-3 sm:grid-cols-3 sm:p-4">
-        {COLUMNS.map((col) => (
-          <Column
-            key={col.status}
-            status={col.status}
-            title={col.title}
-            count={items[col.status].length}
-            onNew={() => onNew(col.status)}
+      {isMobile ? (
+        <div className="flex h-full flex-col gap-3 p-3">
+          <ToggleGroup
+            type="single"
+            value={activeStatus}
+            onValueChange={(v) => v && setActiveStatus(v as TaskStatus)}
+            variant="outline"
+            size="sm"
+            className="w-full"
           >
-            <SortableContext
-              items={items[col.status]}
-              strategy={verticalListSortingStrategy}
-            >
-              {items[col.status].length === 0 ? (
-                <EmptyColumn />
-              ) : (
-                items[col.status].map((id) => {
-                  const task = byId.get(id);
-                  if (!task) return null;
-                  return (
-                    <SortableCard
-                      key={id}
-                      task={task}
-                      color={colorOf(task)}
-                      assignee={task.assigneeId ? members.get(task.assigneeId) ?? null : null}
-                      progress={progressOf?.(task) ?? null}
-                      onOpen={() => onOpen(task)}
-                      onToggleDone={() => onToggleDone(task)}
-                    />
-                  );
-                })
-              )}
-            </SortableContext>
-          </Column>
-        ))}
-      </div>
+            {COLUMNS.map((c) => (
+              <ToggleGroupItem key={c.status} value={c.status} className="flex-1">
+                {c.title}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <div className="min-h-0 flex-1" {...swipe}>
+            {renderColumn(COLUMNS.find((c) => c.status === activeStatus)!)}
+          </div>
+        </div>
+      ) : (
+        <div className="grid h-full grid-cols-1 gap-3 overflow-x-auto p-3 sm:grid-cols-3 sm:p-4">
+          {COLUMNS.map(renderColumn)}
+        </div>
+      )}
 
       <DragOverlay>
         {activeTask ? (

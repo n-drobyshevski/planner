@@ -21,7 +21,7 @@ export function TasksToolbar({
   currentMember: Member | null;
 }) {
   return (
-    <header className="flex items-center gap-2 border-b px-3 py-2 sm:px-4">
+    <header className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4">
       <div className="flex items-center gap-2">
         <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <ListChecks className="size-4" />

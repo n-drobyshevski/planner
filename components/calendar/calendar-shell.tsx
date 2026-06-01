@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { startOfDay } from "date-fns";
@@ -19,11 +19,14 @@ import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { qk } from "@/lib/supabase/query-keys";
 import type { WindowData } from "@/lib/supabase/queries";
 import { useUiStore } from "@/stores/ui-store";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useSwipe } from "@/hooks/use-swipe";
 import { CalendarToolbar } from "./calendar-toolbar";
 import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
+import { CalendarFiltersSheet } from "@/components/sidebar/calendar-filters-sheet";
 import { EventDialog } from "@/components/event/event-dialog";
-import { TaskBacklogRail } from "@/components/tasks/task-backlog-rail";
+import { TaskBacklogRail, TaskBacklogSheet } from "@/components/tasks/task-backlog-rail";
 import { ScheduleTaskDialog } from "@/components/tasks/schedule-task-dialog";
 import {
   RecurrenceScopePrompt,
@@ -45,13 +48,19 @@ interface PendingReschedule {
 export function CalendarShell({
   initialView,
   initialDate,
+  viewFromUrl,
 }: {
   initialView: CalendarView;
   initialDate: number;
+  viewFromUrl: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState<CalendarView>(initialView);
   const [focusedDate, setFocusedDate] = useState<number>(initialDate);
+  const isMobile = useIsMobile();
+  const autoMobileApplied = useRef(false);
+  const [mounted, setMounted] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const workspace = useWorkspace();
   const win = useMemo(() => getWindow(view, focusedDate), [view, focusedDate]);
@@ -187,8 +196,32 @@ export function CalendarShell({
     }
   }
 
+  useEffect(() => setMounted(true), []);
+
   const days = useMemo(() => getVisibleDays(view, focusedDate), [view, focusedDate]);
   const label = formatRangeLabel(view, focusedDate);
+
+  // Swipe the canvas left/right to page the view — only on Agenda/Month, where
+  // there's no horizontal/vertical-scroll conflict with the time grid.
+  const swipe = useSwipe({
+    enabled: mounted && (view === "agenda" || view === "month"),
+    onSwipeLeft: () => go(1),
+    onSwipeRight: () => go(-1),
+  });
+
+  // On a phone, the dense grids are hard to scan — default to the Agenda list
+  // on first load, but only when the URL didn't already pin a view. Applied
+  // once (ref-guarded) so a later manual switch isn't clobbered. Done during
+  // render — React's "adjust state on changed input" pattern, mirroring
+  // task-board's resync — rather than in an effect, to avoid a cascading
+  // set-state-in-effect. Kept after every hook so the conditional setState
+  // never sits above a hook call (rules-of-hooks). `useIsMobile` is false until
+  // mounted, so SSR renders the URL/default view and a real phone flips right
+  // after; the `mounted` gate on the canvas hides that first frame.
+  if (mounted && !autoMobileApplied.current && !viewFromUrl && isMobile) {
+    autoMobileApplied.current = true;
+    setView("agenda");
+  }
 
   return (
     <div className="flex h-dvh flex-col bg-background">
@@ -202,6 +235,7 @@ export function CalendarShell({
         onNewEvent={openNew}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onToggleBacklog={() => setBacklogOpen(!backlogOpen)}
+        onOpenFilters={() => setFiltersOpen(true)}
         backlogOpen={backlogOpen}
         workspace={workspace.data ?? null}
       />
@@ -213,7 +247,8 @@ export function CalendarShell({
             categories={workspace.data.categories}
           />
         )}
-        <main className="min-h-0 flex-1 overflow-hidden">
+        <main className="min-h-0 flex-1 overflow-hidden" {...swipe}>
+          {mounted ? (
           <CalendarCanvas
           view={view}
           days={days}
@@ -231,6 +266,9 @@ export function CalendarShell({
           loading={workspace.isLoading || eventsLoading}
           error={workspace.isError || eventsError}
           />
+          ) : (
+            <div className="h-full" />
+          )}
         </main>
         {backlogOpen && workspace.data && (
           <TaskBacklogRail
@@ -274,6 +312,30 @@ export function CalendarShell({
           subtasks={childrenByParent.get(scheduling.id) ?? []}
           workspaceId={workspace.data.workspaceId}
           defaultStartMs={focusedDate + 9 * 3_600_000}
+        />
+      )}
+
+      {workspace.data && (
+        <CalendarFiltersSheet
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          workspaceId={workspace.data.workspaceId}
+          members={workspace.data.members}
+          categories={workspace.data.categories}
+        />
+      )}
+
+      {workspace.data && (
+        <TaskBacklogSheet
+          open={isMobile && backlogOpen}
+          onOpenChange={setBacklogOpen}
+          tasks={backlogTasks}
+          colorOf={taskColorOf}
+          members={memberMap}
+          onSchedule={(t) => {
+            setScheduling(t);
+            setBacklogOpen(false);
+          }}
         />
       )}
     </div>

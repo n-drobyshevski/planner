@@ -75,7 +75,7 @@ async function main() {
   await admin.from("workspaces").delete().neq("id", crypto.randomUUID());
   const { data: ws, error: wsErr } = await admin
     .from("workspaces")
-    .insert({ name: process.env.WORKSPACE_NAME ?? "Our Planner" })
+    .insert({ name: process.env.WORKSPACE_NAME ?? "Planner" })
     .select()
     .single();
   if (wsErr) throw wsErr;

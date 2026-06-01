@@ -1,0 +1,47 @@
+import * as React from "react";
+
+interface SwipeOptions {
+  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
+  /** Minimum horizontal distance (px) to count as a swipe. */
+  threshold?: number;
+  enabled?: boolean;
+}
+
+/**
+ * Minimal horizontal-swipe detector on pointer events (no deps). Spread the
+ * returned handlers on a container. A swipe fires only when horizontal travel
+ * dominates (|dx| > 1.5·|dy|) and clears `threshold`, so it won't trip on
+ * vertical scrolling. Touch only — mouse/pen drags are ignored. When disabled
+ * it returns no handlers, so callers can gate it per view.
+ */
+export function useSwipe({
+  onSwipeLeft,
+  onSwipeRight,
+  threshold = 60,
+  enabled = true,
+}: SwipeOptions) {
+  const start = React.useRef<{ x: number; y: number; id: number } | null>(null);
+
+  if (!enabled) return {} as React.HTMLAttributes<HTMLElement>;
+
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      const s = start.current;
+      start.current = null;
+      if (!s || e.pointerId !== s.id) return;
+      const dx = e.clientX - s.x;
+      const dy = e.clientY - s.y;
+      if (Math.abs(dx) < threshold || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
+      if (dx < 0) onSwipeLeft?.();
+      else onSwipeRight?.();
+    },
+    onPointerCancel: () => {
+      start.current = null;
+    },
+  } satisfies React.HTMLAttributes<HTMLElement>;
+}

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogBody,
+  ResponsiveDialogFooter,
+} from "@/components/ui/responsive-dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -243,12 +244,15 @@ export function EventDialog(props: EventDialogProps) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{mode === "create" ? "New event" : "Edit event"}</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>
+              {mode === "create" ? "New event" : "Edit event"}
+            </ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
+          <ResponsiveDialogBody>
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="ev-title">Title</FieldLabel>
@@ -382,8 +386,9 @@ export function EventDialog(props: EventDialogProps) {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </FieldGroup>
+          </ResponsiveDialogBody>
 
-          <DialogFooter className="sm:justify-between">
+          <ResponsiveDialogFooter className="sm:justify-between">
             {mode === "edit" ? (
               <Button variant="ghost" onClick={onDelete} disabled={pending} className="text-destructive">
                 <Trash2 data-icon="inline-start" />
@@ -401,9 +406,9 @@ export function EventDialog(props: EventDialogProps) {
                 {mode === "create" ? "Create" : "Save"}
               </Button>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <RecurrenceScopePrompt
         open={scopePrompt !== null}

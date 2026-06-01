@@ -6,6 +6,18 @@ export type Visibility = "private" | "shared";
 export type OverrideType = "cancel" | "modify";
 export type TaskStatus = "todo" | "in_progress" | "done";
 
+/** Appearance preferences, stored per member. Mirror the DB CHECK constraints. */
+export type ThemePreference = "light" | "dark" | "system";
+export type AccentId =
+  | "terracotta"
+  | "teal"
+  | "amber"
+  | "green"
+  | "blue"
+  | "rose"
+  | "violet";
+export type SurfaceTone = "warm" | "neutral" | "cool";
+
 export interface Member {
   id: string;
   workspaceId: string;
@@ -13,6 +25,10 @@ export interface Member {
   name: string;
   color: string; // hex accent
   hasPin: boolean;
+  // Appearance preferences (per member).
+  themePreference: ThemePreference;
+  accent: AccentId;
+  surfaceTone: SurfaceTone;
 }
 
 export interface Category {
@@ -116,7 +132,7 @@ export interface Occurrence {
   isException: boolean;
 }
 
-export type CalendarView = "month" | "week" | "day";
+export type CalendarView = "month" | "week" | "day" | "3day" | "agenda";
 
 /** Half-open time window [start, end) in epoch ms. */
 export interface TimeWindow {

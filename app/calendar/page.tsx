@@ -1,5 +1,9 @@
 import { CalendarShell } from "@/components/calendar/calendar-shell";
-import { parseViewParam, parseDateParam } from "@/lib/datetime/format";
+import {
+  parseViewParam,
+  parseDateParam,
+  isCalendarViewParam,
+} from "@/lib/datetime/format";
 
 export default async function CalendarPage({
   searchParams,
@@ -11,6 +15,7 @@ export default async function CalendarPage({
     <CalendarShell
       initialView={parseViewParam(sp.view)}
       initialDate={parseDateParam(sp.date)}
+      viewFromUrl={isCalendarViewParam(sp.view)}
     />
   );
 }

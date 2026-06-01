@@ -17,6 +17,8 @@ import type { Occurrence } from "@/lib/types";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAY_MS = 86_400_000;
 const MIN_NEW = 30; // minimum minutes for a drag-created event
+const LONG_PRESS_MS = 350; // touch hold before a move-drag arms
+const TAP_TOL = 10; // px a finger may drift before a press becomes a scroll
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const clampMin = (m: number) => clamp(m, 0, 1440);
@@ -84,7 +86,16 @@ export function TimeGrid({
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
+  const longPressRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    occKey?: string;
+    moved: boolean;
+    timer: number;
+  } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [armed, setArmed] = useState(false);
 
   const allDay = occurrences.filter((o) => o.allDay);
   const byKey = useMemo(
@@ -110,11 +121,72 @@ export function TimeGrid({
   const timeLabel = (dayIndex: number, min: number) =>
     format(days[dayIndex] + min * 60_000, "h:mm");
 
+  // Touch: arm a move-drag once the long-press timer (set in onPointerDown)
+  // fires on an event. Until then the grid scrolls normally.
+  function armTouchMove(
+    occKey: string | undefined,
+    clientX: number,
+    clientY: number,
+    pointerId: number,
+  ) {
+    longPressRef.current = null;
+    if (!occKey) return; // long-press on empty space is a no-op on touch
+    const occ = byKey.get(occKey);
+    if (!occ) return;
+    const dayIndex = dayIndexOfMs(occ.start);
+    const g = geom(clientX, clientY);
+    const sMin = minutesIn(occ.start, dayIndex);
+    const durationMin = (occ.end - occ.start) / 60_000;
+    dragRef.current = {
+      kind: "move",
+      pointerId,
+      startX: clientX,
+      startY: clientY,
+      moved: true,
+      dayIndex,
+      occKey,
+      durationMin,
+      grabMin: g.minutes - sMin,
+      startMin: sMin,
+      curDayIndex: dayIndex,
+      curStartMin: sMin,
+    };
+    setArmed(true);
+    try {
+      colsRef.current?.setPointerCapture(pointerId);
+    } catch {
+      /* ignore */
+    }
+    navigator.vibrate?.(10);
+    setPreview({ dayIndex, topMin: sMin, heightMin: durationMin, label: occ.title });
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return;
     const el = e.target as HTMLElement;
     const handle = el.closest<HTMLElement>("[data-resize]");
     const blockEl = el.closest<HTMLElement>("[data-occ-key]");
+
+    // Touch path: defer to a long-press (move) or a tap (select / create).
+    // Never start a create-drag or resize on touch, so vertical scrolling
+    // stays free until the press arms.
+    if (e.pointerType === "touch") {
+      const occKey = blockEl?.dataset.occKey;
+      const timer = window.setTimeout(
+        () => armTouchMove(occKey, e.clientX, e.clientY, e.pointerId),
+        LONG_PRESS_MS,
+      );
+      longPressRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        occKey,
+        moved: false,
+        timer,
+      };
+      return;
+    }
+
     const g = geom(e.clientX, e.clientY);
     colsRef.current?.setPointerCapture(e.pointerId);
 
@@ -169,6 +241,18 @@ export function TimeGrid({
   }
 
   function onPointerMove(e: React.PointerEvent) {
+    const lp = longPressRef.current;
+    if (lp && lp.pointerId === e.pointerId && !dragRef.current) {
+      // Finger drifted before the long-press fired → treat as a scroll, cancel.
+      if (
+        Math.abs(e.clientX - lp.startX) > TAP_TOL ||
+        Math.abs(e.clientY - lp.startY) > TAP_TOL
+      ) {
+        clearTimeout(lp.timer);
+        longPressRef.current = null;
+      }
+      return;
+    }
     const d = dragRef.current;
     if (!d || e.pointerId !== d.pointerId) return;
     if (!d.moved && (Math.abs(e.clientX - d.startX) > 4 || Math.abs(e.clientY - d.startY) > 4)) {
@@ -210,9 +294,30 @@ export function TimeGrid({
   }
 
   function onPointerUp(e: React.PointerEvent) {
+    const lp = longPressRef.current;
+    if (lp && lp.pointerId === e.pointerId) {
+      clearTimeout(lp.timer);
+      longPressRef.current = null;
+      // Quick tap (long-press never armed): select an event, or create a
+      // default block on an empty slot.
+      if (!lp.moved) {
+        if (lp.occKey) {
+          const occ = byKey.get(lp.occKey);
+          if (occ) onSelect(occ);
+        } else {
+          const g = geom(lp.startX, lp.startY);
+          const startMin = snapMinutes(clampMin(g.minutes));
+          const start = days[g.dayIndex] + startMin * 60_000;
+          onCreateRange(start, start + SCHED_MIN * 60_000);
+        }
+      }
+      return;
+    }
+
     const d = dragRef.current;
     if (!d || e.pointerId !== d.pointerId) return;
     dragRef.current = null;
+    setArmed(false);
     setPreview(null);
     try {
       colsRef.current?.releasePointerCapture(e.pointerId);
@@ -348,12 +453,17 @@ export function TimeGrid({
 
           <div
             ref={colsRef}
-            className="relative flex flex-1 touch-none"
+            className={cn("relative flex flex-1", armed ? "touch-none" : "touch-pan-y")}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={() => {
+              if (longPressRef.current) {
+                clearTimeout(longPressRef.current.timer);
+                longPressRef.current = null;
+              }
               dragRef.current = null;
+              setArmed(false);
               setPreview(null);
             }}
             onDragOver={onDragOver}

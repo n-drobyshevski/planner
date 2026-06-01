@@ -7,6 +7,9 @@ import type {
   Member,
   Category,
   TaskRow,
+  ThemePreference,
+  AccentId,
+  SurfaceTone,
 } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -26,6 +29,9 @@ export function mapMember(r: Row): Member {
     name: r.name as string,
     color: r.color as string,
     hasPin: r.pin_hash != null,
+    themePreference: (r.theme_preference as ThemePreference | null) ?? "system",
+    accent: (r.accent as AccentId | null) ?? "terracotta",
+    surfaceTone: (r.surface_tone as SurfaceTone | null) ?? "warm",
   };
 }
 

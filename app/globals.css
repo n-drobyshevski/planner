@@ -152,6 +152,123 @@
   --sidebar-ring: #f2754e;
 }
 
+/* ---------------------------------------------------------------------------
+   Accent presets — user-selectable brand color (Settings → Appearance).
+   Each preset overrides ONLY the brand-color token group (primary + ring +
+   sidebar-primary), leaving surfaces to the tone presets below. `terracotta`
+   is the default and lives in :root / .dark, so it needs no block here.
+   Light values are tuned for white text; dark values for dark ink (#292524),
+   both passing WCAG AA. Both a light `[data-accent]` and a higher-specificity
+   `.dark[data-accent]` block are defined so the dark value wins in dark mode.
+--------------------------------------------------------------------------- */
+[data-accent="teal"] {
+  --primary: #0f766e; --primary-foreground: #ffffff; --ring: #0f766e;
+  --sidebar-primary: #0f766e; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #0f766e;
+}
+.dark[data-accent="teal"] {
+  --primary: #2dd4bf; --primary-foreground: #292524; --ring: #2dd4bf;
+  --sidebar-primary: #2dd4bf; --sidebar-primary-foreground: #292524; --sidebar-ring: #2dd4bf;
+}
+
+[data-accent="amber"] {
+  --primary: #b45309; --primary-foreground: #ffffff; --ring: #b45309;
+  --sidebar-primary: #b45309; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #b45309;
+}
+.dark[data-accent="amber"] {
+  --primary: #fbbf24; --primary-foreground: #292524; --ring: #fbbf24;
+  --sidebar-primary: #fbbf24; --sidebar-primary-foreground: #292524; --sidebar-ring: #fbbf24;
+}
+
+[data-accent="green"] {
+  --primary: #15803d; --primary-foreground: #ffffff; --ring: #15803d;
+  --sidebar-primary: #15803d; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #15803d;
+}
+.dark[data-accent="green"] {
+  --primary: #4ade80; --primary-foreground: #292524; --ring: #4ade80;
+  --sidebar-primary: #4ade80; --sidebar-primary-foreground: #292524; --sidebar-ring: #4ade80;
+}
+
+[data-accent="blue"] {
+  --primary: #0369a1; --primary-foreground: #ffffff; --ring: #0369a1;
+  --sidebar-primary: #0369a1; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #0369a1;
+}
+.dark[data-accent="blue"] {
+  --primary: #38bdf8; --primary-foreground: #292524; --ring: #38bdf8;
+  --sidebar-primary: #38bdf8; --sidebar-primary-foreground: #292524; --sidebar-ring: #38bdf8;
+}
+
+[data-accent="rose"] {
+  --primary: #be185d; --primary-foreground: #ffffff; --ring: #be185d;
+  --sidebar-primary: #be185d; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #be185d;
+}
+.dark[data-accent="rose"] {
+  --primary: #fb7185; --primary-foreground: #292524; --ring: #fb7185;
+  --sidebar-primary: #fb7185; --sidebar-primary-foreground: #292524; --sidebar-ring: #fb7185;
+}
+
+[data-accent="violet"] {
+  --primary: #7c3aed; --primary-foreground: #ffffff; --ring: #7c3aed;
+  --sidebar-primary: #7c3aed; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #7c3aed;
+}
+.dark[data-accent="violet"] {
+  --primary: #c4b5fd; --primary-foreground: #292524; --ring: #c4b5fd;
+  --sidebar-primary: #c4b5fd; --sidebar-primary-foreground: #292524; --sidebar-ring: #c4b5fd;
+}
+
+/* ---------------------------------------------------------------------------
+   Surface tone presets — neutral temperature (Settings → Appearance).
+   Override ONLY the neutral-surface token group (backgrounds, cards, borders,
+   muted/secondary, the shadcn hover `--accent` surface, sidebar surfaces).
+   They never touch --primary/--ring/--destructive, so they compose freely with
+   the accent presets above. `warm` is the default (:root / .dark), so only
+   `neutral` (zinc) and `cool` (slate) are defined here.
+--------------------------------------------------------------------------- */
+[data-tone="neutral"] {
+  --background: #fafafa; --foreground: #27272a;
+  --card: #ffffff; --card-foreground: #27272a;
+  --popover: #ffffff; --popover-foreground: #27272a;
+  --secondary: #f4f4f5; --secondary-foreground: #3f3f46;
+  --muted: #f4f4f5; --muted-foreground: #71717a;
+  --accent: #f4f4f5; --accent-foreground: #27272a;
+  --border: #e4e4e7; --input: #e4e4e7;
+  --sidebar: #fafafa; --sidebar-foreground: #27272a;
+  --sidebar-accent: #f4f4f5; --sidebar-accent-foreground: #27272a; --sidebar-border: #e4e4e7;
+}
+.dark[data-tone="neutral"] {
+  --background: #18181b; --foreground: #fafafa;
+  --card: #27272a; --card-foreground: #fafafa;
+  --popover: #27272a; --popover-foreground: #fafafa;
+  --secondary: #27272a; --secondary-foreground: #fafafa;
+  --muted: #27272a; --muted-foreground: #a1a1aa;
+  --accent: #27272a; --accent-foreground: #fafafa;
+  --border: #27272a; --input: #3f3f46;
+  --sidebar: #18181b; --sidebar-foreground: #fafafa;
+  --sidebar-accent: #27272a; --sidebar-accent-foreground: #fafafa; --sidebar-border: #27272a;
+}
+
+[data-tone="cool"] {
+  --background: #f8fafc; --foreground: #1e293b;
+  --card: #ffffff; --card-foreground: #1e293b;
+  --popover: #ffffff; --popover-foreground: #1e293b;
+  --secondary: #f1f5f9; --secondary-foreground: #334155;
+  --muted: #f1f5f9; --muted-foreground: #64748b;
+  --accent: #f1f5f9; --accent-foreground: #1e293b;
+  --border: #e2e8f0; --input: #e2e8f0;
+  --sidebar: #f8fafc; --sidebar-foreground: #1e293b;
+  --sidebar-accent: #f1f5f9; --sidebar-accent-foreground: #1e293b; --sidebar-border: #e2e8f0;
+}
+.dark[data-tone="cool"] {
+  --background: #0f172a; --foreground: #f8fafc;
+  --card: #1e293b; --card-foreground: #f8fafc;
+  --popover: #1e293b; --popover-foreground: #f8fafc;
+  --secondary: #1e293b; --secondary-foreground: #f8fafc;
+  --muted: #1e293b; --muted-foreground: #94a3b8;
+  --accent: #1e293b; --accent-foreground: #f8fafc;
+  --border: #1e293b; --input: #334155;
+  --sidebar: #0f172a; --sidebar-foreground: #f8fafc;
+  --sidebar-accent: #1e293b; --sidebar-accent-foreground: #f8fafc; --sidebar-border: #1e293b;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -162,8 +279,51 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+    touch-action: manipulation;
   }
   html {
     @apply font-sans antialiased;
+  }
+}
+
+/* ---- Mobile: safe-area insets (notch / Dynamic Island / home indicator) ----
+   Custom Tailwind v4 utilities. The max() fallbacks keep desktop and normal
+   mobile-browser spacing unchanged — env() is 0 unless the page owns the safe
+   area (standalone PWA / fullscreen), where it grows to clear the OS chrome. */
+@utility pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0.5rem);
+}
+@utility pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+@utility px-safe {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* ---- iOS zoom guard: Safari auto-zooms when a focused field is < 16px ---- */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select,
+  [data-slot="select-trigger"] {
+    font-size: 16px;
+  }
+  /* Comfortable touch targets for form controls on phones. */
+  input:not([type="checkbox"]):not([type="radio"]),
+  [data-slot="select-trigger"] {
+    min-height: 2.75rem;
+  }
+}
+
+/* ---- Respect prefers-reduced-motion: near-disable motion globally ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

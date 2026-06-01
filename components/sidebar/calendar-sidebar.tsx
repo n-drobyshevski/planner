@@ -16,6 +16,12 @@ import type { Member, Category } from "@/lib/types";
 const SHARED_COLOR = "#b45309";
 const PALETTE = ["#c0492a", "#0f766e", "#b45309", "#15803d", "#0369a1", "#be185d", "#7c3aed"];
 
+interface FiltersProps {
+  workspaceId: string;
+  members: Member[];
+  categories: Category[];
+}
+
 function ToggleRow({
   color,
   label,
@@ -32,7 +38,7 @@ function ToggleRow({
       type="button"
       onClick={onToggle}
       aria-pressed={active}
-      className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent"
+      className="flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent md:min-h-0"
     >
       <span
         className="size-3.5 shrink-0 rounded-[4px] border-2"
@@ -48,22 +54,18 @@ function ToggleRow({
   );
 }
 
-export function CalendarSidebar({
-  workspaceId,
-  members,
-  categories,
-}: {
-  workspaceId: string;
-  members: Member[];
-  categories: Category[];
-}) {
+/**
+ * Layer + category filter controls, shared by the desktop sidebar and the
+ * mobile bottom sheet so the two presentations never drift apart.
+ */
+export function CalendarFiltersContent({ workspaceId, members, categories }: FiltersProps) {
   const hiddenLayers = useUiStore((s) => s.hiddenLayers);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
   const toggleLayer = useUiStore((s) => s.toggleLayer);
   const toggleCategory = useUiStore((s) => s.toggleCategory);
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-sidebar p-3">
+    <>
       <section className="flex flex-col gap-0.5">
         <h3 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Calendars
@@ -106,6 +108,18 @@ export function CalendarSidebar({
           ))
         )}
       </section>
+    </>
+  );
+}
+
+/**
+ * Desktop-only left rail. Hidden on phones (< md), where the same controls are
+ * presented as a bottom sheet (see CalendarFiltersSheet).
+ */
+export function CalendarSidebar(props: FiltersProps) {
+  return (
+    <aside className="hidden w-60 shrink-0 flex-col gap-5 overflow-y-auto border-r bg-sidebar p-3 md:flex">
+      <CalendarFiltersContent {...props} />
     </aside>
   );
 }

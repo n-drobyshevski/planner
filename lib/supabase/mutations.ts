@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { EventRow, TaskRow } from "@/lib/types";
+import type {
+  EventRow,
+  TaskRow,
+  ThemePreference,
+  AccentId,
+  SurfaceTone,
+} from "@/lib/types";
 import {
   mapEvent,
   mapTask,
@@ -198,6 +204,29 @@ export async function updateCategory(
 
 export async function deleteCategory(sb: SupabaseClient, id: string): Promise<void> {
   const { error } = await sb.from("categories").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// --- Member preferences ----------------------------------------------------
+
+export interface MemberPreferencesPatch {
+  themePreference?: ThemePreference;
+  accent?: AccentId;
+  surfaceTone?: SurfaceTone;
+}
+
+/** Update the signed-in member's appearance preferences. RLS (members_update_self) scopes it. */
+export async function updateMemberPreferences(
+  sb: SupabaseClient,
+  memberId: string,
+  patch: MemberPreferencesPatch,
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.themePreference != null) row.theme_preference = patch.themePreference;
+  if (patch.accent != null) row.accent = patch.accent;
+  if (patch.surfaceTone != null) row.surface_tone = patch.surfaceTone;
+  if (Object.keys(row).length === 0) return;
+  const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;
 }
 

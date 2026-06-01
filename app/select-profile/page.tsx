@@ -1,6 +1,6 @@
 import { getMemberProfiles } from "@/lib/auth/profiles";
 import { ProfileSwitcher } from "@/components/auth/profile-switcher";
-import { CalendarHeart } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 export default function SelectProfilePage() {
   const profiles = getMemberProfiles();
@@ -9,7 +9,7 @@ export default function SelectProfilePage() {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-10 bg-background px-6 py-12">
       <div className="flex flex-col items-center gap-3 text-center">
         <span className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-soft">
-          <CalendarHeart className="size-7" />
+          <CalendarDays className="size-7" />
         </span>
         <h1 className="font-heading text-3xl font-bold tracking-tight">Planner</h1>
         <p className="max-w-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +45,12 @@ export function ToolbarUserMenu({ current }: { current: Member | null }) {
             <DropdownMenuLabel>Signed in as {current.name}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                  <Settings data-icon="inline-start" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
                   void signOutAction();

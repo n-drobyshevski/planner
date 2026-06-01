@@ -14,12 +14,13 @@ function isStartOfDay(ms: number): boolean {
 describe("getVisibleDays", () => {
   it("returns the correct number of days per view", () => {
     expect(getVisibleDays("day", focused)).toHaveLength(1);
+    expect(getVisibleDays("3day", focused)).toHaveLength(3);
     expect(getVisibleDays("week", focused)).toHaveLength(7);
     expect(getVisibleDays("month", focused)).toHaveLength(42);
   });
 
   it("each returned day equals startOfDay of itself", () => {
-    for (const view of ["day", "week", "month"] as const) {
+    for (const view of ["day", "3day", "week", "month"] as const) {
       for (const ms of getVisibleDays(view, focused)) {
         expect(isStartOfDay(ms)).toBe(true);
       }
@@ -29,7 +30,7 @@ describe("getVisibleDays", () => {
   it("returns strictly increasing, consecutive calendar days (no repeats/gaps)", () => {
     // Guards against a bug where the step index is dropped (e.g. addDays(start, 0)),
     // which would yield N identical days that each still pass the startOfDay check.
-    for (const view of ["day", "week", "month"] as const) {
+    for (const view of ["day", "3day", "week", "month"] as const) {
       const days = getVisibleDays(view, focused);
       for (let i = 1; i < days.length; i++) {
         // Strictly increasing.
@@ -49,6 +50,30 @@ describe("getVisibleDays", () => {
   it("week start respects weekStartsOn=0 (Sunday)", () => {
     const [first] = getVisibleDays("week", focused, { weekStartsOn: 0 });
     expect(new Date(first).getDay()).toBe(0); // 0 = Sunday
+  });
+});
+
+describe("3day view", () => {
+  it("shows exactly 3 days with the focused day as the leftmost column", () => {
+    const days = getVisibleDays("3day", focused);
+    expect(days).toHaveLength(3);
+    expect(days[0]).toBe(getTime(startOfDay(focused)));
+    expect(days[2]).toBe(getTime(startOfDay(addDays(focused, 2))));
+  });
+
+  it("window is [startOfDay(focused), +3 days)", () => {
+    const win = getWindow("3day", focused);
+    const days = getVisibleDays("3day", focused);
+    expect(win.start).toBe(getTime(startOfDay(focused)));
+    expect(win.end).toBe(getTime(startOfDay(addDays(focused, 3))));
+    expect(days).not.toContain(win.end);
+  });
+
+  it("navigate(+1) jumps exactly 3 days and round-trips with (-1)", () => {
+    const start = getTime(startOfDay(focused));
+    const forward = navigate("3day", focused, 1);
+    expect(forward).toBe(getTime(startOfDay(addDays(start, 3))));
+    expect(navigate("3day", forward, -1)).toBe(start);
   });
 });
 
@@ -89,7 +114,7 @@ describe("getWindow basic shape", () => {
   });
 
   it("window.start equals getVisibleDays[0] for every view", () => {
-    for (const view of ["day", "week", "month"] as const) {
+    for (const view of ["day", "3day", "week", "month"] as const) {
       const win = getWindow(view, focused);
       const days = getVisibleDays(view, focused);
       expect(win.start).toBe(days[0]);
@@ -101,7 +126,7 @@ describe("getWindow basic shape", () => {
     // [start, end) — end must be exclusive and land on the day boundary right
     // after the final visible day. DST-tolerant: derived via addDays/startOfDay,
     // never asserting a fixed ms duration.
-    for (const view of ["day", "week", "month"] as const) {
+    for (const view of ["day", "3day", "week", "month"] as const) {
       const win = getWindow(view, focused);
       const days = getVisibleDays(view, focused);
       const lastDay = days[days.length - 1];
@@ -116,7 +141,7 @@ describe("getWindow basic shape", () => {
 
 describe("navigate", () => {
   it("returns startOfDay ms", () => {
-    for (const view of ["day", "week", "month"] as const) {
+    for (const view of ["day", "3day", "week", "month"] as const) {
       for (const dir of [-1, 0, 1] as const) {
         expect(isStartOfDay(navigate(view, focused, dir))).toBe(true);
       }
@@ -124,7 +149,7 @@ describe("navigate", () => {
   });
 
   it("dir 0 leaves the focused day unchanged (normalized)", () => {
-    for (const view of ["day", "week", "month"] as const) {
+    for (const view of ["day", "3day", "week", "month"] as const) {
       expect(navigate(view, focused, 0)).toBe(getTime(startOfDay(focused)));
     }
   });

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogBody,
+  ResponsiveDialogFooter,
+} from "@/components/ui/responsive-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -155,12 +156,15 @@ export function TaskDialog(props: TaskDialogProps) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{mode === "create" ? "New task" : "Edit task"}</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>
+              {mode === "create" ? "New task" : "Edit task"}
+            </ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
+          <ResponsiveDialogBody>
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="task-title">Title</FieldLabel>
@@ -307,8 +311,9 @@ export function TaskDialog(props: TaskDialogProps) {
               />
             </div>
           )}
+          </ResponsiveDialogBody>
 
-          <DialogFooter className="sm:justify-between">
+          <ResponsiveDialogFooter className="sm:justify-between">
             {mode === "edit" && task ? (
               <div className="flex gap-1">
                 <Button
@@ -343,9 +348,9 @@ export function TaskDialog(props: TaskDialogProps) {
                 {mode === "create" ? "Create" : "Save"}
               </Button>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

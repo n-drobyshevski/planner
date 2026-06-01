@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { startOfDay } from "date-fns";
 import { TimeGrid } from "./time-grid";
 import { MonthGrid } from "./month-grid";
+import { AgendaView } from "./agenda-view";
 import type { CalendarView, Occurrence } from "@/lib/types";
 
 export interface CanvasProps {
@@ -49,6 +50,19 @@ export function CalendarCanvas(props: CanvasProps) {
         Couldn&apos;t load your calendar. Make sure the database schema is applied
         and seeded.
       </Centered>
+    );
+  }
+
+  if (view === "agenda") {
+    return (
+      <AgendaView
+        occurrences={occurrences}
+        today={today}
+        colorOf={colorOf}
+        selectedKey={selectedKey}
+        onSelect={onSelect}
+        loading={props.loading}
+      />
     );
   }
 
