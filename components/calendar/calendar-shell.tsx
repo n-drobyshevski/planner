@@ -17,7 +17,7 @@ import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent } from "@/lib/tasks/tree";
 import { localTimeZone } from "@/lib/datetime/local";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
-import { useWindowEvents } from "@/lib/hooks/use-window-events";
+import { useWindowEvents, useWorkspaceRealtime } from "@/lib/hooks/use-window-events";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
@@ -25,9 +25,9 @@ import { qk } from "@/lib/supabase/query-keys";
 import type { WindowData } from "@/lib/supabase/queries";
 import { useUiStore } from "@/stores/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useSwipe } from "@/hooks/use-swipe";
 import { CalendarToolbar } from "./calendar-toolbar";
 import { CalendarCanvas } from "./calendar-canvas";
+import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
 import { CalendarFiltersSheet } from "@/components/sidebar/calendar-filters-sheet";
 import { EventDialog } from "@/components/event/event-dialog";
@@ -70,6 +70,21 @@ interface PendingDelete {
   occurrence: Occurrence;
 }
 
+// Neighbour (prev/next) carousel panes are display-only: no selection, no
+// editing, no drag — those all act on the focused window via the centre pane.
+const NOOP = () => {};
+const DISPLAY_ONLY = {
+  selectedKey: null,
+  onSelect: NOOP,
+  onPickDay: NOOP,
+  onCreateRange: NOOP,
+  onReschedule: NOOP,
+  onChangeColor: NOOP,
+  onDeleteEvent: NOOP,
+  onToggleTaskDone: NOOP,
+  onScheduleTask: NOOP,
+} as const;
+
 export function CalendarShell({
   initialView,
   initialDate,
@@ -88,9 +103,23 @@ export function CalendarShell({
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const workspace = useWorkspace();
+  const wsId = workspace.data?.workspaceId;
+  useWorkspaceRealtime(wsId);
+
+  // Three windows for the swipe carousel: the focused period plus its
+  // neighbours. Fetching all three keeps them cached so paging is instant and
+  // the neighbour panes have content to slide in. React Query dedupes by
+  // window, so after the first load each page only fetches one new edge.
+  const prevFocus = useMemo(() => navigate(view, focusedDate, -1), [view, focusedDate]);
+  const nextFocus = useMemo(() => navigate(view, focusedDate, 1), [view, focusedDate]);
   const win = useMemo(() => getWindow(view, focusedDate), [view, focusedDate]);
+  const winPrev = useMemo(() => getWindow(view, prevFocus), [view, prevFocus]);
+  const winNext = useMemo(() => getWindow(view, nextFocus), [view, nextFocus]);
   const { occurrences, events, isLoading: eventsLoading, isError: eventsError } =
-    useWindowEvents(workspace.data?.workspaceId, win);
+    useWindowEvents(wsId, win);
+  const prevWin = useWindowEvents(wsId, winPrev);
+  const nextWin = useWindowEvents(wsId, winNext);
+  const pagerRef = useRef<CalendarPagerHandle>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -111,6 +140,15 @@ export function CalendarShell({
   const visible = useMemo(
     () => filterVisible(occurrences, { viewerId, hiddenCategoryIds, hiddenLayers }),
     [occurrences, viewerId, hiddenCategoryIds, hiddenLayers],
+  );
+  // Same visibility filter for the neighbour panes (display-only).
+  const prevVisible = useMemo(
+    () => filterVisible(prevWin.occurrences, { viewerId, hiddenCategoryIds, hiddenLayers }),
+    [prevWin.occurrences, viewerId, hiddenCategoryIds, hiddenLayers],
+  );
+  const nextVisible = useMemo(
+    () => filterVisible(nextWin.occurrences, { viewerId, hiddenCategoryIds, hiddenLayers }),
+    [nextWin.occurrences, viewerId, hiddenCategoryIds, hiddenLayers],
   );
 
   const memberMap = useMemo(
@@ -292,19 +330,20 @@ export function CalendarShell({
   useEffect(() => setMounted(true), []);
 
   const days = useMemo(() => getVisibleDays(view, focusedDate), [view, focusedDate]);
+  const prevDays = useMemo(() => getVisibleDays(view, prevFocus), [view, prevFocus]);
+  const nextDays = useMemo(() => getVisibleDays(view, nextFocus), [view, nextFocus]);
   const label = formatRangeLabel(view, focusedDate);
 
-  // Swipe the canvas left/right to page to the next/previous period. In the
-  // time-grid views (day/week/3day) a gesture that begins on an event block is
-  // left alone, so long-press-dragging an event between days never doubles as a
-  // page turn. Agenda/Month have no draggable blocks, so nothing to exclude.
+  // Swipe left/right to page the period via the carousel; in the time-grid
+  // views (day/week/3day) a gesture that begins on an event block is left alone
+  // so long-press-dragging an event between days never doubles as a page turn.
   const timeGridView = view === "day" || view === "week" || view === "3day";
-  const swipe = useSwipe({
-    enabled: mounted,
-    onSwipeLeft: () => go(1),
-    onSwipeRight: () => go(-1),
-    ignoreSelector: timeGridView ? "[data-occ-key]" : undefined,
-  });
+  // Prev/Next animate through the carousel too; fall back to an instant jump if
+  // it isn't mounted yet.
+  function page(dir: -1 | 1) {
+    if (pagerRef.current) pagerRef.current.page(dir);
+    else go(dir);
+  }
 
   // On a phone, the dense grids are hard to scan — default to the Agenda list
   // on first load, but only when the URL didn't already pin a view. Applied
@@ -325,8 +364,8 @@ export function CalendarShell({
       <CalendarToolbar
         view={view}
         label={label}
-        onPrev={() => go(-1)}
-        onNext={() => go(1)}
+        onPrev={() => page(-1)}
+        onNext={() => page(1)}
         onToday={goToday}
         onViewChange={changeView}
         onNewEvent={openNew}
@@ -345,29 +384,61 @@ export function CalendarShell({
             categories={workspace.data.categories}
           />
         )}
-        <main className="min-h-0 flex-1 overflow-hidden" {...swipe}>
+        <main className="min-h-0 flex-1 overflow-hidden">
           {mounted ? (
-          <CalendarCanvas
-          view={view}
-          days={days}
-          occurrences={visible}
-          focusedMs={focusedDate}
-          colorOf={colorOf}
-          selectedKey={selectedKey}
-          onSelect={openEdit}
-          onPickDay={pickDay}
-          onCreateRange={onCreateRange}
-          onReschedule={onReschedule}
-          onChangeColor={onChangeEventColor}
-          onDeleteEvent={onDeleteEvent}
-          onAssignContext={onAssignContext}
-          onRemoveContext={onRemoveContext}
-          taskDoneById={taskDoneById}
-          onToggleTaskDone={onToggleTaskDone}
-          onScheduleTask={onScheduleTask}
-          loading={workspace.isLoading || eventsLoading}
-          error={workspace.isError || eventsError}
-          />
+            <CalendarPager
+              ref={pagerRef}
+              onCommit={go}
+              ignoreSelector={timeGridView ? "[data-occ-key]" : undefined}
+              prev={
+                <CalendarCanvas
+                  view={view}
+                  days={prevDays}
+                  occurrences={prevVisible}
+                  focusedMs={prevFocus}
+                  colorOf={colorOf}
+                  taskDoneById={taskDoneById}
+                  {...DISPLAY_ONLY}
+                  loading={workspace.isLoading || prevWin.isLoading}
+                  error={workspace.isError || prevWin.isError}
+                />
+              }
+              next={
+                <CalendarCanvas
+                  view={view}
+                  days={nextDays}
+                  occurrences={nextVisible}
+                  focusedMs={nextFocus}
+                  colorOf={colorOf}
+                  taskDoneById={taskDoneById}
+                  {...DISPLAY_ONLY}
+                  loading={workspace.isLoading || nextWin.isLoading}
+                  error={workspace.isError || nextWin.isError}
+                />
+              }
+            >
+              <CalendarCanvas
+                view={view}
+                days={days}
+                occurrences={visible}
+                focusedMs={focusedDate}
+                colorOf={colorOf}
+                selectedKey={selectedKey}
+                onSelect={openEdit}
+                onPickDay={pickDay}
+                onCreateRange={onCreateRange}
+                onReschedule={onReschedule}
+                onChangeColor={onChangeEventColor}
+                onDeleteEvent={onDeleteEvent}
+                onAssignContext={onAssignContext}
+                onRemoveContext={onRemoveContext}
+                taskDoneById={taskDoneById}
+                onToggleTaskDone={onToggleTaskDone}
+                onScheduleTask={onScheduleTask}
+                loading={workspace.isLoading || eventsLoading}
+                error={workspace.isError || eventsError}
+              />
+            </CalendarPager>
           ) : (
             <div className="h-full" />
           )}

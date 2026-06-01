@@ -28,9 +28,15 @@ export const ContextBackdrop = forwardRef<
     color: string;
     style: React.CSSProperties;
     selected: boolean;
+    /** Day view (one wide column) keeps the time range even on phones; the
+        narrow multi-column week/3day grids drop it below md to save space. */
+    singleColumn?: boolean;
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
->(function ContextBackdrop({ occ, color, style, selected, onMenu, ...rest }, ref) {
+>(function ContextBackdrop(
+  { occ, color, style, selected, singleColumn, onMenu, ...rest },
+  ref,
+) {
   return (
     <div
       ref={ref}
@@ -65,7 +71,14 @@ export const ContextBackdrop = forwardRef<
         style={{ backgroundColor: color }}
       >
         <span className="truncate">{occ.title}</span>
-        <span className="shrink-0 font-normal opacity-90 tabular-nums">
+        {/* Drop the time range on phones (< md) in the narrow week/3day grids
+            to give the name room; day view's one wide column keeps it. */}
+        <span
+          className={cn(
+            "shrink-0 font-normal opacity-90 tabular-nums",
+            !singleColumn && "hidden md:inline",
+          )}
+        >
           {format(occ.start, "h:mm")}–{format(occ.end, "h:mm a")}
         </span>
         {onMenu && (
