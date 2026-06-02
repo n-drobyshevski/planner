@@ -243,6 +243,29 @@ export function TimeGrid({
     setPreview({ dayIndex, topMin: sMin, heightMin: durationMin, label: occ.title });
   }
 
+  // Grabbing a member of a multi-selection acts on the whole group (move or
+  // resize) by one shared delta. Capture each editable, non-recurring member's
+  // start geometry now; recurring members (and a recurring grabbed item) fall
+  // back to the single-item path so their scope prompt isn't skipped.
+  function groupFor(occ: Occurrence): GroupMember[] | undefined {
+    if (!selectedKeys.has(occ.key) || selectedKeys.size <= 1 || occ.isRecurring) {
+      return undefined;
+    }
+    const members: GroupMember[] = [];
+    for (const key of selectedKeys) {
+      const m = byKey.get(key);
+      if (!m || !canEdit(m) || m.isRecurring) continue;
+      const mDay = dayIndexOfMs(m.start);
+      members.push({
+        occ: m,
+        sMin: minutesIn(m.start, mDay),
+        dayIndex: mDay,
+        durationMin: (m.end - m.start) / 60_000,
+      });
+    }
+    return members.length > 1 ? members : undefined;
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return;
     const el = e.target as HTMLElement;
@@ -314,6 +337,7 @@ export function TimeGrid({
         edge: (handle.dataset.resize as "start" | "end") ?? "end",
         startMin: minutesIn(occ.start, dayIndex),
         endMin: minutesIn(occ.end, dayIndex),
+        group: groupFor(occ),
       };
     } else if (blockEl) {
       const occ = byKey.get(blockEl.dataset.occKey!);
@@ -323,22 +347,7 @@ export function TimeGrid({
       // Grabbing a member of a multi-selection moves the whole group by one
       // delta. Capture each editable, non-recurring member's start geometry now;
       // recurring members are left out (they'd each need a scope prompt).
-      let group: GroupMember[] | undefined;
-      if (selectedKeys.has(occ.key) && selectedKeys.size > 1) {
-        const members: GroupMember[] = [];
-        for (const key of selectedKeys) {
-          const m = byKey.get(key);
-          if (!m || !canEdit(m) || m.isRecurring) continue;
-          const mDay = dayIndexOfMs(m.start);
-          members.push({
-            occ: m,
-            sMin: minutesIn(m.start, mDay),
-            dayIndex: mDay,
-            durationMin: (m.end - m.start) / 60_000,
-          });
-        }
-        if (members.length > 1) group = members;
-      }
+      const group = groupFor(occ);
       dragRef.current = {
         kind: "move",
         pointerId: e.pointerId,
@@ -432,12 +441,32 @@ export function TimeGrid({
       }
     } else {
       const m = snapMinutes(clampMin(g.minutes));
+      let deltaMin: number;
       if (d.edge === "start") {
         d.curStart = Math.min(m, d.endMin! - SLOT_MIN);
+        deltaMin = d.curStart - d.startMin!;
         setPreview({ dayIndex: d.dayIndex, topMin: d.curStart, heightMin: d.endMin! - d.curStart, label: "" });
       } else {
         d.curEnd = Math.max(m, d.startMin! + SLOT_MIN);
+        deltaMin = d.curEnd - d.endMin!;
         setPreview({ dayIndex: d.dayIndex, topMin: d.startMin!, heightMin: d.curEnd - d.startMin!, label: "" });
+      }
+      // Group resize: apply the same edge delta to every other member.
+      if (d.group) {
+        const edge = d.edge;
+        setGroupPreview(
+          d.group
+            .filter((mem) => mem.occ.key !== d.occKey)
+            .map((mem) => {
+              const endMin = mem.sMin + mem.durationMin;
+              if (edge === "start") {
+                const top = clamp(mem.sMin + deltaMin, 0, endMin - SLOT_MIN);
+                return { dayIndex: mem.dayIndex, topMin: top, heightMin: endMin - top, label: "" };
+              }
+              const newEnd = clamp(endMin + deltaMin, mem.sMin + SLOT_MIN, 1440);
+              return { dayIndex: mem.dayIndex, topMin: mem.sMin, heightMin: newEnd - mem.sMin, label: "" };
+            }),
+        );
       }
     }
   }
@@ -519,7 +548,23 @@ export function TimeGrid({
         onSelect(occ);
         return;
       }
-      if (d.edge === "start") {
+      // Group resize: apply the same edge delta to every captured member.
+      if (d.group) {
+        const edge = d.edge;
+        const deltaMin = edge === "start" ? d.curStart! - d.startMin! : d.curEnd! - d.endMin!;
+        onRescheduleMany(
+          d.group.map((mem) => {
+            const base = days[mem.dayIndex];
+            const endMin = mem.sMin + mem.durationMin;
+            if (edge === "start") {
+              const top = clamp(mem.sMin + deltaMin, 0, endMin - SLOT_MIN);
+              return { occ: mem.occ, start: base + top * 60_000, end: base + endMin * 60_000 };
+            }
+            const newEnd = clamp(endMin + deltaMin, mem.sMin + SLOT_MIN, 1440);
+            return { occ: mem.occ, start: base + mem.sMin * 60_000, end: base + newEnd * 60_000 };
+          }),
+        );
+      } else if (d.edge === "start") {
         onReschedule(occ, days[d.dayIndex] + d.curStart! * 60_000, occ.end);
       } else {
         onReschedule(occ, occ.start, days[d.dayIndex] + d.curEnd! * 60_000);

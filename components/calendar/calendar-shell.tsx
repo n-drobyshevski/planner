@@ -423,23 +423,24 @@ export function CalendarShell({
     if (!canEditOcc(occ)) return; // overlay items aren't actionable in bulk
     toggleSelected(occ.key);
   }
-  /** Move every selected (non-recurring) block by the same delta in one pass. */
+  /** Move/resize every selected (non-recurring) block in one batched pass:
+   *  all optimistic patches up front for instant feedback, then a single write
+   *  batch (one invalidate + one toast). */
   function onRescheduleMany(moves: { occ: Occurrence; start: number; end: number }[]) {
+    const items: { id: string; patch: Partial<EventInput> }[] = [];
     for (const { occ, start, end } of moves) {
       if (!canEditOcc(occ)) continue;
       const ev = events.find((e) => e.id === occ.eventId);
-      if (!ev || ev.rrule) continue; // recurring excluded from group move
+      if (!ev || ev.rrule) continue; // recurring excluded from group ops
       optimisticMove(ev.id, start, end);
-      if (ev.kind === "context") {
-        void mutations.updateSingle(ev.id, { start, end });
-      } else {
-        void mutations.updateSingle(ev.id, {
-          start,
-          end,
-          contextId: contextIdForRange(contextOccs, start),
-        });
-      }
+      // Re-derive context by overlap on move; contexts never get a context_id.
+      const patch: Partial<EventInput> =
+        ev.kind === "context"
+          ? { start, end }
+          : { start, end, contextId: contextIdForRange(contextOccs, start) };
+      items.push({ id: ev.id, patch });
     }
+    if (items.length > 0) void mutations.rescheduleMany(items);
   }
   /** Ctrl/Cmd-drag drop: create a plain one-off copy at the dropped time. */
   function onDuplicate(occ: Occurrence, start: number, end: number) {

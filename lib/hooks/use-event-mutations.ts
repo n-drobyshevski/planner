@@ -37,6 +37,12 @@ export function useEventMutations(workspaceId: string | undefined) {
     create: (input: EventInput) => run(m.createEvent(sb, input), "Event created"),
     updateSingle: (id: string, patch: Partial<EventInput>) =>
       run(m.updateEvent(sb, id, patch), "Event updated"),
+    /** Move/resize several events at once — one invalidate + one toast. */
+    rescheduleMany: (items: { id: string; patch: Partial<EventInput> }[]) =>
+      run(
+        Promise.all(items.map((it) => m.updateEvent(sb, it.id, it.patch))),
+        `${items.length} events updated`,
+      ),
     remove: (id: string) => run(m.deleteEvent(sb, id), "Event deleted"),
 
     assignContext: (eventId: string, contextId: string) =>

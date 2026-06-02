@@ -87,6 +87,13 @@ describe("expandEvent — single", () => {
     expect(occ[0].start).toBe(e.start);
   });
 
+  it("keeps a single event's key stable when its start changes (selection survives a move)", () => {
+    const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 2, 28, 0) };
+    const before = expandEvent(makeEvent({ start: berlin(2026, 2, 27, 9), end: berlin(2026, 2, 27, 10) }), [], win);
+    const after = expandEvent(makeEvent({ start: berlin(2026, 2, 27, 11), end: berlin(2026, 2, 27, 12) }), [], win);
+    expect(before[0].key).toBe(after[0].key); // key must not move with start
+  });
+
   it("excludes an event outside the window", () => {
     const e = makeEvent({ start: berlin(2026, 2, 20, 9), end: berlin(2026, 2, 20, 10) });
     const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 2, 28, 0) };

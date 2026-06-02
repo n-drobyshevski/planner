@@ -62,7 +62,11 @@ function baseOccurrence(
   opts: { isRecurring: boolean; isException: boolean },
 ): Occurrence {
   return {
-    key: keyFor(event.id, occurrenceDate),
+    // Single events key on the (immutable) event id alone — they have exactly
+    // one occurrence, so the key must NOT move with `start` (else a reschedule
+    // would change the key and orphan any selection keyed on it). Recurring
+    // instances key on id + original occurrenceDate (stable across "this" edits).
+    key: opts.isRecurring ? keyFor(event.id, occurrenceDate) : event.id,
     eventId: event.id,
     occurrenceDate,
     start,
