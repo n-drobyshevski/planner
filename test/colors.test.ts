@@ -22,6 +22,7 @@ const member = (id: string, color: string): Member => ({
   themePreference: "system",
   accent: "terracotta",
   surfaceTone: "warm",
+  palette: "default",
 });
 
 function occ(over: Partial<Occurrence>): Occurrence {

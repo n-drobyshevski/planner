@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePreferences } from "@/lib/hooks/use-preferences";
-import { ACCENTS, TONES } from "@/lib/theme/appearance";
+import { ACCENTS, PALETTES, TONES } from "@/lib/theme/appearance";
 import type { ThemePreference } from "@/lib/types";
 
 const THEME_OPTIONS = [
@@ -32,12 +32,24 @@ const SELECTED_SEGMENT =
   "data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-primary";
 
 export function AppearanceSettings() {
-  const { themePreference, accent, tone, setThemePref, setAccent, setTone, isReady } =
-    usePreferences();
+  const {
+    themePreference,
+    accent,
+    tone,
+    palette,
+    setThemePref,
+    setAccent,
+    setTone,
+    setPalette,
+    isReady,
+  } = usePreferences();
 
   // Controls stay disabled until the signed-in member resolves. `isReady` is
   // false on both the server and the first client render, so no hydration drift.
   const disabled = !isReady;
+  // A Catppuccin flavor owns light/dark + surfaces, so those controls lock while
+  // one is active; the accent picker stays live (it maps into the flavor).
+  const catppuccin = palette !== "default";
 
   return (
     <div className="space-y-6">
@@ -50,18 +62,76 @@ export function AppearanceSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
+          {/* Color palette */}
+          <FieldSet>
+            <FieldLegend variant="label">Color palette</FieldLegend>
+            <FieldDescription>
+              Pick the warm default or a Catppuccin flavor. A flavor restyles the
+              whole app and sets its own light or dark mode.
+            </FieldDescription>
+            <div
+              role="radiogroup"
+              aria-label="Color palette"
+              className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+            >
+              {PALETTES.map((p) => {
+                const selected = palette === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-label={p.label}
+                    disabled={disabled}
+                    onClick={() => setPalette(p.id)}
+                    className={cn(
+                      "flex flex-col gap-2 rounded-lg border-2 p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+                      selected
+                        ? "border-primary"
+                        : "border-border hover:border-foreground/30",
+                    )}
+                  >
+                    <span className="flex gap-1" aria-hidden>
+                      {p.swatches.map((c, i) => (
+                        <span
+                          key={i}
+                          className="size-5 rounded-full ring-1 ring-foreground/10"
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </span>
+                    <span className="flex items-center justify-between gap-1">
+                      <span className="text-sm font-medium text-foreground">
+                        {p.label}
+                      </span>
+                      {selected && (
+                        <Check className="size-4 shrink-0 text-primary" aria-hidden />
+                      )}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {p.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </FieldSet>
+
           {/* Theme */}
           <FieldSet>
             <FieldLegend variant="label">Theme</FieldLegend>
             <FieldDescription>
-              Match your system, or always use light or dark.
+              {catppuccin
+                ? "The Catppuccin flavor sets light or dark."
+                : "Match your system, or always use light or dark."}
             </FieldDescription>
             <ToggleGroup
               type="single"
               variant="outline"
               value={themePreference}
               onValueChange={(v) => v && setThemePref(v as ThemePreference)}
-              disabled={disabled}
+              disabled={disabled || catppuccin}
               aria-label="Theme"
             >
               {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
@@ -82,7 +152,9 @@ export function AppearanceSettings() {
           <FieldSet>
             <FieldLegend variant="label">Accent color</FieldLegend>
             <FieldDescription>
-              Used for buttons, highlights, links, and focus rings.
+              {catppuccin
+                ? "Used for buttons and highlights — tinted to the closest Catppuccin accent."
+                : "Used for buttons, highlights, links, and focus rings."}
             </FieldDescription>
             <div
               role="radiogroup"
@@ -120,14 +192,16 @@ export function AppearanceSettings() {
           <FieldSet>
             <FieldLegend variant="label">Surface tone</FieldLegend>
             <FieldDescription>
-              The temperature of backgrounds and borders behind your content.
+              {catppuccin
+                ? "Catppuccin defines its own surfaces."
+                : "The temperature of backgrounds and borders behind your content."}
             </FieldDescription>
             <ToggleGroup
               type="single"
               variant="outline"
               value={tone}
               onValueChange={(v) => v && setTone(v as (typeof TONES)[number]["id"])}
-              disabled={disabled}
+              disabled={disabled || catppuccin}
               aria-label="Surface tone"
             >
               {TONES.map((t) => (

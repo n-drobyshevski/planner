@@ -269,6 +269,214 @@
   --sidebar-accent: #1e293b; --sidebar-accent-foreground: #f8fafc; --sidebar-border: #1e293b;
 }
 
+/* ===========================================================================
+   Catppuccin palettes — full-palette themes (Settings → Appearance).
+   Unlike accent/tone (which override only a token group), each flavor overrides
+   EVERY semantic surface/accent/text token, so it's a self-contained look. A
+   flavor owns its light/dark mode (Latte is light, the rest dark) — use-preferences
+   drives next-themes accordingly and strips data-tone, so these never need a
+   `.dark` qualifier and aren't fought by the tone presets.
+
+   Layering (per the official Catppuccin style guide): background=mantle so cards
+   (=base) sit above the page; sidebar=crust (deepest); surface0 carries
+   borders/muted/secondary; surface1 = inputs; text/subtext0 = fg/muted-fg.
+   Mapping reference: https://github.com/catppuccin/catppuccin/blob/main/docs/style-guide.md
+
+   Specificity: base blocks are (0,1,0) — placed AFTER :root/.dark so source order
+   wins. The per-accent [data-palette][data-accent] blocks are (0,2,0) — placed
+   AFTER the .dark[data-accent] blocks above so they win for the active flavor,
+   keeping the accent picker live inside Catppuccin.
+=========================================================================== */
+
+/* ---- Latte (light). Accent foreground favors best-available contrast:
+   cool/saturated accents take light ink (base), warm/vivid ones take dark ink. */
+[data-palette="catppuccin-latte"] {
+  --background:#e6e9ef; --foreground:#4c4f69;
+  --card:#eff1f5; --card-foreground:#4c4f69;
+  --popover:#eff1f5; --popover-foreground:#4c4f69;
+  --primary:#8839ef; --primary-foreground:#eff1f5;
+  --secondary:#ccd0da; --secondary-foreground:#4c4f69;
+  --muted:#ccd0da; --muted-foreground:#6c6f85;
+  --accent:#ccd0da; --accent-foreground:#4c4f69;
+  --destructive:#d20f39;
+  --border:#ccd0da; --input:#bcc0cc; --ring:#8839ef;
+  --member-a:#1e66f5; --member-b:#40a02b; --event-shared:#fe640b;
+  --chart-1:#8839ef; --chart-2:#1e66f5; --chart-3:#40a02b; --chart-4:#fe640b; --chart-5:#179299;
+  --sidebar:#dce0e8; --sidebar-foreground:#4c4f69;
+  --sidebar-primary:#8839ef; --sidebar-primary-foreground:#eff1f5;
+  --sidebar-accent:#ccd0da; --sidebar-accent-foreground:#4c4f69;
+  --sidebar-border:#ccd0da; --sidebar-ring:#8839ef;
+}
+[data-palette="catppuccin-latte"][data-accent="terracotta"] {
+  --primary:#fe640b; --primary-foreground:#4c4f69; --ring:#fe640b;
+  --sidebar-primary:#fe640b; --sidebar-primary-foreground:#4c4f69; --sidebar-ring:#fe640b;
+}
+[data-palette="catppuccin-latte"][data-accent="amber"] {
+  --primary:#df8e1d; --primary-foreground:#4c4f69; --ring:#df8e1d;
+  --sidebar-primary:#df8e1d; --sidebar-primary-foreground:#4c4f69; --sidebar-ring:#df8e1d;
+}
+[data-palette="catppuccin-latte"][data-accent="rose"] {
+  --primary:#ea76cb; --primary-foreground:#4c4f69; --ring:#ea76cb;
+  --sidebar-primary:#ea76cb; --sidebar-primary-foreground:#4c4f69; --sidebar-ring:#ea76cb;
+}
+[data-palette="catppuccin-latte"][data-accent="violet"] {
+  --primary:#8839ef; --primary-foreground:#eff1f5; --ring:#8839ef;
+  --sidebar-primary:#8839ef; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#8839ef;
+}
+[data-palette="catppuccin-latte"][data-accent="blue"] {
+  --primary:#1e66f5; --primary-foreground:#eff1f5; --ring:#1e66f5;
+  --sidebar-primary:#1e66f5; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#1e66f5;
+}
+[data-palette="catppuccin-latte"][data-accent="teal"] {
+  --primary:#179299; --primary-foreground:#eff1f5; --ring:#179299;
+  --sidebar-primary:#179299; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#179299;
+}
+[data-palette="catppuccin-latte"][data-accent="green"] {
+  --primary:#40a02b; --primary-foreground:#eff1f5; --ring:#40a02b;
+  --sidebar-primary:#40a02b; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#40a02b;
+}
+
+/* ---- Frappé (dark). All accents are pastel → dark ink (crust). */
+[data-palette="catppuccin-frappe"] {
+  --background:#292c3c; --foreground:#c6d0f5;
+  --card:#303446; --card-foreground:#c6d0f5;
+  --popover:#303446; --popover-foreground:#c6d0f5;
+  --primary:#ca9ee6; --primary-foreground:#232634;
+  --secondary:#414559; --secondary-foreground:#c6d0f5;
+  --muted:#414559; --muted-foreground:#a5adce;
+  --accent:#414559; --accent-foreground:#c6d0f5;
+  --destructive:#e78284;
+  --border:#414559; --input:#51576d; --ring:#ca9ee6;
+  --member-a:#8caaee; --member-b:#a6d189; --event-shared:#ef9f76;
+  --chart-1:#ca9ee6; --chart-2:#8caaee; --chart-3:#a6d189; --chart-4:#ef9f76; --chart-5:#81c8be;
+  --sidebar:#232634; --sidebar-foreground:#c6d0f5;
+  --sidebar-primary:#ca9ee6; --sidebar-primary-foreground:#232634;
+  --sidebar-accent:#414559; --sidebar-accent-foreground:#c6d0f5;
+  --sidebar-border:#414559; --sidebar-ring:#ca9ee6;
+}
+[data-palette="catppuccin-frappe"][data-accent="terracotta"] {
+  --primary:#ef9f76; --primary-foreground:#232634; --ring:#ef9f76;
+  --sidebar-primary:#ef9f76; --sidebar-primary-foreground:#232634; --sidebar-ring:#ef9f76;
+}
+[data-palette="catppuccin-frappe"][data-accent="amber"] {
+  --primary:#e5c890; --primary-foreground:#232634; --ring:#e5c890;
+  --sidebar-primary:#e5c890; --sidebar-primary-foreground:#232634; --sidebar-ring:#e5c890;
+}
+[data-palette="catppuccin-frappe"][data-accent="rose"] {
+  --primary:#f4b8e4; --primary-foreground:#232634; --ring:#f4b8e4;
+  --sidebar-primary:#f4b8e4; --sidebar-primary-foreground:#232634; --sidebar-ring:#f4b8e4;
+}
+[data-palette="catppuccin-frappe"][data-accent="violet"] {
+  --primary:#ca9ee6; --primary-foreground:#232634; --ring:#ca9ee6;
+  --sidebar-primary:#ca9ee6; --sidebar-primary-foreground:#232634; --sidebar-ring:#ca9ee6;
+}
+[data-palette="catppuccin-frappe"][data-accent="blue"] {
+  --primary:#8caaee; --primary-foreground:#232634; --ring:#8caaee;
+  --sidebar-primary:#8caaee; --sidebar-primary-foreground:#232634; --sidebar-ring:#8caaee;
+}
+[data-palette="catppuccin-frappe"][data-accent="teal"] {
+  --primary:#81c8be; --primary-foreground:#232634; --ring:#81c8be;
+  --sidebar-primary:#81c8be; --sidebar-primary-foreground:#232634; --sidebar-ring:#81c8be;
+}
+[data-palette="catppuccin-frappe"][data-accent="green"] {
+  --primary:#a6d189; --primary-foreground:#232634; --ring:#a6d189;
+  --sidebar-primary:#a6d189; --sidebar-primary-foreground:#232634; --sidebar-ring:#a6d189;
+}
+
+/* ---- Macchiato (dark). All accents are pastel → dark ink (crust). */
+[data-palette="catppuccin-macchiato"] {
+  --background:#1e2030; --foreground:#cad3f5;
+  --card:#24273a; --card-foreground:#cad3f5;
+  --popover:#24273a; --popover-foreground:#cad3f5;
+  --primary:#c6a0f6; --primary-foreground:#181926;
+  --secondary:#363a4f; --secondary-foreground:#cad3f5;
+  --muted:#363a4f; --muted-foreground:#a5adcb;
+  --accent:#363a4f; --accent-foreground:#cad3f5;
+  --destructive:#ed8796;
+  --border:#363a4f; --input:#494d64; --ring:#c6a0f6;
+  --member-a:#8aadf4; --member-b:#a6da95; --event-shared:#f5a97f;
+  --chart-1:#c6a0f6; --chart-2:#8aadf4; --chart-3:#a6da95; --chart-4:#f5a97f; --chart-5:#8bd5ca;
+  --sidebar:#181926; --sidebar-foreground:#cad3f5;
+  --sidebar-primary:#c6a0f6; --sidebar-primary-foreground:#181926;
+  --sidebar-accent:#363a4f; --sidebar-accent-foreground:#cad3f5;
+  --sidebar-border:#363a4f; --sidebar-ring:#c6a0f6;
+}
+[data-palette="catppuccin-macchiato"][data-accent="terracotta"] {
+  --primary:#f5a97f; --primary-foreground:#181926; --ring:#f5a97f;
+  --sidebar-primary:#f5a97f; --sidebar-primary-foreground:#181926; --sidebar-ring:#f5a97f;
+}
+[data-palette="catppuccin-macchiato"][data-accent="amber"] {
+  --primary:#eed49f; --primary-foreground:#181926; --ring:#eed49f;
+  --sidebar-primary:#eed49f; --sidebar-primary-foreground:#181926; --sidebar-ring:#eed49f;
+}
+[data-palette="catppuccin-macchiato"][data-accent="rose"] {
+  --primary:#f5bde6; --primary-foreground:#181926; --ring:#f5bde6;
+  --sidebar-primary:#f5bde6; --sidebar-primary-foreground:#181926; --sidebar-ring:#f5bde6;
+}
+[data-palette="catppuccin-macchiato"][data-accent="violet"] {
+  --primary:#c6a0f6; --primary-foreground:#181926; --ring:#c6a0f6;
+  --sidebar-primary:#c6a0f6; --sidebar-primary-foreground:#181926; --sidebar-ring:#c6a0f6;
+}
+[data-palette="catppuccin-macchiato"][data-accent="blue"] {
+  --primary:#8aadf4; --primary-foreground:#181926; --ring:#8aadf4;
+  --sidebar-primary:#8aadf4; --sidebar-primary-foreground:#181926; --sidebar-ring:#8aadf4;
+}
+[data-palette="catppuccin-macchiato"][data-accent="teal"] {
+  --primary:#8bd5ca; --primary-foreground:#181926; --ring:#8bd5ca;
+  --sidebar-primary:#8bd5ca; --sidebar-primary-foreground:#181926; --sidebar-ring:#8bd5ca;
+}
+[data-palette="catppuccin-macchiato"][data-accent="green"] {
+  --primary:#a6da95; --primary-foreground:#181926; --ring:#a6da95;
+  --sidebar-primary:#a6da95; --sidebar-primary-foreground:#181926; --sidebar-ring:#a6da95;
+}
+
+/* ---- Mocha (dark). All accents are pastel → dark ink (crust). */
+[data-palette="catppuccin-mocha"] {
+  --background:#181825; --foreground:#cdd6f4;
+  --card:#1e1e2e; --card-foreground:#cdd6f4;
+  --popover:#1e1e2e; --popover-foreground:#cdd6f4;
+  --primary:#cba6f7; --primary-foreground:#11111b;
+  --secondary:#313244; --secondary-foreground:#cdd6f4;
+  --muted:#313244; --muted-foreground:#a6adc8;
+  --accent:#313244; --accent-foreground:#cdd6f4;
+  --destructive:#f38ba8;
+  --border:#313244; --input:#45475a; --ring:#cba6f7;
+  --member-a:#89b4fa; --member-b:#a6e3a1; --event-shared:#fab387;
+  --chart-1:#cba6f7; --chart-2:#89b4fa; --chart-3:#a6e3a1; --chart-4:#fab387; --chart-5:#94e2d5;
+  --sidebar:#11111b; --sidebar-foreground:#cdd6f4;
+  --sidebar-primary:#cba6f7; --sidebar-primary-foreground:#11111b;
+  --sidebar-accent:#313244; --sidebar-accent-foreground:#cdd6f4;
+  --sidebar-border:#313244; --sidebar-ring:#cba6f7;
+}
+[data-palette="catppuccin-mocha"][data-accent="terracotta"] {
+  --primary:#fab387; --primary-foreground:#11111b; --ring:#fab387;
+  --sidebar-primary:#fab387; --sidebar-primary-foreground:#11111b; --sidebar-ring:#fab387;
+}
+[data-palette="catppuccin-mocha"][data-accent="amber"] {
+  --primary:#f9e2af; --primary-foreground:#11111b; --ring:#f9e2af;
+  --sidebar-primary:#f9e2af; --sidebar-primary-foreground:#11111b; --sidebar-ring:#f9e2af;
+}
+[data-palette="catppuccin-mocha"][data-accent="rose"] {
+  --primary:#f5c2e7; --primary-foreground:#11111b; --ring:#f5c2e7;
+  --sidebar-primary:#f5c2e7; --sidebar-primary-foreground:#11111b; --sidebar-ring:#f5c2e7;
+}
+[data-palette="catppuccin-mocha"][data-accent="violet"] {
+  --primary:#cba6f7; --primary-foreground:#11111b; --ring:#cba6f7;
+  --sidebar-primary:#cba6f7; --sidebar-primary-foreground:#11111b; --sidebar-ring:#cba6f7;
+}
+[data-palette="catppuccin-mocha"][data-accent="blue"] {
+  --primary:#89b4fa; --primary-foreground:#11111b; --ring:#89b4fa;
+  --sidebar-primary:#89b4fa; --sidebar-primary-foreground:#11111b; --sidebar-ring:#89b4fa;
+}
+[data-palette="catppuccin-mocha"][data-accent="teal"] {
+  --primary:#94e2d5; --primary-foreground:#11111b; --ring:#94e2d5;
+  --sidebar-primary:#94e2d5; --sidebar-primary-foreground:#11111b; --sidebar-ring:#94e2d5;
+}
+[data-palette="catppuccin-mocha"][data-accent="green"] {
+  --primary:#a6e3a1; --primary-foreground:#11111b; --ring:#a6e3a1;
+  --sidebar-primary:#a6e3a1; --sidebar-primary-foreground:#11111b; --sidebar-ring:#a6e3a1;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

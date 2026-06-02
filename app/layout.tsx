@@ -6,34 +6,47 @@ import { createClient } from "@/lib/supabase/server";
 import {
   DEFAULT_ACCENT,
   DEFAULT_TONE,
+  DEFAULT_PALETTE,
   normalizeAccent,
   normalizeTone,
+  normalizePalette,
 } from "@/lib/theme/appearance";
-import type { AccentId, SurfaceTone } from "@/lib/types";
+import type { AccentId, Palette, SurfaceTone } from "@/lib/types";
+
+type Appearance = { accent: AccentId; tone: SurfaceTone; palette: Palette };
+
+const DEFAULT_APPEARANCE: Appearance = {
+  accent: DEFAULT_ACCENT,
+  tone: DEFAULT_TONE,
+  palette: DEFAULT_PALETTE,
+};
 
 /**
- * Read the signed-in member's accent/tone server-side so we can set the matching
- * <html> data attributes in the initial HTML — no color flash on load. Falls back
- * to defaults when signed out (e.g. /login) or on any error.
+ * Read the signed-in member's accent/tone/palette server-side so we can set the
+ * matching <html> data attributes in the initial HTML — no color flash on load.
+ * Falls back to defaults when signed out (e.g. /login) or on any error. (The
+ * `.dark` class itself is owned by next-themes' pre-paint script; a Catppuccin
+ * flavor's surfaces are absolute so they render correctly regardless.)
  */
-async function getAppearance(): Promise<{ accent: AccentId; tone: SurfaceTone }> {
+async function getAppearance(): Promise<Appearance> {
   try {
     const sb = await createClient();
     const {
       data: { user },
     } = await sb.auth.getUser();
-    if (!user) return { accent: DEFAULT_ACCENT, tone: DEFAULT_TONE };
+    if (!user) return DEFAULT_APPEARANCE;
     const { data } = await sb
       .from("members")
-      .select("accent, surface_tone")
+      .select("accent, surface_tone, palette")
       .eq("auth_user_id", user.id)
       .maybeSingle();
     return {
       accent: normalizeAccent(data?.accent),
       tone: normalizeTone(data?.surface_tone),
+      palette: normalizePalette(data?.palette),
     };
   } catch {
-    return { accent: DEFAULT_ACCENT, tone: DEFAULT_TONE };
+    return DEFAULT_APPEARANCE;
   }
 }
 
@@ -73,13 +86,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { accent, tone } = await getAppearance();
+  const { accent, tone, palette } = await getAppearance();
   return (
     <html
       lang="en"
       suppressHydrationWarning
       data-accent={accent}
-      data-tone={tone}
+      data-tone={palette === "default" ? tone : "warm"}
+      data-palette={palette}
       className={`${jakarta.variable} ${geistMono.variable} h-full`}
     >
       <body className="min-h-full bg-background text-foreground">

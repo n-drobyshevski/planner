@@ -10,6 +10,7 @@ import type {
   ThemePreference,
   AccentId,
   SurfaceTone,
+  Palette,
 } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -32,6 +33,7 @@ export function mapMember(r: Row): Member {
     themePreference: (r.theme_preference as ThemePreference | null) ?? "system",
     accent: (r.accent as AccentId | null) ?? "terracotta",
     surfaceTone: (r.surface_tone as SurfaceTone | null) ?? "warm",
+    palette: (r.palette as Palette | null) ?? "default",
   };
 }
 

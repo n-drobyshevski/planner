@@ -17,6 +17,17 @@ export type AccentId =
   | "rose"
   | "violet";
 export type SurfaceTone = "warm" | "neutral" | "cool";
+/**
+ * Full-palette theme. `default` keeps the native warm system (light/dark +
+ * accent + tone); the Catppuccin flavors override the entire palette and own
+ * their own light/dark mode (Latte is light, the rest are dark).
+ */
+export type Palette =
+  | "default"
+  | "catppuccin-latte"
+  | "catppuccin-frappe"
+  | "catppuccin-macchiato"
+  | "catppuccin-mocha";
 
 export interface Member {
   id: string;
@@ -29,6 +40,7 @@ export interface Member {
   themePreference: ThemePreference;
   accent: AccentId;
   surfaceTone: SurfaceTone;
+  palette: Palette;
 }
 
 export interface Category {

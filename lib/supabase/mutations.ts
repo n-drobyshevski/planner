@@ -5,6 +5,7 @@ import type {
   ThemePreference,
   AccentId,
   SurfaceTone,
+  Palette,
 } from "@/lib/types";
 import {
   mapEvent,
@@ -240,6 +241,7 @@ export interface MemberPreferencesPatch {
   themePreference?: ThemePreference;
   accent?: AccentId;
   surfaceTone?: SurfaceTone;
+  palette?: Palette;
 }
 
 /**
@@ -283,6 +285,7 @@ export async function updateMemberPreferences(
   if (patch.themePreference != null) row.theme_preference = patch.themePreference;
   if (patch.accent != null) row.accent = patch.accent;
   if (patch.surfaceTone != null) row.surface_tone = patch.surfaceTone;
+  if (patch.palette != null) row.palette = patch.palette;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;
