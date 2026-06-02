@@ -9,6 +9,7 @@ import {
   updateMemberPreferences,
   type MemberPreferencesPatch,
 } from "@/lib/supabase/mutations";
+import { revalidateAppearance } from "@/app/actions/appearance";
 import { useWorkspace, type WorkspaceData } from "@/lib/hooks/use-workspace";
 import { qk } from "@/lib/supabase/query-keys";
 import {
@@ -94,6 +95,14 @@ export function usePreferences() {
       );
       try {
         await updateMemberPreferences(createClient(), member.id, patch);
+        // Only accent/tone/palette are server-rendered onto <html>; bust this
+        // member's cached appearance so the next SSR navigation reflects it
+        // (theme/timezone prefs have no server-rendered attribute).
+        const touchesAppearance =
+          "accent" in patch || "surfaceTone" in patch || "palette" in patch;
+        if (touchesAppearance && member.authUserId) {
+          void revalidateAppearance(member.authUserId);
+        }
       } catch (e) {
         if (prev) qc.setQueryData(qk.workspace, prev); // roll back optimistic change
         toast.error(
