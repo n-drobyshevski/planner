@@ -28,6 +28,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { RecurrenceScopePrompt, type RecurrenceScope } from "./recurrence-scope-prompt";
+import { ColorField } from "@/components/shared/color-field";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
 import { buildRRule, parseRRule, type RecurrenceForm } from "@/lib/recurrence/rrule-build";
 import {
@@ -56,6 +57,8 @@ interface FormState {
   categoryId: string; // "none" | id
   contextId: string; // "none" | context master id
   isPrivate: boolean;
+  /** own color override (hex); null = derive from category/owner */
+  color: string | null;
   recurrence: RecurrenceForm | null;
 }
 
@@ -167,6 +170,7 @@ export function EventDialog(props: EventDialogProps) {
         description: form.description.trim() || null,
         location: form.location.trim() || null,
         isPrivate: form.isPrivate,
+        color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
         start,
@@ -198,6 +202,7 @@ export function EventDialog(props: EventDialogProps) {
         description: form.description.trim() || null,
         location: form.location.trim() || null,
         isPrivate: form.isPrivate,
+        color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
         start,
@@ -229,15 +234,18 @@ export function EventDialog(props: EventDialogProps) {
     setScopePrompt(null);
     setPending(true);
 
-    // Context membership is series-level (a master column, no per-occurrence
-    // form). "this"/"future"/"all" govern time/content; the selected context is
+    // Context membership and color are both series-level (master columns, no
+    // per-occurrence form). "this"/"future"/"all" govern time/content; these are
     // applied to the relevant series independently.
     const selectedContextId = form.contextId === "none" ? null : form.contextId;
     const ctxChanged = !isContext && selectedContextId !== (event.contextId ?? null);
+    const colorChanged = form.color !== (event.color ?? null);
 
     if (scope === "this") {
-      // Per-occurrence time edit can't carry context, so file the series too.
+      // A per-occurrence edit can't carry series-level fields, so apply any
+      // context/color change to the whole series.
       if (ctxChanged) void mutations.updateSingle(event.id, { contextId: selectedContextId });
+      if (colorChanged) void mutations.updateSingle(event.id, { color: form.color });
       finish(await mutations.editThis(event, occurrence.occurrenceDate, patch));
     } else if (scope === "future") {
       finish(
@@ -246,6 +254,7 @@ export function EventDialog(props: EventDialogProps) {
           occurrence.occurrenceDate,
           patch,
           ctxChanged ? selectedContextId : undefined,
+          colorChanged ? form.color : undefined,
         ),
       );
     } else {
@@ -257,6 +266,7 @@ export function EventDialog(props: EventDialogProps) {
           description: patch.description,
           location: patch.location,
           categoryId: patch.categoryId,
+          color: form.color,
           ...(isContext ? {} : { contextId: selectedContextId }),
           allDay: form.allDay,
           inactive: form.inactive,
@@ -452,6 +462,15 @@ export function EventDialog(props: EventDialogProps) {
               </Field>
             )}
 
+            <Field>
+              <FieldLabel htmlFor="ev-color">Color</FieldLabel>
+              <ColorField
+                id="ev-color"
+                value={form.color}
+                onChange={(c) => set("color", c)}
+              />
+            </Field>
+
             <Field orientation="horizontal">
               <Switch
                 id="ev-private"
@@ -552,6 +571,7 @@ function buildInitial(props: EventDialogProps): FormState {
       categoryId: occurrence.categoryId ?? "none",
       contextId: event.contextId ?? "none",
       isPrivate: event.isPrivate,
+      color: event.color ?? null,
       recurrence: parseRRule(event.rrule),
     };
   }
@@ -571,6 +591,7 @@ function buildInitial(props: EventDialogProps): FormState {
     categoryId: "none",
     contextId: defaultContextId ?? "none",
     isPrivate: false,
+    color: null,
     recurrence: null,
   };
 }

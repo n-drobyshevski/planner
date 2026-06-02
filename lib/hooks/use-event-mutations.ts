@@ -59,9 +59,10 @@ export function useEventMutations(workspaceId: string | undefined) {
       occurrenceMs: number,
       patch: OccurrencePatch,
       contextId?: string | null,
+      color?: string | null,
     ) =>
       run(
-        m.splitSeries(sb, event, occurrenceMs, patch, contextId),
+        m.splitSeries(sb, event, occurrenceMs, patch, contextId, color),
         "This and future updated",
       ),
     editAll: (event: EventRow, patch: OccurrencePatch) =>

@@ -144,7 +144,8 @@ export async function updateAll(
 /**
  * "This and future": cap the original series and create a new one. The new
  * series inherits the original's kind + context membership; pass `newContextId`
- * (string | null) to re-file the new series under a different context.
+ * (string | null) to re-file the new series under a different context, and
+ * `newColor` (string | null) to give the future series a different own-color.
  */
 export async function splitSeries(
   sb: SupabaseClient,
@@ -152,6 +153,7 @@ export async function splitSeries(
   fromOccurrenceMs: number,
   patch: OccurrencePatch,
   newContextId?: string | null,
+  newColor?: string | null,
 ): Promise<EventRow> {
   const { original, newSeries } = splitThisAndFuture(event, fromOccurrenceMs, patch);
   const { error } = await sb
@@ -172,7 +174,7 @@ export async function splitSeries(
     description: newSeries.description,
     location: newSeries.location,
     isPrivate: newSeries.isPrivate,
-    color: newSeries.color,
+    color: newColor !== undefined ? newColor : newSeries.color,
     kind: newSeries.kind,
     contextId: newContextId !== undefined ? newContextId : newSeries.contextId,
     allDay: newSeries.allDay,
