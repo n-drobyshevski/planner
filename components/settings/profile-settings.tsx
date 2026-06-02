@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -11,6 +13,7 @@ import {
 import { FieldSet, FieldLegend, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { SWATCHES } from "@/components/shared/color-swatch-picker";
 import {
   InputOTP,
   InputOTPGroup,
@@ -30,7 +33,8 @@ import { useProfile } from "@/lib/hooks/use-profile";
 type PinMode = "set" | "change" | "remove";
 
 export function ProfileSettings() {
-  const { member, isReady, saveName, verifyCurrentPin, savePin } = useProfile();
+  const { member, isReady, saveName, saveColor, verifyCurrentPin, savePin } =
+    useProfile();
   const [pinMode, setPinMode] = React.useState<PinMode | null>(null);
 
   return (
@@ -54,6 +58,20 @@ export function ProfileSettings() {
               <NameField key={member.id} initial={member.name} onSave={saveName} />
             ) : (
               <Input disabled placeholder="Loading…" className="max-w-xs" />
+            )}
+          </FieldSet>
+
+          {/* Profile color */}
+          <FieldSet>
+            <FieldLegend variant="label">Profile color</FieldLegend>
+            <FieldDescription>
+              Tints your avatar and your events on the calendar (unless an event
+              sets its own color).
+            </FieldDescription>
+            {isReady && member ? (
+              <ColorPicker value={member.color} onSelect={saveColor} />
+            ) : (
+              <div className="h-9" />
             )}
           </FieldSet>
 
@@ -130,6 +148,52 @@ function NameField({
       <Button onClick={save} disabled={pending || !dirty || !trimmed}>
         Save
       </Button>
+    </div>
+  );
+}
+
+/**
+ * The member's identity color, picked from the shared accent SWATCHES (same set
+ * events/tasks use). Unlike the event ColorSwatchPicker there's no "Default" —
+ * a member always has a color. Dots render from `var(--swatch-<id>)` so they
+ * re-tint with the active palette, matching the resolved calendar colors.
+ */
+function ColorPicker({
+  value,
+  onSelect,
+}: {
+  value: string;
+  onSelect: (color: string) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label="Profile color" className="flex flex-wrap gap-3">
+      {SWATCHES.map((s) => {
+        const selected = value.toLowerCase() === s.value.toLowerCase();
+        return (
+          <button
+            key={s.id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={s.label}
+            title={s.label}
+            onClick={() => onSelect(s.value)}
+            className={cn(
+              "relative grid size-9 place-items-center rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform outline-none focus-visible:ring-ring active:scale-95",
+              selected ? "ring-foreground" : "ring-transparent hover:ring-border",
+            )}
+            style={{ backgroundColor: `var(--swatch-${s.id})` }}
+          >
+            {selected && (
+              <Check
+                className="size-4 drop-shadow-sm"
+                style={{ color: `var(--swatch-ink-${s.id}, var(--swatch-ink))` }}
+                aria-hidden
+              />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

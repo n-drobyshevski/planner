@@ -11,10 +11,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Field,
+  FieldContent,
+  FieldLabel,
   FieldSet,
   FieldLegend,
   FieldDescription,
 } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePreferences } from "@/lib/hooks/use-preferences";
 import { ACCENTS, PALETTES, TONES } from "@/lib/theme/appearance";
@@ -37,10 +41,12 @@ export function AppearanceSettings() {
     accent,
     tone,
     palette,
+    showInactiveInMonth,
     setThemePref,
     setAccent,
     setTone,
     setPalette,
+    setShowInactiveInMonth,
     isReady,
   } = usePreferences();
 
@@ -225,6 +231,35 @@ export function AppearanceSettings() {
               ))}
             </ToggleGroup>
           </FieldSet>
+        </CardContent>
+      </Card>
+
+      {/* Calendar display */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Calendar</CardTitle>
+          <CardDescription>
+            How your calendar reads. These also follow you across devices.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldLabel htmlFor="show-inactive-month">
+                Show inactive events in month view
+              </FieldLabel>
+              <FieldDescription>
+                Inactive events (like sleep) show grayed out. Turn off to hide
+                them in the cramped month grid — week and day always show them.
+              </FieldDescription>
+            </FieldContent>
+            <Switch
+              id="show-inactive-month"
+              checked={showInactiveInMonth}
+              onCheckedChange={setShowInactiveInMonth}
+              disabled={disabled}
+            />
+          </Field>
         </CardContent>
       </Card>
 

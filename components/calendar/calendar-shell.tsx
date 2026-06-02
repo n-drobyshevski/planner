@@ -182,6 +182,8 @@ export function CalendarShell({
   const setBacklogOpen = useUiStore((s) => s.setTaskBacklogOpen);
 
   const viewerId = workspace.data?.currentMember?.id ?? "";
+  // Month-view display preference (week/day always show inactive events).
+  const showInactiveInMonth = workspace.data?.currentMember?.showInactiveInMonth ?? true;
   // Only my own calendar is editable; overlaid members' items are read-only.
   const canEditOcc = useMemo(
     () => (o: Occurrence) => o.ownerId === viewerId,
@@ -481,6 +483,7 @@ export function CalendarShell({
                   colorOf={colorOf}
                   canEdit={canEditOcc}
                   taskDoneById={taskDoneById}
+                  showInactiveInMonth={showInactiveInMonth}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || prevWin.isLoading}
                   error={workspace.isError || prevWin.isError}
@@ -495,6 +498,7 @@ export function CalendarShell({
                   colorOf={colorOf}
                   canEdit={canEditOcc}
                   taskDoneById={taskDoneById}
+                  showInactiveInMonth={showInactiveInMonth}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || nextWin.isLoading}
                   error={workspace.isError || nextWin.isError}
@@ -521,6 +525,7 @@ export function CalendarShell({
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
                 onScheduleTask={onScheduleTask}
+                showInactiveInMonth={showInactiveInMonth}
                 loading={workspace.isLoading || eventsLoading}
                 error={workspace.isError || eventsError}
               />

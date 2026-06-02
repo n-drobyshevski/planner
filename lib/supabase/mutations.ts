@@ -248,6 +248,8 @@ export interface MemberPreferencesPatch {
   timezone?: string | null;
   /** IANA zone, or null to turn the secondary zone off. */
   secondaryTimezone?: string | null;
+  /** Whether inactive events are shown in the month view. */
+  showInactiveInMonth?: boolean;
 }
 
 /**
@@ -296,6 +298,7 @@ export async function updateMemberPreferences(
   // column (= follow device / turn secondary off), so key on presence, not value.
   if ("timezone" in patch) row.timezone = patch.timezone ?? null;
   if ("secondaryTimezone" in patch) row.secondary_timezone = patch.secondaryTimezone ?? null;
+  if (patch.showInactiveInMonth != null) row.show_inactive_in_month = patch.showInactiveInMonth;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;

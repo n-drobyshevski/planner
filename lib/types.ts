@@ -54,6 +54,9 @@ export interface Member {
   // `secondaryTimezone` null = no secondary zone shown. Both are IANA names.
   timezone: string | null;
   secondaryTimezone: string | null;
+  // When false, inactive (grayed-out) events are hidden in the cramped month
+  // view; they always show in the denser week/day grids. Defaults to true.
+  showInactiveInMonth: boolean;
 }
 
 export interface Category {

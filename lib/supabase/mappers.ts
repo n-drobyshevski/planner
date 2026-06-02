@@ -36,6 +36,8 @@ export function mapMember(r: Row): Member {
     palette: (r.palette as Palette | null) ?? "default",
     timezone: (r.timezone as string | null) ?? null,
     secondaryTimezone: (r.secondary_timezone as string | null) ?? null,
+    showInactiveInMonth:
+      r.show_inactive_in_month == null ? true : Boolean(r.show_inactive_in_month),
   };
 }
 
