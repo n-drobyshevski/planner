@@ -91,6 +91,7 @@ const DISPLAY_ONLY = {
   onReschedule: NOOP,
   onRescheduleMany: NOOP,
   onDuplicate: NOOP,
+  onDuplicateMany: NOOP,
   onChangeColor: NOOP,
   onColorSelected: NOOP,
   onDeleteEvent: NOOP,
@@ -469,12 +470,9 @@ export function CalendarShell({
     const ops = [...updates.values(), ...overrides];
     if (ops.length > 0) void mutations.rescheduleMany(ops);
   }
-  /** Ctrl/Cmd-drag drop: create a plain one-off copy at the dropped time. */
-  function onDuplicate(occ: Occurrence, start: number, end: number) {
-    if (!canEditOcc(occ)) return;
-    const ev = events.find((e) => e.id === occ.eventId);
-    if (!ev || !workspace.data) return;
-    const input: EventInput = {
+  // Fields shared by every duplicate (a plain copy owned by the viewer).
+  function copyBase(ev: EventRow) {
+    return {
       workspaceId: ev.workspaceId,
       ownerId: viewerId,
       categoryId: ev.categoryId,
@@ -484,18 +482,67 @@ export function CalendarShell({
       isPrivate: ev.isPrivate,
       color: ev.color,
       kind: ev.kind,
-      // Re-derive context membership by overlap at the drop (contexts get none).
-      contextId: ev.kind === "context" ? null : contextIdForRange(contextOccs, start),
       allDay: ev.allDay,
       inactive: ev.inactive,
+      timeZone: ev.timeZone,
+      taskId: null as string | null, // a plain copy, not a second "part" of a task
+    };
+  }
+  /** A single one-off copy at the dropped time (drops any recurrence). */
+  function oneOffCopyInput(ev: EventRow, start: number, end: number): EventInput {
+    return {
+      ...copyBase(ev),
+      // Re-derive context membership by overlap at the drop (contexts get none).
+      contextId: ev.kind === "context" ? null : contextIdForRange(contextOccs, start),
       start,
       end,
-      timeZone: ev.timeZone,
-      rrule: null, // a single one-off copy, never a series
+      rrule: null,
       recurrenceEndsAt: null,
-      taskId: null, // a plain copy, not a second "part" of the task
     };
+  }
+  /** A copy of the whole series, shifted by the drag delta (parallel series). */
+  function familyCopyInput(ev: EventRow, delta: number): EventInput {
+    return {
+      ...copyBase(ev),
+      contextId: ev.contextId, // preserve the series' context
+      start: ev.start + delta,
+      end: ev.end + delta,
+      rrule: ev.rrule,
+      recurrenceEndsAt: ev.recurrenceEndsAt != null ? ev.recurrenceEndsAt + delta : null,
+    };
+  }
+  /** Ctrl/Cmd-drag drop: copy one item. `family` (Alt) copies a recurring item's
+   *  whole series shifted by the delta; otherwise a one-off of the occurrence. */
+  function onDuplicate(occ: Occurrence, start: number, end: number, family: boolean) {
+    if (!canEditOcc(occ)) return;
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev || !workspace.data) return;
+    const input =
+      ev.rrule && family ? familyCopyInput(ev, start - occ.start) : oneOffCopyInput(ev, start, end);
     void mutations.create(input);
+  }
+  /** Ctrl/Cmd-drag drop on a multi-selection: duplicate every selected item.
+   *  With `family` (Alt), recurring members copy their whole series (deduped per
+   *  series); otherwise each is a one-off of its occurrence. */
+  function onDuplicateMany(
+    moves: { occ: Occurrence; start: number; end: number }[],
+    family: boolean,
+  ) {
+    const inputs: EventInput[] = [];
+    const seenFamily = new Set<string>();
+    for (const { occ, start, end } of moves) {
+      if (!canEditOcc(occ)) continue;
+      const ev = events.find((e) => e.id === occ.eventId);
+      if (!ev) continue;
+      if (ev.rrule && family) {
+        if (seenFamily.has(ev.id)) continue; // one family copy per series
+        seenFamily.add(ev.id);
+        inputs.push(familyCopyInput(ev, start - occ.start));
+      } else {
+        inputs.push(oneOffCopyInput(ev, start, end));
+      }
+    }
+    if (inputs.length > 0) void mutations.createMany(inputs);
   }
   /** Delete every selected event in one batch. A lone item keeps the existing
    *  prompt (recurring) / direct delete (single). In a multi-pick, recurring
@@ -685,6 +732,7 @@ export function CalendarShell({
                 onReschedule={onReschedule}
                 onRescheduleMany={onRescheduleMany}
                 onDuplicate={onDuplicate}
+                onDuplicateMany={onDuplicateMany}
                 onChangeColor={onChangeEventColor}
                 onColorSelected={colorSelected}
                 onDeleteEvent={onDeleteEvent}

@@ -34,7 +34,12 @@ export interface CanvasProps {
     family: boolean,
   ) => void;
   /** Time-grid: Ctrl/Cmd-drag drops a one-off copy. */
-  onDuplicate?: (occ: Occurrence, startMs: number, endMs: number) => void;
+  onDuplicate?: (occ: Occurrence, startMs: number, endMs: number, family: boolean) => void;
+  /** Time-grid: Ctrl/Cmd-drag a multi-selection duplicates every selected item. */
+  onDuplicateMany?: (
+    moves: { occ: Occurrence; start: number; end: number }[],
+    family: boolean,
+  ) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
   /** Time-grid: recolor the whole multi-selection. */
   onColorSelected?: (color: string | null) => void;
@@ -158,6 +163,7 @@ export function CalendarCanvas(props: CanvasProps) {
       onReschedule={onReschedule}
       onRescheduleMany={props.onRescheduleMany ?? NOOP}
       onDuplicate={props.onDuplicate ?? NOOP}
+      onDuplicateMany={props.onDuplicateMany ?? NOOP}
       onChangeColor={onChangeColor}
       onColorSelected={props.onColorSelected ?? NOOP}
       onDeleteEvent={onDeleteEvent}

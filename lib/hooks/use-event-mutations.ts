@@ -45,6 +45,12 @@ export function useEventMutations(workspaceId: string | undefined) {
 
   return {
     create: (input: EventInput) => run(m.createEvent(sb, input), "Event created"),
+    /** Duplicate several items at once — one invalidate + one toast. */
+    createMany: (inputs: EventInput[]) =>
+      run(
+        Promise.all(inputs.map((i) => m.createEvent(sb, i))),
+        `${inputs.length} events created`,
+      ),
     updateSingle: (id: string, patch: Partial<EventInput>) =>
       run(m.updateEvent(sb, id, patch), "Event updated"),
     /**
