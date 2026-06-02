@@ -26,12 +26,12 @@ import {
 import { ColorSwatchPicker } from "./color-swatch-picker";
 
 /**
- * Run a menu action on the next tick. Opening a dialog from a (modal)
- * ContextMenu item's `onSelect` races with Radix tearing the menu down — focus
- * returns to the trigger and the body's `pointer-events` lock is released on the
- * same tick — so a dialog opened synchronously flickers shut or never appears.
- * Deferring lets the menu finish closing first. (The mobile sheet doesn't have
- * this problem; it already defers via its own close.)
+ * Run a menu action on the next tick. Even with a non-modal menu (see the
+ * `modal={false}` note on ContextMenu below), Radix returns focus to the
+ * trigger as the menu tears down on `onSelect`; opening a dialog synchronously
+ * on the same tick races that and can flicker shut. Deferring one tick lets the
+ * menu finish closing first. (The mobile sheet doesn't have this problem; it
+ * already defers via its own close.)
  */
 function runAfterClose(fn?: () => void) {
   if (fn) setTimeout(fn, 0);
@@ -111,7 +111,12 @@ export function ItemContextMenu({
   const destructive = actions.filter((a) => a.destructive);
 
   return (
-    <ContextMenu>
+    // Non-modal: a modal ContextMenu locks `pointer-events: none` on <body> and
+    // keeps a focus guard while it tears down. When an item opens a dialog (Edit
+    // → details, Delete → recurrence prompt) that lock/guard races the dialog
+    // mount and leaves it frozen or dismisses it — the menu items look "dead".
+    // Non-modal drops the body lock, so the follow-up dialog is interactive.
+    <ContextMenu modal={false}>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-44">
         {nonDestructive.map((a) =>
