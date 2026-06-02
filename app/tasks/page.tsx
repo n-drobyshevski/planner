@@ -1,6 +1,21 @@
+import { Suspense } from "react";
 import { TasksShell } from "@/components/tasks/tasks-shell";
 
-export default async function TasksPage({
+// searchParams is request-time data; behind Suspense so the static shell can
+// prerender while the params-dependent shell streams in (Cache Components).
+export default function TasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <TasksRoute searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function TasksRoute({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string }>;

@@ -15,13 +15,6 @@ export const DEFAULT_ACCENT: AccentId = "peach";
 export const DEFAULT_TONE: SurfaceTone = "warm";
 export const DEFAULT_PALETTE: Palette = "default";
 
-/**
- * Cache tag for one member's server-rendered appearance (accent/tone/palette).
- * Shared by the layout's `unstable_cache` read and the `revalidateAppearance`
- * server action so a preference change busts exactly that user's entry.
- */
-export const appearanceTag = (authUserId: string) => `appearance:${authUserId}`;
-
 export interface AccentPreset {
   id: AccentId;
   label: string;
