@@ -126,7 +126,7 @@ export function TasksShell({
             onToggleDone={(t) => void mutations.toggleDone(t)}
             onMove={(t, status, position) => void mutations.move(t, status, position)}
             onNew={(status) => setEditor({ mode: "create", status })}
-            onChangeColor={(t, color) => void mutations.update(t.id, { color })}
+            onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
             onDelete={(t) => setDeleting(t)}
           />
         ) : (
@@ -137,7 +137,7 @@ export function TasksShell({
             progressOf={progressFor}
             onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
             onToggleDone={(t) => void mutations.toggleDone(t)}
-            onChangeColor={(t, color) => void mutations.update(t.id, { color })}
+            onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
             onDelete={(t) => setDeleting(t)}
           />
         )}

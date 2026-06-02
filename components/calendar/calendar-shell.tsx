@@ -331,17 +331,17 @@ export function CalendarShell({
   }
   function onAssignContext(occ: Occurrence, contextId: string) {
     if (!canEditOcc(occ)) return;
-    void mutations.assignContext(occ.eventId, contextId);
+    void mutations.assignContext(occ.eventId, contextId, occ.contextId);
   }
   function onRemoveContext(occ: Occurrence) {
     if (!canEditOcc(occ)) return;
-    void mutations.removeContext(occ.eventId);
+    void mutations.removeContext(occ.eventId, occ.contextId);
   }
   /** Recolor an event (series-level: writes the master row's color). */
   function onChangeEventColor(occ: Occurrence, color: string | null) {
     if (!canEditOcc(occ)) return;
     const ev = events.find((e) => e.id === occ.eventId);
-    if (ev) void mutations.updateSingle(ev.id, { color });
+    if (ev) void mutations.updateSingle(ev.id, { color }, { color: ev.color });
   }
   function onDeleteEvent(occ: Occurrence) {
     if (!canEditOcc(occ)) return;
@@ -382,13 +382,17 @@ export function CalendarShell({
       // Re-derive context membership from overlap on every move (backdrop model).
       // Contexts themselves never get a context_id; recurring events skip this.
       if (ev.kind === "context") {
-        void mutations.updateSingle(ev.id, { start, end });
+        void mutations.updateSingle(ev.id, { start, end }, { start: ev.start, end: ev.end });
       } else {
-        void mutations.updateSingle(ev.id, {
-          start,
-          end,
-          contextId: contextIdForRange(contextOccs, start),
-        });
+        void mutations.updateSingle(
+          ev.id,
+          {
+            start,
+            end,
+            contextId: contextIdForRange(contextOccs, start),
+          },
+          { start: ev.start, end: ev.end, contextId: ev.contextId },
+        );
       }
     } else {
       setPendingReschedule({ event: ev, occurrence: occ, start, end });
@@ -432,7 +436,10 @@ export function CalendarShell({
     moves: { occ: Occurrence; start: number; end: number }[],
     family: boolean,
   ) {
-    const updates = new Map<string, { kind: "update"; id: string; patch: Partial<EventInput> }>();
+    const updates = new Map<
+      string,
+      { kind: "update"; id: string; patch: Partial<EventInput>; prev: Partial<EventInput> }
+    >();
     const overrides: {
       kind: "override";
       event: EventRow;
@@ -451,6 +458,7 @@ export function CalendarShell({
           kind: "update",
           id: ev.id,
           patch: { start, end, ...ctxPatch(start, ev.kind === "context") },
+          prev: { start: ev.start, end: ev.end, contextId: ev.contextId },
         });
       } else if (family) {
         // Whole series: shift the master row by the same start/end delta.
@@ -461,6 +469,7 @@ export function CalendarShell({
           kind: "update",
           id: ev.id,
           patch: { start: mStart, end: mEnd, ...ctxPatch(start, ev.kind === "context") },
+          prev: { start: ev.start, end: ev.end, contextId: ev.contextId },
         });
       } else {
         // This occurrence only: a modify override keyed on the original date.
@@ -580,7 +589,7 @@ export function CalendarShell({
       const occ = visible.find((o) => o.key === key);
       if (!occ || !canEditOcc(occ)) continue;
       const ev = events.find((e) => e.id === occ.eventId);
-      if (ev) void mutations.updateSingle(ev.id, { color });
+      if (ev) void mutations.updateSingle(ev.id, { color }, { color: ev.color });
     }
   }
 
@@ -759,7 +768,7 @@ export function CalendarShell({
             members={memberMap}
             onSchedule={(t) => setScheduling(t)}
             onToggleDone={(t) => void taskMutations.toggleDone(t)}
-            onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c })}
+            onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c }, { color: t.color })}
             onDelete={(t) => setDeletingTask(t)}
             analytics={{
               occurrences: visible,
@@ -894,7 +903,7 @@ export function CalendarShell({
             setBacklogOpen(false);
           }}
           onToggleDone={(t) => void taskMutations.toggleDone(t)}
-          onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c })}
+          onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c }, { color: t.color })}
           onDelete={(t) => setDeletingTask(t)}
         />
       )}
