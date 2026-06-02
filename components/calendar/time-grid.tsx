@@ -66,8 +66,14 @@ interface Props {
     moves: { occ: Occurrence; start: number; end: number }[],
     family: boolean,
   ) => void;
-  /** Ctrl/Cmd-drag: drop a one-off copy of `occ` at the new time. */
-  onDuplicate: (occ: Occurrence, startMs: number, endMs: number) => void;
+  /** Ctrl/Cmd-drag: copy `occ` at the new time. `family` (Alt) copies a recurring
+   *  item's whole series; otherwise a one-off of the occurrence. */
+  onDuplicate: (occ: Occurrence, startMs: number, endMs: number, family: boolean) => void;
+  /** Ctrl/Cmd-drag a multi-selection: duplicate every selected item. */
+  onDuplicateMany: (
+    moves: { occ: Occurrence; start: number; end: number }[],
+    family: boolean,
+  ) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
   /** Recolor the whole multi-selection (context menu on a grouped item). */
   onColorSelected: (color: string | null) => void;
@@ -144,6 +150,7 @@ export function TimeGrid({
   onReschedule,
   onRescheduleMany,
   onDuplicate,
+  onDuplicateMany,
   onChangeColor,
   onColorSelected,
   onDeleteEvent,
@@ -420,10 +427,13 @@ export function TimeGrid({
       const newStart = clamp(snapMinutes(g.minutes - d.grabMin!), 0, 1440 - dur);
       d.curDayIndex = g.dayIndex;
       d.curStartMin = newStart;
-      // Ctrl/Cmd held → the drop will duplicate (single move only); show it.
-      const copy = !d.group && (e.ctrlKey || e.metaKey);
-      // Alt over a group with recurring members → the drop hits whole series.
-      const series = !!d.group && e.altKey && d.group.some((m) => m.occ.isRecurring);
+      // Ctrl/Cmd held → the drop will duplicate (single or whole selection).
+      const copy = e.ctrlKey || e.metaKey;
+      // Alt hits the whole recurring family — for a group move, or any duplicate.
+      // (A single move with no Ctrl keeps its scope prompt, so Alt doesn't apply.)
+      const hasRecurring =
+        !!byKey.get(d.occKey!)?.isRecurring || !!d.group?.some((m) => m.occ.isRecurring);
+      const series = e.altKey && (!!d.group || copy) && hasRecurring;
       const title = byKey.get(d.occKey!)?.title ?? "";
       setPreview({
         dayIndex: g.dayIndex,
@@ -533,22 +543,22 @@ export function TimeGrid({
       }
       const start = days[d.curDayIndex!] + d.curStartMin! * 60_000;
       const end = start + d.durationMin! * 60_000;
-      // Group move: shift every captured member by the same day + minute delta.
+      // Group: shift every captured member by the same day + minute delta. Ctrl/
+      // Cmd duplicates the whole selection instead of moving it; Alt = family.
       if (d.group) {
         const dayDelta = d.curDayIndex! - d.dayIndex;
         const minuteDelta = d.curStartMin! - d.startMin!;
-        onRescheduleMany(
-          d.group.map((m) => {
-            const mDay = clamp(m.dayIndex + dayDelta, 0, days.length - 1);
-            const mStart =
-              days[mDay] + clamp(m.sMin + minuteDelta, 0, 1440 - m.durationMin) * 60_000;
-            return { occ: m.occ, start: mStart, end: mStart + m.durationMin * 60_000 };
-          }),
-          e.altKey,
-        );
+        const moves = d.group.map((m) => {
+          const mDay = clamp(m.dayIndex + dayDelta, 0, days.length - 1);
+          const mStart =
+            days[mDay] + clamp(m.sMin + minuteDelta, 0, 1440 - m.durationMin) * 60_000;
+          return { occ: m.occ, start: mStart, end: mStart + m.durationMin * 60_000 };
+        });
+        if (e.ctrlKey || e.metaKey) onDuplicateMany(moves, e.altKey);
+        else onRescheduleMany(moves, e.altKey);
       } else if (e.ctrlKey || e.metaKey) {
-        // Ctrl/Cmd-drag → drop a one-off copy, leaving the original in place.
-        onDuplicate(occ, start, end);
+        // Ctrl/Cmd-drag → copy, leaving the original in place. Alt = whole series.
+        onDuplicate(occ, start, end, e.altKey);
       } else {
         onReschedule(occ, start, end);
       }
