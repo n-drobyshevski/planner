@@ -36,6 +36,22 @@ export class StaleWriteError extends Error {
 
 const toIso = (ms: number) => new Date(ms).toISOString();
 
+/**
+ * Apply an optimistic-concurrency guard on `updated_at`. The column is
+ * microsecond-precision in Postgres, but the domain layer carries timestamps as
+ * integer milliseconds, so an exact `eq` match would (almost) always miss the
+ * sub-millisecond digits. Match the 1 ms window the expected value falls in
+ * instead — i.e. "the row still has the updated_at I last saw, at ms
+ * resolution". A genuine partner edit lands on a different millisecond and so
+ * still fails the guard.
+ */
+function guardUpdatedAt<Q extends { gte: (c: string, v: string) => Q; lt: (c: string, v: string) => Q }>(
+  q: Q,
+  expectedUpdatedAt: number,
+): Q {
+  return q.gte("updated_at", toIso(expectedUpdatedAt)).lt("updated_at", toIso(expectedUpdatedAt + 1));
+}
+
 export async function createEvent(
   sb: SupabaseClient,
   input: EventInput,
@@ -60,7 +76,7 @@ export async function updateEvent(
   expectedUpdatedAt?: number,
 ): Promise<EventRow> {
   let q = sb.from("events").update(eventPatchToRow(patch)).eq("id", id);
-  if (expectedUpdatedAt != null) q = q.eq("updated_at", toIso(expectedUpdatedAt));
+  if (expectedUpdatedAt != null) q = guardUpdatedAt(q, expectedUpdatedAt);
   const { data, error } = await q.select();
   if (error) throw error;
   if (!data || data.length === 0) throw new StaleWriteError();
@@ -443,7 +459,7 @@ export async function updateTask(
   expectedUpdatedAt?: number,
 ): Promise<TaskRow> {
   let q = sb.from("tasks").update(taskPatchToRow(patch)).eq("id", id);
-  if (expectedUpdatedAt != null) q = q.eq("updated_at", toIso(expectedUpdatedAt));
+  if (expectedUpdatedAt != null) q = guardUpdatedAt(q, expectedUpdatedAt);
   const { data, error } = await q.select();
   if (error) throw error;
   if (!data || data.length === 0)
