@@ -60,8 +60,12 @@ interface Props {
   onClearSelection: () => void;
   onCreateRange: (startMs: number, endMs: number) => void;
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
-  /** Drag-move several selected blocks at once (same time delta). */
-  onRescheduleMany: (moves: { occ: Occurrence; start: number; end: number }[]) => void;
+  /** Move/resize several selected blocks at once (same delta). `family` (Alt)
+   *  applies recurring members to their whole series instead of this occurrence. */
+  onRescheduleMany: (
+    moves: { occ: Occurrence; start: number; end: number }[],
+    family: boolean,
+  ) => void;
   /** Ctrl/Cmd-drag: drop a one-off copy of `occ` at the new time. */
   onDuplicate: (occ: Occurrence, startMs: number, endMs: number) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
@@ -123,6 +127,8 @@ interface Preview {
   label: string;
   /** Ctrl/Cmd held during a move: the drop will duplicate, not move. */
   copy?: boolean;
+  /** Alt held over a group with recurring members: the drop hits whole series. */
+  series?: boolean;
 }
 
 export function TimeGrid({
@@ -243,6 +249,29 @@ export function TimeGrid({
     setPreview({ dayIndex, topMin: sMin, heightMin: durationMin, label: occ.title });
   }
 
+  // Grabbing a member of a multi-selection acts on the whole group (move or
+  // resize) by one shared delta. Capture each editable member's start geometry
+  // now. Recurring members are included: by default the change applies to the
+  // selected occurrence (this), or to the whole series when Alt is held at drop.
+  // A single recurring item (size 1) is never a group, so it keeps its scope
+  // prompt via the single-item path.
+  function groupFor(occ: Occurrence): GroupMember[] | undefined {
+    if (!selectedKeys.has(occ.key) || selectedKeys.size <= 1) return undefined;
+    const members: GroupMember[] = [];
+    for (const key of selectedKeys) {
+      const m = byKey.get(key);
+      if (!m || !canEdit(m)) continue;
+      const mDay = dayIndexOfMs(m.start);
+      members.push({
+        occ: m,
+        sMin: minutesIn(m.start, mDay),
+        dayIndex: mDay,
+        durationMin: (m.end - m.start) / 60_000,
+      });
+    }
+    return members.length > 1 ? members : undefined;
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return;
     const el = e.target as HTMLElement;
@@ -314,6 +343,7 @@ export function TimeGrid({
         edge: (handle.dataset.resize as "start" | "end") ?? "end",
         startMin: minutesIn(occ.start, dayIndex),
         endMin: minutesIn(occ.end, dayIndex),
+        group: groupFor(occ),
       };
     } else if (blockEl) {
       const occ = byKey.get(blockEl.dataset.occKey!);
@@ -323,22 +353,7 @@ export function TimeGrid({
       // Grabbing a member of a multi-selection moves the whole group by one
       // delta. Capture each editable, non-recurring member's start geometry now;
       // recurring members are left out (they'd each need a scope prompt).
-      let group: GroupMember[] | undefined;
-      if (selectedKeys.has(occ.key) && selectedKeys.size > 1) {
-        const members: GroupMember[] = [];
-        for (const key of selectedKeys) {
-          const m = byKey.get(key);
-          if (!m || !canEdit(m) || m.isRecurring) continue;
-          const mDay = dayIndexOfMs(m.start);
-          members.push({
-            occ: m,
-            sMin: minutesIn(m.start, mDay),
-            dayIndex: mDay,
-            durationMin: (m.end - m.start) / 60_000,
-          });
-        }
-        if (members.length > 1) group = members;
-      }
+      const group = groupFor(occ);
       dragRef.current = {
         kind: "move",
         pointerId: e.pointerId,
@@ -407,6 +422,8 @@ export function TimeGrid({
       d.curStartMin = newStart;
       // Ctrl/Cmd held → the drop will duplicate (single move only); show it.
       const copy = !d.group && (e.ctrlKey || e.metaKey);
+      // Alt over a group with recurring members → the drop hits whole series.
+      const series = !!d.group && e.altKey && d.group.some((m) => m.occ.isRecurring);
       const title = byKey.get(d.occKey!)?.title ?? "";
       setPreview({
         dayIndex: g.dayIndex,
@@ -414,6 +431,7 @@ export function TimeGrid({
         heightMin: dur,
         label: copy ? `Copy of ${title}` : title,
         copy,
+        series,
       });
       // Group move: shift every other member by the same day + minute delta.
       if (d.group) {
@@ -432,12 +450,33 @@ export function TimeGrid({
       }
     } else {
       const m = snapMinutes(clampMin(g.minutes));
+      const series = !!d.group && e.altKey && d.group.some((mem) => mem.occ.isRecurring);
+      let deltaMin: number;
       if (d.edge === "start") {
         d.curStart = Math.min(m, d.endMin! - SLOT_MIN);
-        setPreview({ dayIndex: d.dayIndex, topMin: d.curStart, heightMin: d.endMin! - d.curStart, label: "" });
+        deltaMin = d.curStart - d.startMin!;
+        setPreview({ dayIndex: d.dayIndex, topMin: d.curStart, heightMin: d.endMin! - d.curStart, label: "", series });
       } else {
         d.curEnd = Math.max(m, d.startMin! + SLOT_MIN);
-        setPreview({ dayIndex: d.dayIndex, topMin: d.startMin!, heightMin: d.curEnd - d.startMin!, label: "" });
+        deltaMin = d.curEnd - d.endMin!;
+        setPreview({ dayIndex: d.dayIndex, topMin: d.startMin!, heightMin: d.curEnd - d.startMin!, label: "", series });
+      }
+      // Group resize: apply the same edge delta to every other member.
+      if (d.group) {
+        const edge = d.edge;
+        setGroupPreview(
+          d.group
+            .filter((mem) => mem.occ.key !== d.occKey)
+            .map((mem) => {
+              const endMin = mem.sMin + mem.durationMin;
+              if (edge === "start") {
+                const top = clamp(mem.sMin + deltaMin, 0, endMin - SLOT_MIN);
+                return { dayIndex: mem.dayIndex, topMin: top, heightMin: endMin - top, label: "" };
+              }
+              const newEnd = clamp(endMin + deltaMin, mem.sMin + SLOT_MIN, 1440);
+              return { dayIndex: mem.dayIndex, topMin: mem.sMin, heightMin: newEnd - mem.sMin, label: "" };
+            }),
+        );
       }
     }
   }
@@ -505,6 +544,7 @@ export function TimeGrid({
               days[mDay] + clamp(m.sMin + minuteDelta, 0, 1440 - m.durationMin) * 60_000;
             return { occ: m.occ, start: mStart, end: mStart + m.durationMin * 60_000 };
           }),
+          e.altKey,
         );
       } else if (e.ctrlKey || e.metaKey) {
         // Ctrl/Cmd-drag → drop a one-off copy, leaving the original in place.
@@ -519,7 +559,24 @@ export function TimeGrid({
         onSelect(occ);
         return;
       }
-      if (d.edge === "start") {
+      // Group resize: apply the same edge delta to every captured member.
+      if (d.group) {
+        const edge = d.edge;
+        const deltaMin = edge === "start" ? d.curStart! - d.startMin! : d.curEnd! - d.endMin!;
+        onRescheduleMany(
+          d.group.map((mem) => {
+            const base = days[mem.dayIndex];
+            const endMin = mem.sMin + mem.durationMin;
+            if (edge === "start") {
+              const top = clamp(mem.sMin + deltaMin, 0, endMin - SLOT_MIN);
+              return { occ: mem.occ, start: base + top * 60_000, end: base + endMin * 60_000 };
+            }
+            const newEnd = clamp(endMin + deltaMin, mem.sMin + SLOT_MIN, 1440);
+            return { occ: mem.occ, start: base + mem.sMin * 60_000, end: base + newEnd * 60_000 };
+          }),
+          e.altKey,
+        );
+      } else if (d.edge === "start") {
         onReschedule(occ, days[d.dayIndex] + d.curStart! * 60_000, occ.end);
       } else {
         onReschedule(occ, occ.start, days[d.dayIndex] + d.curEnd! * 60_000);
@@ -753,6 +810,11 @@ export function TimeGrid({
                     aria-hidden
                   >
                     +
+                  </span>
+                )}
+                {preview.series && (
+                  <span className="mt-px shrink-0 rounded bg-primary px-1 text-[10px] font-medium leading-tight text-primary-foreground">
+                    ⟳ series
                   </span>
                 )}
                 <span className="truncate text-xs font-medium text-primary">

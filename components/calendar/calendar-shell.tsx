@@ -423,23 +423,51 @@ export function CalendarShell({
     if (!canEditOcc(occ)) return; // overlay items aren't actionable in bulk
     toggleSelected(occ.key);
   }
-  /** Move every selected (non-recurring) block by the same delta in one pass. */
-  function onRescheduleMany(moves: { occ: Occurrence; start: number; end: number }[]) {
+  /** Move/resize every selected block in one batched pass (one invalidate +
+   *  one toast). Recurring members change only the selected occurrence (this);
+   *  with `family` (Alt) they change the whole series. Master updates are deduped
+   *  by event id so several occurrences of one series shift it once. */
+  function onRescheduleMany(
+    moves: { occ: Occurrence; start: number; end: number }[],
+    family: boolean,
+  ) {
+    const updates = new Map<string, { kind: "update"; id: string; patch: Partial<EventInput> }>();
+    const overrides: {
+      kind: "override";
+      event: EventRow;
+      occurrenceDate: number;
+      patch: { start: number; end: number };
+    }[] = [];
+    const ctxPatch = (start: number, isContext: boolean): Partial<EventInput> =>
+      isContext ? {} : { contextId: contextIdForRange(contextOccs, start) };
     for (const { occ, start, end } of moves) {
       if (!canEditOcc(occ)) continue;
       const ev = events.find((e) => e.id === occ.eventId);
-      if (!ev || ev.rrule) continue; // recurring excluded from group move
-      optimisticMove(ev.id, start, end);
-      if (ev.kind === "context") {
-        void mutations.updateSingle(ev.id, { start, end });
-      } else {
-        void mutations.updateSingle(ev.id, {
-          start,
-          end,
-          contextId: contextIdForRange(contextOccs, start),
+      if (!ev) continue;
+      if (!ev.rrule) {
+        optimisticMove(ev.id, start, end);
+        updates.set(ev.id, {
+          kind: "update",
+          id: ev.id,
+          patch: { start, end, ...ctxPatch(start, ev.kind === "context") },
         });
+      } else if (family) {
+        // Whole series: shift the master row by the same start/end delta.
+        const mStart = ev.start + (start - occ.start);
+        const mEnd = ev.end + (end - occ.end);
+        optimisticMove(ev.id, mStart, mEnd);
+        updates.set(ev.id, {
+          kind: "update",
+          id: ev.id,
+          patch: { start: mStart, end: mEnd, ...ctxPatch(start, ev.kind === "context") },
+        });
+      } else {
+        // This occurrence only: a modify override keyed on the original date.
+        overrides.push({ kind: "override", event: ev, occurrenceDate: occ.occurrenceDate, patch: { start, end } });
       }
     }
+    const ops = [...updates.values(), ...overrides];
+    if (ops.length > 0) void mutations.rescheduleMany(ops);
   }
   /** Ctrl/Cmd-drag drop: create a plain one-off copy at the dropped time. */
   function onDuplicate(occ: Occurrence, start: number, end: number) {
@@ -469,9 +497,11 @@ export function CalendarShell({
     };
     void mutations.create(input);
   }
-  /** Delete every selected event. A lone recurring item keeps its scope prompt;
-   *  in a multi-pick, recurring items are skipped (they'd each need a prompt). */
-  function deleteSelected() {
+  /** Delete every selected event in one batch. A lone item keeps the existing
+   *  prompt (recurring) / direct delete (single). In a multi-pick, recurring
+   *  items delete only the selected occurrence (this), or the whole series with
+   *  `family` (Alt). Series deletes are deduped by event id. */
+  function deleteSelected(family: boolean) {
     const keys = [...selectedKeys];
     if (keys.length === 0) return;
     if (keys.length === 1) {
@@ -480,13 +510,21 @@ export function CalendarShell({
       clearSelection();
       return;
     }
+    const deletes = new Set<string>(); // whole rows (non-recurring + family series)
+    const cancels: { kind: "cancel"; event: EventRow; occurrenceDate: number }[] = [];
     for (const key of keys) {
       const occ = visible.find((o) => o.key === key);
       if (!occ || !canEditOcc(occ)) continue;
       const ev = events.find((e) => e.id === occ.eventId);
-      if (!ev || ev.rrule) continue; // recurring skipped in bulk delete
-      void mutations.remove(ev.id);
+      if (!ev) continue;
+      if (!ev.rrule || family) deletes.add(ev.id);
+      else cancels.push({ kind: "cancel", event: ev, occurrenceDate: occ.occurrenceDate });
     }
+    const ops = [
+      ...[...deletes].map((id) => ({ kind: "delete" as const, id })),
+      ...cancels,
+    ];
+    if (ops.length > 0) void mutations.removeMany(ops);
     clearSelection();
   }
   /** Recolor the whole selection (series-level, mirrors onChangeEventColor). */
@@ -515,7 +553,7 @@ export function CalendarShell({
       return;
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
-      deleteSelected();
+      deleteSelected(e.altKey); // Alt → delete the whole recurring family
     } else if (e.key === "Escape") {
       clearSelection();
     }
