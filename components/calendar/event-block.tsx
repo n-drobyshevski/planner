@@ -6,7 +6,7 @@ import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { CheckCircle2, Circle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
-import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
+import { eventStatusClass, eventFillStyle } from "@/lib/theme/appearance";
 import type { Occurrence } from "@/lib/types";
 
 /**
@@ -38,15 +38,22 @@ export const EventBlock = forwardRef<
 ) {
   const timeZone = useViewerTimeZone();
   const isTask = occ.taskId != null && onToggleTaskDone != null;
+  // Another member's read-only overlay (`!editable`) renders OUTLINED so it
+  // reads as "not mine, look don't touch"; my own and shared/joint events stay
+  // solid-FILLED. See eventFillStyle.
+  const fill = eventFillStyle(color, !editable);
   return (
     <div
       ref={ref}
       data-occ-key={occ.key}
-      style={{ ...style, backgroundColor: toPaletteColor(color), color: toPaletteInk(color) }}
+      style={{ ...style, ...fill }}
       className={cn(
-        "absolute z-10 flex touch-none flex-col overflow-hidden rounded-md px-1.5 py-1 text-left text-xs shadow-soft select-none",
+        // z-index comes from --evt-z (the cascade order set by day-column);
+        // hovering or selecting an event raises it above the stack so a covered
+        // block is revealed in full — a pure z change, no layout shift.
+        "absolute z-[var(--evt-z,10)] flex touch-none flex-col overflow-hidden rounded-md border-[1.5px] px-1.5 py-1 text-left text-xs shadow-soft select-none hover:z-30",
         editable ? "cursor-grab" : "cursor-pointer",
-        selected && "z-20 ring-2 ring-foreground",
+        selected && "z-30 ring-2 ring-foreground",
         occ.inactive && "opacity-55 grayscale",
         eventStatusClass(occ.status),
         className,
@@ -64,7 +71,7 @@ export const EventBlock = forwardRef<
                 e.stopPropagation();
                 onToggleTaskDone?.();
               }}
-              className="mt-px shrink-0 cursor-pointer text-white/90 hover:text-white"
+              className="mt-px shrink-0 cursor-pointer text-current opacity-90 hover:opacity-100"
             >
               {taskDone ? (
                 <CheckCircle2 className="size-3.5" />
@@ -73,7 +80,7 @@ export const EventBlock = forwardRef<
               )}
             </button>
           ) : (
-            <span className="mt-px shrink-0 text-white/90" aria-hidden>
+            <span className="mt-px shrink-0 text-current opacity-90" aria-hidden>
               {taskDone ? (
                 <CheckCircle2 className="size-3.5" />
               ) : (
@@ -96,7 +103,7 @@ export const EventBlock = forwardRef<
         {onMenu && (
           <ItemMenuButton
             onMenu={onMenu}
-            className="-mr-0.5 ml-auto text-white/90 hover:text-white"
+            className="-mr-0.5 ml-auto text-current opacity-90 hover:opacity-100"
           />
         )}
       </div>

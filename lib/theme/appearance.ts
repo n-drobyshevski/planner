@@ -148,6 +148,34 @@ export function toPaletteInk(hex: string | null | undefined): string {
     : "var(--swatch-ink)";
 }
 
+/** The fill/border/text triplet for an event block. `outlined` (another
+ *  member's read-only overlay) renders a faint wash of the color, a colored
+ *  border, and theme-ink text — legible in light/dark where the color alone
+ *  would fail contrast. Filled (mine + shared) keeps the solid swatch with its
+ *  matching ink and a transparent border (so geometry matches the outlined box).
+ *  All colors go through `toPaletteColor` so they re-tint with Catppuccin. */
+export interface EventFill {
+  backgroundColor: string | undefined;
+  borderColor: string;
+  color: string;
+}
+export function eventFillStyle(color: string, outlined: boolean): EventFill {
+  const tint = toPaletteColor(color);
+  return outlined
+    ? {
+        backgroundColor: tint
+          ? `color-mix(in oklab, ${tint} 14%, transparent)`
+          : undefined,
+        borderColor: tint ?? "transparent",
+        color: "var(--foreground)",
+      }
+    : {
+        backgroundColor: tint,
+        borderColor: "transparent",
+        color: toPaletteInk(color),
+      };
+}
+
 /**
  * The CSS class that paints an occurrence's lifecycle status on the calendar:
  * 'cancelled' => diagonal grayed stripes (`evt-cancelled`), 'planned' => dotted

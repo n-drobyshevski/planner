@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { FolderPlus, FolderMinus, Pencil, Trash2, Eye } from "lucide-react";
 import { packDay } from "@/lib/layout/pack-day";
 import { enclosingContext } from "@/lib/calendar/contexts";
@@ -235,12 +235,17 @@ export function DayColumn({
                   ? () => onToggleTaskDone(taskId)
                   : undefined
               }
-              style={{
-                top: msToY(seg.start, dayStart),
-                height: durationToHeight(seg.start, seg.end),
-                left,
-                width,
-              }}
+              style={
+                {
+                  top: msToY(seg.start, dayStart),
+                  height: durationToHeight(seg.start, seg.end),
+                  left,
+                  width,
+                  // Cascade stacking order (later-starting events sit in front);
+                  // EventBlock reads it as z-[var(--evt-z,10)].
+                  "--evt-z": p.zIndex,
+                } as CSSProperties
+              }
             />
           </ItemContextMenu>
         );
