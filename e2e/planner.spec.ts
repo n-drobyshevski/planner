@@ -34,6 +34,27 @@ test("create then delete an event", async ({ page }, testInfo) => {
   await expect(page.getByText(title)).toHaveCount(0, { timeout: 15_000 });
 });
 
+// Regression: the right-click quick menu's items must actually fire. The menu
+// is a Radix portal (rendered into <body>) but a React child of the time grid,
+// so its pointer events bubble to the grid's onPointerDown. That handler must
+// NOT setPointerCapture for them — capture retargets the item's own
+// pointerup/click to the grid, leaving Edit/Delete inert. See time-grid.tsx.
+test("right-click context menu Delete removes the event", async ({ page }, testInfo) => {
+  await signIn(page, "Alex");
+  const title = `E2E-CTX-${testInfo.testId}`;
+
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByText("New event").waitFor();
+  await page.locator("#ev-title").fill(title);
+  await page.getByRole("button", { name: "Create" }).click();
+  const block = page.getByText(title).first();
+  await expect(block).toBeVisible({ timeout: 15_000 });
+
+  await block.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await expect(page.getByText(title)).toHaveCount(0, { timeout: 15_000 });
+});
+
 test("category toggle hides and shows events", async ({ page }) => {
   await signIn(page, "Alex");
   await page.getByRole("button", { name: "Social" }).click();

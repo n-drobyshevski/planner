@@ -287,6 +287,15 @@ export function TimeGrid({
 
   function onPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return;
+    // A right-click menu / dialog opened from a DayColumn renders into a <body>
+    // portal, but React still bubbles ITS pointer events up to this handler
+    // (synthetic events follow the component tree, not the DOM tree). Ignore any
+    // pointerdown that didn't physically land inside the grid columns: otherwise
+    // clicking a menu item would run setPointerCapture below, which retargets the
+    // following pointerup/click to the grid and steals it from the item — leaving
+    // Edit/Delete (and every other menu action) inert.
+    const cols = colsRef.current;
+    if (cols && !cols.contains(e.target as Node)) return;
     const el = e.target as HTMLElement;
     const handle = el.closest<HTMLElement>("[data-resize]");
     const blockEl = el.closest<HTMLElement>("[data-occ-key]");
