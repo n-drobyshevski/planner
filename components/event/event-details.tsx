@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Circle,
   Clock,
-  FolderClosed,
   Lock,
   MapPin,
   Palette,
@@ -51,7 +50,6 @@ interface EventDetailsProps {
   /** resolved display color (per-item / category / owner) */
   color: string;
   categoryName?: string | null;
-  contextName?: string | null;
   ownerName: string;
   /** the viewer owns this item (can edit); otherwise read-only overlay */
   isOwn: boolean;
@@ -76,7 +74,6 @@ export function EventDetails({
   event,
   color,
   categoryName,
-  contextName,
   ownerName,
   isOwn,
   task,
@@ -150,8 +147,6 @@ export function EventDetails({
             )}
 
             {categoryName && <Row icon={Tag}>{categoryName}</Row>}
-
-            {contextName && <Row icon={FolderClosed}>{contextName}</Row>}
 
             {!isOwn && (
               <Row icon={CalendarDays}>

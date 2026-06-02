@@ -72,8 +72,8 @@ function baseOccurrence(
     start,
     end,
     allDay: event.allDay,
-    // Series-level, like color/kind/contextId: every occurrence inherits the
-    // master's inactive flag; applyOverride leaves it alone (no override column).
+    // Series-level, like color/kind: every occurrence inherits the master's
+    // inactive flag; applyOverride leaves it alone (no override column).
     inactive: event.inactive,
     title: event.title,
     description: event.description,
@@ -83,10 +83,9 @@ function baseOccurrence(
     // the master's color. Per-occurrence color would need an overrides.color
     // column — out of scope, so applyOverride deliberately leaves color alone.
     color: event.color,
-    // kind and contextId are series-level, like color: every occurrence inherits
-    // the master's, and applyOverride leaves them alone (no override columns).
+    // kind is series-level, like color: every occurrence inherits the master's,
+    // and applyOverride leaves it alone (no override column).
     kind: event.kind,
-    contextId: event.contextId,
     ownerId: event.ownerId,
     isPrivate: event.isPrivate,
     taskId: event.taskId,

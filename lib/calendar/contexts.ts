@@ -1,10 +1,11 @@
-// Pure helpers for "context" time-block containers.
+// Pure helpers for "context" time-blocks (a Context's calendar backdrop).
 //
-// Membership has two layers (see the feature plan):
+// A context block (an occurrence with kind === "context") paints the category
+// named by its `categoryId`. Membership has two layers:
 //  * Visual nesting in the time grid is OVERLAP-based — a normal event whose
 //    time range overlaps a context occurrence renders on top of its backdrop.
-//  * `contextId` is a stored hint set by the assignment UIs (create-inside,
-//    drag-into, dialog/menu). On move we re-derive it from overlap.
+//  * `categoryId` is the stored membership. When an item is CREATED inside a
+//    block it defaults to the block's category; moving never re-derives it.
 //
 // These functions are framework-free so they can be unit-tested directly.
 
@@ -45,13 +46,14 @@ export function enclosingContext(
 }
 
 /**
- * The master event id of the context a child at [start,end) belongs to under
- * the overlap model, or null. Used to re-derive `contextId` when an event is
- * moved/resized. Anchored on the start instant (consistent with create-inside).
+ * The category id an item starting at `start` should default to under the
+ * overlap model: the category painted by its enclosing context block, or null
+ * when it starts inside no block. Used to auto-assign a Context when an item is
+ * created inside a backdrop. Anchored on the start instant.
  */
-export function contextIdForRange(
+export function categoryIdForRange(
   contexts: Occurrence[],
   start: number,
 ): string | null {
-  return enclosingContext(contexts, start)?.eventId ?? null;
+  return enclosingContext(contexts, start)?.categoryId ?? null;
 }

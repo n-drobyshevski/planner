@@ -3,7 +3,8 @@
 
 export type OverrideType = "cancel" | "modify";
 export type TaskStatus = "todo" | "in_progress" | "done";
-/** A normal calendar event vs. a "context" time-block container. */
+/** A normal calendar event vs. a "context" — a Context's time-block on the
+ *  calendar (a backdrop painting the category in `categoryId`). */
 export type EventKind = "event" | "context";
 
 /** Appearance preferences, stored per member. Mirror the DB CHECK constraints. */
@@ -80,10 +81,9 @@ export interface EventRow {
   isPrivate: boolean;
   /** per-item color override (hex); null = derive from category/owner */
   color: string | null;
-  /** 'event' (normal) or 'context' (a time-block container) */
+  /** 'event' (normal) or 'context' (a Context's time-block on the calendar).
+   *  A context block paints the category named by `categoryId`. */
   kind: EventKind;
-  /** parent context this event is grouped under (master id); null = none */
-  contextId: string | null;
   allDay: boolean;
   /** when true, the event is de-emphasized (grayed out) in the calendar, e.g. sleep hours */
   inactive: boolean;
@@ -164,10 +164,8 @@ export interface Occurrence {
   categoryId: string | null;
   /** per-item color override (hex), carried from the master event; null = derived */
   color: string | null;
-  /** 'event' (normal) or 'context' (a time-block container) */
+  /** 'event' (normal) or 'context' (a Context's time-block on the calendar). */
   kind: EventKind;
-  /** parent context this occurrence is grouped under (master id); null = none */
-  contextId: string | null;
   ownerId: string;
   /** true = only the owner can see it; false (default) = shared */
   isPrivate: boolean;

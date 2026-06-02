@@ -54,8 +54,7 @@ interface FormState {
   startTime: string;
   endDate: string;
   endTime: string;
-  categoryId: string; // "none" | id
-  contextId: string; // "none" | context master id
+  categoryId: string; // "none" | id — the Context this item belongs to / a window paints
   isPrivate: boolean;
   /** own color override (hex); null = derive from category/owner */
   color: string | null;
@@ -68,15 +67,14 @@ export interface EventDialogProps {
   mode: "create" | "edit";
   workspaceId: string;
   currentMemberId: string;
+  /** Contexts (the workspace's categories) an item can belong to / a window can paint. */
   categories: Category[];
-  /** Context master events the user may file an event under. */
-  contexts?: { id: string; title: string }[];
   event?: EventRow | null;
   occurrence?: Occurrence | null;
   defaultStart?: number;
   defaultEnd?: number;
-  /** Pre-selected context when creating an event inside a context backdrop. */
-  defaultContextId?: string | null;
+  /** Pre-selected Context when creating an item inside a context backdrop. */
+  defaultCategoryId?: string | null;
   /** View-only: another member's item — disable inputs and hide save/delete. */
   readOnly?: boolean;
   /** Owner's name, shown in the read-only banner. */
@@ -91,7 +89,6 @@ export function EventDialog(props: EventDialogProps) {
     workspaceId,
     currentMemberId,
     categories,
-    contexts = [],
     event,
     occurrence,
     readOnly = false,
@@ -166,10 +163,8 @@ export function EventDialog(props: EventDialogProps) {
         workspaceId,
         ownerId: currentMemberId,
         kind: form.itemKind,
-        // Contexts never nest; a normal event files under the selected context.
-        contextId:
-          isContext || form.contextId === "none" ? null : form.contextId,
-        categoryId: isContext || form.categoryId === "none" ? null : form.categoryId,
+        // The Context an item belongs to, or the Context a window paints.
+        categoryId: form.categoryId === "none" ? null : form.categoryId,
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
@@ -197,11 +192,7 @@ export function EventDialog(props: EventDialogProps) {
     setPending(true);
     finish(
       await mutations.updateSingle(event.id, {
-        categoryId: isContext || form.categoryId === "none" ? null : form.categoryId,
-        // Only normal events carry a context link; leave a context's own untouched.
-        ...(isContext
-          ? {}
-          : { contextId: form.contextId === "none" ? null : form.contextId }),
+        categoryId: form.categoryId === "none" ? null : form.categoryId,
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
@@ -238,17 +229,14 @@ export function EventDialog(props: EventDialogProps) {
     setScopePrompt(null);
     setPending(true);
 
-    // Context membership and color are both series-level (master columns, no
-    // per-occurrence form). "this"/"future"/"all" govern time/content; these are
-    // applied to the relevant series independently.
-    const selectedContextId = form.contextId === "none" ? null : form.contextId;
-    const ctxChanged = !isContext && selectedContextId !== (event.contextId ?? null);
+    // Color is series-level (a master column, no per-occurrence form), like the
+    // Context membership carried in `patch.categoryId`. "this"/"future"/"all"
+    // govern time/content; the color change is applied to the relevant series.
     const colorChanged = form.color !== (event.color ?? null);
 
     if (scope === "this") {
       // A per-occurrence edit can't carry series-level fields, so apply any
-      // context/color change to the whole series.
-      if (ctxChanged) void mutations.updateSingle(event.id, { contextId: selectedContextId });
+      // color change to the whole series.
       if (colorChanged) void mutations.updateSingle(event.id, { color: form.color });
       finish(await mutations.editThis(event, occurrence.occurrenceDate, patch));
     } else if (scope === "future") {
@@ -257,7 +245,6 @@ export function EventDialog(props: EventDialogProps) {
           event,
           occurrence.occurrenceDate,
           patch,
-          ctxChanged ? selectedContextId : undefined,
           colorChanged ? form.color : undefined,
         ),
       );
@@ -271,7 +258,6 @@ export function EventDialog(props: EventDialogProps) {
           location: patch.location,
           categoryId: patch.categoryId,
           color: form.color,
-          ...(isContext ? {} : { contextId: selectedContextId }),
           allDay: form.allDay,
           inactive: form.inactive,
           start: event.start + delta,
@@ -424,47 +410,24 @@ export function EventDialog(props: EventDialogProps) {
               )}
             </div>
 
-            {!isContext && (
-              <Field>
-                <FieldLabel>Category</FieldLabel>
-                <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="No category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="none">No category</SelectItem>
-                      {usableCategories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
-
-            {!isContext && contexts.length > 0 && (
-              <Field>
-                <FieldLabel>Context</FieldLabel>
-                <Select value={form.contextId} onValueChange={(v) => set("contextId", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="No context" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="none">No context</SelectItem>
-                      {contexts.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.title || "Untitled"}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
+            <Field>
+              <FieldLabel>Context</FieldLabel>
+              <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="No context" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="none">No context</SelectItem>
+                    {usableCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
 
             <Field>
               <FieldLabel htmlFor="ev-color">Color</FieldLabel>
@@ -559,7 +522,7 @@ function recurrenceEndsAt(form: RecurrenceForm | null): number | null {
 }
 
 function buildInitial(props: EventDialogProps, timeZone: string): FormState {
-  const { mode, event, occurrence, defaultStart, defaultEnd, defaultContextId } = props;
+  const { mode, event, occurrence, defaultStart, defaultEnd, defaultCategoryId } = props;
   if (mode === "edit" && event && occurrence) {
     // All-day events are floating dates anchored to UTC midnight: read their
     // date in UTC so the picker shows the same calendar date for every viewer.
@@ -576,7 +539,6 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
       endDate: msToDateInput(occurrence.allDay ? occurrence.end - 1 : occurrence.end, dateZone),
       endTime: msToTimeInput(occurrence.end, timeZone),
       categoryId: occurrence.categoryId ?? "none",
-      contextId: event.contextId ?? "none",
       isPrivate: event.isPrivate,
       color: event.color ?? null,
       recurrence: parseRRule(event.rrule),
@@ -595,8 +557,7 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
     startTime: msToTimeInput(start, timeZone),
     endDate: msToDateInput(end, timeZone),
     endTime: msToTimeInput(end, timeZone),
-    categoryId: "none",
-    contextId: defaultContextId ?? "none",
+    categoryId: defaultCategoryId ?? "none",
     isPrivate: false,
     color: null,
     recurrence: null,

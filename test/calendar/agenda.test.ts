@@ -25,7 +25,6 @@ function occ(start: number, title: string, opts: Partial<Occurrence> = {}): Occu
     categoryId: null,
     color: null,
     kind: "event",
-    contextId: null,
     ownerId: "m",
     isPrivate: false,
     taskId: null,

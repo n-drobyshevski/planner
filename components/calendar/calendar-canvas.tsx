@@ -44,8 +44,10 @@ export interface CanvasProps {
   /** Time-grid: recolor the whole multi-selection. */
   onColorSelected?: (color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
-  onAssignContext?: (occ: Occurrence, contextId: string) => void;
-  onRemoveContext?: (occ: Occurrence) => void;
+  /** Assign an item to a Context (categoryId), or clear it (null). */
+  onAssignCategory?: (occ: Occurrence, categoryId: string | null) => void;
+  /** Contexts the viewer may assign, for the right-click menu. */
+  categoryChoices?: { id: string; name: string }[];
   /** Whether an occurrence is editable (owner-only); others are read-only overlays. */
   canEdit?: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -76,8 +78,8 @@ export function CalendarCanvas(props: CanvasProps) {
     onReschedule,
     onChangeColor,
     onDeleteEvent,
-    onAssignContext,
-    onRemoveContext,
+    onAssignCategory,
+    categoryChoices,
     canEdit = ALWAYS_EDITABLE,
     taskDoneById,
     onToggleTaskDone,
@@ -167,8 +169,8 @@ export function CalendarCanvas(props: CanvasProps) {
       onChangeColor={onChangeColor}
       onColorSelected={props.onColorSelected ?? NOOP}
       onDeleteEvent={onDeleteEvent}
-      onAssignContext={onAssignContext}
-      onRemoveContext={onRemoveContext}
+      onAssignCategory={onAssignCategory}
+      categoryChoices={categoryChoices}
       canEdit={canEdit}
       taskDoneById={taskDoneById}
       onToggleTaskDone={onToggleTaskDone}

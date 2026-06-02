@@ -167,21 +167,21 @@ export function useEventMutations(workspaceId: string | undefined) {
         },
       ),
 
-    assignContext: (eventId: string, contextId: string, prevContextId?: string | null) =>
-      run(m.assignToContext(sb, eventId, contextId), "Added to context", (row) =>
-        prevContextId !== undefined
-          ? inverse("context change", () =>
-              m.updateEvent(sb, eventId, { contextId: prevContextId }, row.updatedAt),
-            )
-          : null,
-      ),
-    removeContext: (eventId: string, prevContextId?: string | null) =>
-      run(m.removeFromContext(sb, eventId), "Removed from context", (row) =>
-        prevContextId !== undefined
-          ? inverse("context change", () =>
-              m.updateEvent(sb, eventId, { contextId: prevContextId }, row.updatedAt),
-            )
-          : null,
+    /** Assign an event to a Context (category), or clear it (categoryId = null). */
+    assignCategory: (
+      eventId: string,
+      categoryId: string | null,
+      prevCategoryId?: string | null,
+    ) =>
+      run(
+        m.updateEvent(sb, eventId, { categoryId }),
+        categoryId ? "Assigned to context" : "Removed from context",
+        (row) =>
+          prevCategoryId !== undefined
+            ? inverse("context change", () =>
+                m.updateEvent(sb, eventId, { categoryId: prevCategoryId }, row.updatedAt),
+              )
+            : null,
       ),
 
     editThis: (event: EventRow, occurrenceMs: number, patch: OccurrencePatch) =>
@@ -198,11 +198,10 @@ export function useEventMutations(workspaceId: string | undefined) {
       event: EventRow,
       occurrenceMs: number,
       patch: OccurrencePatch,
-      contextId?: string | null,
       color?: string | null,
     ) =>
       run(
-        m.splitSeries(sb, event, occurrenceMs, patch, contextId, color),
+        m.splitSeries(sb, event, occurrenceMs, patch, color),
         "This and future updated",
       ),
     editAll: (event: EventRow, patch: OccurrencePatch) =>

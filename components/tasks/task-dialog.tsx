@@ -203,14 +203,14 @@ export function TaskDialog(props: TaskDialogProps) {
               </Field>
 
               <Field>
-                <FieldLabel>Category</FieldLabel>
+                <FieldLabel>Context</FieldLabel>
                 <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="No category" />
+                    <SelectValue placeholder="No context" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="none">No category</SelectItem>
+                      <SelectItem value="none">No context</SelectItem>
                       {usableCategories.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name}

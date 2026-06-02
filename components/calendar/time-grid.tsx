@@ -78,8 +78,8 @@ interface Props {
   /** Recolor the whole multi-selection (context menu on a grouped item). */
   onColorSelected: (color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
-  onAssignContext?: (occ: Occurrence, contextId: string) => void;
-  onRemoveContext?: (occ: Occurrence) => void;
+  onAssignCategory?: (occ: Occurrence, categoryId: string | null) => void;
+  categoryChoices?: { id: string; name: string }[];
   /** Owner-only editability; non-editable blocks are select-only (read-only overlay). */
   canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -154,8 +154,8 @@ export function TimeGrid({
   onChangeColor,
   onColorSelected,
   onDeleteEvent,
-  onAssignContext,
-  onRemoveContext,
+  onAssignCategory,
+  categoryChoices,
   canEdit,
   taskDoneById,
   onToggleTaskDone,
@@ -780,8 +780,8 @@ export function TimeGrid({
                 onChangeColor={onChangeColor}
                 onColorSelected={onColorSelected}
                 onDeleteEvent={onDeleteEvent}
-                onAssignContext={onAssignContext}
-                onRemoveContext={onRemoveContext}
+                onAssignCategory={onAssignCategory}
+                categoryChoices={categoryChoices}
                 canEdit={canEdit}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}

@@ -20,7 +20,6 @@ function occ(over: Partial<Occurrence>): Occurrence {
     categoryId: null,
     color: null,
     kind: "event",
-    contextId: null,
     ownerId: OWNER,
     isPrivate: false,
     taskId: null,
@@ -103,6 +102,28 @@ describe("filterVisible", () => {
         hiddenCategoryIds: new Set(["cat-x"]),
       }),
     ).toEqual([o]);
+  });
+
+  it("hides a context-window backdrop when its painted Context is hidden", () => {
+    const window = occ({ ownerId: OWNER, kind: "context", categoryId: "cat-x" });
+    expect(
+      filterVisible([window], {
+        viewerId: OWNER,
+        overlayMemberIds: none,
+        hiddenCategoryIds: new Set(["cat-x"]),
+      }),
+    ).toEqual([]);
+  });
+
+  it("never hides an unlabeled context window (null categoryId)", () => {
+    const window = occ({ ownerId: OWNER, kind: "context", categoryId: null });
+    expect(
+      filterVisible([window], {
+        viewerId: OWNER,
+        overlayMemberIds: none,
+        hiddenCategoryIds: new Set(["cat-x"]),
+      }),
+    ).toEqual([window]);
   });
 
   it("applies all rules together over a mixed list", () => {
