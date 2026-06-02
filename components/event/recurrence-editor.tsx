@@ -18,6 +18,11 @@ import type { Freq, RecurrenceForm } from "@/lib/recurrence/rrule-build";
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const UNIT: Record<Freq, string> = { DAILY: "day(s)", WEEKLY: "week(s)", MONTHLY: "month(s)" };
 
+// Selected day = filled accent chip (follows the active accent/palette via
+// --primary), overriding the toggle's default muted "on" surface.
+const SELECTED_DAY =
+  "data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground";
+
 function weekdayOf(ms: number): number {
   return (new Date(ms).getDay() + 6) % 7; // Mon=0..Sun=6
 }
@@ -105,7 +110,12 @@ export function RecurrenceEditor({
                     className="justify-start"
                   >
                     {WEEKDAYS.map((d, i) => (
-                      <ToggleGroupItem key={d} value={String(i)} aria-label={d}>
+                      <ToggleGroupItem
+                        key={d}
+                        value={String(i)}
+                        aria-label={d}
+                        className={SELECTED_DAY}
+                      >
                         {d}
                       </ToggleGroupItem>
                     ))}
