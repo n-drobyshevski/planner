@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
 import type { Member, TaskRow } from "@/lib/types";
 
@@ -65,7 +66,7 @@ export const TaskCard = forwardRef<
   return (
     <div
       ref={ref}
-      style={{ ...style, borderInlineStartColor: color }}
+      style={{ ...style, borderInlineStartColor: toPaletteColor(color) }}
       onClick={onOpen}
       className={cn(
         "group/card relative flex gap-2.5 rounded-md border border-l-4 bg-card p-2.5 text-left shadow-soft",
@@ -145,7 +146,7 @@ export const TaskCard = forwardRef<
       {assignee && (
         <Avatar className="size-6 shrink-0" title={assignee.name}>
           <AvatarFallback
-            style={{ backgroundColor: assignee.color, color: "#fff" }}
+            style={{ backgroundColor: toPaletteColor(assignee.color), color: toPaletteInk(assignee.color) }}
             className="text-[10px] font-semibold"
           >
             {assignee.name.slice(0, 1).toUpperCase()}

@@ -6,12 +6,12 @@ import { ACCENTS } from "@/lib/theme/appearance";
 
 /**
  * The selectable colors for events/tasks. Derived from the appearance ACCENTS so
- * per-item colors stay on-brand and (like the resolver fallbacks) read as
- * WCAG-AA on the white text used by event blocks.
+ * per-item colors stay on-brand. We store the default-palette hex (`value`) but
+ * render the dot from `var(--swatch-<id>)`, so picks re-tint with the active
+ * Catppuccin flavor — same as the resolved item colors (see toPaletteColor).
  */
-export const SWATCHES: readonly { value: string; label: string }[] = ACCENTS.map(
-  (a) => ({ value: a.swatch, label: a.label }),
-);
+export const SWATCHES: readonly { id: string; value: string; label: string }[] =
+  ACCENTS.map((a) => ({ id: a.id, value: a.swatch, label: a.label }));
 
 /**
  * A small grid of color swatches plus a "Default" chip that clears the override
@@ -55,14 +55,19 @@ export function ColorSwatchPicker({
             aria-label={s.label}
             aria-pressed={selected}
             title={s.label}
-            style={{ backgroundColor: s.value }}
+            style={{ backgroundColor: `var(--swatch-${s.id})` }}
             className={cn(
-              "flex size-7 items-center justify-center rounded-full text-white",
+              "flex size-7 items-center justify-center rounded-full",
               "transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               selected && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
             )}
           >
-            {selected && <Check className="size-4" />}
+            {selected && (
+              <Check
+                className="size-4"
+                style={{ color: `var(--swatch-ink-${s.id}, var(--swatch-ink))` }}
+              />
+            )}
           </button>
         );
       })}

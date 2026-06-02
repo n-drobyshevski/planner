@@ -29,6 +29,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { ColorSwatchPicker } from "@/components/shared/color-swatch-picker";
 import { formatOccurrenceWhen, formatDayMonth } from "@/lib/datetime/format";
 import { parseRRule, summarizeRecurrence } from "@/lib/recurrence/rrule-build";
+import { toPaletteColor } from "@/lib/theme/appearance";
 import type { EventRow, Occurrence, TaskRow } from "@/lib/types";
 
 const TASK_STATUS_LABEL: Record<TaskRow["status"], string> = {
@@ -92,7 +93,7 @@ export function EventDetails({
           <ResponsiveDialogTitle className="flex items-center gap-2">
             <span
               className="size-3 shrink-0 rounded-[4px]"
-              style={{ backgroundColor: color }}
+              style={{ backgroundColor: toPaletteColor(color) }}
               aria-hidden
             />
             <span className="min-w-0 truncate">{occurrence.title || "Untitled"}</span>

@@ -6,6 +6,7 @@ import { formatTime } from "@/lib/datetime/format";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import {
   HOUR_PX,
@@ -481,9 +482,9 @@ export function TimeGrid({
                     <button
                       type="button"
                       onClick={() => onSelect(o)}
-                      style={{ backgroundColor: colorOf(o) }}
+                      style={{ backgroundColor: toPaletteColor(colorOf(o)), color: toPaletteInk(colorOf(o)) }}
                       className={cn(
-                        "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium text-white",
+                        "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium",
                         selectedKey === o.key && "ring-2 ring-foreground",
                         o.inactive && "opacity-55 grayscale",
                       )}

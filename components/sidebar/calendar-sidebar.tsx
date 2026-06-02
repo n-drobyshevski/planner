@@ -37,6 +37,7 @@ import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-wi
 import { qk } from "@/lib/supabase/query-keys";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { toPaletteColor } from "@/lib/theme/appearance";
 import type { Member, Category } from "@/lib/types";
 
 const PALETTE = ["#c0492a", "#0f766e", "#b45309", "#15803d", "#0369a1", "#be185d", "#7c3aed"];
@@ -81,8 +82,8 @@ const ToggleRow = React.forwardRef<
         <span
           className="size-3.5 shrink-0 rounded-[4px] border-2"
           style={{
-            backgroundColor: active ? color : "transparent",
-            borderColor: color,
+            backgroundColor: active ? toPaletteColor(color) : "transparent",
+            borderColor: toPaletteColor(color),
           }}
         />
         <span className={cn("truncate", !active && "text-muted-foreground line-through")}>
@@ -112,7 +113,7 @@ const LegendRow = React.forwardRef<
       <span className="flex min-h-11 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm md:min-h-0">
         <span
           className="size-3.5 shrink-0 rounded-[4px]"
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: toPaletteColor(color) }}
         />
         <span className="truncate">{label}</span>
       </span>
@@ -427,7 +428,7 @@ function AddCategoryPopover({ workspaceId }: { workspaceId: string }) {
                   "size-6 rounded-full ring-offset-2 ring-offset-popover",
                   color === c && "ring-2 ring-foreground",
                 )}
-                style={{ backgroundColor: c }}
+                style={{ backgroundColor: toPaletteColor(c) }}
               />
             ))}
           </div>

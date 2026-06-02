@@ -5,6 +5,7 @@ import { formatTime } from "@/lib/datetime/format";
 import { CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
+import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import type { Occurrence } from "@/lib/types";
 
 /**
@@ -39,9 +40,9 @@ export const EventBlock = forwardRef<
     <div
       ref={ref}
       data-occ-key={occ.key}
-      style={{ ...style, backgroundColor: color }}
+      style={{ ...style, backgroundColor: toPaletteColor(color), color: toPaletteInk(color) }}
       className={cn(
-        "absolute z-10 flex touch-none flex-col overflow-hidden rounded-md px-1.5 py-1 text-left text-xs text-white shadow-soft select-none",
+        "absolute z-10 flex touch-none flex-col overflow-hidden rounded-md px-1.5 py-1 text-left text-xs shadow-soft select-none",
         editable ? "cursor-grab" : "cursor-pointer",
         selected && "z-20 ring-2 ring-foreground",
         occ.inactive && "opacity-55 grayscale",

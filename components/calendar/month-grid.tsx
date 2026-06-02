@@ -6,6 +6,7 @@ import { formatTime } from "@/lib/datetime/format";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import { packMonthWeek, occurrencesOnDay, type MonthItem } from "@/lib/layout/pack-month";
 import type { Occurrence } from "@/lib/types";
@@ -206,10 +207,10 @@ const MonthItemEl = forwardRef<
       <button
         ref={ref}
         type="button"
-        style={{ ...style, backgroundColor: color }}
+        style={{ ...style, backgroundColor: toPaletteColor(color), color: toPaletteInk(color) }}
         onClick={() => onSelect(item.occ)}
         className={cn(
-          "pointer-events-auto mx-1 truncate rounded px-1.5 text-left text-xs leading-5 text-white",
+          "pointer-events-auto mx-1 truncate rounded px-1.5 text-left text-xs leading-5",
           selected && "ring-2 ring-foreground",
           item.occ.inactive && "opacity-55 grayscale",
           className,
@@ -237,7 +238,7 @@ const MonthItemEl = forwardRef<
     >
       <span
         className="size-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: toPaletteColor(color) }}
       />
       <span className="truncate text-foreground">{item.occ.title}</span>
     </button>
@@ -285,7 +286,7 @@ function MoreButton({
             >
               <span
                 className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: colorOf(o) }}
+                style={{ backgroundColor: toPaletteColor(colorOf(o)) }}
               />
               <span className="truncate">{o.title}</span>
               {!o.allDay && (

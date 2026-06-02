@@ -108,6 +108,27 @@
   --sidebar-accent-foreground: #292524;
   --sidebar-border: #e7e0d7;
   --sidebar-ring: #c0492a;
+
+  /* The 14 accent swatches — picker dots AND (via toPaletteColor) event/task/
+     category/member colors. Catppuccin palette blocks remap these so everything
+     re-tints to the active flavor; in the default palette they stay these warm
+     hexes (so rendering is unchanged). --swatch-ink is the legible text/check
+     color over a filled swatch (white here; flavors use their dark crust). */
+  --swatch-rosewater: #b0645a;
+  --swatch-flamingo: #bf5d5d;
+  --swatch-pink: #be185d;
+  --swatch-mauve: #7c3aed;
+  --swatch-red: #c62828;
+  --swatch-maroon: #a23a4a;
+  --swatch-peach: #c0492a;
+  --swatch-yellow: #b45309;
+  --swatch-green: #15803d;
+  --swatch-teal: #0f766e;
+  --swatch-sky: #0e7490;
+  --swatch-sapphire: #1668a8;
+  --swatch-blue: #0369a1;
+  --swatch-lavender: #6d5dd6;
+  --swatch-ink: #ffffff;
 }
 
 .dark {
@@ -153,28 +174,72 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Accent presets — user-selectable brand color (Settings → Appearance).
+   Accent presets — the 14 Catppuccin accent colors (Settings → Appearance).
    Each preset overrides ONLY the brand-color token group (primary + ring +
-   sidebar-primary), leaving surfaces to the tone presets below. `terracotta`
-   is the default and lives in :root / .dark, so it needs no block here.
-   Light values are tuned for white text; dark values for dark ink (#292524),
-   both passing WCAG AA. Both a light `[data-accent]` and a higher-specificity
-   `.dark[data-accent]` block are defined so the dark value wins in dark mode.
+   sidebar-primary), leaving surfaces to the tone presets below. `peach` (the
+   warm brand terracotta) is the default and lives in :root / .dark, so it needs
+   no block here. Light values are tuned for white text; dark values for dark ink
+   (#292524). A higher-specificity `.dark[data-accent]` block wins in dark mode.
 --------------------------------------------------------------------------- */
-[data-accent="teal"] {
-  --primary: #0f766e; --primary-foreground: #ffffff; --ring: #0f766e;
-  --sidebar-primary: #0f766e; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #0f766e;
+[data-accent="rosewater"] {
+  --primary: #b0645a; --primary-foreground: #ffffff; --ring: #b0645a;
+  --sidebar-primary: #b0645a; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #b0645a;
 }
-.dark[data-accent="teal"] {
-  --primary: #2dd4bf; --primary-foreground: #292524; --ring: #2dd4bf;
-  --sidebar-primary: #2dd4bf; --sidebar-primary-foreground: #292524; --sidebar-ring: #2dd4bf;
+.dark[data-accent="rosewater"] {
+  --primary: #f0b8aa; --primary-foreground: #292524; --ring: #f0b8aa;
+  --sidebar-primary: #f0b8aa; --sidebar-primary-foreground: #292524; --sidebar-ring: #f0b8aa;
 }
 
-[data-accent="amber"] {
+[data-accent="flamingo"] {
+  --primary: #bf5d5d; --primary-foreground: #ffffff; --ring: #bf5d5d;
+  --sidebar-primary: #bf5d5d; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #bf5d5d;
+}
+.dark[data-accent="flamingo"] {
+  --primary: #f3a8a8; --primary-foreground: #292524; --ring: #f3a8a8;
+  --sidebar-primary: #f3a8a8; --sidebar-primary-foreground: #292524; --sidebar-ring: #f3a8a8;
+}
+
+[data-accent="pink"] {
+  --primary: #be185d; --primary-foreground: #ffffff; --ring: #be185d;
+  --sidebar-primary: #be185d; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #be185d;
+}
+.dark[data-accent="pink"] {
+  --primary: #fb7185; --primary-foreground: #292524; --ring: #fb7185;
+  --sidebar-primary: #fb7185; --sidebar-primary-foreground: #292524; --sidebar-ring: #fb7185;
+}
+
+[data-accent="mauve"] {
+  --primary: #7c3aed; --primary-foreground: #ffffff; --ring: #7c3aed;
+  --sidebar-primary: #7c3aed; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #7c3aed;
+}
+.dark[data-accent="mauve"] {
+  --primary: #c4b5fd; --primary-foreground: #292524; --ring: #c4b5fd;
+  --sidebar-primary: #c4b5fd; --sidebar-primary-foreground: #292524; --sidebar-ring: #c4b5fd;
+}
+
+[data-accent="red"] {
+  --primary: #c62828; --primary-foreground: #ffffff; --ring: #c62828;
+  --sidebar-primary: #c62828; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #c62828;
+}
+.dark[data-accent="red"] {
+  --primary: #f87a7a; --primary-foreground: #292524; --ring: #f87a7a;
+  --sidebar-primary: #f87a7a; --sidebar-primary-foreground: #292524; --sidebar-ring: #f87a7a;
+}
+
+[data-accent="maroon"] {
+  --primary: #a23a4a; --primary-foreground: #ffffff; --ring: #a23a4a;
+  --sidebar-primary: #a23a4a; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #a23a4a;
+}
+.dark[data-accent="maroon"] {
+  --primary: #ec96a2; --primary-foreground: #292524; --ring: #ec96a2;
+  --sidebar-primary: #ec96a2; --sidebar-primary-foreground: #292524; --sidebar-ring: #ec96a2;
+}
+
+[data-accent="yellow"] {
   --primary: #b45309; --primary-foreground: #ffffff; --ring: #b45309;
   --sidebar-primary: #b45309; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #b45309;
 }
-.dark[data-accent="amber"] {
+.dark[data-accent="yellow"] {
   --primary: #fbbf24; --primary-foreground: #292524; --ring: #fbbf24;
   --sidebar-primary: #fbbf24; --sidebar-primary-foreground: #292524; --sidebar-ring: #fbbf24;
 }
@@ -188,6 +253,33 @@
   --sidebar-primary: #4ade80; --sidebar-primary-foreground: #292524; --sidebar-ring: #4ade80;
 }
 
+[data-accent="teal"] {
+  --primary: #0f766e; --primary-foreground: #ffffff; --ring: #0f766e;
+  --sidebar-primary: #0f766e; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #0f766e;
+}
+.dark[data-accent="teal"] {
+  --primary: #2dd4bf; --primary-foreground: #292524; --ring: #2dd4bf;
+  --sidebar-primary: #2dd4bf; --sidebar-primary-foreground: #292524; --sidebar-ring: #2dd4bf;
+}
+
+[data-accent="sky"] {
+  --primary: #0e7490; --primary-foreground: #ffffff; --ring: #0e7490;
+  --sidebar-primary: #0e7490; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #0e7490;
+}
+.dark[data-accent="sky"] {
+  --primary: #3cc6ec; --primary-foreground: #292524; --ring: #3cc6ec;
+  --sidebar-primary: #3cc6ec; --sidebar-primary-foreground: #292524; --sidebar-ring: #3cc6ec;
+}
+
+[data-accent="sapphire"] {
+  --primary: #1668a8; --primary-foreground: #ffffff; --ring: #1668a8;
+  --sidebar-primary: #1668a8; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #1668a8;
+}
+.dark[data-accent="sapphire"] {
+  --primary: #54b6ea; --primary-foreground: #292524; --ring: #54b6ea;
+  --sidebar-primary: #54b6ea; --sidebar-primary-foreground: #292524; --sidebar-ring: #54b6ea;
+}
+
 [data-accent="blue"] {
   --primary: #0369a1; --primary-foreground: #ffffff; --ring: #0369a1;
   --sidebar-primary: #0369a1; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #0369a1;
@@ -197,22 +289,13 @@
   --sidebar-primary: #38bdf8; --sidebar-primary-foreground: #292524; --sidebar-ring: #38bdf8;
 }
 
-[data-accent="rose"] {
-  --primary: #be185d; --primary-foreground: #ffffff; --ring: #be185d;
-  --sidebar-primary: #be185d; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #be185d;
+[data-accent="lavender"] {
+  --primary: #6d5dd6; --primary-foreground: #ffffff; --ring: #6d5dd6;
+  --sidebar-primary: #6d5dd6; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #6d5dd6;
 }
-.dark[data-accent="rose"] {
-  --primary: #fb7185; --primary-foreground: #292524; --ring: #fb7185;
-  --sidebar-primary: #fb7185; --sidebar-primary-foreground: #292524; --sidebar-ring: #fb7185;
-}
-
-[data-accent="violet"] {
-  --primary: #7c3aed; --primary-foreground: #ffffff; --ring: #7c3aed;
-  --sidebar-primary: #7c3aed; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #7c3aed;
-}
-.dark[data-accent="violet"] {
-  --primary: #c4b5fd; --primary-foreground: #292524; --ring: #c4b5fd;
-  --sidebar-primary: #c4b5fd; --sidebar-primary-foreground: #292524; --sidebar-ring: #c4b5fd;
+.dark[data-accent="lavender"] {
+  --primary: #c7c2fd; --primary-foreground: #292524; --ring: #c7c2fd;
+  --sidebar-primary: #c7c2fd; --sidebar-primary-foreground: #292524; --sidebar-ring: #c7c2fd;
 }
 
 /* ---------------------------------------------------------------------------
@@ -288,193 +371,149 @@
    keeping the accent picker live inside Catppuccin.
 =========================================================================== */
 
-/* ---- Latte (light). Accent foreground favors best-available contrast:
-   cool/saturated accents take light ink (base), warm/vivid ones take dark ink. */
+/* ---- Latte (light). Each base block defines all 14 --swatch-<name> (the
+   flavor's literal accent hexes) + --swatch-ink; these drive the accent picker
+   AND, via toPaletteColor(), every event/task/category/member color. The block's
+   default --primary is peach (the DEFAULT_ACCENT); other accents come from the
+   shared [data-palette^="catppuccin-"][data-accent] blocks below. */
 [data-palette="catppuccin-latte"] {
   --background:#e6e9ef; --foreground:#4c4f69;
   --card:#eff1f5; --card-foreground:#4c4f69;
   --popover:#eff1f5; --popover-foreground:#4c4f69;
-  --primary:#8839ef; --primary-foreground:#eff1f5;
+  --primary:var(--swatch-peach); --primary-foreground:var(--swatch-ink-peach, var(--swatch-ink));
   --secondary:#ccd0da; --secondary-foreground:#4c4f69;
   --muted:#ccd0da; --muted-foreground:#6c6f85;
   --accent:#ccd0da; --accent-foreground:#4c4f69;
   --destructive:#d20f39;
-  --border:#ccd0da; --input:#bcc0cc; --ring:#8839ef;
+  --border:#ccd0da; --input:#bcc0cc; --ring:var(--swatch-peach);
+  --swatch-rosewater:#dc8a78; --swatch-flamingo:#dd7878; --swatch-pink:#ea76cb; --swatch-mauve:#8839ef; --swatch-red:#d20f39; --swatch-maroon:#e64553; --swatch-peach:#fe640b; --swatch-yellow:#df8e1d; --swatch-green:#40a02b; --swatch-teal:#179299; --swatch-sky:#04a5e5; --swatch-sapphire:#209fb5; --swatch-blue:#1e66f5; --swatch-lavender:#7287fd; --swatch-ink:#ffffff;
+  /* Latte is light: most accents need near-black ink for AA (mauve/red/blue keep
+     white via the --swatch-ink fallback). Used by buttons, chips, avatars, checks. */
+  --swatch-ink-rosewater:#11111b; --swatch-ink-flamingo:#11111b; --swatch-ink-pink:#11111b; --swatch-ink-maroon:#11111b; --swatch-ink-peach:#11111b; --swatch-ink-yellow:#11111b; --swatch-ink-green:#11111b; --swatch-ink-teal:#11111b; --swatch-ink-sky:#11111b; --swatch-ink-sapphire:#11111b; --swatch-ink-lavender:#11111b;
   --member-a:#1e66f5; --member-b:#40a02b; --event-shared:#fe640b;
   --chart-1:#8839ef; --chart-2:#1e66f5; --chart-3:#40a02b; --chart-4:#fe640b; --chart-5:#179299;
   --sidebar:#dce0e8; --sidebar-foreground:#4c4f69;
-  --sidebar-primary:#8839ef; --sidebar-primary-foreground:#eff1f5;
+  --sidebar-primary:var(--swatch-peach); --sidebar-primary-foreground:var(--swatch-ink-peach, var(--swatch-ink));
   --sidebar-accent:#ccd0da; --sidebar-accent-foreground:#4c4f69;
-  --sidebar-border:#ccd0da; --sidebar-ring:#8839ef;
-}
-[data-palette="catppuccin-latte"][data-accent="terracotta"] {
-  --primary:#fe640b; --primary-foreground:#4c4f69; --ring:#fe640b;
-  --sidebar-primary:#fe640b; --sidebar-primary-foreground:#4c4f69; --sidebar-ring:#fe640b;
-}
-[data-palette="catppuccin-latte"][data-accent="amber"] {
-  --primary:#df8e1d; --primary-foreground:#4c4f69; --ring:#df8e1d;
-  --sidebar-primary:#df8e1d; --sidebar-primary-foreground:#4c4f69; --sidebar-ring:#df8e1d;
-}
-[data-palette="catppuccin-latte"][data-accent="rose"] {
-  --primary:#ea76cb; --primary-foreground:#4c4f69; --ring:#ea76cb;
-  --sidebar-primary:#ea76cb; --sidebar-primary-foreground:#4c4f69; --sidebar-ring:#ea76cb;
-}
-[data-palette="catppuccin-latte"][data-accent="violet"] {
-  --primary:#8839ef; --primary-foreground:#eff1f5; --ring:#8839ef;
-  --sidebar-primary:#8839ef; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#8839ef;
-}
-[data-palette="catppuccin-latte"][data-accent="blue"] {
-  --primary:#1e66f5; --primary-foreground:#eff1f5; --ring:#1e66f5;
-  --sidebar-primary:#1e66f5; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#1e66f5;
-}
-[data-palette="catppuccin-latte"][data-accent="teal"] {
-  --primary:#179299; --primary-foreground:#eff1f5; --ring:#179299;
-  --sidebar-primary:#179299; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#179299;
-}
-[data-palette="catppuccin-latte"][data-accent="green"] {
-  --primary:#40a02b; --primary-foreground:#eff1f5; --ring:#40a02b;
-  --sidebar-primary:#40a02b; --sidebar-primary-foreground:#eff1f5; --sidebar-ring:#40a02b;
+  --sidebar-border:#ccd0da; --sidebar-ring:var(--swatch-peach);
 }
 
-/* ---- Frappé (dark). All accents are pastel → dark ink (crust). */
+/* ---- Frappé (dark). */
 [data-palette="catppuccin-frappe"] {
   --background:#292c3c; --foreground:#c6d0f5;
   --card:#303446; --card-foreground:#c6d0f5;
   --popover:#303446; --popover-foreground:#c6d0f5;
-  --primary:#ca9ee6; --primary-foreground:#232634;
+  --primary:var(--swatch-peach); --primary-foreground:var(--swatch-ink);
   --secondary:#414559; --secondary-foreground:#c6d0f5;
   --muted:#414559; --muted-foreground:#a5adce;
   --accent:#414559; --accent-foreground:#c6d0f5;
   --destructive:#e78284;
-  --border:#414559; --input:#51576d; --ring:#ca9ee6;
+  --border:#414559; --input:#51576d; --ring:var(--swatch-peach);
+  --swatch-rosewater:#f2d5cf; --swatch-flamingo:#eebebe; --swatch-pink:#f4b8e4; --swatch-mauve:#ca9ee6; --swatch-red:#e78284; --swatch-maroon:#ea999c; --swatch-peach:#ef9f76; --swatch-yellow:#e5c890; --swatch-green:#a6d189; --swatch-teal:#81c8be; --swatch-sky:#99d1db; --swatch-sapphire:#85c1dc; --swatch-blue:#8caaee; --swatch-lavender:#babbf1; --swatch-ink:#232634;
   --member-a:#8caaee; --member-b:#a6d189; --event-shared:#ef9f76;
   --chart-1:#ca9ee6; --chart-2:#8caaee; --chart-3:#a6d189; --chart-4:#ef9f76; --chart-5:#81c8be;
   --sidebar:#232634; --sidebar-foreground:#c6d0f5;
-  --sidebar-primary:#ca9ee6; --sidebar-primary-foreground:#232634;
+  --sidebar-primary:var(--swatch-peach); --sidebar-primary-foreground:var(--swatch-ink);
   --sidebar-accent:#414559; --sidebar-accent-foreground:#c6d0f5;
-  --sidebar-border:#414559; --sidebar-ring:#ca9ee6;
-}
-[data-palette="catppuccin-frappe"][data-accent="terracotta"] {
-  --primary:#ef9f76; --primary-foreground:#232634; --ring:#ef9f76;
-  --sidebar-primary:#ef9f76; --sidebar-primary-foreground:#232634; --sidebar-ring:#ef9f76;
-}
-[data-palette="catppuccin-frappe"][data-accent="amber"] {
-  --primary:#e5c890; --primary-foreground:#232634; --ring:#e5c890;
-  --sidebar-primary:#e5c890; --sidebar-primary-foreground:#232634; --sidebar-ring:#e5c890;
-}
-[data-palette="catppuccin-frappe"][data-accent="rose"] {
-  --primary:#f4b8e4; --primary-foreground:#232634; --ring:#f4b8e4;
-  --sidebar-primary:#f4b8e4; --sidebar-primary-foreground:#232634; --sidebar-ring:#f4b8e4;
-}
-[data-palette="catppuccin-frappe"][data-accent="violet"] {
-  --primary:#ca9ee6; --primary-foreground:#232634; --ring:#ca9ee6;
-  --sidebar-primary:#ca9ee6; --sidebar-primary-foreground:#232634; --sidebar-ring:#ca9ee6;
-}
-[data-palette="catppuccin-frappe"][data-accent="blue"] {
-  --primary:#8caaee; --primary-foreground:#232634; --ring:#8caaee;
-  --sidebar-primary:#8caaee; --sidebar-primary-foreground:#232634; --sidebar-ring:#8caaee;
-}
-[data-palette="catppuccin-frappe"][data-accent="teal"] {
-  --primary:#81c8be; --primary-foreground:#232634; --ring:#81c8be;
-  --sidebar-primary:#81c8be; --sidebar-primary-foreground:#232634; --sidebar-ring:#81c8be;
-}
-[data-palette="catppuccin-frappe"][data-accent="green"] {
-  --primary:#a6d189; --primary-foreground:#232634; --ring:#a6d189;
-  --sidebar-primary:#a6d189; --sidebar-primary-foreground:#232634; --sidebar-ring:#a6d189;
+  --sidebar-border:#414559; --sidebar-ring:var(--swatch-peach);
 }
 
-/* ---- Macchiato (dark). All accents are pastel → dark ink (crust). */
+/* ---- Macchiato (dark). */
 [data-palette="catppuccin-macchiato"] {
   --background:#1e2030; --foreground:#cad3f5;
   --card:#24273a; --card-foreground:#cad3f5;
   --popover:#24273a; --popover-foreground:#cad3f5;
-  --primary:#c6a0f6; --primary-foreground:#181926;
+  --primary:var(--swatch-peach); --primary-foreground:var(--swatch-ink);
   --secondary:#363a4f; --secondary-foreground:#cad3f5;
   --muted:#363a4f; --muted-foreground:#a5adcb;
   --accent:#363a4f; --accent-foreground:#cad3f5;
   --destructive:#ed8796;
-  --border:#363a4f; --input:#494d64; --ring:#c6a0f6;
+  --border:#363a4f; --input:#494d64; --ring:var(--swatch-peach);
+  --swatch-rosewater:#f4dbd6; --swatch-flamingo:#f0c6c6; --swatch-pink:#f5bde6; --swatch-mauve:#c6a0f6; --swatch-red:#ed8796; --swatch-maroon:#ee99a0; --swatch-peach:#f5a97f; --swatch-yellow:#eed49f; --swatch-green:#a6da95; --swatch-teal:#8bd5ca; --swatch-sky:#91d7e3; --swatch-sapphire:#7dc4e4; --swatch-blue:#8aadf4; --swatch-lavender:#b7bdf8; --swatch-ink:#181926;
   --member-a:#8aadf4; --member-b:#a6da95; --event-shared:#f5a97f;
   --chart-1:#c6a0f6; --chart-2:#8aadf4; --chart-3:#a6da95; --chart-4:#f5a97f; --chart-5:#8bd5ca;
   --sidebar:#181926; --sidebar-foreground:#cad3f5;
-  --sidebar-primary:#c6a0f6; --sidebar-primary-foreground:#181926;
+  --sidebar-primary:var(--swatch-peach); --sidebar-primary-foreground:var(--swatch-ink);
   --sidebar-accent:#363a4f; --sidebar-accent-foreground:#cad3f5;
-  --sidebar-border:#363a4f; --sidebar-ring:#c6a0f6;
-}
-[data-palette="catppuccin-macchiato"][data-accent="terracotta"] {
-  --primary:#f5a97f; --primary-foreground:#181926; --ring:#f5a97f;
-  --sidebar-primary:#f5a97f; --sidebar-primary-foreground:#181926; --sidebar-ring:#f5a97f;
-}
-[data-palette="catppuccin-macchiato"][data-accent="amber"] {
-  --primary:#eed49f; --primary-foreground:#181926; --ring:#eed49f;
-  --sidebar-primary:#eed49f; --sidebar-primary-foreground:#181926; --sidebar-ring:#eed49f;
-}
-[data-palette="catppuccin-macchiato"][data-accent="rose"] {
-  --primary:#f5bde6; --primary-foreground:#181926; --ring:#f5bde6;
-  --sidebar-primary:#f5bde6; --sidebar-primary-foreground:#181926; --sidebar-ring:#f5bde6;
-}
-[data-palette="catppuccin-macchiato"][data-accent="violet"] {
-  --primary:#c6a0f6; --primary-foreground:#181926; --ring:#c6a0f6;
-  --sidebar-primary:#c6a0f6; --sidebar-primary-foreground:#181926; --sidebar-ring:#c6a0f6;
-}
-[data-palette="catppuccin-macchiato"][data-accent="blue"] {
-  --primary:#8aadf4; --primary-foreground:#181926; --ring:#8aadf4;
-  --sidebar-primary:#8aadf4; --sidebar-primary-foreground:#181926; --sidebar-ring:#8aadf4;
-}
-[data-palette="catppuccin-macchiato"][data-accent="teal"] {
-  --primary:#8bd5ca; --primary-foreground:#181926; --ring:#8bd5ca;
-  --sidebar-primary:#8bd5ca; --sidebar-primary-foreground:#181926; --sidebar-ring:#8bd5ca;
-}
-[data-palette="catppuccin-macchiato"][data-accent="green"] {
-  --primary:#a6da95; --primary-foreground:#181926; --ring:#a6da95;
-  --sidebar-primary:#a6da95; --sidebar-primary-foreground:#181926; --sidebar-ring:#a6da95;
+  --sidebar-border:#363a4f; --sidebar-ring:var(--swatch-peach);
 }
 
-/* ---- Mocha (dark). All accents are pastel → dark ink (crust). */
+/* ---- Mocha (dark). */
 [data-palette="catppuccin-mocha"] {
   --background:#181825; --foreground:#cdd6f4;
   --card:#1e1e2e; --card-foreground:#cdd6f4;
   --popover:#1e1e2e; --popover-foreground:#cdd6f4;
-  --primary:#cba6f7; --primary-foreground:#11111b;
+  --primary:var(--swatch-peach); --primary-foreground:var(--swatch-ink);
   --secondary:#313244; --secondary-foreground:#cdd6f4;
   --muted:#313244; --muted-foreground:#a6adc8;
   --accent:#313244; --accent-foreground:#cdd6f4;
   --destructive:#f38ba8;
-  --border:#313244; --input:#45475a; --ring:#cba6f7;
+  --border:#313244; --input:#45475a; --ring:var(--swatch-peach);
+  --swatch-rosewater:#f5e0dc; --swatch-flamingo:#f2cdcd; --swatch-pink:#f5c2e7; --swatch-mauve:#cba6f7; --swatch-red:#f38ba8; --swatch-maroon:#eba0ac; --swatch-peach:#fab387; --swatch-yellow:#f9e2af; --swatch-green:#a6e3a1; --swatch-teal:#94e2d5; --swatch-sky:#89dceb; --swatch-sapphire:#74c7ec; --swatch-blue:#89b4fa; --swatch-lavender:#b4befe; --swatch-ink:#11111b;
   --member-a:#89b4fa; --member-b:#a6e3a1; --event-shared:#fab387;
   --chart-1:#cba6f7; --chart-2:#89b4fa; --chart-3:#a6e3a1; --chart-4:#fab387; --chart-5:#94e2d5;
   --sidebar:#11111b; --sidebar-foreground:#cdd6f4;
-  --sidebar-primary:#cba6f7; --sidebar-primary-foreground:#11111b;
+  --sidebar-primary:var(--swatch-peach); --sidebar-primary-foreground:var(--swatch-ink);
   --sidebar-accent:#313244; --sidebar-accent-foreground:#cdd6f4;
-  --sidebar-border:#313244; --sidebar-ring:#cba6f7;
+  --sidebar-border:#313244; --sidebar-ring:var(--swatch-peach);
 }
-[data-palette="catppuccin-mocha"][data-accent="terracotta"] {
-  --primary:#fab387; --primary-foreground:#11111b; --ring:#fab387;
-  --sidebar-primary:#fab387; --sidebar-primary-foreground:#11111b; --sidebar-ring:#fab387;
+
+/* Accent overrides for ALL four flavors at once: --primary follows the active
+   flavor's --swatch-<accent>, foreground uses its --swatch-ink. The starts-with
+   selector keeps these flavor-agnostic; placed AFTER the default .dark[data-accent]
+   blocks so the (0,2,0) tie resolves here. `peach` is the default (the base block
+   above), so it needs no override. */
+[data-palette^="catppuccin-"][data-accent="rosewater"] {
+  --primary:var(--swatch-rosewater); --primary-foreground:var(--swatch-ink-rosewater, var(--swatch-ink)); --ring:var(--swatch-rosewater);
+  --sidebar-primary:var(--swatch-rosewater); --sidebar-primary-foreground:var(--swatch-ink-rosewater, var(--swatch-ink)); --sidebar-ring:var(--swatch-rosewater);
 }
-[data-palette="catppuccin-mocha"][data-accent="amber"] {
-  --primary:#f9e2af; --primary-foreground:#11111b; --ring:#f9e2af;
-  --sidebar-primary:#f9e2af; --sidebar-primary-foreground:#11111b; --sidebar-ring:#f9e2af;
+[data-palette^="catppuccin-"][data-accent="flamingo"] {
+  --primary:var(--swatch-flamingo); --primary-foreground:var(--swatch-ink-flamingo, var(--swatch-ink)); --ring:var(--swatch-flamingo);
+  --sidebar-primary:var(--swatch-flamingo); --sidebar-primary-foreground:var(--swatch-ink-flamingo, var(--swatch-ink)); --sidebar-ring:var(--swatch-flamingo);
 }
-[data-palette="catppuccin-mocha"][data-accent="rose"] {
-  --primary:#f5c2e7; --primary-foreground:#11111b; --ring:#f5c2e7;
-  --sidebar-primary:#f5c2e7; --sidebar-primary-foreground:#11111b; --sidebar-ring:#f5c2e7;
+[data-palette^="catppuccin-"][data-accent="pink"] {
+  --primary:var(--swatch-pink); --primary-foreground:var(--swatch-ink-pink, var(--swatch-ink)); --ring:var(--swatch-pink);
+  --sidebar-primary:var(--swatch-pink); --sidebar-primary-foreground:var(--swatch-ink-pink, var(--swatch-ink)); --sidebar-ring:var(--swatch-pink);
 }
-[data-palette="catppuccin-mocha"][data-accent="violet"] {
-  --primary:#cba6f7; --primary-foreground:#11111b; --ring:#cba6f7;
-  --sidebar-primary:#cba6f7; --sidebar-primary-foreground:#11111b; --sidebar-ring:#cba6f7;
+[data-palette^="catppuccin-"][data-accent="mauve"] {
+  --primary:var(--swatch-mauve); --primary-foreground:var(--swatch-ink-mauve, var(--swatch-ink)); --ring:var(--swatch-mauve);
+  --sidebar-primary:var(--swatch-mauve); --sidebar-primary-foreground:var(--swatch-ink-mauve, var(--swatch-ink)); --sidebar-ring:var(--swatch-mauve);
 }
-[data-palette="catppuccin-mocha"][data-accent="blue"] {
-  --primary:#89b4fa; --primary-foreground:#11111b; --ring:#89b4fa;
-  --sidebar-primary:#89b4fa; --sidebar-primary-foreground:#11111b; --sidebar-ring:#89b4fa;
+[data-palette^="catppuccin-"][data-accent="red"] {
+  --primary:var(--swatch-red); --primary-foreground:var(--swatch-ink-red, var(--swatch-ink)); --ring:var(--swatch-red);
+  --sidebar-primary:var(--swatch-red); --sidebar-primary-foreground:var(--swatch-ink-red, var(--swatch-ink)); --sidebar-ring:var(--swatch-red);
 }
-[data-palette="catppuccin-mocha"][data-accent="teal"] {
-  --primary:#94e2d5; --primary-foreground:#11111b; --ring:#94e2d5;
-  --sidebar-primary:#94e2d5; --sidebar-primary-foreground:#11111b; --sidebar-ring:#94e2d5;
+[data-palette^="catppuccin-"][data-accent="maroon"] {
+  --primary:var(--swatch-maroon); --primary-foreground:var(--swatch-ink-maroon, var(--swatch-ink)); --ring:var(--swatch-maroon);
+  --sidebar-primary:var(--swatch-maroon); --sidebar-primary-foreground:var(--swatch-ink-maroon, var(--swatch-ink)); --sidebar-ring:var(--swatch-maroon);
 }
-[data-palette="catppuccin-mocha"][data-accent="green"] {
-  --primary:#a6e3a1; --primary-foreground:#11111b; --ring:#a6e3a1;
-  --sidebar-primary:#a6e3a1; --sidebar-primary-foreground:#11111b; --sidebar-ring:#a6e3a1;
+[data-palette^="catppuccin-"][data-accent="yellow"] {
+  --primary:var(--swatch-yellow); --primary-foreground:var(--swatch-ink-yellow, var(--swatch-ink)); --ring:var(--swatch-yellow);
+  --sidebar-primary:var(--swatch-yellow); --sidebar-primary-foreground:var(--swatch-ink-yellow, var(--swatch-ink)); --sidebar-ring:var(--swatch-yellow);
+}
+[data-palette^="catppuccin-"][data-accent="green"] {
+  --primary:var(--swatch-green); --primary-foreground:var(--swatch-ink-green, var(--swatch-ink)); --ring:var(--swatch-green);
+  --sidebar-primary:var(--swatch-green); --sidebar-primary-foreground:var(--swatch-ink-green, var(--swatch-ink)); --sidebar-ring:var(--swatch-green);
+}
+[data-palette^="catppuccin-"][data-accent="teal"] {
+  --primary:var(--swatch-teal); --primary-foreground:var(--swatch-ink-teal, var(--swatch-ink)); --ring:var(--swatch-teal);
+  --sidebar-primary:var(--swatch-teal); --sidebar-primary-foreground:var(--swatch-ink-teal, var(--swatch-ink)); --sidebar-ring:var(--swatch-teal);
+}
+[data-palette^="catppuccin-"][data-accent="sky"] {
+  --primary:var(--swatch-sky); --primary-foreground:var(--swatch-ink-sky, var(--swatch-ink)); --ring:var(--swatch-sky);
+  --sidebar-primary:var(--swatch-sky); --sidebar-primary-foreground:var(--swatch-ink-sky, var(--swatch-ink)); --sidebar-ring:var(--swatch-sky);
+}
+[data-palette^="catppuccin-"][data-accent="sapphire"] {
+  --primary:var(--swatch-sapphire); --primary-foreground:var(--swatch-ink-sapphire, var(--swatch-ink)); --ring:var(--swatch-sapphire);
+  --sidebar-primary:var(--swatch-sapphire); --sidebar-primary-foreground:var(--swatch-ink-sapphire, var(--swatch-ink)); --sidebar-ring:var(--swatch-sapphire);
+}
+[data-palette^="catppuccin-"][data-accent="blue"] {
+  --primary:var(--swatch-blue); --primary-foreground:var(--swatch-ink-blue, var(--swatch-ink)); --ring:var(--swatch-blue);
+  --sidebar-primary:var(--swatch-blue); --sidebar-primary-foreground:var(--swatch-ink-blue, var(--swatch-ink)); --sidebar-ring:var(--swatch-blue);
+}
+[data-palette^="catppuccin-"][data-accent="lavender"] {
+  --primary:var(--swatch-lavender); --primary-foreground:var(--swatch-ink-lavender, var(--swatch-ink)); --ring:var(--swatch-lavender);
+  --sidebar-primary:var(--swatch-lavender); --sidebar-primary-foreground:var(--swatch-ink-lavender, var(--swatch-ink)); --sidebar-ring:var(--swatch-lavender);
 }
 
 @layer base {

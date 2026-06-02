@@ -11,26 +11,40 @@ import type {
 } from "@/lib/types";
 
 export const DEFAULT_THEME: ThemePreference = "system";
-export const DEFAULT_ACCENT: AccentId = "terracotta";
+export const DEFAULT_ACCENT: AccentId = "peach";
 export const DEFAULT_TONE: SurfaceTone = "warm";
 export const DEFAULT_PALETTE: Palette = "default";
 
 export interface AccentPreset {
   id: AccentId;
   label: string;
-  /** Light-mode --primary hex, used for the picker swatch. */
+  /** The default-(warm)-palette light hex — the picker dot's color in the default
+   *  palette and the reverse-map key for adapting stored item colors. Catppuccin
+   *  flavors remap it via the --swatch-* vars in globals.css. */
   swatch: string;
 }
 
-/** Order mirrors the in-app category palette. `terracotta` is the default. */
+/**
+ * The 14 Catppuccin accent colors (Catppuccin's canonical order). `swatch` is the
+ * warm default-palette interpretation of each; `peach` (the brand terracotta) is
+ * the default and lives in :root. The literal Catppuccin hex per flavor lives in
+ * the [data-palette="catppuccin-*"] --swatch-* blocks in app/globals.css.
+ */
 export const ACCENTS: readonly AccentPreset[] = [
-  { id: "terracotta", label: "Terracotta", swatch: "#c0492a" },
-  { id: "amber", label: "Amber", swatch: "#b45309" },
-  { id: "rose", label: "Rose", swatch: "#be185d" },
-  { id: "violet", label: "Violet", swatch: "#7c3aed" },
-  { id: "blue", label: "Blue", swatch: "#0369a1" },
-  { id: "teal", label: "Teal", swatch: "#0f766e" },
+  { id: "rosewater", label: "Rosewater", swatch: "#b0645a" },
+  { id: "flamingo", label: "Flamingo", swatch: "#bf5d5d" },
+  { id: "pink", label: "Pink", swatch: "#be185d" },
+  { id: "mauve", label: "Mauve", swatch: "#7c3aed" },
+  { id: "red", label: "Red", swatch: "#c62828" },
+  { id: "maroon", label: "Maroon", swatch: "#a23a4a" },
+  { id: "peach", label: "Peach", swatch: "#c0492a" },
+  { id: "yellow", label: "Yellow", swatch: "#b45309" },
   { id: "green", label: "Green", swatch: "#15803d" },
+  { id: "teal", label: "Teal", swatch: "#0f766e" },
+  { id: "sky", label: "Sky", swatch: "#0e7490" },
+  { id: "sapphire", label: "Sapphire", swatch: "#1668a8" },
+  { id: "blue", label: "Blue", swatch: "#0369a1" },
+  { id: "lavender", label: "Lavender", swatch: "#6d5dd6" },
 ] as const;
 
 export interface TonePreset {
@@ -98,6 +112,40 @@ export const PALETTES: readonly PalettePreset[] = [
 const ACCENT_IDS = new Set<string>(ACCENTS.map((a) => a.id));
 const TONE_IDS = new Set<string>(TONES.map((t) => t.id));
 const PALETTE_IDS = new Set<string>(PALETTES.map((p) => p.id));
+
+/** Default-palette hex → accent token. Every pickable color comes from ACCENTS
+ *  (the swatch picker derives from it, seeds use these hexes), so this covers
+ *  all stored item/category/member colors. */
+const TOKEN_BY_HEX = new Map<string, AccentId>(
+  ACCENTS.map((a) => [a.swatch.toLowerCase(), a.id]),
+);
+
+/**
+ * Map a stored accent hex to its palette-aware CSS var so the color re-tints with
+ * the active Catppuccin flavor (in the default palette the var resolves to the
+ * same hex, so rendering is unchanged). Unknown/custom hexes pass through
+ * unchanged; nullish input returns undefined (lets `style` omit the property).
+ */
+export function toPaletteColor(
+  hex: string | null | undefined,
+): string | undefined {
+  if (!hex) return undefined;
+  const token = TOKEN_BY_HEX.get(hex.toLowerCase());
+  return token ? `var(--swatch-${token})` : hex;
+}
+
+/**
+ * The legible text/icon color to overlay on a filled swatch of `hex`. Catppuccin
+ * Latte (a light theme with wide-lightness accents) sets per-accent inks; every
+ * other palette falls back to its single `--swatch-ink` (white / dark `crust`),
+ * so this is a no-op there. Unknown hexes use the palette default ink.
+ */
+export function toPaletteInk(hex: string | null | undefined): string {
+  const token = hex ? TOKEN_BY_HEX.get(hex.toLowerCase()) : undefined;
+  return token
+    ? `var(--swatch-ink-${token}, var(--swatch-ink))`
+    : "var(--swatch-ink)";
+}
 
 /** Coerce an unknown string to a valid accent id, falling back to the default. */
 export function normalizeAccent(value: string | null | undefined): AccentId {

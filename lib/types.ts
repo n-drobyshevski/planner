@@ -8,14 +8,23 @@ export type EventKind = "event" | "context";
 
 /** Appearance preferences, stored per member. Mirror the DB CHECK constraints. */
 export type ThemePreference = "light" | "dark" | "system";
+/** The 14 Catppuccin accent colors. Each has a default-(warm)-palette hex plus a
+ *  value per Catppuccin flavor (see the --swatch-* / [data-accent] CSS). */
 export type AccentId =
-  | "terracotta"
-  | "teal"
-  | "amber"
+  | "rosewater"
+  | "flamingo"
+  | "pink"
+  | "mauve"
+  | "red"
+  | "maroon"
+  | "peach"
+  | "yellow"
   | "green"
+  | "teal"
+  | "sky"
+  | "sapphire"
   | "blue"
-  | "rose"
-  | "violet";
+  | "lavender";
 export type SurfaceTone = "warm" | "neutral" | "cool";
 /**
  * Full-palette theme. `default` keeps the native warm system (light/dark +

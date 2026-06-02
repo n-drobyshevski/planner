@@ -24,6 +24,7 @@ import {
 } from "@/lib/datetime/format";
 import { computeUsage } from "@/lib/analytics/usage";
 import { cn } from "@/lib/utils";
+import { toPaletteColor } from "@/lib/theme/appearance";
 import type {
   CalendarView,
   Category,
@@ -268,7 +269,7 @@ export function UsageTab({
                           <span className="flex items-center gap-1.5">
                             <span
                               className="size-2 shrink-0 rounded-[2px]"
-                              style={{ background: p.color }}
+                              style={{ background: toPaletteColor(p.color) }}
                             />
                             {p.name}
                           </span>
@@ -291,7 +292,7 @@ export function UsageTab({
                 isAnimationActive={!reduced}
               >
                 {categoryData.map((d) => (
-                  <Cell key={d.id} fill={d.color} stroke="var(--card)" />
+                  <Cell key={d.id} fill={toPaletteColor(d.color)} stroke="var(--card)" />
                 ))}
               </Pie>
             </PieChart>
@@ -309,7 +310,7 @@ export function UsageTab({
             <li key={d.id} className="flex items-center gap-2 text-xs">
               <span
                 className="size-2.5 shrink-0 rounded-[3px]"
-                style={{ background: d.color }}
+                style={{ background: toPaletteColor(d.color) }}
                 aria-hidden
               />
               <span className="min-w-0 flex-1 truncate">{d.name}</span>
@@ -346,7 +347,7 @@ export function UsageTab({
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                     <div
                       className={cn("h-full rounded-full")}
-                      style={{ width: `${pct}%`, background: color }}
+                      style={{ width: `${pct}%`, background: toPaletteColor(color) }}
                     />
                   </div>
                 </li>

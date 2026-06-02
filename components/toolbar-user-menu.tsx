@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/calendar/theme-toggle";
 import { signOutAction } from "@/app/login/actions";
+import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import type { Member } from "@/lib/types";
 
 /** Theme toggle + profile menu, shared by the calendar and tasks toolbars. */
@@ -33,7 +34,7 @@ export function ToolbarUserMenu({ current }: { current: Member | null }) {
             >
               <Avatar className="size-8">
                 <AvatarFallback
-                  style={{ backgroundColor: current.color, color: "#fff" }}
+                  style={{ backgroundColor: toPaletteColor(current.color), color: toPaletteInk(current.color) }}
                   className="text-sm font-semibold"
                 >
                   {current.name.slice(0, 1).toUpperCase()}

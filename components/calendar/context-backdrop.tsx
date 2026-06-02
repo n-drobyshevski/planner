@@ -3,6 +3,7 @@
 import { forwardRef } from "react";
 import { formatTime } from "@/lib/datetime/format";
 import { cn } from "@/lib/utils";
+import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
 import type { Occurrence } from "@/lib/types";
 
@@ -47,8 +48,8 @@ export const ContextBackdrop = forwardRef<
         ...style,
         // A clearly framed, translucent container: solid border in the context
         // color + a faint fill, so its events visibly sit inside the zone.
-        backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`,
-        border: `1.5px solid ${color}`,
+        backgroundColor: `color-mix(in srgb, ${toPaletteColor(color)} 10%, transparent)`,
+        border: `1.5px solid ${toPaletteColor(color)}`,
       }}
       className={cn(
         "pointer-events-none absolute z-0 overflow-hidden rounded-lg",
@@ -77,10 +78,10 @@ export const ContextBackdrop = forwardRef<
           container, and doubles as the move / menu handle. */}
       <div
         className={cn(
-          "pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight text-white select-none",
+          "pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 text-left text-[11px] font-semibold leading-tight select-none",
           editable ? "cursor-grab" : "cursor-pointer",
         )}
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: toPaletteColor(color), color: toPaletteInk(color) }}
       >
         <span className="truncate">{occ.title}</span>
         {/* Drop the time range on phones (< md) in the narrow week/3day grids

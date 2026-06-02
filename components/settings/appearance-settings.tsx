@@ -153,7 +153,7 @@ export function AppearanceSettings() {
             <FieldLegend variant="label">Accent color</FieldLegend>
             <FieldDescription>
               {catppuccin
-                ? "Used for buttons and highlights — tinted to the closest Catppuccin accent."
+                ? "Used for buttons, highlights, and focus rings — shown in the active flavor's palette."
                 : "Used for buttons, highlights, links, and focus rings."}
             </FieldDescription>
             <div
@@ -177,10 +177,14 @@ export function AppearanceSettings() {
                       "relative grid size-11 place-items-center rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform outline-none focus-visible:ring-ring active:scale-95 disabled:cursor-not-allowed disabled:opacity-50",
                       selected ? "ring-foreground" : "ring-transparent hover:ring-border",
                     )}
-                    style={{ backgroundColor: a.swatch }}
+                    style={{ backgroundColor: `var(--swatch-${a.id})` }}
                   >
                     {selected && (
-                      <Check className="size-5 text-white drop-shadow-sm" aria-hidden />
+                      <Check
+                        className="size-5 drop-shadow-sm"
+                        style={{ color: `var(--swatch-ink-${a.id}, var(--swatch-ink))` }}
+                        aria-hidden
+                      />
                     )}
                   </button>
                 );

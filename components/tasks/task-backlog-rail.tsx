@@ -28,6 +28,7 @@ import {
 import { UsageTab, type UsageTabProps } from "@/components/analytics/usage-tab";
 import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-width";
 import { cn } from "@/lib/utils";
+import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import type { Member, TaskRow } from "@/lib/types";
 
 interface BacklogProps {
@@ -68,7 +69,7 @@ const BacklogCard = React.forwardRef<
             }
           : undefined
       }
-      style={{ borderInlineStartColor: color }}
+      style={{ borderInlineStartColor: toPaletteColor(color) }}
       className={cn(
         "group flex min-h-11 items-center gap-1.5 rounded-md border border-l-4 bg-card p-2 text-sm shadow-soft md:min-h-0",
         draggable && "cursor-grab active:cursor-grabbing",
@@ -83,7 +84,7 @@ const BacklogCard = React.forwardRef<
       {assignee && (
         <Avatar className="size-5 shrink-0" title={assignee.name}>
           <AvatarFallback
-            style={{ backgroundColor: assignee.color, color: "#fff" }}
+            style={{ backgroundColor: toPaletteColor(assignee.color), color: toPaletteInk(assignee.color) }}
             className="text-[9px] font-semibold"
           >
             {assignee.name.slice(0, 1).toUpperCase()}

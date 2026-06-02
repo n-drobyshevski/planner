@@ -31,7 +31,7 @@ export function mapMember(r: Row): Member {
     color: r.color as string,
     hasPin: r.pin_hash != null,
     themePreference: (r.theme_preference as ThemePreference | null) ?? "system",
-    accent: (r.accent as AccentId | null) ?? "terracotta",
+    accent: (r.accent as AccentId | null) ?? "peach",
     surfaceTone: (r.surface_tone as SurfaceTone | null) ?? "warm",
     palette: (r.palette as Palette | null) ?? "default",
   };

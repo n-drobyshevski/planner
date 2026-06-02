@@ -6,6 +6,7 @@ import { formatTime } from "@/lib/datetime/format";
 import { CalendarDays, Pencil, Trash2, Eye } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
 import { cn } from "@/lib/utils";
+import { toPaletteColor } from "@/lib/theme/appearance";
 import {
   Empty,
   EmptyDescription,
@@ -179,7 +180,7 @@ const AgendaRow = forwardRef<
     >
       <span
         className="size-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: toPaletteColor(color) }}
         aria-hidden
       />
       <span className="min-w-0 flex-1">

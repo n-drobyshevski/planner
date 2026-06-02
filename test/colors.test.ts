@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
 import { resolveTaskColor } from "@/lib/tasks/colors";
+import { toPaletteColor } from "@/lib/theme/appearance";
 import type { Category, Member, Occurrence, TaskRow } from "@/lib/types";
 
 const cat = (id: string, color: string): Category => ({
@@ -20,7 +21,7 @@ const member = (id: string, color: string): Member => ({
   color,
   hasPin: false,
   themePreference: "system",
-  accent: "terracotta",
+  accent: "peach",
   surfaceTone: "warm",
   palette: "default",
 });
@@ -106,5 +107,26 @@ describe("resolveTaskColor", () => {
   it("falls back to category color when no own color", () => {
     const t = task({ categoryId: "c1" });
     expect(resolveTaskColor(t, categories, members)).toBe("#111111");
+  });
+});
+
+describe("toPaletteColor", () => {
+  it("maps a known accent hex to its palette-aware CSS var", () => {
+    expect(toPaletteColor("#c0492a")).toBe("var(--swatch-peach)");
+    expect(toPaletteColor("#0f766e")).toBe("var(--swatch-teal)");
+  });
+
+  it("is case-insensitive on the hex", () => {
+    expect(toPaletteColor("#C0492A")).toBe("var(--swatch-peach)");
+  });
+
+  it("passes unknown/custom hexes through unchanged", () => {
+    expect(toPaletteColor("#123456")).toBe("#123456");
+  });
+
+  it("returns undefined for nullish input", () => {
+    expect(toPaletteColor(null)).toBeUndefined();
+    expect(toPaletteColor(undefined)).toBeUndefined();
+    expect(toPaletteColor("")).toBeUndefined();
   });
 });
