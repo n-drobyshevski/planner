@@ -22,6 +22,7 @@ const eventRow = {
   context_id: null,
   all_day: false,
   inactive: false,
+  status: "confirmed",
   starts_at: "2026-06-01T09:00:00.000Z",
   ends_at: "2026-06-01T10:00:00.000Z",
   time_zone: "UTC",

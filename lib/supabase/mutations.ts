@@ -286,6 +286,7 @@ export async function splitSeries(
     kind: newSeries.kind,
     allDay: newSeries.allDay,
     inactive: newSeries.inactive,
+    status: newSeries.status,
     start: newSeries.start,
     end: newSeries.end,
     timeZone: newSeries.timeZone,

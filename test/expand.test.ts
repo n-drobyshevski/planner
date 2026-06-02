@@ -28,6 +28,7 @@ function makeEvent(p: Partial<EventRow> = {}): EventRow {
     kind: "event",
     allDay: false,
     inactive: false,
+    status: "confirmed",
     start: berlin(2026, 2, 27, 9),
     end: berlin(2026, 2, 27, 10),
     timeZone: TZ,

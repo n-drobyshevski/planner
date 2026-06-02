@@ -6,7 +6,7 @@ import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
-import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
+import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import type { Occurrence } from "@/lib/types";
 
 /**
@@ -48,6 +48,7 @@ export const EventBlock = forwardRef<
         editable ? "cursor-grab" : "cursor-pointer",
         selected && "z-20 ring-2 ring-foreground",
         occ.inactive && "opacity-55 grayscale",
+        eventStatusClass(occ.status),
         className,
       )}
       {...rest}
@@ -84,6 +85,7 @@ export const EventBlock = forwardRef<
           className={cn(
             "truncate font-semibold leading-tight",
             taskDone && "line-through opacity-80",
+            occ.status === "cancelled" && "line-through",
           )}
         >
           {occ.title}

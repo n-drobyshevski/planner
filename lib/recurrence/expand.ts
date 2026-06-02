@@ -75,6 +75,9 @@ function baseOccurrence(
     // Series-level, like color/kind: every occurrence inherits the master's
     // inactive flag; applyOverride leaves it alone (no override column).
     inactive: event.inactive,
+    // Series-level, like inactive: every occurrence inherits the master's
+    // lifecycle status; applyOverride leaves it alone (no override column).
+    status: event.status,
     title: event.title,
     description: event.description,
     location: event.location,

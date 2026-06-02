@@ -178,6 +178,8 @@ const AgendaRow = forwardRef<
         "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg border bg-card px-3 py-2 text-left shadow-soft transition-colors active:bg-accent",
         selected && "ring-2 ring-ring",
         occ.inactive && "opacity-55",
+        occ.status === "planned" && "evt-planned",
+        occ.status === "cancelled" && "opacity-55",
         className,
       )}
       {...rest}
@@ -189,7 +191,9 @@ const AgendaRow = forwardRef<
       />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className="truncate font-medium">{occ.title}</span>
+          <span className={cn("truncate font-medium", occ.status === "cancelled" && "line-through")}>
+            {occ.title}
+          </span>
           {occ.kind === "context" && (
             <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Context

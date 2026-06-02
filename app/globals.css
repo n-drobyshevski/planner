@@ -548,6 +548,26 @@
   padding-right: env(safe-area-inset-right);
 }
 
+/* ---- Event lifecycle status overlays (see lib/theme/appearance.ts) ----
+   These ride on top of the inline backgroundColor each event block sets.
+   'confirmed' uses no class (plain fill). */
+@utility evt-cancelled {
+  /* Diagonal stripes, grayed out — reads as "this isn't happening". */
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(0 0 0 / 0.22) 0 5px,
+    transparent 5px 10px
+  );
+  filter: grayscale(1);
+  opacity: 0.65;
+}
+@utility evt-planned {
+  /* Dotted outline, drawn inside the rounded corners; fill shows through so it
+     reads as "pencilled in, not yet solid". */
+  outline: 2px dotted var(--foreground);
+  outline-offset: -3px;
+}
+
 /* ---- iOS zoom guard: Safari auto-zooms when a focused field is < 16px ---- */
 @media (max-width: 767px) {
   input,

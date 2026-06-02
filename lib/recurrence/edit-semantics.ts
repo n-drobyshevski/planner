@@ -6,7 +6,7 @@
 
 import { RRule } from "rrule";
 import type { Options } from "rrule";
-import type { EventRow } from "@/lib/types";
+import type { EventRow, EventStatus } from "@/lib/types";
 
 /** Fields that may be patched on a single occurrence (or, for editAll, the master). */
 export interface OccurrencePatch {
@@ -18,6 +18,7 @@ export interface OccurrencePatch {
   end?: number;
   allDay?: boolean;
   inactive?: boolean;
+  status?: EventStatus;
 }
 
 /** Description of an override row to upsert for one occurrence of a recurring event. */
@@ -70,6 +71,7 @@ export function editAll(
   if (patch.categoryId !== undefined) out.categoryId = patch.categoryId;
   if (patch.allDay !== undefined) out.allDay = patch.allDay;
   if (patch.inactive !== undefined) out.inactive = patch.inactive;
+  if (patch.status !== undefined) out.status = patch.status;
 
   const hasStart = patch.start !== undefined;
   const hasEnd = patch.end !== undefined;
@@ -162,6 +164,7 @@ export function splitThisAndFuture(
     kind: event.kind,
     allDay: patch.allDay !== undefined ? patch.allDay : event.allDay,
     inactive: patch.inactive !== undefined ? patch.inactive : event.inactive,
+    status: patch.status !== undefined ? patch.status : event.status,
     start: newStart,
     end: newEnd,
     timeZone: event.timeZone,

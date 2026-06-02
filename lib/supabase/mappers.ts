@@ -3,6 +3,7 @@
 
 import type {
   EventRow,
+  EventStatus,
   OverrideRow,
   Member,
   Category,
@@ -66,6 +67,7 @@ export function mapEvent(r: Row): EventRow {
     kind: (r.kind as EventRow["kind"] | null) ?? "event",
     allDay: Boolean(r.all_day),
     inactive: Boolean(r.inactive),
+    status: (r.status as EventStatus | null) ?? "confirmed",
     start: toMs(r.starts_at),
     end: toMs(r.ends_at),
     timeZone: r.time_zone as string,
@@ -130,6 +132,7 @@ export interface EventInput {
   kind?: EventRow["kind"];
   allDay?: boolean;
   inactive?: boolean;
+  status?: EventStatus;
   start: number;
   end: number;
   timeZone: string;
@@ -151,6 +154,7 @@ export function eventInputToRow(input: EventInput): Row {
     kind: input.kind ?? "event",
     all_day: input.allDay ?? false,
     inactive: input.inactive ?? false,
+    status: input.status ?? "confirmed",
     starts_at: toIso(input.start),
     ends_at: toIso(input.end),
     time_zone: input.timeZone,
@@ -172,6 +176,7 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("kind" in patch) row.kind = patch.kind;
   if ("allDay" in patch) row.all_day = patch.allDay;
   if ("inactive" in patch) row.inactive = patch.inactive;
+  if ("status" in patch) row.status = patch.status;
   if ("start" in patch && patch.start != null) row.starts_at = toIso(patch.start);
   if ("end" in patch && patch.end != null) row.ends_at = toIso(patch.end);
   if ("timeZone" in patch) row.time_zone = patch.timeZone;

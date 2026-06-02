@@ -19,6 +19,7 @@ function occ(start: number, title: string, opts: Partial<Occurrence> = {}): Occu
     end: start + 3_600_000,
     allDay: false,
     inactive: false,
+    status: "confirmed",
     title,
     description: null,
     location: null,

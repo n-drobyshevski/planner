@@ -14,6 +14,7 @@ function occ(over: Partial<Occurrence>): Occurrence {
     end: 2000,
     allDay: false,
     inactive: false,
+    status: "confirmed",
     title: "t",
     description: null,
     location: null,
