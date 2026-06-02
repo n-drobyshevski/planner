@@ -27,15 +27,14 @@ const baseRow = {
   updated_at: "2026-06-01T00:00:00.000Z",
 };
 
-describe("mapEvent — kind/contextId", () => {
-  it("reads kind and context_id from the row", () => {
+describe("mapEvent — kind", () => {
+  it("reads kind from the row", () => {
     const ctx = mapEvent({ ...baseRow, kind: "context" });
     expect(ctx.kind).toBe("context");
-    expect(ctx.contextId).toBeNull();
 
-    const child = mapEvent({ ...baseRow, context_id: "ctx-1" });
-    expect(child.kind).toBe("event"); // default when column absent
-    expect(child.contextId).toBe("ctx-1");
+    // A context window paints a category via its own category_id.
+    const painted = mapEvent({ ...baseRow, kind: "context", category_id: "cat-1" });
+    expect(painted.categoryId).toBe("cat-1");
   });
 
   it("defaults kind to event when the column is missing", () => {
@@ -43,7 +42,7 @@ describe("mapEvent — kind/contextId", () => {
   });
 });
 
-describe("eventInputToRow — kind/contextId", () => {
+describe("eventInputToRow — kind/category", () => {
   const input: EventInput = {
     workspaceId: "w1",
     ownerId: "m1",
@@ -54,26 +53,24 @@ describe("eventInputToRow — kind/contextId", () => {
     timeZone: "UTC",
   };
 
-  it("defaults to a normal event with no context", () => {
+  it("defaults to a normal event", () => {
     const row = eventInputToRow(input);
     expect(row.kind).toBe("event");
-    expect(row.context_id).toBeNull();
+    expect(row).not.toHaveProperty("context_id");
   });
 
-  it("passes through kind and contextId", () => {
-    const row = eventInputToRow({ ...input, kind: "context" });
+  it("passes through kind and the painted category", () => {
+    const row = eventInputToRow({ ...input, kind: "context", categoryId: "cat-1" });
     expect(row.kind).toBe("context");
-
-    const child = eventInputToRow({ ...input, contextId: "ctx-1" });
-    expect(child.context_id).toBe("ctx-1");
+    expect(row.category_id).toBe("cat-1");
   });
 });
 
-describe("eventPatchToRow — kind/contextId", () => {
-  it("only writes fields present in the patch", () => {
+describe("eventPatchToRow — kind/category", () => {
+  it("only writes fields present in the patch (and never context_id)", () => {
     expect(eventPatchToRow({ title: "x" })).not.toHaveProperty("context_id");
-    expect(eventPatchToRow({ contextId: "ctx-1" })).toEqual({ context_id: "ctx-1" });
-    expect(eventPatchToRow({ contextId: null })).toEqual({ context_id: null });
+    expect(eventPatchToRow({ categoryId: "cat-1" })).toEqual({ category_id: "cat-1" });
+    expect(eventPatchToRow({ categoryId: null })).toEqual({ category_id: null });
     expect(eventPatchToRow({ kind: "context" })).toEqual({ kind: "context" });
   });
 });

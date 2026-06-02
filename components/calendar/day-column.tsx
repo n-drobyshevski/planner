@@ -29,8 +29,8 @@ export function DayColumn({
   onChangeColor,
   onColorSelected,
   onDeleteEvent,
-  onAssignContext,
-  onRemoveContext,
+  onAssignCategory,
+  categoryChoices,
   canEdit,
   taskDoneById,
   onToggleTaskDone,
@@ -48,8 +48,9 @@ export function DayColumn({
   /** Recolor the whole multi-selection (used when the item is part of it). */
   onColorSelected: (color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
-  onAssignContext?: (o: Occurrence, contextId: string) => void;
-  onRemoveContext?: (o: Occurrence) => void;
+  onAssignCategory?: (o: Occurrence, categoryId: string | null) => void;
+  /** Contexts the viewer may assign, for the right-click menu. */
+  categoryChoices?: { id: string; name: string }[];
   /** Owner-only editability; non-editable occurrences are read-only overlays. */
   canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -88,15 +89,6 @@ export function DayColumn({
     return { segments: segs, packed: packDay(segs), nestedFlags: nested };
   }, [occurrences, dayStart, dayEnd, contextSegs]);
 
-  // Distinct contexts visible in this window, for the "Add to context" submenu.
-  const contextChoices = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const o of occurrences) {
-      if (o.kind === "context" && !seen.has(o.eventId)) seen.set(o.eventId, o.title);
-    }
-    return Array.from(seen, ([id, title]) => ({ id, title }));
-  }, [occurrences]);
-
   // Recolor routes to the whole selection when the item is part of a multi-pick,
   // otherwise just the one item.
   function colorChange(occ: Occurrence, color: string | null) {
@@ -105,25 +97,25 @@ export function DayColumn({
   }
 
   function contextActions(occ: Occurrence): ItemAction[] {
+    // A context block paints its own category; its membership isn't reassignable.
+    if (!onAssignCategory || occ.kind === "context") return [];
     const actions: ItemAction[] = [];
-    if (onAssignContext && contextChoices.length > 0) {
-      const targets = contextChoices.filter((c) => c.id !== occ.contextId);
-      if (targets.length > 0) {
-        actions.push({
-          label: "Add to context",
-          icon: FolderPlus,
-          submenu: targets.map((c) => ({
-            label: c.title || "Untitled",
-            onSelect: () => onAssignContext(occ, c.id),
-          })),
-        });
-      }
-    }
-    if (onRemoveContext && occ.contextId) {
+    const targets = (categoryChoices ?? []).filter((c) => c.id !== occ.categoryId);
+    if (targets.length > 0) {
       actions.push({
-        label: "Remove from context",
+        label: "Assign to context",
+        icon: FolderPlus,
+        submenu: targets.map((c) => ({
+          label: c.name || "Untitled",
+          onSelect: () => onAssignCategory(occ, c.id),
+        })),
+      });
+    }
+    if (occ.categoryId) {
+      actions.push({
+        label: "Clear context",
         icon: FolderMinus,
-        onSelect: () => onRemoveContext(occ),
+        onSelect: () => onAssignCategory(occ, null),
       });
     }
     return actions;

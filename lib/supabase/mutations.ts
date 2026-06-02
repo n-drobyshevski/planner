@@ -103,7 +103,7 @@ export async function deleteEvent(sb: SupabaseClient, id: string): Promise<void>
  * keep the full Postgres rows (not the domain shape) because restore must
  * preserve every column — including ones the app layer doesn't model (scope,
  * visibility) — and the original ids, so all links (task_id, parent_id,
- * context_id, override→event) survive the round-trip intact.
+ * override→event) survive the round-trip intact.
  */
 export interface DeletedSnapshot {
   /** Parent-before-child order; restore inserts them in this order. */
@@ -211,25 +211,6 @@ export async function restoreDeleted(
   }
 }
 
-/** Group an event under a context (or move it to a different one). */
-export function assignToContext(
-  sb: SupabaseClient,
-  eventId: string,
-  contextId: string,
-  expectedUpdatedAt?: number,
-): Promise<EventRow> {
-  return updateEvent(sb, eventId, { contextId }, expectedUpdatedAt);
-}
-
-/** Detach an event from its context (the event stays on the calendar). */
-export function removeFromContext(
-  sb: SupabaseClient,
-  eventId: string,
-  expectedUpdatedAt?: number,
-): Promise<EventRow> {
-  return updateEvent(sb, eventId, { contextId: null }, expectedUpdatedAt);
-}
-
 // --- Recurring edits -------------------------------------------------------
 
 /** Apply a cancel/modify override for a single occurrence (this-occurrence edit). */
@@ -272,16 +253,14 @@ export async function updateAll(
 
 /**
  * "This and future": cap the original series and create a new one. The new
- * series inherits the original's kind + context membership; pass `newContextId`
- * (string | null) to re-file the new series under a different context, and
- * `newColor` (string | null) to give the future series a different own-color.
+ * series inherits the original's kind + category; pass `newColor`
+ * (string | null) to give the future series a different own-color.
  */
 export async function splitSeries(
   sb: SupabaseClient,
   event: EventRow,
   fromOccurrenceMs: number,
   patch: OccurrencePatch,
-  newContextId?: string | null,
   newColor?: string | null,
 ): Promise<EventRow> {
   const { original, newSeries } = splitThisAndFuture(event, fromOccurrenceMs, patch);
@@ -305,7 +284,6 @@ export async function splitSeries(
     isPrivate: newSeries.isPrivate,
     color: newColor !== undefined ? newColor : newSeries.color,
     kind: newSeries.kind,
-    contextId: newContextId !== undefined ? newContextId : newSeries.contextId,
     allDay: newSeries.allDay,
     inactive: newSeries.inactive,
     start: newSeries.start,
@@ -361,9 +339,117 @@ export async function updateCategory(
   if (error) throw error;
 }
 
-export async function deleteCategory(sb: SupabaseClient, id: string): Promise<void> {
-  const { error } = await sb.from("categories").delete().eq("id", id);
-  if (error) throw error;
+/**
+ * Snapshot captured before deleting a category so the delete can be undone.
+ * Deleting a category removes the time-blocks ("context" events) that paint it
+ * and their overrides outright, and — via `category_id ... on delete set null`
+ * — un-links every item that belonged to it. Restore re-inserts the category +
+ * its blocks and re-links the items, so one undo brings everything back.
+ */
+export interface DeletedCategory {
+  category: Record<string, unknown>;
+  /** kind='context' time-blocks painting this category (deleted). */
+  blocks: Record<string, unknown>[];
+  /** overrides of those blocks (cascade-deleted with them). */
+  blockOverrides: Record<string, unknown>[];
+  /** ids of items un-linked by the delete, to re-link on undo. */
+  eventIds: string[];
+  taskIds: string[];
+  overrideIds: string[];
+}
+
+/** Delete a category, its calendar time-blocks, and unlink its items (undoable). */
+export async function deleteCategory(
+  sb: SupabaseClient,
+  id: string,
+): Promise<DeletedCategory> {
+  const { data: cat, error: cErr } = await sb
+    .from("categories")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (cErr) throw cErr;
+
+  // Time-blocks painting this category, and their overrides (snapshotted so the
+  // undo can re-insert them; they're deleted outright below).
+  const { data: blocks, error: bErr } = await sb
+    .from("events")
+    .select("*")
+    .eq("category_id", id)
+    .eq("kind", "context");
+  if (bErr) throw bErr;
+  const blockIds = (blocks ?? []).map((b) => b.id as string);
+  let blockOverrides: Record<string, unknown>[] = [];
+  if (blockIds.length > 0) {
+    const { data, error } = await sb
+      .from("event_overrides")
+      .select("*")
+      .in("event_id", blockIds);
+    if (error) throw error;
+    blockOverrides = data ?? [];
+  }
+
+  // Items (non-block events, tasks, overrides) that will be un-linked by the
+  // FK's ON DELETE SET NULL — capture their ids so undo can re-link them.
+  const [evRes, tkRes, ovRes] = await Promise.all([
+    sb.from("events").select("id").eq("category_id", id).neq("kind", "context"),
+    sb.from("tasks").select("id").eq("category_id", id),
+    sb.from("event_overrides").select("id").eq("category_id", id),
+  ]);
+  if (evRes.error) throw evRes.error;
+  if (tkRes.error) throw tkRes.error;
+  if (ovRes.error) throw ovRes.error;
+
+  // Delete the blocks first (they'd otherwise just be un-linked), then the
+  // category — which un-links every remaining item via ON DELETE SET NULL.
+  if (blockIds.length > 0) {
+    const { error } = await sb.from("events").delete().in("id", blockIds);
+    if (error) throw error;
+  }
+  const { error: delErr } = await sb.from("categories").delete().eq("id", id);
+  if (delErr) throw delErr;
+
+  return {
+    category: cat as Record<string, unknown>,
+    blocks: blocks ?? [],
+    blockOverrides,
+    eventIds: (evRes.data ?? []).map((r) => r.id as string),
+    taskIds: (tkRes.data ?? []).map((r) => r.id as string),
+    overrideIds: (ovRes.data ?? []).map((r) => r.id as string),
+  };
+}
+
+/** Re-insert a deleted category, its time-blocks, and re-link its items. */
+export async function restoreCategory(
+  sb: SupabaseClient,
+  snap: DeletedCategory,
+): Promise<void> {
+  const { error: cErr } = await sb.from("categories").insert(snap.category);
+  if (cErr) throw cErr;
+  if (snap.blocks.length > 0) {
+    const { error } = await sb.from("events").insert(snap.blocks);
+    if (error) throw error;
+  }
+  if (snap.blockOverrides.length > 0) {
+    const { error } = await sb.from("event_overrides").insert(snap.blockOverrides);
+    if (error) throw error;
+  }
+  const id = snap.category.id as string;
+  if (snap.eventIds.length > 0) {
+    const { error } = await sb.from("events").update({ category_id: id }).in("id", snap.eventIds);
+    if (error) throw error;
+  }
+  if (snap.taskIds.length > 0) {
+    const { error } = await sb.from("tasks").update({ category_id: id }).in("id", snap.taskIds);
+    if (error) throw error;
+  }
+  if (snap.overrideIds.length > 0) {
+    const { error } = await sb
+      .from("event_overrides")
+      .update({ category_id: id })
+      .in("id", snap.overrideIds);
+    if (error) throw error;
+  }
 }
 
 // --- Member preferences ----------------------------------------------------

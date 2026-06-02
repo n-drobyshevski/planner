@@ -64,7 +64,6 @@ export function mapEvent(r: Row): EventRow {
     isPrivate: Boolean(r.is_private),
     color: (r.color as string | null) ?? null,
     kind: (r.kind as EventRow["kind"] | null) ?? "event",
-    contextId: (r.context_id as string | null) ?? null,
     allDay: Boolean(r.all_day),
     inactive: Boolean(r.inactive),
     start: toMs(r.starts_at),
@@ -129,7 +128,6 @@ export interface EventInput {
   isPrivate?: boolean;
   color?: string | null;
   kind?: EventRow["kind"];
-  contextId?: string | null;
   allDay?: boolean;
   inactive?: boolean;
   start: number;
@@ -151,7 +149,6 @@ export function eventInputToRow(input: EventInput): Row {
     is_private: input.isPrivate ?? false,
     color: input.color ?? null,
     kind: input.kind ?? "event",
-    context_id: input.contextId ?? null,
     all_day: input.allDay ?? false,
     inactive: input.inactive ?? false,
     starts_at: toIso(input.start),
@@ -173,7 +170,6 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("isPrivate" in patch) row.is_private = patch.isPrivate ?? false;
   if ("color" in patch) row.color = patch.color ?? null;
   if ("kind" in patch) row.kind = patch.kind;
-  if ("contextId" in patch) row.context_id = patch.contextId ?? null;
   if ("allDay" in patch) row.all_day = patch.allDay;
   if ("inactive" in patch) row.inactive = patch.inactive;
   if ("start" in patch && patch.start != null) row.starts_at = toIso(patch.start);

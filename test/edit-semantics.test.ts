@@ -25,7 +25,6 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     isPrivate: false,
     color: null,
     kind: "event",
-    contextId: null,
     allDay: false,
     inactive: false,
     start: baseStart,
@@ -196,12 +195,12 @@ describe("splitThisAndFuture", () => {
     expect(newSeries.workspaceId).toBe(event.workspaceId);
   });
 
-  it("preserves kind and context membership on the split new series", () => {
+  it("preserves kind and Context membership on the split new series", () => {
     const ctx = makeEvent({ kind: "context" });
     expect(splitThisAndFuture(ctx, fromOccurrenceMs, {}).newSeries.kind).toBe("context");
 
-    const child = makeEvent({ contextId: "ctx-1" });
-    expect(splitThisAndFuture(child, fromOccurrenceMs, {}).newSeries.contextId).toBe("ctx-1");
+    const child = makeEvent({ categoryId: "cat-1" });
+    expect(splitThisAndFuture(child, fromOccurrenceMs, {}).newSeries.categoryId).toBe("cat-1");
   });
 
   it("inherits the inactive flag from the master, and lets the patch override it", () => {

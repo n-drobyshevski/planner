@@ -19,7 +19,6 @@ function occ(over: Partial<Occurrence> = {}): Occurrence {
     categoryId: null,
     color: null,
     kind: "event",
-    contextId: null,
     ownerId: "m",
     isPrivate: false,
     taskId: null,

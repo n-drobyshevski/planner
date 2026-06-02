@@ -3,7 +3,7 @@ import {
   overlaps,
   contextOccurrences,
   enclosingContext,
-  contextIdForRange,
+  categoryIdForRange,
 } from "@/lib/calendar/contexts";
 import type { EventKind, Occurrence } from "@/lib/types";
 
@@ -20,7 +20,6 @@ function occ(over: Partial<Occurrence> & Pick<Occurrence, "start" | "end">): Occ
     categoryId: null,
     color: null,
     kind: "event" as EventKind,
-    contextId: null,
     ownerId: "m",
     isPrivate: false,
     taskId: null,
@@ -74,14 +73,25 @@ describe("enclosingContext", () => {
   });
 });
 
-describe("contextIdForRange", () => {
-  const work = occ({ start: 9 * H, end: 17 * H, kind: "context", eventId: "work" });
+describe("categoryIdForRange", () => {
+  const work = occ({
+    start: 9 * H,
+    end: 17 * H,
+    kind: "context",
+    eventId: "work",
+    categoryId: "cat-work",
+  });
 
-  it("returns the enclosing context's master id, anchored on start", () => {
-    expect(contextIdForRange([work], 9 * H)).toBe("work");
+  it("returns the enclosing context's painted category, anchored on start", () => {
+    expect(categoryIdForRange([work], 9 * H)).toBe("cat-work");
   });
 
   it("returns null when the start falls outside every context", () => {
-    expect(contextIdForRange([work], 18 * H)).toBeNull();
+    expect(categoryIdForRange([work], 18 * H)).toBeNull();
+  });
+
+  it("returns null for an unlabeled context window (null category)", () => {
+    const blank = occ({ start: 9 * H, end: 17 * H, kind: "context", eventId: "blank" });
+    expect(categoryIdForRange([blank], 10 * H)).toBeNull();
   });
 });

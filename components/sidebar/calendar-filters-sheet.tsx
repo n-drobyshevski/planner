@@ -35,7 +35,7 @@ export function CalendarFiltersSheet({
         <SheetHeader>
           <SheetTitle>Filters</SheetTitle>
           <SheetDescription className="sr-only">
-            Show or hide calendars and categories.
+            Show or hide calendars and contexts.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-safe">

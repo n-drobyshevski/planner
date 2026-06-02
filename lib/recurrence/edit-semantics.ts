@@ -160,7 +160,6 @@ export function splitThisAndFuture(
     isPrivate: event.isPrivate,
     color: event.color,
     kind: event.kind,
-    contextId: event.contextId,
     allDay: patch.allDay !== undefined ? patch.allDay : event.allDay,
     inactive: patch.inactive !== undefined ? patch.inactive : event.inactive,
     start: newStart,

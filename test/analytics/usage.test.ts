@@ -32,7 +32,6 @@ function occ(over: Partial<Occurrence>): Occurrence {
     categoryId: null,
     color: null,
     kind: "event",
-    contextId: null,
     ownerId: "me",
     isPrivate: false,
     taskId: null,
@@ -124,6 +123,30 @@ describe("computeUsage", () => {
       { ownerId: "me", ms: 4 * HOUR },
       { ownerId: "you", ms: 2 * HOUR },
     ]);
+  });
+
+  it("folds context membership into byCategory and ignores the backdrop", () => {
+    // A context window painting "work" (excluded from totals), a child event
+    // inside it assigned the same Context, and an override event physically
+    // inside the window but assigned a different Context ("errands").
+    const u = computeUsage(
+      [
+        occ({ key: "w", kind: "context", categoryId: "work", start: D(9), end: D(17) }),
+        occ({ key: "a", categoryId: "work", start: D(9), end: D(11) }),
+        occ({ key: "b", categoryId: "errands", start: D(11), end: D(12) }),
+      ],
+      days3,
+      win3,
+    );
+    // The backdrop is not tracked; the two real events count toward their own
+    // assigned Context (the override counts as errands, not work).
+    expect(u.byCategory).toEqual([
+      { categoryId: "work", ms: 2 * HOUR },
+      { categoryId: "errands", ms: 1 * HOUR },
+    ]);
+    expect(u.summary.totalMs).toBe(3 * HOUR);
+    // Σ perDay still equals the total.
+    expect(u.perDay.reduce((s, d) => s + d.ms, 0)).toBe(u.summary.totalMs);
   });
 
   it("picks the busiest day across several days", () => {

@@ -13,7 +13,6 @@ import { resolveOccurrenceColor } from "@/lib/calendar/colors";
 import {
   contextOccurrences,
   enclosingContext,
-  contextIdForRange,
 } from "@/lib/calendar/contexts";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent } from "@/lib/tasks/tree";
@@ -59,7 +58,7 @@ type EditorState =
       mode: "create";
       defaultStart: number;
       defaultEnd: number;
-      defaultContextId: string | null;
+      defaultCategoryId: string | null;
     }
   | { mode: "edit"; event: EventRow; occurrence: Occurrence };
 
@@ -227,12 +226,17 @@ export function CalendarShell({
     () => (o: Occurrence) => resolveOccurrenceColor(o, categoryMap, memberMap),
     [categoryMap, memberMap],
   );
-  // Context backdrops (expanded occurrences) for create-inside / move re-eval,
-  // and the master list of contexts for the dialog's "Context" selector.
+  // Context backdrops (expanded occurrences) for auto-assigning a Context when
+  // an item is created inside one.
   const contextOccs = useMemo(() => contextOccurrences(occurrences), [occurrences]);
-  const contextList = useMemo(
-    () => events.filter((e) => e.kind === "context").map((e) => ({ id: e.id, title: e.title })),
-    [events],
+  // The Contexts (categories) the viewer can file an item under: shared ones and
+  // their own. Drives the calendar's right-click "Assign to context" menu.
+  const categoryChoices = useMemo(
+    () =>
+      (workspace.data?.categories ?? [])
+        .filter((c) => c.ownerId === null || c.ownerId === viewerId)
+        .map((c) => ({ id: c.id, name: c.name })),
+    [workspace.data, viewerId],
   );
   const taskColorOf = (t: TaskRow) => resolveTaskColor(t, categoryMap, memberMap);
 
@@ -315,13 +319,13 @@ export function CalendarShell({
     setDetails({ event: ev, occurrence: occ });
   }
   function onCreateRange(start: number, end: number) {
-    // Drawing inside a context auto-assigns the new event to it.
+    // Drawing inside a context backdrop defaults the new item to that Context.
     const ctx = enclosingContext(contextOccs, start);
     setEditor({
       mode: "create",
       defaultStart: start,
       defaultEnd: end,
-      defaultContextId: ctx?.eventId ?? null,
+      defaultCategoryId: ctx?.categoryId ?? null,
     });
   }
   /** Month-view empty-cell create: default time on the clicked day, 1h long. */
@@ -329,13 +333,10 @@ export function CalendarShell({
     const s = defaultStartOnDay(dayMs, viewerTimeZone);
     onCreateRange(s, s + 3_600_000);
   }
-  function onAssignContext(occ: Occurrence, contextId: string) {
+  /** Assign an item to a Context (categoryId), or clear it (null). Series-level. */
+  function onAssignCategory(occ: Occurrence, categoryId: string | null) {
     if (!canEditOcc(occ)) return;
-    void mutations.assignContext(occ.eventId, contextId, occ.contextId);
-  }
-  function onRemoveContext(occ: Occurrence) {
-    if (!canEditOcc(occ)) return;
-    void mutations.removeContext(occ.eventId, occ.contextId);
+    void mutations.assignCategory(occ.eventId, categoryId, occ.categoryId);
   }
   /** Recolor an event (series-level: writes the master row's color). */
   function onChangeEventColor(occ: Occurrence, color: string | null) {
@@ -379,21 +380,9 @@ export function CalendarShell({
     if (!ev) return;
     if (!ev.rrule) {
       optimisticMove(ev.id, start, end);
-      // Re-derive context membership from overlap on every move (backdrop model).
-      // Contexts themselves never get a context_id; recurring events skip this.
-      if (ev.kind === "context") {
-        void mutations.updateSingle(ev.id, { start, end }, { start: ev.start, end: ev.end });
-      } else {
-        void mutations.updateSingle(
-          ev.id,
-          {
-            start,
-            end,
-            contextId: contextIdForRange(contextOccs, start),
-          },
-          { start: ev.start, end: ev.end, contextId: ev.contextId },
-        );
-      }
+      // Moving never changes a Context membership — only creating inside a
+      // backdrop assigns one. So a move just writes the new time.
+      void mutations.updateSingle(ev.id, { start, end }, { start: ev.start, end: ev.end });
     } else {
       setPendingReschedule({ event: ev, occurrence: occ, start, end });
     }
@@ -403,21 +392,16 @@ export function CalendarShell({
     setPendingReschedule(null);
     if (!p) return;
     const patch = { start: p.start, end: p.end };
-    // Re-derive context by overlap (series-level). "this" only moves a single
-    // occurrence, so it leaves series membership alone (it still nests visually);
-    // "future"/"all" re-file the affected series. Contexts never get a context_id.
-    const ctxId =
-      p.event.kind === "context" ? undefined : contextIdForRange(contextOccs, p.start);
+    // A move never changes Context membership (only create-inside assigns one).
     if (scope === "this") {
       void mutations.editThis(p.event, p.occurrence.occurrenceDate, patch);
     } else if (scope === "future") {
-      void mutations.editFuture(p.event, p.occurrence.occurrenceDate, patch, ctxId);
+      void mutations.editFuture(p.event, p.occurrence.occurrenceDate, patch);
     } else {
       const delta = p.start - p.occurrence.start;
       void mutations.updateSingle(p.event.id, {
         start: p.event.start + delta,
         end: p.event.end + delta,
-        ...(ctxId === undefined ? {} : { contextId: ctxId }),
       });
     }
   }
@@ -446,8 +430,6 @@ export function CalendarShell({
       occurrenceDate: number;
       patch: { start: number; end: number };
     }[] = [];
-    const ctxPatch = (start: number, isContext: boolean): Partial<EventInput> =>
-      isContext ? {} : { contextId: contextIdForRange(contextOccs, start) };
     for (const { occ, start, end } of moves) {
       if (!canEditOcc(occ)) continue;
       const ev = events.find((e) => e.id === occ.eventId);
@@ -457,8 +439,8 @@ export function CalendarShell({
         updates.set(ev.id, {
           kind: "update",
           id: ev.id,
-          patch: { start, end, ...ctxPatch(start, ev.kind === "context") },
-          prev: { start: ev.start, end: ev.end, contextId: ev.contextId },
+          patch: { start, end },
+          prev: { start: ev.start, end: ev.end },
         });
       } else if (family) {
         // Whole series: shift the master row by the same start/end delta.
@@ -468,8 +450,8 @@ export function CalendarShell({
         updates.set(ev.id, {
           kind: "update",
           id: ev.id,
-          patch: { start: mStart, end: mEnd, ...ctxPatch(start, ev.kind === "context") },
-          prev: { start: ev.start, end: ev.end, contextId: ev.contextId },
+          patch: { start: mStart, end: mEnd },
+          prev: { start: ev.start, end: ev.end },
         });
       } else {
         // This occurrence only: a modify override keyed on the original date.
@@ -497,12 +479,11 @@ export function CalendarShell({
       taskId: null as string | null, // a plain copy, not a second "part" of a task
     };
   }
-  /** A single one-off copy at the dropped time (drops any recurrence). */
+  /** A single one-off copy at the dropped time (drops any recurrence). The copy
+   *  keeps the original's Context (categoryId, carried by copyBase). */
   function oneOffCopyInput(ev: EventRow, start: number, end: number): EventInput {
     return {
       ...copyBase(ev),
-      // Re-derive context membership by overlap at the drop (contexts get none).
-      contextId: ev.kind === "context" ? null : contextIdForRange(contextOccs, start),
       start,
       end,
       rrule: null,
@@ -513,7 +494,6 @@ export function CalendarShell({
   function familyCopyInput(ev: EventRow, delta: number): EventInput {
     return {
       ...copyBase(ev),
-      contextId: ev.contextId, // preserve the series' context
       start: ev.start + delta,
       end: ev.end + delta,
       rrule: ev.rrule,
@@ -745,8 +725,8 @@ export function CalendarShell({
                 onChangeColor={onChangeEventColor}
                 onColorSelected={colorSelected}
                 onDeleteEvent={onDeleteEvent}
-                onAssignContext={onAssignContext}
-                onRemoveContext={onRemoveContext}
+                onAssignCategory={onAssignCategory}
+                categoryChoices={categoryChoices}
                 canEdit={canEditOcc}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
@@ -796,11 +776,6 @@ export function CalendarShell({
               ? categoryMap.get(details.occurrence.categoryId)?.name ?? null
               : null
           }
-          contextName={
-            details.occurrence.contextId
-              ? contextList.find((c) => c.id === details.occurrence.contextId)?.title ?? null
-              : null
-          }
           ownerName={memberMap.get(details.occurrence.ownerId)?.name ?? "Unknown"}
           isOwn={canEditOcc(details.occurrence)}
           task={
@@ -840,12 +815,11 @@ export function CalendarShell({
           workspaceId={workspace.data.workspaceId}
           currentMemberId={workspace.data.currentMember.id}
           categories={workspace.data.categories}
-          contexts={contextList}
           event={editor.mode === "edit" ? editor.event : null}
           occurrence={editor.mode === "edit" ? editor.occurrence : null}
           defaultStart={editor.mode === "create" ? editor.defaultStart : undefined}
           defaultEnd={editor.mode === "create" ? editor.defaultEnd : undefined}
-          defaultContextId={editor.mode === "create" ? editor.defaultContextId : undefined}
+          defaultCategoryId={editor.mode === "create" ? editor.defaultCategoryId : undefined}
           readOnly={editor.mode === "edit" && editor.event.ownerId !== viewerId}
           ownerName={
             editor.mode === "edit"
@@ -914,10 +888,10 @@ export function CalendarShell({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this context?</AlertDialogTitle>
+            <AlertDialogTitle>Remove this context window?</AlertDialogTitle>
             <AlertDialogDescription>
-              The events inside it stay on your calendar — only the time-block
-              grouping is removed.
+              Items keep their Context — only this time-block is removed from the
+              calendar. The Context itself stays in the sidebar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

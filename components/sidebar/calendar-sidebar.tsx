@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, SquarePen, Focus, Eye, Trash2 } from "lucide-react";
+import { Plus, SquarePen, Focus, Eye, Trash2, CalendarPlus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-wi
 import { qk } from "@/lib/supabase/query-keys";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { localTimeZone } from "@/lib/datetime/local";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import type { Member, Category } from "@/lib/types";
 
@@ -143,13 +144,22 @@ export function CalendarFiltersContent({
   const toggleOverlay = useUiStore((s) => s.toggleOverlay);
   const toggleCategory = useUiStore((s) => s.toggleCategory);
   const setHiddenCategoryIds = useUiStore((s) => s.setHiddenCategoryIds);
-  const mutations = useSidebarMutations();
+  const mutations = useSidebarMutations(workspaceId);
 
   const [renaming, setRenaming] = React.useState<RenameTarget | null>(null);
   const [deleting, setDeleting] = React.useState<{ id: string; name: string } | null>(null);
 
   const ownMember = members.find((m) => m.id === currentMemberId) ?? null;
   const otherMembers = members.filter((m) => m.id !== currentMemberId);
+
+  /** Give a Context a default time-block on the calendar. */
+  function addToCalendar(c: Category) {
+    void mutations.addContextWindow(c.id, {
+      ownerId: currentMemberId,
+      timeZone: ownMember?.timezone ?? localTimeZone(),
+      title: c.name,
+    });
+  }
 
   const categoryVisibility = (id: string): ItemAction[] => [
     {
@@ -209,12 +219,12 @@ export function CalendarFiltersContent({
       <section className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between px-2 pb-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Categories
+            Contexts
           </h3>
           <AddCategoryPopover workspaceId={workspaceId} />
         </div>
         {categories.length === 0 ? (
-          <p className="px-2 text-xs text-muted-foreground">No categories yet</p>
+          <p className="px-2 text-xs text-muted-foreground">No contexts yet</p>
         ) : (
           categories.map((c) => (
             <ItemContextMenu
@@ -227,6 +237,11 @@ export function CalendarFiltersContent({
                   label: "Rename",
                   icon: SquarePen,
                   onSelect: () => setRenaming({ kind: "category", id: c.id, name: c.name }),
+                },
+                {
+                  label: "Add to calendar",
+                  icon: CalendarPlus,
+                  onSelect: () => addToCalendar(c),
                 },
                 ...categoryVisibility(c.id),
                 {
@@ -261,10 +276,10 @@ export function CalendarFiltersContent({
       <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this category?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this context?</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{deleting?.name}&rdquo; will be removed. Events keep their data but
-              lose this category label. This can&apos;t be undone.
+              &ldquo;{deleting?.name}&rdquo; and its calendar time-blocks will be
+              removed; its items become uncategorized. You can undo this.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -320,7 +335,7 @@ function RenameDialog({
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>
-            {target?.kind === "member" ? "Rename calendar" : "Rename category"}
+            {target?.kind === "member" ? "Rename calendar" : "Rename context"}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="sr-only">
             Enter a new name.
@@ -404,7 +419,7 @@ function AddCategoryPopover({ workspaceId }: { workspaceId: string }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-6" aria-label="Add category">
+        <Button variant="ghost" size="icon" className="size-6" aria-label="Add context">
           <Plus />
         </Button>
       </PopoverTrigger>
@@ -413,7 +428,7 @@ function AddCategoryPopover({ workspaceId }: { workspaceId: string }) {
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Category name"
+            placeholder="Context name"
             onKeyDown={(e) => e.key === "Enter" && add()}
             autoFocus
           />
@@ -433,7 +448,7 @@ function AddCategoryPopover({ workspaceId }: { workspaceId: string }) {
             ))}
           </div>
           <Button onClick={add} disabled={pending || !name.trim()} size="sm">
-            Add category
+            Add context
           </Button>
         </div>
       </PopoverContent>

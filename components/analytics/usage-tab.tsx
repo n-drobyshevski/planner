@@ -145,7 +145,7 @@ export function UsageTab({
       id: c.categoryId ?? "uncategorized",
       name: c.categoryId
         ? (categories.get(c.categoryId)?.name ?? "Unknown")
-        : "Uncategorized",
+        : "No context",
       color: c.categoryId
         ? (categories.get(c.categoryId)?.color ?? NEUTRAL)
         : NEUTRAL,
@@ -254,9 +254,9 @@ export function UsageTab({
         </ChartContainer>
       </section>
 
-      {/* By category */}
+      {/* By context */}
       <section className="flex flex-col gap-2">
-        <SectionLabel>By category</SectionLabel>
+        <SectionLabel>By context</SectionLabel>
         <div className="relative mx-auto h-[150px] w-full">
           <ChartContainer config={{}} className="aspect-square h-[150px] w-full">
             <PieChart>
