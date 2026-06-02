@@ -4,6 +4,7 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useDragPager } from "@/hooks/use-drag-pager";
+import { useWheelPager } from "@/hooks/use-wheel-pager";
 
 export interface CalendarPagerHandle {
   /** Animate to the next (+1) / previous (-1) period, then commit. */
@@ -142,27 +143,36 @@ export const CalendarPager = React.forwardRef<CalendarPagerHandle, Props>(
       },
     });
 
-    React.useImperativeHandle(
-      ref,
-      () => ({
-        page: (dir) => {
-          if (transitioning) return;
-          if (reducedMotion()) {
-            onCommit(dir);
-            return;
-          }
-          setNeighborsOn(true);
-          // Let the neighbour mount, sync its scroll, then animate.
-          requestAnimationFrame(() => {
-            const top = findScroller(curRef.current)?.scrollTop ?? 0;
-            const s = findScroller(dir === 1 ? nextRef.current : prevRef.current);
-            if (s) s.scrollTop = top;
-            startAnim(dir === 1 ? "translateX(-200%)" : "translateX(0%)", dir);
-          });
-        },
-      }),
+    // The shared paging path: toolbar buttons (via the imperative handle) and
+    // horizontal wheel/trackpad paging both route through here.
+    const doPage = React.useCallback(
+      (dir: -1 | 1) => {
+        if (transitioning) return;
+        if (reducedMotion()) {
+          onCommit(dir);
+          return;
+        }
+        setNeighborsOn(true);
+        // Let the neighbour mount, sync its scroll, then animate.
+        requestAnimationFrame(() => {
+          const top = findScroller(curRef.current)?.scrollTop ?? 0;
+          const s = findScroller(dir === 1 ? nextRef.current : prevRef.current);
+          if (s) s.scrollTop = top;
+          startAnim(dir === 1 ? "translateX(-200%)" : "translateX(0%)", dir);
+        });
+      },
       [transitioning, onCommit, startAnim],
     );
+
+    React.useImperativeHandle(ref, () => ({ page: doPage }), [doPage]);
+
+    // Desktop: horizontal trackpad swipe / Shift+wheel pages the carousel.
+    useWheelPager({
+      targetRef: viewportRef,
+      enabled,
+      isBusy: () => transitioning,
+      onPage: doPage,
+    });
 
     React.useEffect(() => () => window.clearTimeout(settleTimer.current), []);
 
