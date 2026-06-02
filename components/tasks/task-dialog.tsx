@@ -38,6 +38,7 @@ import { Trash2, Loader2, CalendarPlus } from "lucide-react";
 import { SubtaskEditor } from "./subtask-editor";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { msToDateInput, dateInputToMs } from "@/lib/datetime/local";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import type { Category, Member, TaskRow, TaskStatus } from "@/lib/types";
 import type { TaskInput } from "@/lib/supabase/mappers";
 
@@ -73,15 +74,16 @@ export function TaskDialog(props: TaskDialogProps) {
   const { open, onOpenChange, mode, workspaceId, currentMemberId, members, categories, task } =
     props;
   const mutations = useTaskMutations(workspaceId);
+  const timeZone = useViewerTimeZone();
 
-  const [form, setForm] = useState<FormState>(() => buildInitial(props));
+  const [form, setForm] = useState<FormState>(() => buildInitial(props, timeZone));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(buildInitial(props));
+      setForm(buildInitial(props, timeZone));
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,7 +104,7 @@ export function TaskDialog(props: TaskDialogProps) {
       description: form.description.trim() || null,
       isPrivate: form.isPrivate,
       priority: form.priority === "none" ? null : Number(form.priority),
-      dueAt: form.dueDate ? dateInputToMs(form.dueDate) : null,
+      dueAt: form.dueDate ? dateInputToMs(form.dueDate, timeZone) : null,
       status: form.status,
     };
   }
@@ -353,7 +355,7 @@ export function TaskDialog(props: TaskDialogProps) {
   );
 }
 
-function buildInitial(props: TaskDialogProps): FormState {
+function buildInitial(props: TaskDialogProps, timeZone: string): FormState {
   const { mode, task, defaultStatus } = props;
   if (mode === "edit" && task) {
     return {
@@ -363,7 +365,7 @@ function buildInitial(props: TaskDialogProps): FormState {
       categoryId: task.categoryId ?? "none",
       isPrivate: task.isPrivate,
       priority: task.priority ? String(task.priority) : "none",
-      dueDate: task.dueAt != null ? msToDateInput(task.dueAt) : "",
+      dueDate: task.dueAt != null ? msToDateInput(task.dueAt, timeZone) : "",
       status: task.status,
     };
   }

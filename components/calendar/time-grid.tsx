@@ -2,7 +2,13 @@
 
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
+import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
+import { allDayDateKey, dateKeyInZone } from "@/lib/datetime/local";
+import {
+  useViewerTimeZone,
+  useSecondaryTimeZone,
+} from "@/lib/datetime/timezone-context";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -26,6 +32,19 @@ const TAP_TOL = 10; // px a finger may drift before a press becomes a scroll
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const clampMin = (m: number) => clamp(m, 0, 1440);
+
+/** Compact zone label for the hour-gutter headers, e.g. "GMT+2", "PDT". */
+function zoneAbbrev(zone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      timeZoneName: "short",
+    }).formatToParts(Date.now());
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? zone;
+  } catch {
+    return zone;
+  }
+}
 
 interface Props {
   days: number[];
@@ -113,6 +132,8 @@ export function TimeGrid({
   } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [armed, setArmed] = useState(false);
+  const timeZone = useViewerTimeZone();
+  const secondaryTimeZone = useSecondaryTimeZone();
 
   // Contexts are timed backdrops in the grid body; never show them all-day
   // (all-day contexts are deferred — they'd otherwise render as a flat chip).
@@ -138,7 +159,17 @@ export function TimeGrid({
     return ms < days[0] ? 0 : days.length - 1;
   };
   const timeLabel = (dayIndex: number, min: number) =>
-    formatTime(days[dayIndex] + min * 60_000);
+    formatTime(days[dayIndex] + min * 60_000, timeZone);
+
+  // Secondary-zone clock at primary hour `h` on the first visible day. Compact:
+  // "14" on the hour, "14:30" for half-hour-offset zones (e.g. Asia/Kolkata).
+  const secondaryHourLabel = (h: number): string => {
+    const inst = days[0] + h * 3_600_000;
+    const ctx = tz(secondaryTimeZone!);
+    return format(inst, "mm", { in: ctx }) === "00"
+      ? format(inst, "HH", { in: ctx })
+      : format(inst, "HH:mm", { in: ctx });
+  };
 
   // Touch: arm a move-drag once the long-press timer (set in onPointerDown)
   // fires on an event. Until then the grid scrolls normally.
@@ -430,11 +461,22 @@ export function TimeGrid({
     <div className="flex h-full flex-col">
       {/* Day headers */}
       <div className="flex border-b pr-3">
-        <div className="w-14 shrink-0" />
+        {secondaryTimeZone && (
+          <div className="flex w-12 shrink-0 items-end justify-center pb-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+            {zoneAbbrev(secondaryTimeZone)}
+          </div>
+        )}
+        {secondaryTimeZone ? (
+          <div className="flex w-14 shrink-0 items-end justify-center pb-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+            {zoneAbbrev(timeZone)}
+          </div>
+        ) : (
+          <div className="w-14 shrink-0" />
+        )}
         {days.map((d) => (
           <div key={d} className="flex-1 border-l py-2 text-center">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              {format(d, "EEE")}
+              {format(d, "EEE", { in: tz(timeZone) })}
             </div>
             <div
               className={cn(
@@ -442,7 +484,7 @@ export function TimeGrid({
                 d === today && "bg-primary text-primary-foreground",
               )}
             >
-              {format(d, "d")}
+              {format(d, "d", { in: tz(timeZone) })}
             </div>
           </div>
         ))}
@@ -451,11 +493,18 @@ export function TimeGrid({
       {/* All-day strip */}
       {allDay.length > 0 && (
         <div className="flex border-b bg-muted/30 pr-3">
+          {secondaryTimeZone && <div className="w-12 shrink-0" />}
           <div className="flex w-14 shrink-0 items-start justify-end p-1 text-[10px] uppercase text-muted-foreground">
             All-day
           </div>
           {days.map((d) => {
-            const items = allDay.filter((o) => o.start < d + DAY_MS && o.end > d);
+            // All-day events are floating dates: match by calendar date (UTC
+            // date-key vs the column's date in the viewer zone), never instant.
+            const dayKey = dateKeyInZone(d, timeZone);
+            const items = allDay.filter(
+              (o) =>
+                allDayDateKey(o.start) <= dayKey && allDayDateKey(o.end - 1) >= dayKey,
+            );
             return (
               <div key={d} className="flex min-w-0 flex-1 flex-col gap-1 border-l p-1">
                 {items.map((o) => (
@@ -502,6 +551,17 @@ export function TimeGrid({
       {/* Scrollable time grid */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex" style={{ height: HOUR_PX * 24 }}>
+          {secondaryTimeZone && (
+            <div className="w-12 shrink-0 border-r border-border/40">
+              {HOURS.map((h) => (
+                <div key={h} style={{ height: HOUR_PX }} className="relative">
+                  <span className="absolute -top-2 right-2 text-xs text-muted-foreground tabular-nums">
+                    {h === 0 ? "" : secondaryHourLabel(h)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="w-14 shrink-0">
             {HOURS.map((h) => (
               <div key={h} style={{ height: HOUR_PX }} className="relative">

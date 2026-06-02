@@ -34,6 +34,8 @@ export function mapMember(r: Row): Member {
     accent: (r.accent as AccentId | null) ?? "peach",
     surfaceTone: (r.surface_tone as SurfaceTone | null) ?? "warm",
     palette: (r.palette as Palette | null) ?? "default",
+    timezone: (r.timezone as string | null) ?? null,
+    secondaryTimezone: (r.secondary_timezone as string | null) ?? null,
   };
 }
 

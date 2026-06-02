@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import { formatTime } from "@/lib/datetime/format";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { cn } from "@/lib/utils";
 import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
@@ -40,6 +41,7 @@ export const ContextBackdrop = forwardRef<
   { occ, color, style, selected, singleColumn, editable = true, onMenu, className, ...rest },
   ref,
 ) {
+  const timeZone = useViewerTimeZone();
   return (
     <div
       ref={ref}
@@ -92,7 +94,7 @@ export const ContextBackdrop = forwardRef<
             !singleColumn && "hidden md:inline",
           )}
         >
-          {formatTime(occ.start)}–{formatTime(occ.end)}
+          {formatTime(occ.start, timeZone)}–{formatTime(occ.end, timeZone)}
         </span>
         {onMenu && (
           <ItemMenuButton

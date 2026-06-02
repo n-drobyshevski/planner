@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { startOfDay } from "date-fns";
+import { startOfDay, getTime } from "date-fns";
+import { tz } from "@date-fns/tz";
 import { getWindow, getVisibleDays, navigate, defaultCreateDay } from "@/lib/datetime/window";
 import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
+import { TimezoneProvider } from "@/lib/datetime/timezone-context";
 import { filterVisible } from "@/lib/scope/visibility";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
 import {
@@ -108,15 +110,35 @@ export function CalendarShell({
   const wsId = workspace.data?.workspaceId;
   useWorkspaceRealtime(wsId);
 
+  // The viewer's chosen zone (null = follow device) is the single source of
+  // truth for every window/day-boundary/label computation below, and is shared
+  // with the calendar tree via TimezoneProvider for per-occurrence formatting.
+  const viewerTimeZone = workspace.data?.currentMember?.timezone ?? localTimeZone();
+
   // Three windows for the swipe carousel: the focused period plus its
   // neighbours. Fetching all three keeps them cached so paging is instant and
   // the neighbour panes have content to slide in. React Query dedupes by
   // window, so after the first load each page only fetches one new edge.
-  const prevFocus = useMemo(() => navigate(view, focusedDate, -1), [view, focusedDate]);
-  const nextFocus = useMemo(() => navigate(view, focusedDate, 1), [view, focusedDate]);
-  const win = useMemo(() => getWindow(view, focusedDate), [view, focusedDate]);
-  const winPrev = useMemo(() => getWindow(view, prevFocus), [view, prevFocus]);
-  const winNext = useMemo(() => getWindow(view, nextFocus), [view, nextFocus]);
+  const prevFocus = useMemo(
+    () => navigate(view, focusedDate, -1, { timeZone: viewerTimeZone }),
+    [view, focusedDate, viewerTimeZone],
+  );
+  const nextFocus = useMemo(
+    () => navigate(view, focusedDate, 1, { timeZone: viewerTimeZone }),
+    [view, focusedDate, viewerTimeZone],
+  );
+  const win = useMemo(
+    () => getWindow(view, focusedDate, { timeZone: viewerTimeZone }),
+    [view, focusedDate, viewerTimeZone],
+  );
+  const winPrev = useMemo(
+    () => getWindow(view, prevFocus, { timeZone: viewerTimeZone }),
+    [view, prevFocus, viewerTimeZone],
+  );
+  const winNext = useMemo(
+    () => getWindow(view, nextFocus, { timeZone: viewerTimeZone }),
+    [view, nextFocus, viewerTimeZone],
+  );
   const { occurrences, events, isLoading: eventsLoading, isError: eventsError } =
     useWindowEvents(wsId, win);
   const prevWin = useWindowEvents(wsId, winPrev);
@@ -204,23 +226,25 @@ export function CalendarShell({
   }
   function onScheduleTask(taskId: string, start: number, end: number) {
     const t = tasksById.get(taskId);
-    if (t) void taskMutations.schedule(t, [{ start, end }], localTimeZone());
+    if (t) void taskMutations.schedule(t, [{ start, end }], viewerTimeZone);
   }
 
   function pushUrl(v: CalendarView, ms: number) {
-    router.replace(`/calendar?view=${v}&date=${toDateParam(ms)}`, { scroll: false });
+    router.replace(`/calendar?view=${v}&date=${toDateParam(ms, viewerTimeZone)}`, {
+      scroll: false,
+    });
   }
   function changeView(v: CalendarView) {
     setView(v);
     pushUrl(v, focusedDate);
   }
   function go(dir: -1 | 1) {
-    const next = navigate(view, focusedDate, dir);
+    const next = navigate(view, focusedDate, dir, { timeZone: viewerTimeZone });
     setFocusedDate(next);
     pushUrl(view, next);
   }
   function goToday() {
-    const t = startOfDay(new Date()).getTime();
+    const t = getTime(startOfDay(Date.now(), { in: tz(viewerTimeZone) }));
     setFocusedDate(t);
     pushUrl(view, t);
   }
@@ -232,7 +256,10 @@ export function CalendarShell({
   function openNew() {
     // Default to the first day of the visible timeframe (1st of month / Monday
     // of the week / focused day), at the next 30-min slot if today else 9am.
-    const s = defaultStartOnDay(defaultCreateDay(view, focusedDate));
+    const s = defaultStartOnDay(
+      defaultCreateDay(view, focusedDate, { timeZone: viewerTimeZone }),
+      viewerTimeZone,
+    );
     onCreateRange(s, s + 3_600_000);
   }
   function openEdit(occ: Occurrence) {
@@ -260,7 +287,7 @@ export function CalendarShell({
   }
   /** Month-view empty-cell create: default time on the clicked day, 1h long. */
   function createOnDay(dayMs: number) {
-    const s = defaultStartOnDay(dayMs);
+    const s = defaultStartOnDay(dayMs, viewerTimeZone);
     onCreateRange(s, s + 3_600_000);
   }
   function onAssignContext(occ: Occurrence, contextId: string) {
@@ -354,10 +381,19 @@ export function CalendarShell({
 
   useEffect(() => setMounted(true), []);
 
-  const days = useMemo(() => getVisibleDays(view, focusedDate), [view, focusedDate]);
-  const prevDays = useMemo(() => getVisibleDays(view, prevFocus), [view, prevFocus]);
-  const nextDays = useMemo(() => getVisibleDays(view, nextFocus), [view, nextFocus]);
-  const label = formatRangeLabel(view, focusedDate);
+  const days = useMemo(
+    () => getVisibleDays(view, focusedDate, { timeZone: viewerTimeZone }),
+    [view, focusedDate, viewerTimeZone],
+  );
+  const prevDays = useMemo(
+    () => getVisibleDays(view, prevFocus, { timeZone: viewerTimeZone }),
+    [view, prevFocus, viewerTimeZone],
+  );
+  const nextDays = useMemo(
+    () => getVisibleDays(view, nextFocus, { timeZone: viewerTimeZone }),
+    [view, nextFocus, viewerTimeZone],
+  );
+  const label = formatRangeLabel(view, focusedDate, viewerTimeZone);
 
   // Swipe left/right to page the period via the carousel; in the time-grid
   // views (day/week/3day) a gesture that begins on an event block is left alone
@@ -385,7 +421,8 @@ export function CalendarShell({
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    <TimezoneProvider>
+      <div className="flex h-dvh flex-col bg-background">
       <CalendarToolbar
         view={view}
         label={label}
@@ -673,6 +710,7 @@ export function CalendarShell({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </TimezoneProvider>
   );
 }

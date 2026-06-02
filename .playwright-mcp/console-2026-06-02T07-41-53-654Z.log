@@ -1,0 +1,115 @@
+[     373ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[     917ms] [LOG] [Fast Refresh] done in 656ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[    2983ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[    3066ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[    8327ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[    8342ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[  756513ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[  756675ms] [LOG] [Fast Refresh] done in 270ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[  826183ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[  826236ms] [LOG] [Fast Refresh] done in 169ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[  826712ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[  826841ms] [LOG] [Fast Refresh] done in 242ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1003096ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1003220ms] [LOG] [Fast Refresh] done in 226ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1005030ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1005071ms] [LOG] [Fast Refresh] done in 150ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1096010ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1105314ms] [LOG] [Fast Refresh] done in 9411ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1117187ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1118946ms] [LOG] [Fast Refresh] done in 1832ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1120242ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1124182ms] [LOG] [Fast Refresh] done in 4041ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1134974ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1135787ms] [LOG] [Fast Refresh] done in 916ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1135894ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1137240ms] [LOG] [Fast Refresh] done in 1422ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1138538ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1139695ms] [LOG] [Fast Refresh] done in 1264ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1147438ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1148518ms] [LOG] [Fast Refresh] done in 1159ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1149572ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1150987ms] [LOG] [Fast Refresh] done in 1521ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1156812ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1157486ms] [LOG] [Fast Refresh] done in 755ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1158401ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1159690ms] [LOG] [Fast Refresh] done in 1391ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1168377ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1177639ms] [LOG] [Fast Refresh] done in 9357ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1178400ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1179466ms] [LOG] [Fast Refresh] done in 1174ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1180070ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1180260ms] [LOG] [Fast Refresh] done in 301ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1180429ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/chunks/_0ta97.g._.js:0
+[ 1181049ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1181143ms] [LOG] [Fast Refresh] done in 201ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1181583ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1181733ms] [LOG] [Fast Refresh] done in 257ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1182339ms] ChunkLoadError: Failed to load chunk /_next/static/chunks/_0ta97.g._.js from module [project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.29.7_@playwright+test@1.60.0_react-dom@19.2.4_react@19.2.4/node_modules/next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js [app-client] (ecmascript)
+    at http://localhost:3000/_next/static/chunks/turbopack-_13iuybn._.js:698:25
+[ 1187498ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1189295ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1189346ms] [ERROR] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:3318
+[ 1189402ms] ChunkLoadError: Failed to load chunk /_next/static/chunks/_0ta97.g._.js from module [project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.29.7_@playwright+test@1.60.0_react-dom@19.2.4_react@19.2.4/node_modules/next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js [app-client] (ecmascript)
+    at http://localhost:3000/_next/static/chunks/turbopack-_13iuybn._.js:698:25
+[ 1189494ms] [LOG] [Fast Refresh] done in 1898ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1190450ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1192999ms] [LOG] [Fast Refresh] done in 2661ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1210286ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1210346ms] ChunkLoadError: Failed to load chunk /_next/static/chunks/_0ta97.g._.js from module [project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.29.7_@playwright+test@1.60.0_react-dom@19.2.4_react@19.2.4/node_modules/next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js [app-client] (ecmascript)
+    at http://localhost:3000/_next/static/chunks/turbopack-_13iuybn._.js:698:25
+[ 1210981ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1211082ms] [LOG] [Fast Refresh] done in 201ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1217979ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/calendar:0
+[ 1219016ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1219313ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1219645ms] [ERROR] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:3318
+[ 1219706ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/chunks/_0ta97.g._.js:0
+[ 1219890ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1219990ms] [LOG] [Fast Refresh] done in 212ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1220060ms] ChunkLoadError: Failed to load chunk /_next/static/chunks/_0ta97.g._.js from module [project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.29.7_@playwright+test@1.60.0_react-dom@19.2.4_react@19.2.4/node_modules/next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js [app-client] (ecmascript)
+    at http://localhost:3000/_next/static/chunks/turbopack-_13iuybn._.js:698:25
+[ 1220345ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1221145ms] [LOG] [Fast Refresh] done in 903ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1223669ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1223680ms] [LOG] [Fast Refresh] done in 129ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1224068ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1224413ms] [LOG] [Fast Refresh] done in 453ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1240988ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1243691ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1243737ms] [LOG] [Fast Refresh] done in 2792ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1245099ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1248381ms] [LOG] [Fast Refresh] done in 3388ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1265601ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1265611ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1265679ms] [LOG] [Fast Refresh] done in 37ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1266032ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1272943ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1272947ms] [LOG] [Fast Refresh] done in 7013ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1273006ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/calendar:0
+[ 1273437ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1273508ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1273653ms] [ERROR] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:3318
+[ 1273826ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/chunks/_0ta97.g._.js:0
+[ 1273933ms] ChunkLoadError: Failed to load chunk /_next/static/chunks/_0ta97.g._.js from module [project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.29.7_@playwright+test@1.60.0_react-dom@19.2.4_react@19.2.4/node_modules/next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js [app-client] (ecmascript)
+    at http://localhost:3000/_next/static/chunks/turbopack-_13iuybn._.js:698:25
+[ 1273964ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1273974ms] [LOG] [Fast Refresh] done in 163ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1277313ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1277889ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1277894ms] [LOG] [Fast Refresh] done in 674ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1278858ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1280911ms] [LOG] [Fast Refresh] done in 2164ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1295532ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1295550ms] [LOG] [Fast Refresh] done in 119ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1301546ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/calendar:0
+[ 1302297ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1302634ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1309872ms] [ERROR] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:3318
+[ 1312857ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/chunks/_0ta97.g._.js:0
+[ 1313048ms] ChunkLoadError: Failed to load chunk /_next/static/chunks/_0ta97.g._.js from module [project]/node_modules/.pnpm/next@16.2.6_@babel+core@7.29.7_@playwright+test@1.60.0_react-dom@19.2.4_react@19.2.4/node_modules/next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js [app-client] (ecmascript)
+    at http://localhost:3000/_next/static/chunks/turbopack-_13iuybn._.js:698:25
+[ 1313619ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1313645ms] [LOG] [Fast Refresh] done in 130ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1405182ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477
+[ 1405807ms] [LOG] [Fast Refresh] done in 731ms @ http://localhost:3000/_next/static/chunks/05~u_next_dist_0rc3476._.js:2477

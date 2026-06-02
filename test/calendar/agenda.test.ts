@@ -85,10 +85,13 @@ describe("groupByDay", () => {
   });
 
   it("puts all-day items first, then by start time", () => {
+    // The all-day item is a floating date (UTC-anchored) for the same calendar
+    // day as the timed ones, so it buckets into the same viewer-zone day.
+    const allDayStart = Date.UTC(2026, 5, 1);
     const groups = groupByDay([
       occ(day0 + 15 * 3_600_000, "3pm"),
       occ(day0 + 9 * 3_600_000, "9am"),
-      occ(day0, "All day", { allDay: true }),
+      occ(allDayStart, "All day", { allDay: true, end: allDayStart + 86_400_000 }),
     ]);
     expect(groups).toHaveLength(1);
     expect(groups[0].items.map((i) => i.title)).toEqual(["All day", "9am", "3pm"]);

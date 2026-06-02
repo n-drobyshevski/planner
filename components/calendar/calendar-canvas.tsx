@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { startOfDay } from "date-fns";
+import { startOfDay, getTime } from "date-fns";
+import { tz } from "@date-fns/tz";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TimeGrid } from "./time-grid";
 import { MonthGrid } from "./month-grid";
 import { AgendaView } from "./agenda-view";
@@ -58,7 +60,13 @@ export function CalendarCanvas(props: CanvasProps) {
     onScheduleTask,
     error,
   } = props;
-  const today = useMemo(() => startOfDay(new Date()).getTime(), []);
+  const timeZone = useViewerTimeZone();
+  // "Today" is the viewer-zone day, so the highlight + now-line land on the
+  // right column even when the chosen zone differs from the device.
+  const today = useMemo(
+    () => getTime(startOfDay(Date.now(), { in: tz(timeZone) })),
+    [timeZone],
+  );
 
   // The month grid's tiny cells can't show a time-block backdrop usefully, so
   // contexts are filtered out there. Agenda keeps them (as badged rows).

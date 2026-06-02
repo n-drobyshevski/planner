@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { msToDateInput, dateInputToMs } from "@/lib/datetime/local";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import type { Freq, RecurrenceForm } from "@/lib/recurrence/rrule-build";
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -36,6 +37,7 @@ export function RecurrenceEditor({
   onChange: (v: RecurrenceForm | null) => void;
   startMs: number;
 }) {
+  const timeZone = useViewerTimeZone();
   function setFreq(next: string) {
     if (next === "none") return onChange(null);
     const freq = next as Freq;
@@ -154,9 +156,12 @@ export function RecurrenceEditor({
 
                   {value.end.type === "until" && (
                     <DatePicker
-                      value={msToDateInput(value.end.dateMs)}
+                      value={msToDateInput(value.end.dateMs, timeZone)}
                       onChange={(v) =>
-                        onChange({ ...value, end: { type: "until", dateMs: dateInputToMs(v) } })
+                        onChange({
+                          ...value,
+                          end: { type: "until", dateMs: dateInputToMs(v, timeZone) },
+                        })
                       }
                       aria-label="Repeat until date"
                       className="w-40"

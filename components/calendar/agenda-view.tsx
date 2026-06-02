@@ -2,7 +2,9 @@
 
 import { forwardRef, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
+import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { CalendarDays, Pencil, Trash2, Eye } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
 import { cn } from "@/lib/utils";
@@ -52,7 +54,8 @@ export function AgendaView({
   canEdit,
   loading,
 }: Props) {
-  const groups = useMemo(() => groupByDay(occurrences), [occurrences]);
+  const timeZone = useViewerTimeZone();
+  const groups = useMemo(() => groupByDay(occurrences, timeZone), [occurrences, timeZone]);
 
   if (loading && groups.length === 0) return <AgendaSkeleton />;
 
@@ -78,7 +81,7 @@ export function AgendaView({
     <div className="h-full overflow-y-auto overscroll-contain">
       <ol className="mx-auto max-w-2xl divide-y">
         {groups.map((g) => {
-          const isToday = isSameDay(g.dayMs, today);
+          const isToday = isSameDay(g.dayMs, today, { in: tz(timeZone) });
           return (
             <li key={g.dayMs} className="flex gap-3 px-3 py-3 sm:px-4">
               <div className="flex w-12 shrink-0 flex-col items-center pt-0.5">
@@ -88,7 +91,7 @@ export function AgendaView({
                     isToday ? "text-primary" : "text-muted-foreground",
                   )}
                 >
-                  {format(g.dayMs, "EEE")}
+                  {format(g.dayMs, "EEE", { in: tz(timeZone) })}
                 </span>
                 <span
                   className={cn(
@@ -96,10 +99,10 @@ export function AgendaView({
                     isToday && "bg-primary text-primary-foreground",
                   )}
                 >
-                  {format(g.dayMs, "d")}
+                  {format(g.dayMs, "d", { in: tz(timeZone) })}
                 </span>
                 <span className="mt-0.5 text-[10px] text-muted-foreground">
-                  {format(g.dayMs, "MMM")}
+                  {format(g.dayMs, "MMM", { in: tz(timeZone) })}
                 </span>
               </div>
 
@@ -157,6 +160,7 @@ const AgendaRow = forwardRef<
   } & MenuableProps &
     Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect">
 >(function AgendaRow({ occ, color, selected, onSelect, onMenu, className, ...rest }, ref) {
+  const timeZone = useViewerTimeZone();
   return (
     <div
       ref={ref}
@@ -199,7 +203,7 @@ const AgendaRow = forwardRef<
         )}
       </span>
       <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-        {occ.allDay ? "All day" : formatTime(occ.start)}
+        {occ.allDay ? "All day" : formatTime(occ.start, timeZone)}
       </span>
       {onMenu && (
         <ItemMenuButton onMenu={onMenu} className="-mr-1 text-muted-foreground" />

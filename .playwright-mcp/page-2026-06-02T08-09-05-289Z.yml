@@ -1,0 +1,39 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e7]:
+      - img [ref=e8]
+    - generic [ref=e11]:
+      - button "Open issues overlay" [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: "1"
+          - generic [ref=e15]: "2"
+        - generic [ref=e16]:
+          - text: Issue
+          - generic [ref=e17]: s
+      - button "Collapse issues badge" [ref=e18]:
+        - img [ref=e19]
+  - generic [ref=e21]:
+    - banner [ref=e22]:
+      - img [ref=e25]
+      - navigation [ref=e28]:
+        - link "Calendar" [ref=e29] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e30]
+          - generic [ref=e32]: Calendar
+        - link "Tasks" [ref=e33] [cursor=pointer]:
+          - /url: /tasks
+          - img [ref=e34]
+          - generic [ref=e37]: Tasks
+      - generic [ref=e38]:
+        - group [ref=e39]:
+          - radio "Board" [checked] [ref=e40] [cursor=pointer]
+          - radio "List" [ref=e41] [cursor=pointer]
+        - button "New task" [ref=e42] [cursor=pointer]:
+          - img
+          - generic [ref=e43]: New task
+        - button "Toggle theme" [ref=e44] [cursor=pointer]:
+          - img
+    - main [ref=e45]:
+      - img [ref=e48]
+  - region "Notifications alt+T"
+  - alert [ref=e50]

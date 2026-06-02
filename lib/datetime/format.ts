@@ -1,41 +1,57 @@
 import { format, isSameDay } from "date-fns";
+import { tz } from "@date-fns/tz";
 import type { CalendarView } from "@/lib/types";
 import { getVisibleDays } from "@/lib/datetime/window";
+import { localTimeZone } from "@/lib/datetime/local";
 
 /** 24-hour time, e.g. "09:00". */
-export function formatTime(ms: number): string {
-  return format(ms, "HH:mm");
+export function formatTime(ms: number, timeZone: string = localTimeZone()): string {
+  return format(ms, "HH:mm", { in: tz(timeZone) });
 }
 
 /** Day then month, e.g. "1 Jun". */
-export function formatDayMonth(ms: number): string {
-  return format(ms, "d MMM");
+export function formatDayMonth(ms: number, timeZone: string = localTimeZone()): string {
+  return format(ms, "d MMM", { in: tz(timeZone) });
 }
 
 /** Weekday, day, month, e.g. "Mon, 1 Jun". */
-export function formatWeekdayDayMonth(ms: number): string {
-  return format(ms, "EEE, d MMM");
+export function formatWeekdayDayMonth(
+  ms: number,
+  timeZone: string = localTimeZone(),
+): string {
+  return format(ms, "EEE, d MMM", { in: tz(timeZone) });
 }
 
 /** Day, month, year, e.g. "1 Jun 2026". */
-export function formatDayMonthYear(ms: number): string {
-  return format(ms, "d MMM yyyy");
+export function formatDayMonthYear(
+  ms: number,
+  timeZone: string = localTimeZone(),
+): string {
+  return format(ms, "d MMM yyyy", { in: tz(timeZone) });
 }
 
 /** Human label for the current view + focused date (e.g. "25 – 31 May 2026"). */
-export function formatRangeLabel(view: CalendarView, focusedMs: number): string {
-  if (view === "day") return format(focusedMs, "EEEE, d MMM yyyy");
-  if (view === "month") return format(focusedMs, "MMMM yyyy");
+export function formatRangeLabel(
+  view: CalendarView,
+  focusedMs: number,
+  timeZone: string = localTimeZone(),
+): string {
+  const ctx = tz(timeZone);
+  if (view === "day") return format(focusedMs, "EEEE, d MMM yyyy", { in: ctx });
+  if (view === "month") return format(focusedMs, "MMMM yyyy", { in: ctx });
   // Agenda is a rolling list from the focused day — label it by that month.
-  if (view === "agenda") return format(focusedMs, "MMMM yyyy");
+  if (view === "agenda") return format(focusedMs, "MMMM yyyy", { in: ctx });
 
   // Range views (week, 3day): span the actual visible days, day-before-month.
-  const days = getVisibleDays(view, focusedMs);
+  const days = getVisibleDays(view, focusedMs, { timeZone });
   const start = days[0];
   const end = days[days.length - 1];
-  const sameMonth = format(start, "MMM yyyy") === format(end, "MMM yyyy");
-  const left = sameMonth ? format(start, "d") : format(start, "d MMM");
-  const right = format(end, "d MMM yyyy");
+  const sameMonth =
+    format(start, "MMM yyyy", { in: ctx }) === format(end, "MMM yyyy", { in: ctx });
+  const left = sameMonth
+    ? format(start, "d", { in: ctx })
+    : format(start, "d MMM", { in: ctx });
+  const right = format(end, "d MMM yyyy", { in: ctx });
   return `${left} – ${right}`;
 }
 
@@ -45,22 +61,26 @@ export function formatRangeLabel(view: CalendarView, focusedMs: number): string 
  *  - all-day, multi-day: "1 Jun – 4 Jun"   (end is exclusive midnight)
  *  - timed, same day:    "Mon, 1 Jun · 09:00 – 09:30"
  *  - timed, across days: "1 Jun, 23:00 – 2 Jun, 01:00"
+ *
+ * All-day dates are rendered in UTC (floating: the same calendar date for every
+ * viewer); timed instants render in the viewer's `timeZone`.
  */
 export function formatOccurrenceWhen(
   start: number,
   end: number,
   allDay: boolean,
+  timeZone: string = localTimeZone(),
 ): string {
   if (allDay) {
     const lastDay = end - 1; // exclusive end → inclusive last day
-    return isSameDay(start, lastDay)
-      ? `${formatWeekdayDayMonth(start)} · All day`
-      : `${formatDayMonth(start)} – ${formatDayMonth(lastDay)}`;
+    return isSameDay(start, lastDay, { in: tz("UTC") })
+      ? `${formatWeekdayDayMonth(start, "UTC")} · All day`
+      : `${formatDayMonth(start, "UTC")} – ${formatDayMonth(lastDay, "UTC")}`;
   }
-  if (isSameDay(start, end)) {
-    return `${formatWeekdayDayMonth(start)} · ${formatTime(start)} – ${formatTime(end)}`;
+  if (isSameDay(start, end, { in: tz(timeZone) })) {
+    return `${formatWeekdayDayMonth(start, timeZone)} · ${formatTime(start, timeZone)} – ${formatTime(end, timeZone)}`;
   }
-  return `${formatDayMonth(start)}, ${formatTime(start)} – ${formatDayMonth(end)}, ${formatTime(end)}`;
+  return `${formatDayMonth(start, timeZone)}, ${formatTime(start, timeZone)} – ${formatDayMonth(end, timeZone)}, ${formatTime(end, timeZone)}`;
 }
 
 /**
@@ -76,12 +96,14 @@ export function formatDuration(ms: number): string {
   return `${h}h ${m}m`;
 }
 
-/** URL date param helpers. */
-export function toDateParam(ms: number): string {
-  return format(ms, "yyyy-MM-dd");
+/** URL date param helpers. `toDateParam` encodes the focused day in `timeZone`. */
+export function toDateParam(ms: number, timeZone: string = localTimeZone()): string {
+  return format(ms, "yyyy-MM-dd", { in: tz(timeZone) });
 }
 
 export function parseDateParam(value: string | undefined): number {
+  // Runs in the server route with no member context; the coarse y-m-d seed is
+  // re-normalized to the viewer's zone by getWindow on the client.
   if (value) {
     const d = new Date(`${value}T00:00:00`);
     if (!Number.isNaN(d.getTime())) return d.getTime();

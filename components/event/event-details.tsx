@@ -28,6 +28,10 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ColorSwatchPicker } from "@/components/shared/color-swatch-picker";
 import { formatOccurrenceWhen, formatDayMonth } from "@/lib/datetime/format";
+import {
+  useViewerTimeZone,
+  useSecondaryTimeZone,
+} from "@/lib/datetime/timezone-context";
 import { parseRRule, summarizeRecurrence } from "@/lib/recurrence/rrule-build";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import type { EventRow, Occurrence, TaskRow } from "@/lib/types";
@@ -85,6 +89,12 @@ export function EventDetails({
   const isContext = occurrence.kind === "context";
   const rec = parseRRule(event.rrule);
   const recText = rec ? summarizeRecurrence(rec) : null;
+  const timeZone = useViewerTimeZone();
+  const secondaryTimeZone = useSecondaryTimeZone();
+  // All-day events are floating dates (same for everyone), so a secondary zone
+  // only adds value for timed occurrences.
+  const showSecondary = secondaryTimeZone != null && !occurrence.allDay;
+  const secondaryLabel = secondaryTimeZone?.split("/").pop()?.replace(/_/g, " ");
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
@@ -113,7 +123,25 @@ export function EventDetails({
         <ResponsiveDialogBody>
           <div className="flex flex-col gap-3 text-sm">
             <Row icon={Clock}>
-              <div>{formatOccurrenceWhen(occurrence.start, occurrence.end, occurrence.allDay)}</div>
+              <div>
+                {formatOccurrenceWhen(
+                  occurrence.start,
+                  occurrence.end,
+                  occurrence.allDay,
+                  timeZone,
+                )}
+              </div>
+              {showSecondary && (
+                <div className="text-muted-foreground">
+                  {formatOccurrenceWhen(
+                    occurrence.start,
+                    occurrence.end,
+                    occurrence.allDay,
+                    secondaryTimeZone!,
+                  )}{" "}
+                  ({secondaryLabel})
+                </div>
+              )}
               {recText && <div className="text-muted-foreground">{recText}</div>}
             </Row>
 
@@ -137,7 +165,7 @@ export function EventDetails({
                   <span>Task · {TASK_STATUS_LABEL[task.status]}</span>
                   {task.dueAt != null && (
                     <span className="text-muted-foreground tabular-nums">
-                      Due {formatDayMonth(task.dueAt)}
+                      Due {formatDayMonth(task.dueAt, timeZone)}
                     </span>
                   )}
                   {isOwn && onToggleTaskDone && (

@@ -35,11 +35,11 @@ import {
   msToDateInput,
   msToTimeInput,
   combineDateTime,
-  dateInputToMs,
-  localTimeZone,
+  dateInputToUtcMs,
   ceilToStep,
   DAY_IN_MS,
 } from "@/lib/datetime/local";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import type { Category, EventKind, EventRow, Occurrence } from "@/lib/types";
 import type { EventInput } from "@/lib/supabase/mappers";
 
@@ -98,8 +98,9 @@ export function EventDialog(props: EventDialogProps) {
     ownerName,
   } = props;
   const mutations = useEventMutations(workspaceId);
+  const timeZone = useViewerTimeZone();
 
-  const [form, setForm] = useState<FormState>(() => buildInitial(props));
+  const [form, setForm] = useState<FormState>(() => buildInitial(props, timeZone));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [scopePrompt, setScopePrompt] = useState<null | "edit" | "delete">(null);
@@ -107,7 +108,7 @@ export function EventDialog(props: EventDialogProps) {
   // Re-initialize when (re)opened for a different event/slot.
   useEffect(() => {
     if (open) {
-      setForm(buildInitial(props));
+      setForm(buildInitial(props, timeZone));
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,12 +125,15 @@ export function EventDialog(props: EventDialogProps) {
   );
 
   function computeTimes() {
+    // All-day events are floating dates anchored to UTC midnight (the same
+    // calendar date for everyone); timed events are interpreted in the viewer's
+    // chosen zone.
     const start = form.allDay
-      ? dateInputToMs(form.startDate)
-      : combineDateTime(form.startDate, form.startTime);
+      ? dateInputToUtcMs(form.startDate)
+      : combineDateTime(form.startDate, form.startTime, timeZone);
     const end = form.allDay
-      ? dateInputToMs(form.endDate) + DAY_IN_MS
-      : combineDateTime(form.endDate, form.endTime);
+      ? dateInputToUtcMs(form.endDate) + DAY_IN_MS
+      : combineDateTime(form.endDate, form.endTime, timeZone);
     return { start, end };
   }
 
@@ -175,7 +179,7 @@ export function EventDialog(props: EventDialogProps) {
         inactive: form.inactive,
         start,
         end,
-        timeZone: localTimeZone(),
+        timeZone,
         rrule: buildRRule(form.recurrence),
         recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
       };
@@ -554,9 +558,12 @@ function recurrenceEndsAt(form: RecurrenceForm | null): number | null {
   return null;
 }
 
-function buildInitial(props: EventDialogProps): FormState {
+function buildInitial(props: EventDialogProps, timeZone: string): FormState {
   const { mode, event, occurrence, defaultStart, defaultEnd, defaultContextId } = props;
   if (mode === "edit" && event && occurrence) {
+    // All-day events are floating dates anchored to UTC midnight: read their
+    // date in UTC so the picker shows the same calendar date for every viewer.
+    const dateZone = occurrence.allDay ? "UTC" : timeZone;
     return {
       itemKind: event.kind,
       title: occurrence.title,
@@ -564,10 +571,10 @@ function buildInitial(props: EventDialogProps): FormState {
       location: occurrence.location ?? "",
       allDay: occurrence.allDay,
       inactive: occurrence.inactive,
-      startDate: msToDateInput(occurrence.start),
-      startTime: msToTimeInput(occurrence.start),
-      endDate: msToDateInput(occurrence.allDay ? occurrence.end - 1 : occurrence.end),
-      endTime: msToTimeInput(occurrence.end),
+      startDate: msToDateInput(occurrence.start, dateZone),
+      startTime: msToTimeInput(occurrence.start, timeZone),
+      endDate: msToDateInput(occurrence.allDay ? occurrence.end - 1 : occurrence.end, dateZone),
+      endTime: msToTimeInput(occurrence.end, timeZone),
       categoryId: occurrence.categoryId ?? "none",
       contextId: event.contextId ?? "none",
       isPrivate: event.isPrivate,
@@ -584,10 +591,10 @@ function buildInitial(props: EventDialogProps): FormState {
     location: "",
     allDay: false,
     inactive: false,
-    startDate: msToDateInput(start),
-    startTime: msToTimeInput(start),
-    endDate: msToDateInput(end),
-    endTime: msToTimeInput(end),
+    startDate: msToDateInput(start, timeZone),
+    startTime: msToTimeInput(start, timeZone),
+    endDate: msToDateInput(end, timeZone),
+    endTime: msToTimeInput(end, timeZone),
     categoryId: "none",
     contextId: defaultContextId ?? "none",
     isPrivate: false,

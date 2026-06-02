@@ -244,6 +244,10 @@ export interface MemberPreferencesPatch {
   accent?: AccentId;
   surfaceTone?: SurfaceTone;
   palette?: Palette;
+  /** IANA zone, or null to clear it (= follow the device). */
+  timezone?: string | null;
+  /** IANA zone, or null to turn the secondary zone off. */
+  secondaryTimezone?: string | null;
 }
 
 /**
@@ -288,6 +292,10 @@ export async function updateMemberPreferences(
   if (patch.accent != null) row.accent = patch.accent;
   if (patch.surfaceTone != null) row.surface_tone = patch.surfaceTone;
   if (patch.palette != null) row.palette = patch.palette;
+  // `timezone`/`secondaryTimezone` are nullable: an explicit null clears the
+  // column (= follow device / turn secondary off), so key on presence, not value.
+  if ("timezone" in patch) row.timezone = patch.timezone ?? null;
+  if ("secondaryTimezone" in patch) row.secondary_timezone = patch.secondaryTimezone ?? null;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;

@@ -126,7 +126,11 @@ export function expandEvent(
   }
 
   // --- Recurring event ------------------------------------------------------
-  const tz = event.timeZone;
+  // All-day events are floating dates anchored to UTC midnight (the same
+  // calendar date for every viewer), so expand them in UTC: floating == real,
+  // keeping each occurrence_date exactly on UTC midnight for stable override
+  // matching. Timed events expand in their own IANA zone (DST-correct).
+  const tz = event.allDay ? "UTC" : event.timeZone;
   const duration = event.end - event.start;
 
   const options = RRule.parseString(event.rrule);

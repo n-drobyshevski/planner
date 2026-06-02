@@ -18,6 +18,7 @@ import {
   DEFAULT_PALETTE,
   paletteMode,
 } from "@/lib/theme/appearance";
+import { localTimeZone } from "@/lib/datetime/local";
 import type { Member, Palette, ThemePreference } from "@/lib/types";
 
 function applyAppearance(accent: string, tone: string, palette: Palette) {
@@ -63,6 +64,11 @@ export function usePreferences() {
   const tone = member?.surfaceTone ?? DEFAULT_TONE;
   const themePreference = member?.themePreference ?? DEFAULT_THEME;
   const palette = member?.palette ?? DEFAULT_PALETTE;
+  // Time zones: the stored value (null = follow device) and the resolved zone
+  // the calendar actually renders in. The secondary zone is null when off.
+  const rawTimezone = member?.timezone ?? null;
+  const timeZone = rawTimezone ?? localTimeZone();
+  const secondaryTimeZone = member?.secondaryTimezone ?? null;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
   // its own (Latte light, the rest dark); `default` defers to themePreference.
@@ -122,6 +128,24 @@ export function usePreferences() {
     [persist, setTheme],
   );
 
+  // Time-zone preferences have no DOM side-effect (unlike accent/tone, which
+  // re-tint <html> at once); the calendar re-reads the resolved zone from the
+  // workspace cache that `persist` patches. Passing null clears the column
+  // (= follow device / turn the secondary zone off).
+  const setTimezone = useCallback(
+    (next: string | null) => {
+      void persist({ timezone: next });
+    },
+    [persist],
+  );
+
+  const setSecondaryTimezone = useCallback(
+    (next: string | null) => {
+      void persist({ secondaryTimezone: next });
+    },
+    [persist],
+  );
+
   const setPalette = useCallback(
     (next: Palette) => {
       const el = document.documentElement;
@@ -143,10 +167,18 @@ export function usePreferences() {
     accent,
     tone,
     palette,
+    /** Stored zone (null = follow device) — for the Settings picker's selected state. */
+    rawTimezone,
+    /** Resolved zone the calendar renders in (stored value or the device zone). */
+    timeZone,
+    /** Optional secondary zone (world-clock), or null when off. */
+    secondaryTimeZone,
     setThemePref,
     setAccent,
     setTone,
     setPalette,
+    setTimezone,
+    setSecondaryTimezone,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,
   };

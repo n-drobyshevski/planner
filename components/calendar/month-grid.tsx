@@ -2,7 +2,9 @@
 
 import { forwardRef, useMemo } from "react";
 import { format, isSameMonth } from "date-fns";
+import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -77,9 +79,10 @@ function WeekRow({
   onDeleteEvent,
   canEdit,
 }: CommonProps & { dayStarts: number[] }) {
+  const timeZone = useViewerTimeZone();
   const layout = useMemo(
-    () => packMonthWeek(occurrences, dayStarts, MAX_LANES),
-    [occurrences, dayStarts],
+    () => packMonthWeek(occurrences, dayStarts, MAX_LANES, timeZone),
+    [occurrences, dayStarts, timeZone],
   );
 
   return (
@@ -87,14 +90,14 @@ function WeekRow({
       {/* Background day cells */}
       <div className="grid h-full grid-cols-7">
         {dayStarts.map((d) => {
-          const inMonth = isSameMonth(d, focusedMs);
+          const inMonth = isSameMonth(d, focusedMs, { in: tz(timeZone) });
           const isToday = d === today;
           return (
             <div
               key={d}
               role="button"
               tabIndex={0}
-              aria-label={`Create event on ${format(d, "d MMMM")}`}
+              aria-label={`Create event on ${format(d, "d MMMM", { in: tz(timeZone) })}`}
               onClick={() => onCreateDay(d)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -109,7 +112,7 @@ function WeekRow({
             >
               <button
                 type="button"
-                aria-label={`Go to ${format(d, "d MMMM")}`}
+                aria-label={`Go to ${format(d, "d MMMM", { in: tz(timeZone) })}`}
                 onClick={(e) => {
                   // The day number navigates to Day view; don't also create.
                   e.stopPropagation();
@@ -122,7 +125,7 @@ function WeekRow({
                   !inMonth && !isToday && "text-muted-foreground",
                 )}
               >
-                {format(d, "d")}
+                {format(d, "d", { in: tz(timeZone) })}
               </button>
             </div>
           );
@@ -258,7 +261,8 @@ function MoreButton({
   colorOf: (o: Occurrence) => string;
   onSelect: (o: Occurrence) => void;
 }) {
-  const items = occurrencesOnDay(occurrences, day);
+  const timeZone = useViewerTimeZone();
+  const items = occurrencesOnDay(occurrences, day, timeZone);
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -271,7 +275,7 @@ function MoreButton({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-2">
         <div className="mb-1 px-1 text-xs font-medium text-muted-foreground">
-          {format(day, "EEEE, d MMM")}
+          {format(day, "EEEE, d MMM", { in: tz(timeZone) })}
         </div>
         <div className="flex flex-col gap-0.5">
           {items.map((o) => (
@@ -291,7 +295,7 @@ function MoreButton({
               <span className="truncate">{o.title}</span>
               {!o.allDay && (
                 <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {formatTime(o.start)}
+                  {formatTime(o.start, timeZone)}
                 </span>
               )}
             </button>

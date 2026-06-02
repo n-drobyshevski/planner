@@ -24,6 +24,8 @@ const member = (id: string, color: string): Member => ({
   accent: "peach",
   surfaceTone: "warm",
   palette: "default",
+  timezone: null,
+  secondaryTimezone: null,
 });
 
 function occ(over: Partial<Occurrence>): Occurrence {

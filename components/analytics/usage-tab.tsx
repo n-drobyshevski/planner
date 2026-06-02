@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { format } from "date-fns";
+import { tz } from "@date-fns/tz";
 import { Bar, BarChart, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { ChartColumnBig } from "lucide-react";
 import {
@@ -23,6 +24,7 @@ import {
   formatWeekdayDayMonth,
 } from "@/lib/datetime/format";
 import { computeUsage } from "@/lib/analytics/usage";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { cn } from "@/lib/utils";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import type {
@@ -117,22 +119,23 @@ export function UsageTab({
   overlayActive,
 }: UsageTabProps) {
   const reduced = usePrefersReducedMotion();
+  const timeZone = useViewerTimeZone();
   const usage = React.useMemo(
     () => computeUsage(occurrences, days, window),
     [occurrences, days, window],
   );
 
   const total = usage.summary.totalMs;
-  const rangeLabel = formatRangeLabel(view, focusedDate);
+  const rangeLabel = formatRangeLabel(view, focusedDate, timeZone);
 
   const perDayData = React.useMemo(
     () =>
       usage.perDay.map((d) => ({
         key: String(d.dayMs),
         ms: d.ms,
-        full: formatWeekdayDayMonth(d.dayMs),
+        full: formatWeekdayDayMonth(d.dayMs, timeZone),
       })),
-    [usage.perDay],
+    [usage.perDay, timeZone],
   );
   // Thin out x-axis labels on dense windows (month=42, agenda=30) to ~7 ticks.
   const tickInterval = days.length <= 14 ? 0 : Math.ceil(days.length / 7) - 1;
@@ -195,7 +198,7 @@ export function UsageTab({
           value={usage.summary.busiestDay ? formatDuration(usage.summary.busiestDay.ms) : "—"}
           hint={
             usage.summary.busiestDay
-              ? format(usage.summary.busiestDay.dayMs, "EEE d MMM")
+              ? format(usage.summary.busiestDay.dayMs, "EEE d MMM", { in: tz(timeZone) })
               : undefined
           }
         />
@@ -222,7 +225,7 @@ export function UsageTab({
               tickMargin={6}
               minTickGap={8}
               interval={tickInterval}
-              tickFormatter={(value: string) => format(Number(value), "d")}
+              tickFormatter={(value: string) => format(Number(value), "d", { in: tz(timeZone) })}
             />
             <YAxis hide domain={[0, "dataMax"]} />
             <ChartTooltip

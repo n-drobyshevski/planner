@@ -25,6 +25,18 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { ColorSwatchPicker } from "./color-swatch-picker";
 
+/**
+ * Run a menu action on the next tick. Opening a dialog from a (modal)
+ * ContextMenu item's `onSelect` races with Radix tearing the menu down — focus
+ * returns to the trigger and the body's `pointer-events` lock is released on the
+ * same tick — so a dialog opened synchronously flickers shut or never appears.
+ * Deferring lets the menu finish closing first. (The mobile sheet doesn't have
+ * this problem; it already defers via its own close.)
+ */
+function runAfterClose(fn?: () => void) {
+  if (fn) setTimeout(fn, 0);
+}
+
 export interface ItemAction {
   label: string;
   /** Omitted for a pure submenu parent (its `submenu` items carry the handlers). */
@@ -114,7 +126,7 @@ export function ItemContextMenu({
                   <ContextMenuItem
                     key={s.label}
                     variant={s.destructive ? "destructive" : undefined}
-                    onSelect={s.onSelect}
+                    onSelect={() => runAfterClose(s.onSelect)}
                   >
                     {s.icon && <s.icon />}
                     {s.label}
@@ -123,7 +135,7 @@ export function ItemContextMenu({
               </ContextMenuSubContent>
             </ContextMenuSub>
           ) : (
-            <ContextMenuItem key={a.label} onSelect={a.onSelect}>
+            <ContextMenuItem key={a.label} onSelect={() => runAfterClose(a.onSelect)}>
               {a.icon && <a.icon />}
               {a.label}
             </ContextMenuItem>
@@ -143,7 +155,11 @@ export function ItemContextMenu({
         )}
         {destructive.length > 0 && <ContextMenuSeparator />}
         {destructive.map((a) => (
-          <ContextMenuItem key={a.label} variant="destructive" onSelect={a.onSelect}>
+          <ContextMenuItem
+            key={a.label}
+            variant="destructive"
+            onSelect={() => runAfterClose(a.onSelect)}
+          >
             {a.icon && <a.icon />}
             {a.label}
           </ContextMenuItem>

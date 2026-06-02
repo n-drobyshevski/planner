@@ -1,0 +1,168 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - button "Toggle sidebar" [ref=e5] [cursor=pointer]:
+          - img
+        - img [ref=e8]
+        - navigation [ref=e10]:
+          - link "Calendar" [ref=e11] [cursor=pointer]:
+            - /url: /calendar
+            - img [ref=e12]
+            - generic [ref=e14]: Calendar
+          - link "Tasks" [ref=e15] [cursor=pointer]:
+            - /url: /tasks
+            - img [ref=e16]
+            - generic [ref=e19]: Tasks
+        - button "Today" [ref=e20] [cursor=pointer]
+        - generic [ref=e21]:
+          - button "Previous" [ref=e22] [cursor=pointer]:
+            - img
+          - button "Next" [ref=e23] [cursor=pointer]:
+            - img
+        - heading "1 – 7 Jun 2026" [level=2] [ref=e24]
+        - generic [ref=e25]:
+          - group [ref=e26]:
+            - radio "Agenda" [ref=e27] [cursor=pointer]
+            - radio "Month" [ref=e28] [cursor=pointer]
+            - radio "Week" [checked] [ref=e29] [cursor=pointer]
+            - radio "3 Day" [ref=e30] [cursor=pointer]
+            - radio "Day" [ref=e31] [cursor=pointer]
+          - button "New" [ref=e32] [cursor=pointer]:
+            - img
+            - generic [ref=e33]: New
+          - button "Toggle tasks panel" [ref=e34] [cursor=pointer]:
+            - img
+          - button "Toggle theme" [ref=e35] [cursor=pointer]:
+            - img
+          - button "Profile menu" [ref=e48] [cursor=pointer]:
+            - generic [ref=e50]: S
+    - generic [ref=e36]:
+      - complementary [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - heading "My calendar" [level=3] [ref=e54]
+            - generic [ref=e58]: Sam
+          - generic [ref=e59]:
+            - heading "Other calendars" [level=3] [ref=e60]
+            - button "nick" [ref=e62] [cursor=pointer]:
+              - generic [ref=e64]: nick
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - heading "Categories" [level=3] [ref=e67]
+              - button "Add category" [ref=e68] [cursor=pointer]:
+                - img
+            - button "Home" [pressed] [ref=e70] [cursor=pointer]:
+              - generic [ref=e72]: Home
+            - button "Клуб" [pressed] [ref=e74] [cursor=pointer]:
+              - generic [ref=e76]: Клуб
+            - button "transport" [pressed] [ref=e78] [cursor=pointer]:
+              - generic [ref=e80]: transport
+            - button "Social" [pressed] [ref=e82] [cursor=pointer]:
+              - generic [ref=e84]: Social
+            - button "Sam · Work" [pressed] [ref=e86] [cursor=pointer]:
+              - generic [ref=e88]: Sam · Work
+        - separator "Resize sidebar" [ref=e89]
+      - main [ref=e37]:
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e97]:
+              - generic [ref=e98]: Mon
+              - generic [ref=e99]: "1"
+            - generic [ref=e100]:
+              - generic [ref=e101]: Tue
+              - generic [ref=e102]: "2"
+            - generic [ref=e103]:
+              - generic [ref=e104]: Wed
+              - generic [ref=e105]: "3"
+            - generic [ref=e106]:
+              - generic [ref=e107]: Thu
+              - generic [ref=e108]: "4"
+            - generic [ref=e109]:
+              - generic [ref=e110]: Fri
+              - generic [ref=e111]: "5"
+            - generic [ref=e112]:
+              - generic [ref=e113]: Sat
+              - generic [ref=e114]: "6"
+            - generic [ref=e115]:
+              - generic [ref=e116]: Sun
+              - generic [ref=e117]: "7"
+          - generic [ref=e118]:
+            - generic [ref=e119]: All-day
+            - button "Day off" [ref=e124] [cursor=pointer]
+            - button "Day off" [ref=e126] [cursor=pointer]
+          - generic [ref=e132]:
+            - generic [ref=e133]:
+              - generic [ref=e136]: "01"
+              - generic [ref=e138]: "02"
+              - generic [ref=e140]: "03"
+              - generic [ref=e142]: "04"
+              - generic [ref=e144]: "05"
+              - generic [ref=e146]: "06"
+              - generic [ref=e148]: "07"
+              - generic [ref=e150]: "08"
+              - generic [ref=e152]: "09"
+              - generic [ref=e154]: "10"
+              - generic [ref=e156]: "11"
+              - generic [ref=e158]: "12"
+              - generic [ref=e160]: "13"
+              - generic [ref=e162]: "14"
+              - generic [ref=e164]: "15"
+              - generic [ref=e166]: "16"
+              - generic [ref=e168]: "17"
+              - generic [ref=e170]: "18"
+              - generic [ref=e172]: "19"
+              - generic [ref=e174]: "20"
+              - generic [ref=e176]: "21"
+              - generic [ref=e178]: "22"
+              - generic [ref=e180]: "23"
+            - generic [ref=e181]:
+              - generic [ref=e182]:
+                - generic [ref=e510]:
+                  - generic [ref=e512]: ColorTest-DELETE
+                  - generic [ref=e513]: 09:00–10:00
+                - generic [ref=e207]:
+                  - generic [ref=e209]: Standup
+                  - generic [ref=e210]: 09:00–09:30
+                - generic [ref=e213]:
+                  - generic [ref=e215]: Team sync
+                  - generic [ref=e216]: 10:00–10:45
+                - generic [ref=e219]:
+                  - generic [ref=e221]: Dinner
+                  - generic [ref=e222]: 18:00–19:00
+                - generic [ref=e225]:
+                  - generic [ref=e227]: Gym
+                  - generic [ref=e228]: 18:00–19:00
+              - generic [ref=e231]:
+                - generic [ref=e256]:
+                  - generic [ref=e258]: Dentist
+                  - generic [ref=e259]: 14:00–15:00
+                - generic [ref=e262]:
+                  - generic [ref=e263]:
+                    - button "Mark task done" [ref=e264] [cursor=pointer]:
+                      - img [ref=e265]
+                    - generic [ref=e267]: Prepare quarterly report
+                  - generic [ref=e268]: 16:00–17:00
+              - generic [ref=e271]:
+                - generic [ref=e296]:
+                  - generic [ref=e298]: Lunch with Pat
+                  - generic [ref=e299]: 12:30–13:30
+                - generic [ref=e302]:
+                  - generic [ref=e304]: Therapy
+                  - generic [ref=e305]: 17:00–18:00
+                - generic [ref=e308]:
+                  - generic [ref=e310]: Dinner
+                  - generic [ref=e311]: 18:00–19:00
+              - generic [ref=e364]:
+                - generic [ref=e366]: Dinner
+                - generic [ref=e367]: 18:00–19:00
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e518]:
+        - button "Close toast" [ref=e519] [cursor=pointer]:
+          - img [ref=e520]
+        - img [ref=e524]
+        - generic [ref=e528]: Event created
+  - button "Open Next.js Dev Tools" [ref=e44] [cursor=pointer]:
+    - img [ref=e45]
+  - alert [ref=e423]

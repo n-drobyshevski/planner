@@ -1,0 +1,289 @@
+- generic:
+  - generic:
+    - banner:
+      - generic:
+        - button:
+          - img
+        - generic:
+          - generic:
+            - img
+        - navigation:
+          - link:
+            - /url: /calendar
+            - img
+            - generic: Calendar
+          - link:
+            - /url: /tasks
+            - img
+            - generic: Tasks
+        - button: Today
+        - generic:
+          - button:
+            - img
+          - button:
+            - img
+        - heading [level=2]: 1 – 7 Jun 2026
+        - generic:
+          - group:
+            - radio: Agenda
+            - radio: Month
+            - radio [checked]: Week
+            - radio: 3 Day
+            - radio: Day
+          - button:
+            - img
+            - generic: New
+          - button:
+            - img
+          - button:
+            - img
+          - button:
+            - generic:
+              - generic: S
+    - generic:
+      - complementary:
+        - generic:
+          - generic:
+            - heading [level=3]: My calendar
+            - generic:
+              - generic:
+                - generic: Sam
+          - generic:
+            - heading [level=3]: Other calendars
+            - generic:
+              - button:
+                - generic: nick
+          - generic:
+            - generic:
+              - heading [level=3]: Categories
+              - button:
+                - img
+            - generic:
+              - button [pressed]:
+                - generic: Home
+            - generic:
+              - button [pressed]:
+                - generic: Клуб
+            - generic:
+              - button [pressed]:
+                - generic: transport
+            - generic:
+              - button [pressed]:
+                - generic: Social
+            - generic:
+              - button [pressed]:
+                - generic: Sam · Work
+        - separator
+      - main:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Mon
+                    - generic: "1"
+                  - generic:
+                    - generic: Tue
+                    - generic: "2"
+                  - generic:
+                    - generic: Wed
+                    - generic: "3"
+                  - generic:
+                    - generic: Thu
+                    - generic: "4"
+                  - generic:
+                    - generic: Fri
+                    - generic: "5"
+                  - generic:
+                    - generic: Sat
+                    - generic: "6"
+                  - generic:
+                    - generic: Sun
+                    - generic: "7"
+                - generic:
+                  - generic: All-day
+                  - generic:
+                    - button: Day off
+                  - generic:
+                    - button: Day off
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: "01"
+                          - generic:
+                            - generic: "02"
+                          - generic:
+                            - generic: "03"
+                          - generic:
+                            - generic: "04"
+                          - generic:
+                            - generic: "05"
+                          - generic:
+                            - generic: "06"
+                          - generic:
+                            - generic: "07"
+                          - generic:
+                            - generic: "08"
+                          - generic:
+                            - generic: "09"
+                          - generic:
+                            - generic: "10"
+                          - generic:
+                            - generic: "11"
+                          - generic:
+                            - generic: "12"
+                          - generic:
+                            - generic: "13"
+                          - generic:
+                            - generic: "14"
+                          - generic:
+                            - generic: "15"
+                          - generic:
+                            - generic: "16"
+                          - generic:
+                            - generic: "17"
+                          - generic:
+                            - generic: "18"
+                          - generic:
+                            - generic: "19"
+                          - generic:
+                            - generic: "20"
+                          - generic:
+                            - generic: "21"
+                          - generic:
+                            - generic: "22"
+                          - generic:
+                            - generic: "23"
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: ColorTest-DELETE
+                              - generic: 09:00–10:00
+                            - generic:
+                              - generic:
+                                - generic: Standup
+                              - generic: 09:00–09:30
+                            - generic:
+                              - generic:
+                                - generic: Team sync
+                              - generic: 10:00–10:45
+                            - generic:
+                              - generic:
+                                - generic: Dinner
+                              - generic: 18:00–19:00
+                            - generic:
+                              - generic:
+                                - generic: Gym
+                              - generic: 18:00–19:00
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Dentist
+                              - generic: 14:00–15:00
+                            - generic:
+                              - generic:
+                                - button:
+                                  - img
+                                - generic: Prepare quarterly report
+                              - generic: 16:00–17:00
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Lunch with Pat
+                              - generic: 12:30–13:30
+                            - generic:
+                              - generic:
+                                - generic: Therapy
+                              - generic: 17:00–18:00
+                            - generic:
+                              - generic:
+                                - generic: Dinner
+                              - generic: 18:00–19:00
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Dinner
+                              - generic: 18:00–19:00
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e44] [cursor=pointer]:
+    - img [ref=e45]
+  - alert
+  - dialog "Edit event" [ref=e555]:
+    - heading "Edit event" [level=2] [ref=e557]
+    - group [ref=e559]:
+      - generic [ref=e560]:
+        - group [ref=e561]:
+          - generic [ref=e562]: Title
+          - textbox "Title" [active] [ref=e563]:
+            - /placeholder: Add a title
+            - text: ColorTest-DELETE
+        - group [ref=e564]:
+          - switch "All day" [ref=e565] [cursor=pointer]
+          - generic [ref=e566]: All day
+        - group [ref=e567]:
+          - switch "Inactive (grayed out)" [ref=e568] [cursor=pointer]
+          - generic [ref=e569]: Inactive (grayed out)
+        - generic [ref=e570]:
+          - group [ref=e571]:
+            - generic [ref=e572]: Starts
+            - button "Start date, 01/06/2026" [ref=e573] [cursor=pointer]:
+              - img
+              - text: 01/06/2026
+          - group [ref=e574]:
+            - textbox "Start time" [ref=e576]:
+              - /placeholder: hh:mm
+              - text: 09:00
+        - generic [ref=e577]:
+          - group [ref=e578]:
+            - generic [ref=e579]: Ends
+            - button "End date, 01/06/2026" [ref=e580] [cursor=pointer]:
+              - img
+              - text: 01/06/2026
+          - group [ref=e581]:
+            - textbox "End time" [ref=e583]:
+              - /placeholder: hh:mm
+              - text: 10:00
+        - group [ref=e584]:
+          - generic [ref=e585]: Category
+          - combobox [ref=e586] [cursor=pointer]:
+            - generic: No category
+            - img
+        - group [ref=e587]:
+          - generic [ref=e588]: Context
+          - combobox [ref=e589] [cursor=pointer]:
+            - generic: Work
+            - img
+        - group [ref=e590]:
+          - generic [ref=e591]: Color
+          - 'button "Color: Blue" [ref=e592] [cursor=pointer]':
+            - generic [ref=e593]: Blue
+            - img
+        - group [ref=e595]:
+          - switch "Private (only you can see this)" [ref=e596] [cursor=pointer]
+          - generic [ref=e597]: Private (only you can see this)
+        - group [ref=e598]:
+          - generic [ref=e599]: Location
+          - textbox "Add a location" [ref=e600]
+        - group [ref=e601]:
+          - generic [ref=e602]: Notes
+          - textbox [ref=e603]
+        - group [ref=e605]:
+          - generic [ref=e606]: Repeat
+          - combobox [ref=e607] [cursor=pointer]:
+            - generic: Does not repeat
+            - img
+    - generic [ref=e608]:
+      - button "Delete" [ref=e609] [cursor=pointer]:
+        - img
+        - text: Delete
+      - generic [ref=e610]:
+        - button "Cancel" [ref=e611] [cursor=pointer]
+        - button "Save" [ref=e612] [cursor=pointer]
+    - button "Close" [ref=e613] [cursor=pointer]:
+      - img
+      - generic [ref=e614]: Close

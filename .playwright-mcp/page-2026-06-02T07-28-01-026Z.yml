@@ -1,0 +1,19 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e5]
+      - heading "Welcome to Planner" [level=1] [ref=e7]
+      - paragraph [ref=e8]: A shared calendar for the two of you. Sign in with your name and PIN to continue.
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: Name
+        - textbox "Name" [active] [ref=e14]:
+          - /placeholder: Your name
+      - generic [ref=e15]:
+        - generic [ref=e16]: PIN
+        - textbox [ref=e17]
+        - generic [ref=e18]: Leave blank if you haven't set a PIN.
+      - button "Sign in" [disabled]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e24] [cursor=pointer]:
+    - img [ref=e25]

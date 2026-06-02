@@ -50,6 +50,10 @@ export interface Member {
   accent: AccentId;
   surfaceTone: SurfaceTone;
   palette: Palette;
+  // Time-zone preferences (per member). `timezone` null = follow the device;
+  // `secondaryTimezone` null = no secondary zone shown. Both are IANA names.
+  timezone: string | null;
+  secondaryTimezone: string | null;
 }
 
 export interface Category {

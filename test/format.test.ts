@@ -12,16 +12,17 @@ import {
 } from "@/lib/datetime/format";
 
 describe("formatOccurrenceWhen", () => {
-  // June 1 2026 is a Monday. Local Date construction keeps these tz-stable.
+  // June 1 2026 is a Monday. All-day events are floating dates anchored to UTC
+  // midnight and rendered in UTC, so Date.UTC fixtures are tz-stable.
   it("all-day single day", () => {
-    const start = new Date(2026, 5, 1).getTime();
-    const end = new Date(2026, 5, 2).getTime();
+    const start = Date.UTC(2026, 5, 1);
+    const end = Date.UTC(2026, 5, 2);
     expect(formatOccurrenceWhen(start, end, true)).toBe("Mon, 1 Jun · All day");
   });
 
   it("all-day multi day (exclusive end)", () => {
-    const start = new Date(2026, 5, 1).getTime();
-    const end = new Date(2026, 5, 5).getTime();
+    const start = Date.UTC(2026, 5, 1);
+    const end = Date.UTC(2026, 5, 5);
     expect(formatOccurrenceWhen(start, end, true)).toBe("1 Jun – 4 Jun");
   });
 

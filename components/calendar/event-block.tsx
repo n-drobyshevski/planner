@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import { formatTime } from "@/lib/datetime/format";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
@@ -35,6 +36,7 @@ export const EventBlock = forwardRef<
   { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, onMenu, className, ...rest },
   ref,
 ) {
+  const timeZone = useViewerTimeZone();
   const isTask = occ.taskId != null && onToggleTaskDone != null;
   return (
     <div
@@ -94,7 +96,7 @@ export const EventBlock = forwardRef<
         )}
       </div>
       <span className="truncate text-[11px] leading-tight opacity-90 tabular-nums">
-        {formatTime(occ.start)}–{formatTime(occ.end)}
+        {formatTime(occ.start, timeZone)}–{formatTime(occ.end, timeZone)}
       </span>
       {editable && (
         <>

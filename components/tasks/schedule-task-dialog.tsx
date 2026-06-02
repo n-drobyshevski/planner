@@ -32,9 +32,9 @@ import {
   msToDateInput,
   msToTimeInput,
   combineDateTime,
-  localTimeZone,
   ceilToStep,
 } from "@/lib/datetime/local";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import type { TaskRow } from "@/lib/types";
 
 type Mode = "single" | "split" | "subtasks";
@@ -64,15 +64,16 @@ export function ScheduleTaskDialog({
   defaultStartMs?: number;
 }) {
   const mutations = useTaskMutations(workspaceId);
+  const timeZone = useViewerTimeZone();
   const hasSubtasks = subtasks.length > 0;
 
   // Seed from defaultStartMs when given; otherwise the open-effect fills a
   // sensible default (keeps Date.now() out of render).
   const [date, setDate] = useState(
-    defaultStartMs != null ? msToDateInput(defaultStartMs) : "",
+    defaultStartMs != null ? msToDateInput(defaultStartMs, timeZone) : "",
   );
   const [time, setTime] = useState(
-    defaultStartMs != null ? msToTimeInput(defaultStartMs) : "",
+    defaultStartMs != null ? msToTimeInput(defaultStartMs, timeZone) : "",
   );
   const [mode, setMode] = useState<Mode>("single");
   const [duration, setDuration] = useState("60"); // single & per-subtask minutes
@@ -83,8 +84,8 @@ export function ScheduleTaskDialog({
   useEffect(() => {
     if (open) {
       const s = defaultStartMs ?? ceilToStep(Date.now() + 3_600_000, 30);
-      setDate(msToDateInput(s));
-      setTime(msToTimeInput(s));
+      setDate(msToDateInput(s, timeZone));
+      setTime(msToTimeInput(s, timeZone));
       setMode("single");
       setPending(false);
     }
@@ -94,8 +95,8 @@ export function ScheduleTaskDialog({
   const ordered = sortByPosition(subtasks);
 
   async function onSchedule() {
-    const start = combineDateTime(date, time);
-    const tz = localTimeZone();
+    const start = combineDateTime(date, time, timeZone);
+    const tz = timeZone;
     setPending(true);
     let ok = false;
     if (mode === "subtasks" && hasSubtasks) {
