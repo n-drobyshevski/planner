@@ -24,9 +24,10 @@ export function DayColumn({
   isToday,
   singleColumn,
   colorOf,
-  selectedKey,
+  selectedKeys,
   onSelect,
   onChangeColor,
+  onColorSelected,
   onDeleteEvent,
   onAssignContext,
   onRemoveContext,
@@ -40,9 +41,12 @@ export function DayColumn({
   /** True in day view — its one wide column keeps the context time range on phones. */
   singleColumn?: boolean;
   colorOf: (o: Occurrence) => string;
-  selectedKey: string | null;
+  /** Multi-selection set; an occurrence is highlighted when its key is in it. */
+  selectedKeys: Set<string>;
   onSelect: (o: Occurrence) => void;
   onChangeColor: (o: Occurrence, color: string | null) => void;
+  /** Recolor the whole multi-selection (used when the item is part of it). */
+  onColorSelected: (color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
   onAssignContext?: (o: Occurrence, contextId: string) => void;
   onRemoveContext?: (o: Occurrence) => void;
@@ -93,6 +97,13 @@ export function DayColumn({
     return Array.from(seen, ([id, title]) => ({ id, title }));
   }, [occurrences]);
 
+  // Recolor routes to the whole selection when the item is part of a multi-pick,
+  // otherwise just the one item.
+  function colorChange(occ: Occurrence, color: string | null) {
+    if (selectedKeys.has(occ.key) && selectedKeys.size > 1) onColorSelected(color);
+    else onChangeColor(occ, color);
+  }
+
   function contextActions(occ: Occurrence): ItemAction[] {
     const actions: ItemAction[] = [];
     if (onAssignContext && contextChoices.length > 0) {
@@ -136,7 +147,7 @@ export function DayColumn({
             key={seg.occ.key}
             title={seg.occ.title}
             color={editable ? seg.occ.color : undefined}
-            onColorChange={editable ? (c) => onChangeColor(seg.occ, c) : undefined}
+            onColorChange={editable ? (c) => colorChange(seg.occ, c) : undefined}
             actions={
               editable
                 ? [
@@ -154,7 +165,7 @@ export function DayColumn({
             <ContextBackdrop
               occ={seg.occ}
               color={colorOf(seg.occ)}
-              selected={selectedKey === seg.occ.key}
+              selected={selectedKeys.has(seg.occ.key)}
               singleColumn={singleColumn}
               editable={editable}
               style={{
@@ -186,7 +197,7 @@ export function DayColumn({
             key={seg.occ.key}
             title={seg.occ.title}
             color={editable ? seg.occ.color : undefined}
-            onColorChange={editable ? (c) => onChangeColor(seg.occ, c) : undefined}
+            onColorChange={editable ? (c) => colorChange(seg.occ, c) : undefined}
             actions={
               editable
                 ? [
@@ -205,7 +216,7 @@ export function DayColumn({
             <EventBlock
               occ={seg.occ}
               color={colorOf(seg.occ)}
-              selected={selectedKey === seg.occ.key}
+              selected={selectedKeys.has(seg.occ.key)}
               editable={editable}
               taskDone={taskId ? taskDoneById?.get(taskId) ?? false : undefined}
               onToggleTaskDone={

@@ -16,13 +16,25 @@ export interface CanvasProps {
   focusedMs: number;
   colorOf: (o: Occurrence) => string;
   selectedKey: string | null;
+  /** Multi-selection set (time-grid views); drives the ring highlight + bulk ops. */
+  selectedKeys?: Set<string>;
   onSelect: (o: Occurrence) => void;
+  /** Time-grid: Shift+click toggles an occurrence in/out of the multi-selection. */
+  onToggleSelect?: (o: Occurrence) => void;
+  /** Time-grid: empty-space click clears the multi-selection. */
+  onClearSelection?: () => void;
   onPickDay: (ms: number) => void;
   onCreateRange: (startMs: number, endMs: number) => void;
   /** Month-view: create an event on a whole day (empty-cell click). */
   onCreateDay: (ms: number) => void;
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
+  /** Time-grid: move several selected blocks together. */
+  onRescheduleMany?: (moves: { occ: Occurrence; start: number; end: number }[]) => void;
+  /** Time-grid: Ctrl/Cmd-drag drops a one-off copy. */
+  onDuplicate?: (occ: Occurrence, startMs: number, endMs: number) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
+  /** Time-grid: recolor the whole multi-selection. */
+  onColorSelected?: (color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
   onAssignContext?: (occ: Occurrence, contextId: string) => void;
   onRemoveContext?: (occ: Occurrence) => void;
@@ -38,6 +50,8 @@ export interface CanvasProps {
 }
 
 const ALWAYS_EDITABLE = () => true;
+const EMPTY_SET: Set<string> = new Set();
+const NOOP = () => {};
 
 export function CalendarCanvas(props: CanvasProps) {
   const {
@@ -133,11 +147,16 @@ export function CalendarCanvas(props: CanvasProps) {
       occurrences={occurrences}
       today={today}
       colorOf={colorOf}
-      selectedKey={selectedKey}
+      selectedKeys={props.selectedKeys ?? EMPTY_SET}
       onSelect={onSelect}
+      onToggleSelect={props.onToggleSelect ?? NOOP}
+      onClearSelection={props.onClearSelection ?? NOOP}
       onCreateRange={onCreateRange}
       onReschedule={onReschedule}
+      onRescheduleMany={props.onRescheduleMany ?? NOOP}
+      onDuplicate={props.onDuplicate ?? NOOP}
       onChangeColor={onChangeColor}
+      onColorSelected={props.onColorSelected ?? NOOP}
       onDeleteEvent={onDeleteEvent}
       onAssignContext={onAssignContext}
       onRemoveContext={onRemoveContext}

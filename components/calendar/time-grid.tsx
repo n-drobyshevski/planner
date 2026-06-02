@@ -51,11 +51,22 @@ interface Props {
   occurrences: Occurrence[];
   today: number;
   colorOf: (o: Occurrence) => string;
-  selectedKey: string | null;
+  /** Multi-selection set (Shift+click); drives the ring highlight + bulk ops. */
+  selectedKeys: Set<string>;
   onSelect: (o: Occurrence) => void;
+  /** Shift+click: toggle an occurrence in/out of the multi-selection. */
+  onToggleSelect: (o: Occurrence) => void;
+  /** Click empty space / cleared: drop the whole multi-selection. */
+  onClearSelection: () => void;
   onCreateRange: (startMs: number, endMs: number) => void;
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
+  /** Drag-move several selected blocks at once (same time delta). */
+  onRescheduleMany: (moves: { occ: Occurrence; start: number; end: number }[]) => void;
+  /** Ctrl/Cmd-drag: drop a one-off copy of `occ` at the new time. */
+  onDuplicate: (occ: Occurrence, startMs: number, endMs: number) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
+  /** Recolor the whole multi-selection (context menu on a grouped item). */
+  onColorSelected: (color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
   onAssignContext?: (occ: Occurrence, contextId: string) => void;
   onRemoveContext?: (occ: Occurrence) => void;
@@ -68,6 +79,14 @@ interface Props {
 }
 
 const SCHED_MIN = 60; // default minutes for a task dropped onto the grid
+
+/** A member of a group (multi-selection) move: its start geometry, captured once. */
+interface GroupMember {
+  occ: Occurrence;
+  sMin: number;
+  dayIndex: number;
+  durationMin: number;
+}
 
 interface Drag {
   kind: "create" | "move" | "resize";
@@ -88,6 +107,8 @@ interface Drag {
   curStartMin?: number;
   /** another member's block: select-only, never moves/resizes */
   readonly?: boolean;
+  /** when set, drag moves every selected member by the same delta (group move) */
+  group?: GroupMember[];
   // resize
   edge?: "start" | "end";
   endMin?: number;
@@ -100,6 +121,8 @@ interface Preview {
   topMin: number;
   heightMin: number;
   label: string;
+  /** Ctrl/Cmd held during a move: the drop will duplicate, not move. */
+  copy?: boolean;
 }
 
 export function TimeGrid({
@@ -107,11 +130,16 @@ export function TimeGrid({
   occurrences,
   today,
   colorOf,
-  selectedKey,
+  selectedKeys,
   onSelect,
+  onToggleSelect,
+  onClearSelection,
   onCreateRange,
   onReschedule,
+  onRescheduleMany,
+  onDuplicate,
   onChangeColor,
+  onColorSelected,
   onDeleteEvent,
   onAssignContext,
   onRemoveContext,
@@ -131,6 +159,9 @@ export function TimeGrid({
     timer: number;
   } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  /** Dashed previews for the OTHER members of a group move (the grabbed block
+   *  uses `preview`). */
+  const [groupPreview, setGroupPreview] = useState<Preview[]>([]);
   const [armed, setArmed] = useState(false);
   const timeZone = useViewerTimeZone();
   const secondaryTimeZone = useSecondaryTimeZone();
@@ -238,6 +269,14 @@ export function TimeGrid({
       return;
     }
 
+    // Shift+click toggles an event in/out of the multi-selection — no drag, no
+    // capture, no details panel. (Mouse only; the touch path returned above.)
+    if (e.shiftKey && blockEl) {
+      const occ = byKey.get(blockEl.dataset.occKey!);
+      if (occ) onToggleSelect(occ);
+      return;
+    }
+
     const g = geom(e.clientX, e.clientY);
     colsRef.current?.setPointerCapture(e.pointerId);
 
@@ -281,6 +320,25 @@ export function TimeGrid({
       if (!occ) return;
       const dayIndex = dayIndexOfMs(occ.start);
       const sMin = minutesIn(occ.start, dayIndex);
+      // Grabbing a member of a multi-selection moves the whole group by one
+      // delta. Capture each editable, non-recurring member's start geometry now;
+      // recurring members are left out (they'd each need a scope prompt).
+      let group: GroupMember[] | undefined;
+      if (selectedKeys.has(occ.key) && selectedKeys.size > 1) {
+        const members: GroupMember[] = [];
+        for (const key of selectedKeys) {
+          const m = byKey.get(key);
+          if (!m || !canEdit(m) || m.isRecurring) continue;
+          const mDay = dayIndexOfMs(m.start);
+          members.push({
+            occ: m,
+            sMin: minutesIn(m.start, mDay),
+            dayIndex: mDay,
+            durationMin: (m.end - m.start) / 60_000,
+          });
+        }
+        if (members.length > 1) group = members;
+      }
       dragRef.current = {
         kind: "move",
         pointerId: e.pointerId,
@@ -294,6 +352,7 @@ export function TimeGrid({
         startMin: sMin,
         curDayIndex: dayIndex,
         curStartMin: sMin,
+        group,
       };
     } else {
       const anchorMin = snapMinutes(clampMin(g.minutes));
@@ -346,12 +405,31 @@ export function TimeGrid({
       const newStart = clamp(snapMinutes(g.minutes - d.grabMin!), 0, 1440 - dur);
       d.curDayIndex = g.dayIndex;
       d.curStartMin = newStart;
+      // Ctrl/Cmd held → the drop will duplicate (single move only); show it.
+      const copy = !d.group && (e.ctrlKey || e.metaKey);
+      const title = byKey.get(d.occKey!)?.title ?? "";
       setPreview({
         dayIndex: g.dayIndex,
         topMin: newStart,
         heightMin: dur,
-        label: byKey.get(d.occKey!)?.title ?? "",
+        label: copy ? `Copy of ${title}` : title,
+        copy,
       });
+      // Group move: shift every other member by the same day + minute delta.
+      if (d.group) {
+        const dayDelta = g.dayIndex - d.dayIndex;
+        const minuteDelta = newStart - d.startMin!;
+        setGroupPreview(
+          d.group
+            .filter((m) => m.occ.key !== d.occKey)
+            .map((m) => ({
+              dayIndex: clamp(m.dayIndex + dayDelta, 0, days.length - 1),
+              topMin: clamp(m.sMin + minuteDelta, 0, 1440 - m.durationMin),
+              heightMin: m.durationMin,
+              label: m.occ.title,
+            })),
+        );
+      }
     } else {
       const m = snapMinutes(clampMin(g.minutes));
       if (d.edge === "start") {
@@ -390,6 +468,7 @@ export function TimeGrid({
     dragRef.current = null;
     setArmed(false);
     setPreview(null);
+    setGroupPreview([]);
     try {
       colsRef.current?.releasePointerCapture(e.pointerId);
     } catch {
@@ -397,7 +476,11 @@ export function TimeGrid({
     }
 
     if (d.kind === "create") {
-      if (!d.moved) return;
+      // An empty-space click (no drag) clears the multi-selection.
+      if (!d.moved) {
+        if (selectedKeys.size > 0) onClearSelection();
+        return;
+      }
       const top = Math.min(d.anchorMin!, d.curMin!);
       const bot = Math.max(d.anchorMin!, d.curMin!);
       const end = Math.max(bot, top + MIN_NEW);
@@ -410,7 +493,25 @@ export function TimeGrid({
         return;
       }
       const start = days[d.curDayIndex!] + d.curStartMin! * 60_000;
-      onReschedule(occ, start, start + d.durationMin! * 60_000);
+      const end = start + d.durationMin! * 60_000;
+      // Group move: shift every captured member by the same day + minute delta.
+      if (d.group) {
+        const dayDelta = d.curDayIndex! - d.dayIndex;
+        const minuteDelta = d.curStartMin! - d.startMin!;
+        onRescheduleMany(
+          d.group.map((m) => {
+            const mDay = clamp(m.dayIndex + dayDelta, 0, days.length - 1);
+            const mStart =
+              days[mDay] + clamp(m.sMin + minuteDelta, 0, 1440 - m.durationMin) * 60_000;
+            return { occ: m.occ, start: mStart, end: mStart + m.durationMin * 60_000 };
+          }),
+        );
+      } else if (e.ctrlKey || e.metaKey) {
+        // Ctrl/Cmd-drag → drop a one-off copy, leaving the original in place.
+        onDuplicate(occ, start, end);
+      } else {
+        onReschedule(occ, start, end);
+      }
     } else {
       const occ = byKey.get(d.occKey!);
       if (!occ) return;
@@ -513,7 +614,14 @@ export function TimeGrid({
                     mobileSheet={false}
                     title={o.title}
                     color={canEdit(o) ? o.color : undefined}
-                    onColorChange={canEdit(o) ? (c) => onChangeColor(o, c) : undefined}
+                    onColorChange={
+                      canEdit(o)
+                        ? (c) =>
+                            selectedKeys.has(o.key) && selectedKeys.size > 1
+                              ? onColorSelected(c)
+                              : onChangeColor(o, c)
+                        : undefined
+                    }
                     actions={
                       canEdit(o)
                         ? [
@@ -530,11 +638,11 @@ export function TimeGrid({
                   >
                     <button
                       type="button"
-                      onClick={() => onSelect(o)}
+                      onClick={(e) => (e.shiftKey ? onToggleSelect(o) : onSelect(o))}
                       style={{ backgroundColor: toPaletteColor(colorOf(o)), color: toPaletteInk(colorOf(o)) }}
                       className={cn(
                         "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium",
-                        selectedKey === o.key && "ring-2 ring-foreground",
+                        selectedKeys.has(o.key) && "ring-2 ring-foreground",
                         o.inactive && "opacity-55 grayscale",
                       )}
                     >
@@ -586,6 +694,7 @@ export function TimeGrid({
               dragRef.current = null;
               setArmed(false);
               setPreview(null);
+              setGroupPreview([]);
             }}
             onDragOver={onDragOver}
             onDrop={onDrop}
@@ -599,9 +708,10 @@ export function TimeGrid({
                 singleColumn={days.length === 1}
                 occurrences={occurrences}
                 colorOf={colorOf}
-                selectedKey={selectedKey}
+                selectedKeys={selectedKeys}
                 onSelect={onSelect}
                 onChangeColor={onChangeColor}
+                onColorSelected={onColorSelected}
                 onDeleteEvent={onDeleteEvent}
                 onAssignContext={onAssignContext}
                 onRemoveContext={onRemoveContext}
@@ -611,9 +721,25 @@ export function TimeGrid({
               />
             ))}
 
+            {/* Other group-move members: dashed ghosts tracking the same delta. */}
+            {groupPreview.map((gp, i) => (
+              <div
+                key={i}
+                className="pointer-events-none absolute z-30 overflow-hidden rounded-md border-2 border-dashed border-primary bg-primary/10 px-1"
+                style={{
+                  left: `calc(${(gp.dayIndex / days.length) * 100}% + 2px)`,
+                  width: `calc(${100 / days.length}% - 4px)`,
+                  top: minutesToY(gp.topMin),
+                  height: Math.max(minutesToY(gp.heightMin), 6),
+                }}
+              >
+                <span className="truncate text-xs font-medium text-primary">{gp.label}</span>
+              </div>
+            ))}
+
             {preview && (
               <div
-                className="pointer-events-none absolute z-30 overflow-hidden rounded-md border-2 border-dashed border-primary bg-primary/20 px-1"
+                className="pointer-events-none absolute z-30 flex items-start gap-1 overflow-hidden rounded-md border-2 border-dashed border-primary bg-primary/20 px-1"
                 style={{
                   left: `calc(${(preview.dayIndex / days.length) * 100}% + 2px)`,
                   width: `calc(${100 / days.length}% - 4px)`,
@@ -621,6 +747,14 @@ export function TimeGrid({
                   height: Math.max(minutesToY(preview.heightMin), 6),
                 }}
               >
+                {preview.copy && (
+                  <span
+                    className="mt-px shrink-0 rounded bg-primary px-1 text-[10px] font-bold leading-tight text-primary-foreground"
+                    aria-hidden
+                  >
+                    +
+                  </span>
+                )}
                 <span className="truncate text-xs font-medium text-primary">
                   {preview.label}
                 </span>
