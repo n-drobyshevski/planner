@@ -475,6 +475,7 @@ export function CalendarShell({
       kind: ev.kind,
       allDay: ev.allDay,
       inactive: ev.inactive,
+      status: ev.status,
       timeZone: ev.timeZone,
       taskId: null as string | null, // a plain copy, not a second "part" of a task
     };

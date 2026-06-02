@@ -27,6 +27,7 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     kind: "event",
     allDay: false,
     inactive: false,
+    status: "confirmed",
     start: baseStart,
     end: baseEnd,
     timeZone: "America/New_York",

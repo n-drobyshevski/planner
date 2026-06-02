@@ -3,6 +3,10 @@
 
 export type OverrideType = "cancel" | "modify";
 export type TaskStatus = "todo" | "in_progress" | "done";
+/** An event's lifecycle state, driving how it renders on the calendar:
+ *  'cancelled' (diagonal grayed stripes), 'planned' (dotted outline), or
+ *  'confirmed' (plain fill, the default). */
+export type EventStatus = "cancelled" | "planned" | "confirmed";
 /** A normal calendar event vs. a "context" — a Context's time-block on the
  *  calendar (a backdrop painting the category in `categoryId`). */
 export type EventKind = "event" | "context";
@@ -87,6 +91,8 @@ export interface EventRow {
   allDay: boolean;
   /** when true, the event is de-emphasized (grayed out) in the calendar, e.g. sleep hours */
   inactive: boolean;
+  /** lifecycle state; series-level, drives the calendar rendering (default 'confirmed') */
+  status: EventStatus;
   /** master / first-occurrence start, epoch ms */
   start: number;
   /** master / first-occurrence end, epoch ms */
@@ -158,6 +164,8 @@ export interface Occurrence {
   allDay: boolean;
   /** inherited from the event: when true, render this occurrence grayed out */
   inactive: boolean;
+  /** inherited from the event: lifecycle state driving the calendar rendering */
+  status: EventStatus;
   title: string;
   description: string | null;
   location: string | null;

@@ -5,6 +5,7 @@
 
 import type {
   AccentId,
+  EventStatus,
   Palette,
   SurfaceTone,
   ThemePreference,
@@ -145,6 +146,21 @@ export function toPaletteInk(hex: string | null | undefined): string {
   return token
     ? `var(--swatch-ink-${token}, var(--swatch-ink))`
     : "var(--swatch-ink)";
+}
+
+/**
+ * The CSS class that paints an occurrence's lifecycle status on the calendar:
+ * 'cancelled' => diagonal grayed stripes (`evt-cancelled`), 'planned' => dotted
+ * outline (`evt-planned`), 'confirmed' => plain fill (no class). The classes
+ * live in app/globals.css; they overlay the inline backgroundColor already set
+ * on the block. Pass the result through `cn(...)` alongside the other modifiers.
+ */
+export function eventStatusClass(status: EventStatus): string {
+  return status === "cancelled"
+    ? "evt-cancelled"
+    : status === "planned"
+      ? "evt-planned"
+      : "";
 }
 
 /** Coerce an unknown string to a valid accent id, falling back to the default. */

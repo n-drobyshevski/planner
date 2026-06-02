@@ -8,7 +8,7 @@ import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
+import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import { packMonthWeek, occurrencesOnDay, type MonthItem } from "@/lib/layout/pack-month";
 import type { Occurrence } from "@/lib/types";
@@ -216,6 +216,8 @@ const MonthItemEl = forwardRef<
           "pointer-events-auto mx-1 truncate rounded px-1.5 text-left text-xs leading-5",
           selected && "ring-2 ring-foreground",
           item.occ.inactive && "opacity-55 grayscale",
+          eventStatusClass(item.occ.status),
+          item.occ.status === "cancelled" && "line-through",
           className,
         )}
         {...rest}
@@ -235,6 +237,8 @@ const MonthItemEl = forwardRef<
         "pointer-events-auto mx-1 flex items-center gap-1 truncate rounded px-1 text-left text-xs leading-5 hover:bg-accent",
         selected && "ring-2 ring-foreground",
         item.occ.inactive && "opacity-55 grayscale",
+        item.occ.status === "planned" && "evt-planned",
+        item.occ.status === "cancelled" && "line-through opacity-55",
         className,
       )}
       {...rest}
@@ -286,6 +290,8 @@ function MoreButton({
               className={cn(
                 "flex items-center gap-1.5 truncate rounded px-1.5 py-1 text-left text-sm hover:bg-accent",
                 o.inactive && "opacity-55 grayscale",
+                o.status === "planned" && "evt-planned",
+                o.status === "cancelled" && "line-through opacity-55",
               )}
             >
               <span

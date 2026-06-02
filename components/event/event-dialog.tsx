@@ -40,7 +40,7 @@ import {
   DAY_IN_MS,
 } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
-import type { Category, EventKind, EventRow, Occurrence } from "@/lib/types";
+import type { Category, EventKind, EventRow, EventStatus, Occurrence } from "@/lib/types";
 import type { EventInput } from "@/lib/supabase/mappers";
 
 interface FormState {
@@ -50,6 +50,7 @@ interface FormState {
   location: string;
   allDay: boolean;
   inactive: boolean;
+  status: EventStatus;
   startDate: string;
   startTime: string;
   endDate: string;
@@ -172,6 +173,7 @@ export function EventDialog(props: EventDialogProps) {
         color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
+        status: form.status,
         start,
         end,
         timeZone,
@@ -200,6 +202,7 @@ export function EventDialog(props: EventDialogProps) {
         color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
+        status: form.status,
         start,
         end,
         rrule: buildRRule(form.recurrence),
@@ -223,6 +226,7 @@ export function EventDialog(props: EventDialogProps) {
       categoryId: form.categoryId === "none" ? null : form.categoryId,
       allDay: form.allDay,
       inactive: form.inactive,
+      status: form.status,
       start,
       end,
     };
@@ -260,6 +264,7 @@ export function EventDialog(props: EventDialogProps) {
           color: form.color,
           allDay: form.allDay,
           inactive: form.inactive,
+          status: form.status,
           start: event.start + delta,
           end: event.end + delta,
           rrule: buildRRule(form.recurrence),
@@ -366,6 +371,21 @@ export function EventDialog(props: EventDialogProps) {
                 onCheckedChange={(v) => set("inactive", v)}
               />
               <FieldLabel htmlFor="ev-inactive">Inactive (grayed out)</FieldLabel>
+            </Field>
+
+            <Field>
+              <FieldLabel>Status</FieldLabel>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={form.status}
+                onValueChange={(v) => v && set("status", v as EventStatus)}
+                className="justify-start"
+              >
+                <ToggleGroupItem value="planned">Planned</ToggleGroupItem>
+                <ToggleGroupItem value="confirmed">Confirmed</ToggleGroupItem>
+                <ToggleGroupItem value="cancelled">Cancelled</ToggleGroupItem>
+              </ToggleGroup>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
@@ -534,6 +554,7 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
       location: occurrence.location ?? "",
       allDay: occurrence.allDay,
       inactive: occurrence.inactive,
+      status: event.status,
       startDate: msToDateInput(occurrence.start, dateZone),
       startTime: msToTimeInput(occurrence.start, timeZone),
       endDate: msToDateInput(occurrence.allDay ? occurrence.end - 1 : occurrence.end, dateZone),
@@ -553,6 +574,7 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
     location: "",
     allDay: false,
     inactive: false,
+    status: "confirmed",
     startDate: msToDateInput(start, timeZone),
     startTime: msToTimeInput(start, timeZone),
     endDate: msToDateInput(end, timeZone),

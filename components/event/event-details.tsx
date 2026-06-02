@@ -105,9 +105,14 @@ export function EventDetails({
             />
             <span className="min-w-0 truncate">{occurrence.title || "Untitled"}</span>
           </ResponsiveDialogTitle>
-          {(occurrence.isPrivate || isContext) && (
+          {(occurrence.isPrivate || isContext || occurrence.status !== "confirmed") && (
             <div className="mt-1 flex flex-wrap gap-1.5">
               {isContext && <Badge variant="outline">Context</Badge>}
+              {occurrence.status !== "confirmed" && (
+                <Badge variant="outline" className="text-muted-foreground capitalize">
+                  {occurrence.status}
+                </Badge>
+              )}
               {occurrence.isPrivate && (
                 <Badge variant="outline" className="gap-1 text-muted-foreground">
                   <Lock /> Private

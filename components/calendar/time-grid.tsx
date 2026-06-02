@@ -12,7 +12,7 @@ import {
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
+import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import {
   HOUR_PX,
@@ -711,6 +711,8 @@ export function TimeGrid({
                         "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium",
                         selectedKeys.has(o.key) && "ring-2 ring-foreground",
                         o.inactive && "opacity-55 grayscale",
+                        eventStatusClass(o.status),
+                        o.status === "cancelled" && "line-through",
                       )}
                     >
                       {o.title}

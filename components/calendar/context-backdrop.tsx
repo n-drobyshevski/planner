@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { formatTime } from "@/lib/datetime/format";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { cn } from "@/lib/utils";
-import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
+import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
 import type { Occurrence } from "@/lib/types";
 
@@ -57,6 +57,7 @@ export const ContextBackdrop = forwardRef<
         "pointer-events-none absolute z-0 overflow-hidden rounded-lg",
         selected && "ring-2 ring-foreground ring-offset-1",
         occ.inactive && "opacity-55 grayscale",
+        eventStatusClass(occ.status),
         className,
       )}
       {...rest}
