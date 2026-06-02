@@ -26,7 +26,7 @@ function patchCachedMember(
 }
 
 /**
- * Profile edits for the signed-in member: display name and the 4-digit PIN
+ * Profile edits for the signed-in member: display name and the 8-digit PIN
  * "UX gate". The member row in Supabase is the source of truth; changes patch
  * the query cache optimistically and roll back on failure (mirrors
  * usePreferences). PIN values are hashed (sha256Hex) before they leave the
