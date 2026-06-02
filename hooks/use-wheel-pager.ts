@@ -16,8 +16,10 @@ interface WheelPagerOptions {
   ignoreSelector?: string;
 }
 
-const THRESHOLD = 40; // px of accumulated |deltaX| before a gesture pages
-const RESET_GAP = 220; // ms of wheel silence that ends a gesture and re-arms
+const THRESHOLD = 60; // normalized px of accumulated |deltaX| before a page fires
+const RESET_GAP = 200; // ms of silence after which leftover accumulation is dropped
+const MIN_INTERVAL = 180; // ms floor between pages (rate-limit, independent of React state)
+const LINE = 40; // px per line, for deltaMode=1 (Firefox) normalization
 
 /**
  * The desktop counterpart to `useDragPager`: a two-finger horizontal trackpad
@@ -27,8 +29,17 @@ const RESET_GAP = 220; // ms of wheel silence that ends a gesture and re-arms
  * horizontal events to suppress the browser's history back/forward swipe.
  *
  * Only horizontal-dominant events are claimed; vertical scrolling flows through
- * to the time grid untouched. One page fires per momentum gesture: a `fired`
- * latch holds until `RESET_GAP` ms of silence marks the gesture's end.
+ * to the time grid untouched.
+ *
+ * Paging cadence: accumulate `deltaX` until it crosses `THRESHOLD`, fire one
+ * page, then RESET the accumulator. The re-arm is immediate — we deliberately do
+ * NOT wait for the momentum tail to fall silent (that's what made paging "stick"
+ * for up to a second after a flick). Overshoot from a hard flick's momentum is
+ * curbed three ways: events during the slide are discarded (the animation is the
+ * cooldown), a `MIN_INTERVAL` floor caps the page rate, and a direction reversal
+ * or a `RESET_GAP` pause zeroes the accumulator. A discrete mouse-wheel notch
+ * (one event ≥ THRESHOLD) pages exactly once; momentum is normalized across
+ * browsers via `deltaMode`.
  *
  * Direction: `deltaX > 0` → next (+1), `< 0` → prev (-1). This is the platform
  * natural-direction convention and the physical inverse of `useDragPager`'s
@@ -63,39 +74,47 @@ export function useWheelPager({
     if (!el) return;
 
     let accumX = 0;
-    let fired = false;
     let lastTs = 0;
+    let lastFire = 0;
+
+    // Normalize deltas to px so THRESHOLD is meaningful across line/page modes.
+    const norm = (d: number, mode: number, page: number) =>
+      mode === 1 ? d * LINE : mode === 2 ? d * page : d;
 
     const onWheel = (e: WheelEvent) => {
       if (!enabledRef.current) return;
-      // Mid-slide: swallow the event (kill history-nav) but never page.
-      if (isBusyRef.current?.()) {
-        e.preventDefault();
-        lastTs = e.timeStamp;
-        return;
-      }
-      // A gap in the wheel stream marks a fresh gesture.
-      if (e.timeStamp - lastTs > RESET_GAP) {
-        accumX = 0;
-        fired = false;
-      }
-      lastTs = e.timeStamp;
+      const dx = norm(e.deltaX, e.deltaMode, el.clientWidth || 1);
+      const dy = norm(e.deltaY, e.deltaMode, el.clientHeight || 1);
 
       // Vertical-dominant: let the grid's scroller have it, untouched.
-      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      if (Math.abs(dx) <= Math.abs(dy)) return;
       // Cede to an inner horizontal scroller if one ever exists (none today).
       const sel = ignoreRef.current;
       if (sel && (e.target as Element).closest(sel)) return;
 
-      // Ours — block the browser's horizontal history swipe for the whole
-      // gesture, including the momentum tail.
+      // Ours — block the browser's horizontal history swipe (every event).
       e.preventDefault();
-      if (fired) return;
 
-      accumX += e.deltaX;
+      const now = e.timeStamp;
+      // Drop stale accumulation after a pause or a direction reversal.
+      if (now - lastTs > RESET_GAP || (accumX !== 0 && Math.sign(dx) !== Math.sign(accumX))) {
+        accumX = 0;
+      }
+      lastTs = now;
+
+      // During the slide, discard input — the animation is the cooldown.
+      if (isBusyRef.current?.()) {
+        accumX = 0;
+        return;
+      }
+      // Rate-limit, independent of React's transitioning state settling.
+      if (now - lastFire < MIN_INTERVAL) return;
+
+      accumX += dx;
       if (Math.abs(accumX) >= THRESHOLD) {
-        fired = true;
         onPageRef.current(accumX > 0 ? 1 : -1);
+        lastFire = now;
+        accumX = 0;
       }
     };
 
