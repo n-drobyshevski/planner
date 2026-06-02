@@ -91,7 +91,7 @@ export function CalendarCanvas(props: CanvasProps) {
   // "Today" is the viewer-zone day, so the highlight + now-line land on the
   // right column even when the chosen zone differs from the device.
   const today = useMemo(
-    () => getTime(startOfDay(Date.now(), { in: tz(timeZone) })),
+    () => getTime(startOfDay(new Date(), { in: tz(timeZone) })),
     [timeZone],
   );
 

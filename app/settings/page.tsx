@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
+import { TimezoneSettings } from "@/components/settings/timezone-settings";
 
 export const metadata: Metadata = {
   title: "Settings · Planner",
@@ -23,6 +24,7 @@ export default function SettingsPage() {
       <main className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <ProfileSettings />
         <AppearanceSettings />
+        <TimezoneSettings />
       </main>
     </div>
   );
