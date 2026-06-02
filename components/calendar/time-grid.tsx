@@ -15,13 +15,14 @@ import { cn } from "@/lib/utils";
 import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemContextMenu, type ItemAction } from "@/components/shared/item-context-menu";
 import {
-  HOUR_PX,
   SLOT_MIN,
   minutesToY,
   yToMinutes,
   snapMinutes,
 } from "@/lib/datetime/grid-math";
 import { DayColumn } from "./day-column";
+import { useUiStore } from "@/stores/ui-store";
+import { useTimelineZoom } from "@/hooks/use-timeline-zoom";
 import type { Occurrence } from "@/lib/types";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -168,6 +169,8 @@ export function TimeGrid({
   onScheduleTask,
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const hourPx = useUiStore((s) => s.hourPx);
   const dragRef = useRef<Drag | null>(null);
   const longPressRef = useRef<{
     pointerId: number;
@@ -185,6 +188,21 @@ export function TimeGrid({
   const timeZone = useViewerTimeZone();
   const secondaryTimeZone = useSecondaryTimeZone();
 
+  // Cancel any in-progress single-touch grid gesture so a two-finger pinch
+  // (zoom) never also creates or moves an event.
+  const cancelGesture = () => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current.timer);
+      longPressRef.current = null;
+    }
+    dragRef.current = null;
+    setArmed(false);
+    setPreview(null);
+    setGroupPreview([]);
+  };
+  // Ctrl+wheel / trackpad + touch pinch stretch the grid vertically (via hourPx).
+  useTimelineZoom({ viewportRef, onGestureStart: cancelGesture });
+
   // Contexts are timed backdrops in the grid body; never show them all-day
   // (all-day contexts are deferred — they'd otherwise render as a flat chip).
   const allDay = occurrences.filter((o) => o.allDay && o.kind !== "context");
@@ -197,7 +215,7 @@ export function TimeGrid({
     const rect = colsRef.current!.getBoundingClientRect();
     const colW = rect.width / days.length;
     const dayIndex = clamp(Math.floor((clientX - rect.left) / colW), 0, days.length - 1);
-    const minutes = yToMinutes(clientY - rect.top);
+    const minutes = yToMinutes(clientY - rect.top, hourPx);
     return { dayIndex, minutes };
   }
 
@@ -749,12 +767,12 @@ export function TimeGrid({
       )}
 
       {/* Scrollable time grid */}
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="flex" style={{ height: HOUR_PX * 24 }}>
+      <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef}>
+        <div className="flex" style={{ height: hourPx * 24 }}>
           {secondaryTimeZone && (
             <div className="w-12 shrink-0 border-r border-border/40">
               {HOURS.map((h) => (
-                <div key={h} style={{ height: HOUR_PX }} className="relative">
+                <div key={h} style={{ height: hourPx }} className="relative">
                   <span className="absolute -top-2 right-2 text-xs text-muted-foreground tabular-nums">
                     {h === 0 ? "" : secondaryHourLabel(h)}
                   </span>
@@ -764,7 +782,7 @@ export function TimeGrid({
           )}
           <div className="w-14 shrink-0">
             {HOURS.map((h) => (
-              <div key={h} style={{ height: HOUR_PX }} className="relative">
+              <div key={h} style={{ height: hourPx }} className="relative">
                 <span className="absolute -top-2 right-2 text-xs text-muted-foreground tabular-nums">
                   {h === 0 ? "" : format(new Date(2000, 0, 1, h), "HH")}
                 </span>
@@ -796,6 +814,7 @@ export function TimeGrid({
               <DayColumn
                 key={d}
                 dayStart={d}
+                hourPx={hourPx}
                 isToday={d === today}
                 singleColumn={days.length === 1}
                 occurrences={occurrences}
@@ -823,8 +842,8 @@ export function TimeGrid({
                 style={{
                   left: `calc(${(gp.dayIndex / days.length) * 100}% + 2px)`,
                   width: `calc(${100 / days.length}% - 4px)`,
-                  top: minutesToY(gp.topMin),
-                  height: Math.max(minutesToY(gp.heightMin), 6),
+                  top: minutesToY(gp.topMin, hourPx),
+                  height: Math.max(minutesToY(gp.heightMin, hourPx), 6),
                 }}
               >
                 <span className="truncate text-xs font-medium text-primary">{gp.label}</span>
@@ -837,8 +856,8 @@ export function TimeGrid({
                 style={{
                   left: `calc(${(preview.dayIndex / days.length) * 100}% + 2px)`,
                   width: `calc(${100 / days.length}% - 4px)`,
-                  top: minutesToY(preview.topMin),
-                  height: Math.max(minutesToY(preview.heightMin), 6),
+                  top: minutesToY(preview.topMin, hourPx),
+                  height: Math.max(minutesToY(preview.heightMin, hourPx), 6),
                 }}
               >
                 {preview.copy && (

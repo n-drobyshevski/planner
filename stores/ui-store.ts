@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { DEFAULT_HOUR_PX, clampHourPx } from "@/lib/datetime/zoom-math";
 
 /**
  * UI-only client state (ephemeral). The active view + focused date are URL-
@@ -22,6 +23,8 @@ interface UiState {
   selectedTaskId: string | null;
   /** the "Unscheduled tasks" rail on the calendar (T4) */
   taskBacklogOpen: boolean;
+  /** Vertical time-grid scale (px per hour) — driven by Ctrl+wheel / pinch zoom. */
+  hourPx: number;
 
   setSelectedEventKey: (key: string | null) => void;
   /** Replace the whole multi-selection set. */
@@ -40,6 +43,8 @@ interface UiState {
   setOverlayMemberIds: (next: Set<string>) => void;
   setSelectedTaskId: (id: string | null) => void;
   setTaskBacklogOpen: (open: boolean) => void;
+  /** Set the time-grid scale; clamped to the allowed zoom range. */
+  setHourPx: (px: number) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -50,6 +55,7 @@ export const useUiStore = create<UiState>((set) => ({
   overlayMemberIds: new Set(),
   selectedTaskId: null,
   taskBacklogOpen: false,
+  hourPx: DEFAULT_HOUR_PX,
 
   // A plain selection is also the (size-1) multi-selection, so the grid's ring
   // highlight — which reads `selectedEventKeys` — always tracks single clicks.
@@ -86,4 +92,5 @@ export const useUiStore = create<UiState>((set) => ({
     }),
   setHiddenCategoryIds: (hiddenCategoryIds) => set({ hiddenCategoryIds }),
   setOverlayMemberIds: (overlayMemberIds) => set({ overlayMemberIds }),
+  setHourPx: (px) => set({ hourPx: clampHourPx(px) }),
 }));

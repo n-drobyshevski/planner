@@ -13,6 +13,7 @@ import {
   MoreVertical,
   Settings,
   LogOut,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
+import { DEFAULT_HOUR_PX } from "@/lib/datetime/zoom-math";
 import { ViewSwitcher } from "./view-switcher";
 import { AppNav } from "@/components/app-nav";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
@@ -71,6 +74,12 @@ export function CalendarToolbar({
   workspace: WorkspaceData | null;
 }) {
   const current = workspace?.currentMember ?? null;
+  const timeGridView = view === "day" || view === "week" || view === "3day";
+  const hourPx = useUiStore((s) => s.hourPx);
+  const setHourPx = useUiStore((s) => s.setHourPx);
+  // The reset affordance only makes sense in the timed grid, and only once the
+  // user has actually zoomed away from the default scale.
+  const zoomed = timeGridView && hourPx !== DEFAULT_HOUR_PX;
 
   return (
     <header className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4">
@@ -110,6 +119,17 @@ export function CalendarToolbar({
         </h2>
 
         <div className="ml-auto flex items-center gap-2">
+          {zoomed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Reset zoom"
+              title="Reset zoom (Ctrl+0)"
+              onClick={() => setHourPx(DEFAULT_HOUR_PX)}
+            >
+              <Minimize2 />
+            </Button>
+          )}
           <ViewSwitcher view={view} onViewChange={onViewChange} />
           <Button size="sm" onClick={onNewEvent}>
             <Plus data-icon="inline-start" />
@@ -180,6 +200,11 @@ function CalendarMobileMenu({
   backlogOpen: boolean;
   current: Member | null;
 }) {
+  const timeGridView = view === "day" || view === "week" || view === "3day";
+  const hourPx = useUiStore((s) => s.hourPx);
+  const setHourPx = useUiStore((s) => s.setHourPx);
+  const zoomed = timeGridView && hourPx !== DEFAULT_HOUR_PX;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -221,6 +246,13 @@ function CalendarMobileMenu({
         >
           Tasks panel
         </DropdownMenuCheckboxItem>
+
+        {zoomed && (
+          <DropdownMenuItem onClick={() => setHourPx(DEFAULT_HOUR_PX)}>
+            <Minimize2 data-icon="inline-start" />
+            Reset zoom
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
         {current && (

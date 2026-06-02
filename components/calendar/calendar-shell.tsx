@@ -28,6 +28,7 @@ import type { EventInput } from "@/lib/supabase/mappers";
 import { createClient } from "@/lib/supabase/client";
 import { useUiStore } from "@/stores/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTimelineZoomPersistence } from "@/hooks/use-timeline-zoom";
 import { CalendarToolbar } from "./calendar-toolbar";
 import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
@@ -700,6 +701,8 @@ export function CalendarShell({
   // views (day/week/3day) a gesture that begins on an event block is left alone
   // so long-press-dragging an event between days never doubles as a page turn.
   const timeGridView = view === "day" || view === "week" || view === "3day";
+  // Remember the time-grid zoom per user; Ctrl/Cmd+0 resets it in timed views.
+  useTimelineZoomPersistence(viewerId, timeGridView);
   // Prev/Next animate through the carousel too; fall back to an instant jump if
   // it isn't mounted yet.
   function page(dir: -1 | 1) {

@@ -20,6 +20,7 @@ const NEST_R = 6; // right margin (px)
 
 export function DayColumn({
   dayStart,
+  hourPx = HOUR_PX,
   occurrences,
   isToday,
   singleColumn,
@@ -38,6 +39,8 @@ export function DayColumn({
   onToggleTaskDone,
 }: {
   dayStart: number;
+  /** Vertical scale (px per hour); defaults to the un-zoomed HOUR_PX. */
+  hourPx?: number;
   occurrences: Occurrence[];
   isToday: boolean;
   /** True in day view — its one wide column keeps the context time range on phones. */
@@ -132,7 +135,7 @@ export function DayColumn({
       {HOURS.map((h) => (
         <div
           key={h}
-          style={{ height: HOUR_PX }}
+          style={{ height: hourPx }}
           className="border-b border-border/40"
         />
       ))}
@@ -172,8 +175,8 @@ export function DayColumn({
               singleColumn={singleColumn}
               editable={editable}
               style={{
-                top: msToY(seg.start, dayStart),
-                height: durationToHeight(seg.start, seg.end),
+                top: msToY(seg.start, dayStart, hourPx),
+                height: durationToHeight(seg.start, seg.end, hourPx),
                 left: 1,
                 right: 1,
               }}
@@ -237,8 +240,8 @@ export function DayColumn({
               }
               style={
                 {
-                  top: msToY(seg.start, dayStart),
-                  height: durationToHeight(seg.start, seg.end),
+                  top: msToY(seg.start, dayStart, hourPx),
+                  height: durationToHeight(seg.start, seg.end, hourPx),
                   left,
                   width,
                   // Cascade stacking order (later-starting events sit in front);
@@ -250,7 +253,7 @@ export function DayColumn({
           </ItemContextMenu>
         );
       })}
-      {isToday && <NowLine dayStart={dayStart} />}
+      {isToday && <NowLine dayStart={dayStart} hourPx={hourPx} />}
     </div>
   );
 }

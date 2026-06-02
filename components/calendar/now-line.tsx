@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { msToY } from "@/lib/datetime/grid-math";
+import { msToY, HOUR_PX } from "@/lib/datetime/grid-math";
 
 const DAY_MS = 86_400_000;
 
 /** Minute-ticking current-time indicator for the today column. */
-export function NowLine({ dayStart }: { dayStart: number }) {
+export function NowLine({ dayStart, hourPx = HOUR_PX }: { dayStart: number; hourPx?: number }) {
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export function NowLine({ dayStart }: { dayStart: number }) {
   return (
     <div
       className="pointer-events-none absolute inset-x-0 z-30"
-      style={{ top: msToY(now, dayStart) }}
+      style={{ top: msToY(now, dayStart, hourPx) }}
       aria-hidden
     >
       <div className="relative h-px w-full bg-destructive">
