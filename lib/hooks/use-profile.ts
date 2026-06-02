@@ -70,6 +70,18 @@ export function useProfile() {
     [member, optimistic],
   );
 
+  const saveColor = useCallback(
+    (color: string) => {
+      if (!member) return Promise.resolve(false);
+      return optimistic(
+        { color },
+        () => updateMember(createClient(), member.id, { color }),
+        "Profile color updated",
+      );
+    },
+    [member, optimistic],
+  );
+
   /** Compare a candidate PIN against the stored hash (re-selected; not cached). */
   const verifyCurrentPin = useCallback(
     async (pin: string): Promise<boolean> => {
@@ -104,6 +116,7 @@ export function useProfile() {
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,
     saveName,
+    saveColor,
     verifyCurrentPin,
     savePin,
   };

@@ -31,6 +31,8 @@ export interface CanvasProps {
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
   onScheduleTask?: (taskId: string, startMs: number, endMs: number) => void;
+  /** Month-view only: when false, inactive (grayed-out) events are hidden there. */
+  showInactiveInMonth?: boolean;
   loading: boolean;
   error: boolean;
 }
@@ -58,6 +60,7 @@ export function CalendarCanvas(props: CanvasProps) {
     taskDoneById,
     onToggleTaskDone,
     onScheduleTask,
+    showInactiveInMonth = true,
     error,
   } = props;
   const timeZone = useViewerTimeZone();
@@ -70,9 +73,14 @@ export function CalendarCanvas(props: CanvasProps) {
 
   // The month grid's tiny cells can't show a time-block backdrop usefully, so
   // contexts are filtered out there. Agenda keeps them (as badged rows).
+  // Inactive (grayed-out) events are optionally hidden here too, per the
+  // member's preference, to keep the cramped cells legible.
   const monthOccurrences = useMemo(
-    () => occurrences.filter((o) => o.kind !== "context"),
-    [occurrences],
+    () =>
+      occurrences.filter(
+        (o) => o.kind !== "context" && (showInactiveInMonth || !o.inactive),
+      ),
+    [occurrences, showInactiveInMonth],
   );
 
   if (error) {

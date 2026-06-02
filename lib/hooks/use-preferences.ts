@@ -73,6 +73,8 @@ export function usePreferences() {
   const rawTimezone = member?.timezone ?? null;
   const timeZone = rawTimezone ?? localTimeZone();
   const secondaryTimeZone = member?.secondaryTimezone ?? null;
+  // Month-view display: whether inactive (grayed-out) events are shown there.
+  const showInactiveInMonth = member?.showInactiveInMonth ?? true;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
   // its own (Latte light, the rest dark); `default` defers to themePreference.
@@ -150,6 +152,15 @@ export function usePreferences() {
     [persist],
   );
 
+  // No DOM side-effect (like the time-zone setters): the month grid re-reads the
+  // flag from the workspace cache that `persist` patches.
+  const setShowInactiveInMonth = useCallback(
+    (next: boolean) => {
+      void persist({ showInactiveInMonth: next });
+    },
+    [persist],
+  );
+
   const setPalette = useCallback(
     (next: Palette) => {
       // applyAppearance handles the data-tone rule (default honors tone, a
@@ -176,12 +187,15 @@ export function usePreferences() {
     timeZone,
     /** Optional secondary zone (world-clock), or null when off. */
     secondaryTimeZone,
+    /** Whether inactive events are shown in the month view. */
+    showInactiveInMonth,
     setThemePref,
     setAccent,
     setTone,
     setPalette,
     setTimezone,
     setSecondaryTimezone,
+    setShowInactiveInMonth,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,
   };

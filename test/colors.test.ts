@@ -26,6 +26,7 @@ const member = (id: string, color: string): Member => ({
   palette: "default",
   timezone: null,
   secondaryTimezone: null,
+  showInactiveInMonth: true,
 });
 
 function occ(over: Partial<Occurrence>): Occurrence {
