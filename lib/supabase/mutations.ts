@@ -82,6 +82,119 @@ export async function deleteEvent(sb: SupabaseClient, id: string): Promise<void>
   if (error) throw error;
 }
 
+/**
+ * Raw rows captured before a delete so undo can re-insert them verbatim. We
+ * keep the full Postgres rows (not the domain shape) because restore must
+ * preserve every column — including ones the app layer doesn't model (scope,
+ * visibility) — and the original ids, so all links (task_id, parent_id,
+ * context_id, override→event) survive the round-trip intact.
+ */
+export interface DeletedSnapshot {
+  /** Parent-before-child order; restore inserts them in this order. */
+  tasks: Record<string, unknown>[];
+  events: Record<string, unknown>[];
+  overrides: Record<string, unknown>[];
+}
+
+/**
+ * Delete an event after snapshotting it (and its occurrence overrides, which
+ * cascade) so the delete can be undone by `restoreDeleted`.
+ */
+export async function deleteEventDeep(
+  sb: SupabaseClient,
+  id: string,
+): Promise<DeletedSnapshot> {
+  const { data: events, error: eErr } = await sb
+    .from("events")
+    .select("*")
+    .eq("id", id);
+  if (eErr) throw eErr;
+  const { data: overrides, error: oErr } = await sb
+    .from("event_overrides")
+    .select("*")
+    .eq("event_id", id);
+  if (oErr) throw oErr;
+  const { error } = await sb.from("events").delete().eq("id", id);
+  if (error) throw error;
+  return { tasks: [], events: events ?? [], overrides: overrides ?? [] };
+}
+
+/**
+ * Delete a task after snapshotting its whole subtree (descendant tasks via
+ * parent_id) plus the calendar blocks linked to any of those tasks and their
+ * overrides — all of which the DB cascades away. `restoreDeleted` re-inserts
+ * the snapshot to bring the task, its subtasks, and its blocks back.
+ */
+export async function deleteTaskDeep(
+  sb: SupabaseClient,
+  id: string,
+): Promise<DeletedSnapshot> {
+  // BFS the subtree so arbitrary nesting depth is captured parent-before-child.
+  const { data: root, error: rErr } = await sb
+    .from("tasks")
+    .select("*")
+    .eq("id", id);
+  if (rErr) throw rErr;
+  const tasks: Record<string, unknown>[] = [...(root ?? [])];
+  let frontier = tasks.map((t) => t.id as string);
+  while (frontier.length > 0) {
+    const { data: children, error: cErr } = await sb
+      .from("tasks")
+      .select("*")
+      .in("parent_id", frontier);
+    if (cErr) throw cErr;
+    if (!children || children.length === 0) break;
+    tasks.push(...children);
+    frontier = children.map((c) => c.id as string);
+  }
+
+  const taskIds = tasks.map((t) => t.id as string);
+  const { data: events, error: eErr } = await sb
+    .from("events")
+    .select("*")
+    .in("task_id", taskIds);
+  if (eErr) throw eErr;
+  const eventIds = (events ?? []).map((e) => e.id as string);
+  let overrides: Record<string, unknown>[] = [];
+  if (eventIds.length > 0) {
+    const { data, error: oErr } = await sb
+      .from("event_overrides")
+      .select("*")
+      .in("event_id", eventIds);
+    if (oErr) throw oErr;
+    overrides = data ?? [];
+  }
+
+  // Deleting the root cascades to descendant tasks, their linked blocks, and
+  // those blocks' overrides — so one delete clears everything we snapshotted.
+  const { error } = await sb.from("tasks").delete().eq("id", id);
+  if (error) throw error;
+  return { tasks, events: events ?? [], overrides };
+}
+
+/**
+ * Re-insert a `DeletedSnapshot` to undo a delete. Tasks go first (in captured
+ * parent-before-child order, inserted one at a time to satisfy the self-
+ * referential parent_id FK), then the linked blocks, then their overrides.
+ */
+export async function restoreDeleted(
+  sb: SupabaseClient,
+  snap: DeletedSnapshot,
+): Promise<void> {
+  for (const task of snap.tasks) {
+    const { error } = await sb.from("tasks").insert(task);
+    if (error) throw error;
+  }
+  if (snap.events.length > 0) {
+    const { error } = await sb.from("events").insert(snap.events);
+    if (error) throw error;
+  }
+  if (snap.overrides.length > 0) {
+    const { error } = await sb.from("event_overrides").insert(snap.overrides);
+    if (error) throw error;
+  }
+}
+
 /** Group an event under a context (or move it to a different one). */
 export function assignToContext(
   sb: SupabaseClient,
