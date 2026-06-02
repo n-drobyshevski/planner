@@ -24,7 +24,8 @@ import { useEventMutations } from "@/lib/hooks/use-event-mutations";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { qk } from "@/lib/supabase/query-keys";
-import type { WindowData } from "@/lib/supabase/queries";
+import { fetchWindow, type WindowData } from "@/lib/supabase/queries";
+import { createClient } from "@/lib/supabase/client";
 import { useUiStore } from "@/stores/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CalendarToolbar } from "./calendar-toolbar";
@@ -151,6 +152,25 @@ export function CalendarShell({
   const [deletingContext, setDeletingContext] = useState<EventRow | null>(null);
   const mutations = useEventMutations(workspace.data?.workspaceId);
   const qc = useQueryClient();
+
+  // Warm the windows two steps out in each direction so a fast double-swipe
+  // stays instant — the carousel already holds ±1, this prefetches ±2 so the
+  // edge a second consecutive page needs is cached before the animation lands.
+  useEffect(() => {
+    if (!wsId) return;
+    const sb = createClient();
+    const farFocuses = [
+      navigate(view, prevFocus, -1, { timeZone: viewerTimeZone }),
+      navigate(view, nextFocus, 1, { timeZone: viewerTimeZone }),
+    ];
+    for (const focus of farFocuses) {
+      const w = getWindow(view, focus, { timeZone: viewerTimeZone });
+      void qc.prefetchQuery({
+        queryKey: qk.window(wsId, w.start, w.end),
+        queryFn: () => fetchWindow(sb, wsId, w),
+      });
+    }
+  }, [wsId, view, prevFocus, nextFocus, viewerTimeZone, qc]);
 
   const selectedKey = useUiStore((s) => s.selectedEventKey);
   const setSelected = useUiStore((s) => s.setSelectedEventKey);

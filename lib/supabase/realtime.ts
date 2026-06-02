@@ -1,14 +1,28 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type {
+  RealtimePostgresChangesPayload,
+  SupabaseClient,
+} from "@supabase/supabase-js";
+
+/**
+ * One realtime row change. `table` lets a subscriber react only to the tables
+ * it owns, and `new`/`old` let it scope invalidation to the affected rows.
+ * Note: with the default replica identity, `old` only carries the primary key
+ * on UPDATE/DELETE — full row data is available on INSERT (`new`) only.
+ */
+export type WorkspaceChange = RealtimePostgresChangesPayload<
+  Record<string, unknown>
+>;
 
 /**
  * Subscribe to all event/override/category/task changes for a workspace.
  * RLS is enforced for realtime, so a private event/task of the other member is
- * never delivered here. Returns an unsubscribe function.
+ * never delivered here. The handler receives the row-change payload so callers
+ * can filter by table and narrow invalidation. Returns an unsubscribe function.
  */
 export function subscribeWorkspace(
   sb: SupabaseClient,
   workspaceId: string,
-  onChange: () => void,
+  onChange: (change: WorkspaceChange) => void,
   channelKey = "main",
 ): () => void {
   const filter = `workspace_id=eq.${workspaceId}`;
