@@ -54,6 +54,7 @@ function event(p: Partial<EventRow>): EventRow {
     description: null,
     location: null,
     isPrivate: false,
+    isShared: false,
     color: null,
     kind: "event",
     allDay: false,

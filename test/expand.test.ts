@@ -24,6 +24,7 @@ function makeEvent(p: Partial<EventRow> = {}): EventRow {
     description: null,
     location: null,
     isPrivate: false,
+    isShared: false,
     color: null,
     kind: "event",
     allDay: false,
@@ -247,6 +248,21 @@ describe("expandEvent — isShared (joint events under a Shared context)", () =>
 
   it("is not shared when the event is private, even under a shared context", () => {
     const e = makeEvent({ categoryId: "cat-shared", isPrivate: true });
+    expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(false);
+  });
+
+  it("is shared when the event's own is_shared flag is set, in a personal context", () => {
+    const e = makeEvent({ categoryId: "cat-personal", isShared: true });
+    expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(true);
+  });
+
+  it("is shared when the event's own is_shared flag is set, with no context", () => {
+    const e = makeEvent({ categoryId: null, isShared: true });
+    expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(true);
+  });
+
+  it("is not shared when is_shared is set but the event is private", () => {
+    const e = makeEvent({ categoryId: null, isShared: true, isPrivate: true });
     expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(false);
   });
 

@@ -9,7 +9,7 @@ import { Pencil, Trash2, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
-import { ItemContextMenu } from "@/components/shared/item-context-menu";
+import { ItemContextMenu, type ItemAction } from "@/components/shared/item-context-menu";
 import { packMonthWeek, occurrencesOnDay, type MonthItem } from "@/lib/layout/pack-month";
 import type { Occurrence } from "@/lib/types";
 
@@ -30,6 +30,8 @@ interface CommonProps {
   onCreateDay: (ms: number) => void;
   onChangeColor: (o: Occurrence, color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
+  /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
+  eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Owner-only editability; non-editable occurrences are read-only overlays. */
   canEdit: (o: Occurrence) => boolean;
 }
@@ -77,6 +79,7 @@ function WeekRow({
   onCreateDay,
   onChangeColor,
   onDeleteEvent,
+  eventShareAction,
   canEdit,
 }: CommonProps & { dayStarts: number[] }) {
   const timeZone = useViewerTimeZone();
@@ -152,6 +155,9 @@ function WeekRow({
                     canEdit(it.occ)
                       ? [
                           { label: "Edit", icon: Pencil, onSelect: () => onSelect(it.occ) },
+                          ...(eventShareAction && eventShareAction(it.occ)
+                            ? [eventShareAction(it.occ)!]
+                            : []),
                           {
                             label: "Delete",
                             icon: Trash2,

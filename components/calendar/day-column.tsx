@@ -31,6 +31,7 @@ export function DayColumn({
   onDeleteEvent,
   onAssignCategory,
   categoryChoices,
+  eventShareAction,
   canEdit,
   taskDoneById,
   onToggleTaskDone,
@@ -51,6 +52,8 @@ export function DayColumn({
   onAssignCategory?: (o: Occurrence, categoryId: string | null) => void;
   /** Contexts the viewer may assign, for the right-click menu. */
   categoryChoices?: { id: string; name: string }[];
+  /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
+  eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Owner-only editability; non-editable occurrences are read-only overlays. */
   canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -195,6 +198,9 @@ export function DayColumn({
                 ? [
                     { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
                     ...contextActions(seg.occ),
+                    ...(eventShareAction && eventShareAction(seg.occ)
+                      ? [eventShareAction(seg.occ)!]
+                      : []),
                     {
                       label: "Delete",
                       icon: Trash2,

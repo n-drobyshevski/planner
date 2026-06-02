@@ -21,6 +21,7 @@ import {
   ItemContextMenu,
   ItemMenuButton,
   type MenuableProps,
+  type ItemAction,
 } from "@/components/shared/item-context-menu";
 import type { Occurrence } from "@/lib/types";
 
@@ -32,6 +33,8 @@ interface Props {
   onSelect: (o: Occurrence) => void;
   onChangeColor: (o: Occurrence, color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
+  /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
+  eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Owner-only editability; non-editable occurrences are read-only overlays. */
   canEdit: (o: Occurrence) => boolean;
   loading?: boolean;
@@ -51,6 +54,7 @@ export function AgendaView({
   onSelect,
   onChangeColor,
   onDeleteEvent,
+  eventShareAction,
   canEdit,
   loading,
 }: Props) {
@@ -117,6 +121,9 @@ export function AgendaView({
                         canEdit(o)
                           ? [
                               { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                              ...(eventShareAction && eventShareAction(o)
+                                ? [eventShareAction(o)!]
+                                : []),
                               {
                                 label: "Delete",
                                 icon: Trash2,

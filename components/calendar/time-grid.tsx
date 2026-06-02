@@ -13,7 +13,7 @@ import { Pencil, Trash2, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
-import { ItemContextMenu } from "@/components/shared/item-context-menu";
+import { ItemContextMenu, type ItemAction } from "@/components/shared/item-context-menu";
 import {
   HOUR_PX,
   SLOT_MIN,
@@ -80,6 +80,8 @@ interface Props {
   onDeleteEvent: (occ: Occurrence) => void;
   onAssignCategory?: (occ: Occurrence, categoryId: string | null) => void;
   categoryChoices?: { id: string; name: string }[];
+  /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
+  eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Owner-only editability; non-editable blocks are select-only (read-only overlay). */
   canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -156,6 +158,7 @@ export function TimeGrid({
   onDeleteEvent,
   onAssignCategory,
   categoryChoices,
+  eventShareAction,
   canEdit,
   taskDoneById,
   onToggleTaskDone,
@@ -693,6 +696,9 @@ export function TimeGrid({
                       canEdit(o)
                         ? [
                             { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                            ...(eventShareAction && eventShareAction(o)
+                              ? [eventShareAction(o)!]
+                              : []),
                             {
                               label: "Delete",
                               icon: Trash2,
@@ -784,6 +790,7 @@ export function TimeGrid({
                 onDeleteEvent={onDeleteEvent}
                 onAssignCategory={onAssignCategory}
                 categoryChoices={categoryChoices}
+                eventShareAction={eventShareAction}
                 canEdit={canEdit}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}

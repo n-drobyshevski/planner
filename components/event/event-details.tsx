@@ -13,6 +13,8 @@ import {
   Repeat,
   Tag,
   Trash2,
+  User,
+  Users,
 } from "lucide-react";
 import {
   ResponsiveDialog,
@@ -53,11 +55,15 @@ interface EventDetailsProps {
   ownerName: string;
   /** the viewer owns this item (can edit); otherwise read-only overlay */
   isOwn: boolean;
+  /** the item is joint via its (Shared) context — per-event share toggle is hidden */
+  sharedContext: boolean;
   task?: TaskRow | null;
   taskDone?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onChangeColor: (color: string | null) => void;
+  /** toggle this single event's joint (Shared) flag */
+  onToggleEventShared: () => void;
   onToggleTaskDone?: () => void;
 }
 
@@ -76,11 +82,13 @@ export function EventDetails({
   categoryName,
   ownerName,
   isOwn,
+  sharedContext,
   task,
   taskDone,
   onEdit,
   onDelete,
   onChangeColor,
+  onToggleEventShared,
   onToggleTaskDone,
 }: EventDetailsProps) {
   const isContext = occurrence.kind === "context";
@@ -105,7 +113,10 @@ export function EventDetails({
             />
             <span className="min-w-0 truncate">{occurrence.title || "Untitled"}</span>
           </ResponsiveDialogTitle>
-          {(occurrence.isPrivate || isContext || occurrence.status !== "confirmed") && (
+          {(occurrence.isPrivate ||
+            occurrence.isShared ||
+            isContext ||
+            occurrence.status !== "confirmed") && (
             <div className="mt-1 flex flex-wrap gap-1.5">
               {isContext && <Badge variant="outline">Context</Badge>}
               {occurrence.status !== "confirmed" && (
@@ -116,6 +127,11 @@ export function EventDetails({
               {occurrence.isPrivate && (
                 <Badge variant="outline" className="gap-1 text-muted-foreground">
                   <Lock /> Private
+                </Badge>
+              )}
+              {occurrence.isShared && (
+                <Badge variant="outline" className="gap-1 text-muted-foreground">
+                  <Users /> Shared
                 </Badge>
               )}
             </div>
@@ -202,6 +218,21 @@ export function EventDetails({
                 Delete
               </Button>
               <div className="flex gap-2">
+                {!isContext && !sharedContext && (
+                  <Button variant="outline" size="sm" onClick={onToggleEventShared}>
+                    {occurrence.isShared ? (
+                      <>
+                        <User data-icon="inline-start" />
+                        Make personal
+                      </>
+                    ) : (
+                      <>
+                        <Users data-icon="inline-start" />
+                        Share
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" aria-label="Change color">

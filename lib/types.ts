@@ -83,6 +83,12 @@ export interface EventRow {
   location: string | null;
   /** true = only the owner can see it; false (default) = shared with the workspace */
   isPrivate: boolean;
+  /**
+   * per-event joint flag: a non-private event marked Shared is joint (both see
+   * + edit) even outside a Shared context. Effective jointness is the union of
+   * this with the shared-context derivation — see the derived `Occurrence.isShared`.
+   */
+  isShared: boolean;
   /** per-item color override (hex); null = derive from category/owner */
   color: string | null;
   /** 'event' (normal) or 'context' (a Context's time-block on the calendar).

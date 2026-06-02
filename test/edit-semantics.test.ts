@@ -23,6 +23,7 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     description: "Daily sync",
     location: "Room A",
     isPrivate: false,
+    isShared: false,
     color: null,
     kind: "event",
     allDay: false,

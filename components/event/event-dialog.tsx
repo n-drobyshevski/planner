@@ -9,7 +9,7 @@ import {
   ResponsiveDialogBody,
   ResponsiveDialogFooter,
 } from "@/components/ui/responsive-dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -23,7 +23,7 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Lock, Trash2, Loader2, Users } from "lucide-react";
+import { Lock, Eye, Trash2, Loader2, Users } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
@@ -43,6 +43,15 @@ import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import type { Category, EventKind, EventRow, EventStatus, Occurrence } from "@/lib/types";
 import type { EventInput } from "@/lib/supabase/mappers";
 
+/**
+ * Visibility of an item (outside a Shared context):
+ *  - private: only the owner sees it
+ *  - visible: the default — the partner can see it on the owner's calendar
+ *    (overlay), only the owner edits
+ *  - shared: joint — both see it on their own calendars and both can edit it
+ */
+type EventVisibility = "private" | "visible" | "shared";
+
 interface FormState {
   itemKind: EventKind;
   title: string;
@@ -56,7 +65,7 @@ interface FormState {
   endDate: string;
   endTime: string;
   categoryId: string; // "none" | id — the Context this item belongs to / a window paints
-  isPrivate: boolean;
+  visibility: EventVisibility;
   /** own color override (hex); null = derive from category/owner */
   color: string | null;
   recurrence: RecurrenceForm | null;
@@ -122,14 +131,17 @@ export function EventDialog(props: EventDialogProps) {
     (c) => c.ownerId === null || c.ownerId === currentMemberId,
   );
 
-  // An item filed under a SHARED context (owner_id IS NULL) is JOINT: both
-  // members co-edit it, so it must stay non-private (else the other member
-  // couldn't see it). The private toggle is hidden and isPrivate forced off.
+  // An item filed under a SHARED context (owner_id IS NULL) is JOINT via the
+  // context, so the per-event visibility control is hidden and the stored flags
+  // are coerced clean (jointness comes from the context). Otherwise the 3-way
+  // control governs the flags.
   const selectedCategory =
     form.categoryId !== "none"
       ? categories.find((c) => c.id === form.categoryId) ?? null
       : null;
   const sharedContext = selectedCategory?.ownerId === null;
+  const isPrivate = sharedContext ? false : form.visibility === "private";
+  const isShared = sharedContext ? false : form.visibility === "shared";
 
   function computeTimes() {
     // All-day events are floating dates anchored to UTC midnight (the same
@@ -178,7 +190,8 @@ export function EventDialog(props: EventDialogProps) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
-        isPrivate: sharedContext ? false : form.isPrivate,
+        isPrivate,
+        isShared,
         color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
@@ -207,7 +220,8 @@ export function EventDialog(props: EventDialogProps) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
-        isPrivate: sharedContext ? false : form.isPrivate,
+        isPrivate,
+        isShared,
         color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
@@ -270,8 +284,9 @@ export function EventDialog(props: EventDialogProps) {
           description: patch.description,
           location: patch.location,
           categoryId: patch.categoryId,
-          // Joint series must stay non-private so both members can see it.
-          isPrivate: sharedContext ? false : event.isPrivate,
+          // The 3-way control governs the whole series on an "all" edit.
+          isPrivate,
+          isShared,
           color: form.color,
           allDay: form.allDay,
           inactive: form.inactive,
@@ -475,13 +490,35 @@ export function EventDialog(props: EventDialogProps) {
                 <span>Shared context — you both attend and can edit this.</span>
               </div>
             ) : (
-              <Field orientation="horizontal">
-                <Switch
-                  id="ev-private"
-                  checked={form.isPrivate}
-                  onCheckedChange={(v) => set("isPrivate", v)}
-                />
-                <FieldLabel htmlFor="ev-private">Private (only you can see this)</FieldLabel>
+              <Field>
+                <FieldLabel>Sharing</FieldLabel>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={form.visibility}
+                  onValueChange={(v) => v && set("visibility", v as EventVisibility)}
+                  className="justify-start"
+                >
+                  <ToggleGroupItem value="private">
+                    <Lock data-icon="inline-start" />
+                    Private
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="visible">
+                    <Eye data-icon="inline-start" />
+                    Visible
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="shared">
+                    <Users data-icon="inline-start" />
+                    Shared
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <FieldDescription>
+                  {form.visibility === "private"
+                    ? "Only you can see this."
+                    : form.visibility === "shared"
+                      ? "Shows on both calendars; you both can edit it."
+                      : "Your partner can see it on your calendar; only you can edit it."}
+                </FieldDescription>
               </Field>
             )}
 
@@ -578,7 +615,7 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
       endDate: msToDateInput(occurrence.allDay ? occurrence.end - 1 : occurrence.end, dateZone),
       endTime: msToTimeInput(occurrence.end, timeZone),
       categoryId: occurrence.categoryId ?? "none",
-      isPrivate: event.isPrivate,
+      visibility: event.isPrivate ? "private" : event.isShared ? "shared" : "visible",
       color: event.color ?? null,
       recurrence: parseRRule(event.rrule),
     };
@@ -598,7 +635,7 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
     endDate: msToDateInput(end, timeZone),
     endTime: msToTimeInput(end, timeZone),
     categoryId: defaultCategoryId ?? "none",
-    isPrivate: false,
+    visibility: "visible",
     color: null,
     recurrence: null,
   };

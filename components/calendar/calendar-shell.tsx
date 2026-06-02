@@ -33,8 +33,10 @@ import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
 import { CalendarFiltersSheet } from "@/components/sidebar/calendar-filters-sheet";
+import { Users, User } from "lucide-react";
 import { EventDialog } from "@/components/event/event-dialog";
 import { EventDetails } from "@/components/event/event-details";
+import type { ItemAction } from "@/components/shared/item-context-menu";
 import { TaskBacklogRail, TaskBacklogSheet } from "@/components/tasks/task-backlog-rail";
 import { ScheduleTaskDialog } from "@/components/tasks/schedule-task-dialog";
 import {
@@ -358,6 +360,32 @@ export function CalendarShell({
     const ev = events.find((e) => e.id === occ.eventId);
     if (ev) void mutations.updateSingle(ev.id, { color }, { color: ev.color });
   }
+  /** Toggle a single event Shared (joint). Series-level, like is_private:
+   *  writes the master row, no scope prompt. Sharing also clears Private so the
+   *  partner can see it. */
+  function onToggleEventShared(occ: Occurrence) {
+    if (!canEditOcc(occ)) return;
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev) return;
+    const next = !ev.isShared;
+    void mutations.updateSingle(
+      ev.id,
+      next ? { isShared: true, isPrivate: false } : { isShared: false },
+      next ? { isShared: ev.isShared, isPrivate: ev.isPrivate } : { isShared: ev.isShared },
+    );
+  }
+  /** The right-click "Share / Make personal" action for an event, or null when
+   *  it doesn't apply: not editable, not a normal event, or already joint via a
+   *  Shared context (the per-event toggle is moot there). Outside a Shared
+   *  context, occ.isShared equals the stored per-event flag. */
+  function eventShareAction(occ: Occurrence): ItemAction | null {
+    if (occ.kind !== "event" || !canEditOcc(occ)) return null;
+    const cat = occ.categoryId ? categoryMap.get(occ.categoryId) : null;
+    if (cat?.ownerId === null) return null;
+    return occ.isShared
+      ? { label: "Make personal", icon: User, onSelect: () => onToggleEventShared(occ) }
+      : { label: "Share", icon: Users, onSelect: () => onToggleEventShared(occ) };
+  }
   function onDeleteEvent(occ: Occurrence) {
     if (!canEditOcc(occ)) return;
     const ev = events.find((e) => e.id === occ.eventId);
@@ -485,6 +513,7 @@ export function CalendarShell({
       description: ev.description,
       location: ev.location,
       isPrivate: ev.isPrivate,
+      isShared: ev.isShared,
       color: ev.color,
       kind: ev.kind,
       allDay: ev.allDay,
@@ -742,6 +771,7 @@ export function CalendarShell({
                 onDeleteEvent={onDeleteEvent}
                 onAssignCategory={onAssignCategory}
                 categoryChoices={categoryChoices}
+                eventShareAction={eventShareAction}
                 canEdit={canEditOcc}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
@@ -812,6 +842,12 @@ export function CalendarShell({
             onDeleteEvent(occ);
           }}
           onChangeColor={(c) => onChangeEventColor(details.occurrence, c)}
+          sharedContext={
+            details.occurrence.categoryId
+              ? categoryMap.get(details.occurrence.categoryId)?.ownerId === null
+              : false
+          }
+          onToggleEventShared={() => onToggleEventShared(details.occurrence)}
           onToggleTaskDone={
             details.occurrence.taskId
               ? () => onToggleTaskDone(details.occurrence.taskId!)

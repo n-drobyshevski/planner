@@ -3,7 +3,7 @@
 import { forwardRef } from "react";
 import { formatTime } from "@/lib/datetime/format";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
 import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
@@ -90,6 +90,9 @@ export const EventBlock = forwardRef<
         >
           {occ.title}
         </span>
+        {occ.isShared && (
+          <Users className="mt-px size-3 shrink-0 opacity-90" aria-label="Shared" />
+        )}
         {onMenu && (
           <ItemMenuButton
             onMenu={onMenu}

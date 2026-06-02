@@ -63,6 +63,7 @@ export function mapEvent(r: Row): EventRow {
     description: (r.description as string | null) ?? null,
     location: (r.location as string | null) ?? null,
     isPrivate: Boolean(r.is_private),
+    isShared: Boolean(r.is_shared),
     color: (r.color as string | null) ?? null,
     kind: (r.kind as EventRow["kind"] | null) ?? "event",
     allDay: Boolean(r.all_day),
@@ -128,6 +129,7 @@ export interface EventInput {
   description?: string | null;
   location?: string | null;
   isPrivate?: boolean;
+  isShared?: boolean;
   color?: string | null;
   kind?: EventRow["kind"];
   allDay?: boolean;
@@ -150,6 +152,7 @@ export function eventInputToRow(input: EventInput): Row {
     description: input.description ?? null,
     location: input.location ?? null,
     is_private: input.isPrivate ?? false,
+    is_shared: input.isShared ?? false,
     color: input.color ?? null,
     kind: input.kind ?? "event",
     all_day: input.allDay ?? false,
@@ -172,6 +175,7 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("description" in patch) row.description = patch.description ?? null;
   if ("location" in patch) row.location = patch.location ?? null;
   if ("isPrivate" in patch) row.is_private = patch.isPrivate ?? false;
+  if ("isShared" in patch) row.is_shared = patch.isShared ?? false;
   if ("color" in patch) row.color = patch.color ?? null;
   if ("kind" in patch) row.kind = patch.kind;
   if ("allDay" in patch) row.all_day = patch.allDay;

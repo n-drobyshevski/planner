@@ -8,6 +8,7 @@ import { TimeGrid } from "./time-grid";
 import { MonthGrid } from "./month-grid";
 import { AgendaView } from "./agenda-view";
 import type { CalendarView, Occurrence } from "@/lib/types";
+import type { ItemAction } from "@/components/shared/item-context-menu";
 
 export interface CanvasProps {
   view: CalendarView;
@@ -48,6 +49,8 @@ export interface CanvasProps {
   onAssignCategory?: (occ: Occurrence, categoryId: string | null) => void;
   /** Contexts the viewer may assign, for the right-click menu. */
   categoryChoices?: { id: string; name: string }[];
+  /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
+  eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Whether an occurrence is editable (owner-only); others are read-only overlays. */
   canEdit?: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -80,6 +83,7 @@ export function CalendarCanvas(props: CanvasProps) {
     onDeleteEvent,
     onAssignCategory,
     categoryChoices,
+    eventShareAction,
     canEdit = ALWAYS_EDITABLE,
     taskDoneById,
     onToggleTaskDone,
@@ -126,6 +130,7 @@ export function CalendarCanvas(props: CanvasProps) {
         onSelect={onSelect}
         onChangeColor={onChangeColor}
         onDeleteEvent={onDeleteEvent}
+        eventShareAction={eventShareAction}
         canEdit={canEdit}
         loading={props.loading}
       />
@@ -146,6 +151,7 @@ export function CalendarCanvas(props: CanvasProps) {
         onCreateDay={onCreateDay}
         onChangeColor={onChangeColor}
         onDeleteEvent={onDeleteEvent}
+        eventShareAction={eventShareAction}
         canEdit={canEdit}
       />
     );
@@ -171,6 +177,7 @@ export function CalendarCanvas(props: CanvasProps) {
       onDeleteEvent={onDeleteEvent}
       onAssignCategory={onAssignCategory}
       categoryChoices={categoryChoices}
+      eventShareAction={eventShareAction}
       canEdit={canEdit}
       taskDoneById={taskDoneById}
       onToggleTaskDone={onToggleTaskDone}

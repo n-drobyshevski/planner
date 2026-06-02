@@ -42,6 +42,32 @@ describe("mapEvent — kind", () => {
   });
 });
 
+describe("is_shared round-trip", () => {
+  it("mapEvent reads is_shared (false when the column is missing)", () => {
+    expect(mapEvent(baseRow).isShared).toBe(false);
+    expect(mapEvent({ ...baseRow, is_shared: true }).isShared).toBe(true);
+  });
+
+  it("eventInputToRow defaults is_shared false and passes it through", () => {
+    const input: EventInput = {
+      workspaceId: "w1",
+      ownerId: "m1",
+      title: "Work",
+      start: 0,
+      end: 1,
+      timeZone: "UTC",
+    };
+    expect(eventInputToRow(input).is_shared).toBe(false);
+    expect(eventInputToRow({ ...input, isShared: true }).is_shared).toBe(true);
+  });
+
+  it("eventPatchToRow only writes is_shared when present in the patch", () => {
+    expect(eventPatchToRow({ isShared: true })).toEqual({ is_shared: true });
+    expect(eventPatchToRow({ isShared: false })).toEqual({ is_shared: false });
+    expect(eventPatchToRow({ title: "x" })).not.toHaveProperty("is_shared");
+  });
+});
+
 describe("eventInputToRow — kind/category", () => {
   const input: EventInput = {
     workspaceId: "w1",

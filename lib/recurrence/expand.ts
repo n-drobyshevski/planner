@@ -93,15 +93,15 @@ function baseOccurrence(
     kind: event.kind,
     ownerId: event.ownerId,
     isPrivate: event.isPrivate,
-    // Series-level, derived from the workspace's Shared contexts: a non-private
-    // event filed under a Shared category (owner_id IS NULL) is joint — both
-    // members see it without overlay and both may edit it. A private event is
-    // never joint (it stays owner-only, mirroring the events_write RLS).
-    // applyOverride leaves this alone.
+    // Series-level effective jointness: a non-private event is joint — both
+    // members see it without overlay and both may edit it — when it is either
+    // explicitly shared (its own is_shared flag) OR filed under a Shared
+    // category (owner_id IS NULL). A private event is never joint (it stays
+    // owner-only, mirroring the events_write RLS). applyOverride leaves it alone.
     isShared:
       !event.isPrivate &&
-      event.categoryId != null &&
-      sharedCategoryIds.has(event.categoryId),
+      (event.isShared ||
+        (event.categoryId != null && sharedCategoryIds.has(event.categoryId))),
     taskId: event.taskId,
     isRecurring: opts.isRecurring,
     isException: opts.isException,
