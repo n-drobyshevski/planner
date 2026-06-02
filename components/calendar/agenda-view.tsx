@@ -35,6 +35,8 @@ interface Props {
   onDeleteEvent: (o: Occurrence) => void;
   /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
   eventShareAction?: (o: Occurrence) => ItemAction | null;
+  /** Builds the "Copy to my calendar" menu action for another member's event (null = N/A). */
+  eventCopyAction?: (o: Occurrence) => ItemAction | null;
   /** Owner-only editability; non-editable occurrences are read-only overlays. */
   canEdit: (o: Occurrence) => boolean;
   loading?: boolean;
@@ -55,6 +57,7 @@ export function AgendaView({
   onChangeColor,
   onDeleteEvent,
   eventShareAction,
+  eventCopyAction,
   canEdit,
   loading,
 }: Props) {
@@ -131,7 +134,12 @@ export function AgendaView({
                                 onSelect: () => onDeleteEvent(o),
                               },
                             ]
-                          : [{ label: "Open", icon: Eye, onSelect: () => onSelect(o) }]
+                          : [
+                              { label: "Open", icon: Eye, onSelect: () => onSelect(o) },
+                              ...(eventCopyAction && eventCopyAction(o)
+                                ? [eventCopyAction(o)!]
+                                : []),
+                            ]
                       }
                     >
                       <AgendaRow

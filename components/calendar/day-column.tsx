@@ -32,6 +32,7 @@ export function DayColumn({
   onAssignCategory,
   categoryChoices,
   eventShareAction,
+  eventCopyAction,
   canEdit,
   taskDoneById,
   onToggleTaskDone,
@@ -54,6 +55,8 @@ export function DayColumn({
   categoryChoices?: { id: string; name: string }[];
   /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
   eventShareAction?: (o: Occurrence) => ItemAction | null;
+  /** Builds the "Copy to my calendar" menu action for another member's event (null = N/A). */
+  eventCopyAction?: (o: Occurrence) => ItemAction | null;
   /** Owner-only editability; non-editable occurrences are read-only overlays. */
   canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -154,7 +157,12 @@ export function DayColumn({
                       onSelect: () => onDeleteEvent(seg.occ),
                     },
                   ]
-                : [{ label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) }]
+                : [
+                    { label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) },
+                    ...(eventCopyAction && eventCopyAction(seg.occ)
+                      ? [eventCopyAction(seg.occ)!]
+                      : []),
+                  ]
             }
           >
             <ContextBackdrop
@@ -208,7 +216,12 @@ export function DayColumn({
                       onSelect: () => onDeleteEvent(seg.occ),
                     },
                   ]
-                : [{ label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) }]
+                : [
+                    { label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) },
+                    ...(eventCopyAction && eventCopyAction(seg.occ)
+                      ? [eventCopyAction(seg.occ)!]
+                      : []),
+                  ]
             }
           >
             <EventBlock

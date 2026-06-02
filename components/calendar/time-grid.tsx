@@ -82,6 +82,8 @@ interface Props {
   categoryChoices?: { id: string; name: string }[];
   /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
   eventShareAction?: (o: Occurrence) => ItemAction | null;
+  /** Builds the "Copy to my calendar" menu action for another member's event (null = N/A). */
+  eventCopyAction?: (o: Occurrence) => ItemAction | null;
   /** Owner-only editability; non-editable blocks are select-only (read-only overlay). */
   canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -159,6 +161,7 @@ export function TimeGrid({
   onAssignCategory,
   categoryChoices,
   eventShareAction,
+  eventCopyAction,
   canEdit,
   taskDoneById,
   onToggleTaskDone,
@@ -706,7 +709,12 @@ export function TimeGrid({
                               onSelect: () => onDeleteEvent(o),
                             },
                           ]
-                        : [{ label: "Open", icon: Eye, onSelect: () => onSelect(o) }]
+                        : [
+                            { label: "Open", icon: Eye, onSelect: () => onSelect(o) },
+                            ...(eventCopyAction && eventCopyAction(o)
+                              ? [eventCopyAction(o)!]
+                              : []),
+                          ]
                     }
                   >
                     <button
@@ -791,6 +799,7 @@ export function TimeGrid({
                 onAssignCategory={onAssignCategory}
                 categoryChoices={categoryChoices}
                 eventShareAction={eventShareAction}
+                eventCopyAction={eventCopyAction}
                 canEdit={canEdit}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}

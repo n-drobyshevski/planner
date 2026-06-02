@@ -33,7 +33,7 @@ import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
 import { CalendarFiltersSheet } from "@/components/sidebar/calendar-filters-sheet";
-import { Users, User } from "lucide-react";
+import { Users, User, CopyPlus } from "lucide-react";
 import { EventDialog } from "@/components/event/event-dialog";
 import { EventDetails } from "@/components/event/event-details";
 import type { ItemAction } from "@/components/shared/item-context-menu";
@@ -171,6 +171,7 @@ export function CalendarShell({
   const [details, setDetails] = useState<{ event: EventRow; occurrence: Occurrence } | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [pendingCopy, setPendingCopy] = useState<{ event: EventRow; occurrence: Occurrence } | null>(null);
   const [deletingContext, setDeletingContext] = useState<EventRow | null>(null);
   const mutations = useEventMutations(workspace.data?.workspaceId);
   const qc = useQueryClient();
@@ -577,6 +578,41 @@ export function CalendarShell({
     }
     if (inputs.length > 0) void mutations.createMany(inputs);
   }
+  /** Build a copy of another member's event for MY calendar. `scope === "all"`
+   *  copies the whole recurring series at the same times; otherwise a one-off at
+   *  this occurrence's slot. Drops a category I can't see (the other member's
+   *  personal context) so the copy doesn't dangle. */
+  function copyInput(ev: EventRow, occ: Occurrence, scope: RecurrenceScope): EventInput {
+    const input =
+      scope === "all" && ev.rrule
+        ? familyCopyInput(ev, 0)
+        : oneOffCopyInput(ev, occ.start, occ.end);
+    if (input.categoryId && !categoryMap.has(input.categoryId)) input.categoryId = null;
+    return input;
+  }
+  /** "Copy to my calendar" for an event I don't own. Recurring sources prompt
+   *  for this-occurrence vs whole-series; everything else copies immediately. */
+  function onCopyToMine(occ: Occurrence) {
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev) return;
+    if (ev.rrule) {
+      setPendingCopy({ event: ev, occurrence: occ });
+      return;
+    }
+    void mutations.create(copyInput(ev, occ, "this"));
+  }
+  function onCopyScope(scope: RecurrenceScope) {
+    if (!pendingCopy) return;
+    const { event: ev, occurrence: occ } = pendingCopy;
+    setPendingCopy(null);
+    void mutations.create(copyInput(ev, occ, scope));
+  }
+  /** The right-click "Copy to my calendar" action, shown only for another
+   *  member's non-joint event (read-only to me). */
+  function eventCopyAction(occ: Occurrence): ItemAction | null {
+    if (occ.kind !== "event" || canEditOcc(occ)) return null;
+    return { label: "Copy to my calendar", icon: CopyPlus, onSelect: () => onCopyToMine(occ) };
+  }
   /** Delete every selected event in one batch. A lone item keeps the existing
    *  prompt (recurring) / direct delete (single). In a multi-pick, recurring
    *  items delete only the selected occurrence (this), or the whole series with
@@ -772,6 +808,7 @@ export function CalendarShell({
                 onAssignCategory={onAssignCategory}
                 categoryChoices={categoryChoices}
                 eventShareAction={eventShareAction}
+                eventCopyAction={eventCopyAction}
                 canEdit={canEditOcc}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
@@ -848,6 +885,11 @@ export function CalendarShell({
               : false
           }
           onToggleEventShared={() => onToggleEventShared(details.occurrence)}
+          onCopyToMine={() => {
+            const occ = details.occurrence;
+            setDetails(null);
+            onCopyToMine(occ);
+          }}
           onToggleTaskDone={
             details.occurrence.taskId
               ? () => onToggleTaskDone(details.occurrence.taskId!)
@@ -892,6 +934,13 @@ export function CalendarShell({
         onOpenChange={(o) => !o && setPendingDelete(null)}
         mode="delete"
         onChoose={onDeleteScope}
+      />
+
+      <RecurrenceScopePrompt
+        open={pendingCopy !== null}
+        onOpenChange={(o) => !o && setPendingCopy(null)}
+        mode="copy"
+        onChoose={onCopyScope}
       />
 
       {scheduling && workspace.data && (

@@ -51,6 +51,8 @@ export interface CanvasProps {
   categoryChoices?: { id: string; name: string }[];
   /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
   eventShareAction?: (o: Occurrence) => ItemAction | null;
+  /** Builds the "Copy to my calendar" menu action for another member's event (null = N/A). */
+  eventCopyAction?: (o: Occurrence) => ItemAction | null;
   /** Whether an occurrence is editable (owner-only); others are read-only overlays. */
   canEdit?: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
@@ -84,6 +86,7 @@ export function CalendarCanvas(props: CanvasProps) {
     onAssignCategory,
     categoryChoices,
     eventShareAction,
+    eventCopyAction,
     canEdit = ALWAYS_EDITABLE,
     taskDoneById,
     onToggleTaskDone,
@@ -131,6 +134,7 @@ export function CalendarCanvas(props: CanvasProps) {
         onChangeColor={onChangeColor}
         onDeleteEvent={onDeleteEvent}
         eventShareAction={eventShareAction}
+        eventCopyAction={eventCopyAction}
         canEdit={canEdit}
         loading={props.loading}
       />
@@ -152,6 +156,7 @@ export function CalendarCanvas(props: CanvasProps) {
         onChangeColor={onChangeColor}
         onDeleteEvent={onDeleteEvent}
         eventShareAction={eventShareAction}
+        eventCopyAction={eventCopyAction}
         canEdit={canEdit}
       />
     );
@@ -178,6 +183,7 @@ export function CalendarCanvas(props: CanvasProps) {
       onAssignCategory={onAssignCategory}
       categoryChoices={categoryChoices}
       eventShareAction={eventShareAction}
+      eventCopyAction={eventCopyAction}
       canEdit={canEdit}
       taskDoneById={taskDoneById}
       onToggleTaskDone={onToggleTaskDone}

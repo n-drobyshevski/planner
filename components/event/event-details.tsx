@@ -9,6 +9,7 @@ import {
   Lock,
   MapPin,
   Palette,
+  CopyPlus,
   Pencil,
   Repeat,
   Tag,
@@ -64,6 +65,8 @@ interface EventDetailsProps {
   onChangeColor: (color: string | null) => void;
   /** toggle this single event's joint (Shared) flag */
   onToggleEventShared: () => void;
+  /** copy another member's event onto my calendar (read-only items only) */
+  onCopyToMine?: () => void;
   onToggleTaskDone?: () => void;
 }
 
@@ -89,6 +92,7 @@ export function EventDetails({
   onDelete,
   onChangeColor,
   onToggleEventShared,
+  onCopyToMine,
   onToggleTaskDone,
 }: EventDetailsProps) {
   const isContext = occurrence.kind === "context";
@@ -250,9 +254,17 @@ export function EventDetails({
               </div>
             </>
           ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="ml-auto">
-              Close
-            </Button>
+            <div className="ml-auto flex gap-2">
+              {occurrence.kind === "event" && onCopyToMine && (
+                <Button variant="outline" onClick={onCopyToMine}>
+                  <CopyPlus data-icon="inline-start" />
+                  Copy to my calendar
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+            </div>
           )}
         </ResponsiveDialogFooter>
       </ResponsiveDialogContent>
