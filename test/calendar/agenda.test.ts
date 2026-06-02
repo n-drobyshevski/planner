@@ -28,6 +28,7 @@ function occ(start: number, title: string, opts: Partial<Occurrence> = {}): Occu
     kind: "event",
     ownerId: "m",
     isPrivate: false,
+    isShared: false,
     taskId: null,
     isRecurring: false,
     isException: false,

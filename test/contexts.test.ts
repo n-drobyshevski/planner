@@ -23,6 +23,7 @@ function occ(over: Partial<Occurrence> & Pick<Occurrence, "start" | "end">): Occ
     kind: "event" as EventKind,
     ownerId: "m",
     isPrivate: false,
+    isShared: false,
     taskId: null,
     isRecurring: false,
     isException: false,

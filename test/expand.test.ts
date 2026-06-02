@@ -226,3 +226,50 @@ describe("expandEvents", () => {
     expect(occ.map((o) => o.eventId)).toEqual(["b", "a"]);
   });
 });
+
+describe("expandEvent — isShared (joint events under a Shared context)", () => {
+  const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 3, 1, 0) };
+
+  it("marks an occurrence shared when its category is in sharedCategoryIds", () => {
+    const e = makeEvent({ categoryId: "cat-shared" });
+    expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(true);
+  });
+
+  it("leaves an occurrence not shared when its category is personal", () => {
+    const e = makeEvent({ categoryId: "cat-personal" });
+    expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(false);
+  });
+
+  it("is not shared when the event has no category", () => {
+    const e = makeEvent({ categoryId: null });
+    expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(false);
+  });
+
+  it("is not shared when the event is private, even under a shared context", () => {
+    const e = makeEvent({ categoryId: "cat-shared", isPrivate: true });
+    expect(expandEvent(e, [], win, new Set(["cat-shared"]))[0].isShared).toBe(false);
+  });
+
+  it("defaults to not shared when no shared set is given", () => {
+    const e = makeEvent({ categoryId: "cat-shared" });
+    expect(expandEvent(e, [], win)[0].isShared).toBe(false);
+  });
+
+  it("marks every occurrence of a recurring series shared, incl. a modify-exception", () => {
+    const e = makeEvent({ categoryId: "cat-shared", rrule: "FREQ=DAILY" });
+    const target = berlin(2026, 2, 28, 9);
+    const occ = expandEvent(
+      e,
+      [ov({ occurrenceDate: target, type: "modify", title: "Moved" })],
+      win,
+      new Set(["cat-shared"]),
+    );
+    expect(occ.length).toBeGreaterThan(1);
+    expect(occ.every((o) => o.isShared)).toBe(true);
+  });
+
+  it("propagates the shared set through expandEvents", () => {
+    const e = makeEvent({ categoryId: "cat-shared" });
+    expect(expandEvents([e], [], win, new Set(["cat-shared"]))[0].isShared).toBe(true);
+  });
+});

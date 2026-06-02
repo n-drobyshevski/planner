@@ -36,6 +36,7 @@ function occ(p: Partial<Occurrence>): Occurrence {
     status: "confirmed",
     ownerId: "m",
     isPrivate: false,
+    isShared: false,
     taskId: null,
     isRecurring: false,
     isException: false,

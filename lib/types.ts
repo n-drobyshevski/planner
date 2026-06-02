@@ -177,6 +177,13 @@ export interface Occurrence {
   ownerId: string;
   /** true = only the owner can see it; false (default) = shared */
   isPrivate: boolean;
+  /**
+   * true when filed under a Shared context (its category's owner_id IS NULL) —
+   * a JOINT event: both members see it without overlaying the owner's calendar
+   * and both may edit it. Derived at expansion from the workspace's shared
+   * categories (not stored on the event row).
+   */
+  isShared: boolean;
   /** when set, this occurrence is a scheduled block of a task */
   taskId: string | null;
   isRecurring: boolean;

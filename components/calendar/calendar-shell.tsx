@@ -8,7 +8,7 @@ import { tz } from "@date-fns/tz";
 import { getWindow, getVisibleDays, navigate, defaultCreateDay } from "@/lib/datetime/window";
 import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { TimezoneProvider } from "@/lib/datetime/timezone-context";
-import { filterVisible } from "@/lib/scope/visibility";
+import { filterVisible, canEdit } from "@/lib/scope/visibility";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
 import {
   contextOccurrences,
@@ -148,10 +148,22 @@ export function CalendarShell({
     () => getWindow(view, nextFocus, { timeZone: viewerTimeZone }),
     [view, nextFocus, viewerTimeZone],
   );
+  // Ids of Shared contexts (categories with no owner). Events filed under one are
+  // JOINT — both members see them without overlay and both may edit them. Drives
+  // the derived `isShared` on every occurrence.
+  const sharedCategoryIds = useMemo(
+    () =>
+      new Set(
+        (workspace.data?.categories ?? [])
+          .filter((c) => c.ownerId === null)
+          .map((c) => c.id),
+      ),
+    [workspace.data],
+  );
   const { occurrences, events, isLoading: eventsLoading, isError: eventsError } =
-    useWindowEvents(wsId, win);
-  const prevWin = useWindowEvents(wsId, winPrev);
-  const nextWin = useWindowEvents(wsId, winNext);
+    useWindowEvents(wsId, win, sharedCategoryIds);
+  const prevWin = useWindowEvents(wsId, winPrev, sharedCategoryIds);
+  const nextWin = useWindowEvents(wsId, winNext, sharedCategoryIds);
   const pagerRef = useRef<CalendarPagerHandle>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [details, setDetails] = useState<{ event: EventRow; occurrence: Occurrence } | null>(null);
@@ -195,9 +207,11 @@ export function CalendarShell({
   const viewerId = workspace.data?.currentMember?.id ?? "";
   // Month-view display preference (week/day always show inactive events).
   const showInactiveInMonth = workspace.data?.currentMember?.showInactiveInMonth ?? true;
-  // Only my own calendar is editable; overlaid members' items are read-only.
+  // My own items are editable, plus any JOINT item (filed under a Shared
+  // context — both members co-edit); overlaid members' personal items are
+  // read-only. Mirrors the widened events_write RLS.
   const canEditOcc = useMemo(
-    () => (o: Occurrence) => o.ownerId === viewerId,
+    () => (o: Occurrence) => canEdit(o, viewerId),
     [viewerId],
   );
   const visible = useMemo(
@@ -821,7 +835,7 @@ export function CalendarShell({
           defaultStart={editor.mode === "create" ? editor.defaultStart : undefined}
           defaultEnd={editor.mode === "create" ? editor.defaultEnd : undefined}
           defaultCategoryId={editor.mode === "create" ? editor.defaultCategoryId : undefined}
-          readOnly={editor.mode === "edit" && editor.event.ownerId !== viewerId}
+          readOnly={editor.mode === "edit" && !canEdit(editor.occurrence, viewerId)}
           ownerName={
             editor.mode === "edit"
               ? memberMap.get(editor.event.ownerId)?.name

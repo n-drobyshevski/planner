@@ -14,6 +14,8 @@ import { qk } from "@/lib/supabase/query-keys";
 import { expandEvents } from "@/lib/recurrence/expand";
 import type { EventRow, Occurrence, TimeWindow } from "@/lib/types";
 
+const EMPTY_SHARED: ReadonlySet<string> = new Set();
+
 /** [start, end) epoch-ms span an event row touches, or null if untimed/recurring. */
 function rowSpan(row: Record<string, unknown> | undefined): [number, number] | null {
   if (!row) return null;
@@ -78,9 +80,11 @@ function invalidateAffectedWindows(
  * (the prev/current/next swipe panes) without opening duplicate realtime
  * channels — call this once per screen, then `useWindowEvents` per window.
  *
- * Reacts only to event/override changes (tasks/categories have their own
- * subscribers) and narrows to the affected window(s) where possible, instead of
- * refetching every cached window on every change.
+ * Narrows event/override changes to the affected window(s) where possible. Also
+ * refreshes the workspace bundle on category changes so a partner flipping a
+ * context's Personal/Shared state (or renaming/recoloring/adding/deleting one)
+ * propagates live — the bundle query is otherwise kept warm for 5 min and only
+ * patched by the actor's own mutations. (Tasks have their own subscriber.)
  */
 export function useWorkspaceRealtime(workspaceId: string | undefined) {
   const qc = useQueryClient();
@@ -89,6 +93,12 @@ export function useWorkspaceRealtime(workspaceId: string | undefined) {
   useEffect(() => {
     if (!workspaceId) return;
     return subscribeWorkspace(sb, workspaceId, (change) => {
+      if (change.table === "categories") {
+        // A category's owner/name/color drives derived jointness + the sidebar;
+        // refetch the bundle so both calendars stay in sync.
+        qc.invalidateQueries({ queryKey: qk.workspace });
+        return;
+      }
       if (change.table !== "events" && change.table !== "event_overrides") {
         return; // not an event-window concern
       }
@@ -106,6 +116,7 @@ export function useWorkspaceRealtime(workspaceId: string | undefined) {
 export function useWindowEvents(
   workspaceId: string | undefined,
   win: TimeWindow,
+  sharedCategoryIds: ReadonlySet<string> = EMPTY_SHARED,
 ): {
   occurrences: Occurrence[];
   events: EventRow[];
@@ -126,11 +137,12 @@ export function useWindowEvents(
   const occurrences = useMemo<Occurrence[]>(
     () =>
       query.data
-        ? expandEvents(query.data.events, query.data.overrides, win)
+        ? expandEvents(query.data.events, query.data.overrides, win, sharedCategoryIds)
         : [],
-    // win identity changes each render; depend on its primitive bounds.
+    // win identity changes each render; depend on its primitive bounds. The
+    // shared-id set is memoized by the caller, so it is a stable dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [query.data, win.start, win.end],
+    [query.data, win.start, win.end, sharedCategoryIds],
   );
 
   return {

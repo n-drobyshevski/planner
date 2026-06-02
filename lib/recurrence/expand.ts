@@ -17,6 +17,7 @@ import type { EventRow, OverrideRow, Occurrence, TimeWindow } from "@/lib/types"
 
 const DAY_MS = 86_400_000;
 const PAD_MS = 36 * 60 * 60 * 1000; // covers any single-jump DST skew at edges
+const NO_SHARED: ReadonlySet<string> = new Set();
 
 /** Wall-clock parts of a real instant, read in the given IANA zone. */
 function floatingFromRealMs(realMs: number, tz: string): number {
@@ -60,6 +61,7 @@ function baseOccurrence(
   start: number,
   end: number,
   opts: { isRecurring: boolean; isException: boolean },
+  sharedCategoryIds: ReadonlySet<string>,
 ): Occurrence {
   return {
     // Single events key on the (immutable) event id alone — they have exactly
@@ -91,6 +93,15 @@ function baseOccurrence(
     kind: event.kind,
     ownerId: event.ownerId,
     isPrivate: event.isPrivate,
+    // Series-level, derived from the workspace's Shared contexts: a non-private
+    // event filed under a Shared category (owner_id IS NULL) is joint — both
+    // members see it without overlay and both may edit it. A private event is
+    // never joint (it stays owner-only, mirroring the events_write RLS).
+    // applyOverride leaves this alone.
+    isShared:
+      !event.isPrivate &&
+      event.categoryId != null &&
+      sharedCategoryIds.has(event.categoryId),
     taskId: event.taskId,
     isRecurring: opts.isRecurring,
     isException: opts.isException,
@@ -115,6 +126,7 @@ export function expandEvent(
   event: EventRow,
   overrides: OverrideRow[],
   win: TimeWindow,
+  sharedCategoryIds: ReadonlySet<string> = NO_SHARED,
 ): Occurrence[] {
   const out: Occurrence[] = [];
 
@@ -122,10 +134,14 @@ export function expandEvent(
   if (!event.rrule) {
     if (intersects(event.start, event.end, win)) {
       out.push(
-        baseOccurrence(event, event.start, event.start, event.end, {
-          isRecurring: false,
-          isException: false,
-        }),
+        baseOccurrence(
+          event,
+          event.start,
+          event.start,
+          event.end,
+          { isRecurring: false, isException: false },
+          sharedCategoryIds,
+        ),
       );
     }
     return out;
@@ -173,6 +189,7 @@ export function expandEvent(
       occurrenceDate,
       occurrenceDate + duration,
       { isRecurring: true, isException: false },
+      sharedCategoryIds,
     );
     if (ov?.type === "modify") occ = applyOverride(occ, ov);
 
@@ -188,10 +205,14 @@ export function expandEvent(
     const end = ov.end ?? start + duration;
     if (!intersects(start, end, win)) continue;
     const occ = applyOverride(
-      baseOccurrence(event, ov.occurrenceDate, ov.occurrenceDate, ov.occurrenceDate + duration, {
-        isRecurring: true,
-        isException: false,
-      }),
+      baseOccurrence(
+        event,
+        ov.occurrenceDate,
+        ov.occurrenceDate,
+        ov.occurrenceDate + duration,
+        { isRecurring: true, isException: false },
+        sharedCategoryIds,
+      ),
       ov,
     );
     out.push(occ);
@@ -204,9 +225,11 @@ export function expandEvents(
   events: EventRow[],
   overrides: OverrideRow[],
   win: TimeWindow,
+  sharedCategoryIds: ReadonlySet<string> = NO_SHARED,
 ): Occurrence[] {
   const out: Occurrence[] = [];
-  for (const event of events) out.push(...expandEvent(event, overrides, win));
+  for (const event of events)
+    out.push(...expandEvent(event, overrides, win, sharedCategoryIds));
   // Stable order: by start, then title, then key.
   out.sort(
     (a, b) =>

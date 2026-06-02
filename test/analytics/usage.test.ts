@@ -35,6 +35,7 @@ function occ(over: Partial<Occurrence>): Occurrence {
     kind: "event",
     ownerId: "me",
     isPrivate: false,
+    isShared: false,
     taskId: null,
     isRecurring: false,
     isException: false,

@@ -23,7 +23,7 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Lock, Trash2, Loader2 } from "lucide-react";
+import { Lock, Trash2, Loader2, Users } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
@@ -122,6 +122,15 @@ export function EventDialog(props: EventDialogProps) {
     (c) => c.ownerId === null || c.ownerId === currentMemberId,
   );
 
+  // An item filed under a SHARED context (owner_id IS NULL) is JOINT: both
+  // members co-edit it, so it must stay non-private (else the other member
+  // couldn't see it). The private toggle is hidden and isPrivate forced off.
+  const selectedCategory =
+    form.categoryId !== "none"
+      ? categories.find((c) => c.id === form.categoryId) ?? null
+      : null;
+  const sharedContext = selectedCategory?.ownerId === null;
+
   function computeTimes() {
     // All-day events are floating dates anchored to UTC midnight (the same
     // calendar date for everyone); timed events are interpreted in the viewer's
@@ -169,7 +178,7 @@ export function EventDialog(props: EventDialogProps) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
-        isPrivate: form.isPrivate,
+        isPrivate: sharedContext ? false : form.isPrivate,
         color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
@@ -198,7 +207,7 @@ export function EventDialog(props: EventDialogProps) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         location: form.location.trim() || null,
-        isPrivate: form.isPrivate,
+        isPrivate: sharedContext ? false : form.isPrivate,
         color: form.color,
         allDay: isContext ? false : form.allDay,
         inactive: form.inactive,
@@ -261,6 +270,8 @@ export function EventDialog(props: EventDialogProps) {
           description: patch.description,
           location: patch.location,
           categoryId: patch.categoryId,
+          // Joint series must stay non-private so both members can see it.
+          isPrivate: sharedContext ? false : event.isPrivate,
           color: form.color,
           allDay: form.allDay,
           inactive: form.inactive,
@@ -458,14 +469,21 @@ export function EventDialog(props: EventDialogProps) {
               />
             </Field>
 
-            <Field orientation="horizontal">
-              <Switch
-                id="ev-private"
-                checked={form.isPrivate}
-                onCheckedChange={(v) => set("isPrivate", v)}
-              />
-              <FieldLabel htmlFor="ev-private">Private (only you can see this)</FieldLabel>
-            </Field>
+            {sharedContext ? (
+              <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                <Users className="size-4 shrink-0" />
+                <span>Shared context — you both attend and can edit this.</span>
+              </div>
+            ) : (
+              <Field orientation="horizontal">
+                <Switch
+                  id="ev-private"
+                  checked={form.isPrivate}
+                  onCheckedChange={(v) => set("isPrivate", v)}
+                />
+                <FieldLabel htmlFor="ev-private">Private (only you can see this)</FieldLabel>
+              </Field>
+            )}
 
             <Field>
               <FieldLabel>Location</FieldLabel>

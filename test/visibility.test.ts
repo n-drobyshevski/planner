@@ -23,6 +23,7 @@ function occ(over: Partial<Occurrence>): Occurrence {
     kind: "event",
     ownerId: OWNER,
     isPrivate: false,
+    isShared: false,
     taskId: null,
     isRecurring: false,
     isException: false,
@@ -32,23 +33,23 @@ function occ(over: Partial<Occurrence>): Occurrence {
 
 describe("canSee", () => {
   it("the owner always sees their own item, private or not", () => {
-    expect(canSee({ isPrivate: true, ownerId: OWNER }, OWNER)).toBe(true);
-    expect(canSee({ isPrivate: false, ownerId: OWNER }, OWNER)).toBe(true);
+    expect(canSee({ isPrivate: true, ownerId: OWNER, isShared: false }, OWNER)).toBe(true);
+    expect(canSee({ isPrivate: false, ownerId: OWNER, isShared: false }, OWNER)).toBe(true);
   });
 
   it("others see a shared (non-private) item", () => {
-    expect(canSee({ isPrivate: false, ownerId: OWNER }, OTHER)).toBe(true);
+    expect(canSee({ isPrivate: false, ownerId: OWNER, isShared: false }, OTHER)).toBe(true);
   });
 
   it("others cannot see another member's private item", () => {
-    expect(canSee({ isPrivate: true, ownerId: OWNER }, OTHER)).toBe(false);
+    expect(canSee({ isPrivate: true, ownerId: OWNER, isShared: false }, OTHER)).toBe(false);
   });
 });
 
 describe("canEdit", () => {
   it("only the owner can edit", () => {
-    expect(canEdit({ ownerId: OWNER }, OWNER)).toBe(true);
-    expect(canEdit({ ownerId: OWNER }, OTHER)).toBe(false);
+    expect(canEdit({ ownerId: OWNER, isShared: false }, OWNER)).toBe(true);
+    expect(canEdit({ ownerId: OWNER, isShared: false }, OTHER)).toBe(false);
   });
 });
 
@@ -173,5 +174,39 @@ describe("filterVisible", () => {
     expect(input).toEqual([a, b]);
     expect(overlayMemberIds).toEqual(new Set([OTHER]));
     expect(hiddenCategoryIds).toEqual(new Set(["cat-x"]));
+  });
+});
+
+describe("joint events (filed under a Shared context)", () => {
+  const none = new Set<string>();
+
+  it("canSee: the other member sees a joint event even if it is marked private", () => {
+    expect(canSee({ isPrivate: true, ownerId: OWNER, isShared: true }, OTHER)).toBe(true);
+  });
+
+  it("canEdit: the other member can edit a joint event", () => {
+    expect(canEdit({ ownerId: OWNER, isShared: true }, OTHER)).toBe(true);
+  });
+
+  it("canEdit: a non-shared item is still owner-only", () => {
+    expect(canEdit({ ownerId: OWNER, isShared: false }, OTHER)).toBe(false);
+  });
+
+  it("filterVisible: keeps another member's joint event WITHOUT overlaying their calendar", () => {
+    const o = occ({ ownerId: OTHER, isShared: true });
+    expect(
+      filterVisible([o], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none }),
+    ).toEqual([o]);
+  });
+
+  it("filterVisible: still hides a joint event when its shared context is hidden", () => {
+    const o = occ({ ownerId: OTHER, isShared: true, categoryId: "cat-x" });
+    expect(
+      filterVisible([o], {
+        viewerId: OWNER,
+        overlayMemberIds: none,
+        hiddenCategoryIds: new Set(["cat-x"]),
+      }),
+    ).toEqual([]);
   });
 });

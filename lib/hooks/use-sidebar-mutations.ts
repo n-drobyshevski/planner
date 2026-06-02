@@ -48,6 +48,19 @@ export function useSidebarMutations(workspaceId?: string) {
       run(m.updateCategory(sb, id, { name }), "Context renamed"),
     recolorCategory: (id: string, color: string) =>
       run(m.updateCategory(sb, id, { color }), "Context color updated"),
+    /**
+     * Convert a Context between Shared (`ownerId = null`; events in it become
+     * joint) and Personal (`ownerId = a member`). Also invalidates events so the
+     * calendar re-derives each occurrence's `isShared`.
+     */
+    makeContextShared: async (id: string, ownerId: string | null): Promise<boolean> => {
+      const ok = await run(
+        m.setCategoryOwner(sb, id, ownerId),
+        ownerId === null ? "Context shared" : "Context made personal",
+      );
+      if (ok) invalidateEvents();
+      return ok;
+    },
     /** Delete a Context, its calendar time-blocks, and unlink its items (undoable). */
     deleteCategory: async (id: string): Promise<boolean> => {
       try {

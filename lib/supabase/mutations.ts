@@ -341,6 +341,23 @@ export async function updateCategory(
 }
 
 /**
+ * Convert a context between Personal and Shared by setting its owner: `null`
+ * makes it Shared (both members co-own it; every event filed under it becomes a
+ * joint event); a member id makes it Personal (owner-only). No event rows are
+ * rewritten — jointness is derived from the category. `categories_write` already
+ * permits `owner_id` null or self, so a member can only re-own a context they can
+ * already edit (their own personal one or a shared one).
+ */
+export async function setCategoryOwner(
+  sb: SupabaseClient,
+  id: string,
+  ownerId: string | null,
+): Promise<void> {
+  const { error } = await sb.from("categories").update({ owner_id: ownerId }).eq("id", id);
+  if (error) throw error;
+}
+
+/**
  * Snapshot captured before deleting a category so the delete can be undone.
  * Deleting a category removes the time-blocks ("context" events) that paint it
  * and their overrides outright, and — via `category_id ... on delete set null`

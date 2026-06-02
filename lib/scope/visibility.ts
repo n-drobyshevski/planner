@@ -3,22 +3,30 @@
 //
 // Sharing model: every item belongs to one member's calendar (its owner) and is
 // shared (visible to the workspace) by default. An item flagged `isPrivate` is
-// visible only to its owner. Editing is owner-only; other members' calendars are
-// overlaid read-only. RLS enforces the same rules server-side.
+// visible only to its owner; other members' calendars are overlaid read-only.
+// EXCEPTION — a JOINT item (`isShared`, i.e. filed under a Shared context): both
+// members see it without overlaying the owner and both may edit it ("we both
+// attend this"). RLS enforces the same rules server-side.
 
 import type { Occurrence } from "@/lib/types";
 
-/** Whether a viewer may SEE an item: the owner always can; others only if it's not private. */
+/**
+ * Whether a viewer may SEE an item: a joint item is visible to both members; the
+ * owner always sees their own; others see it only if it isn't private.
+ */
 export function canSee(
-  e: { isPrivate: boolean; ownerId: string },
+  e: { isPrivate: boolean; ownerId: string; isShared: boolean },
   viewerId: string,
 ): boolean {
-  return e.ownerId === viewerId || !e.isPrivate;
+  return e.isShared || e.ownerId === viewerId || !e.isPrivate;
 }
 
-/** Whether a viewer may EDIT an item: only its owner. */
-export function canEdit(e: { ownerId: string }, viewerId: string): boolean {
-  return e.ownerId === viewerId;
+/** Whether a viewer may EDIT an item: its owner, or either member if it's joint. */
+export function canEdit(
+  e: { ownerId: string; isShared: boolean },
+  viewerId: string,
+): boolean {
+  return e.isShared || e.ownerId === viewerId;
 }
 
 /** The display layer (calendar) an item belongs to: always its owner. */
@@ -27,10 +35,12 @@ export function layerOf(e: { ownerId: string }): string {
 }
 
 /**
- * Filter occurrences for the calendar view. Keep `o` iff it belongs to the
- * viewer's own calendar OR an explicitly-overlaid member's calendar, and its
- * category (when set) isn't hidden. The viewer's own calendar is always shown;
- * other members appear only when toggled on in the sidebar.
+ * Filter occurrences for the calendar view. Keep `o` iff it is joint (a Shared
+ * context — always shown to both), or belongs to the viewer's own calendar, or
+ * to an explicitly-overlaid member's calendar — and its category (when set)
+ * isn't hidden. The viewer's own calendar is always shown; other members appear
+ * only when toggled on in the sidebar. Hiding a context still hides its joint
+ * items (the hidden-category clause applies to everything).
  */
 export function filterVisible(
   occ: Occurrence[],
@@ -43,7 +53,7 @@ export function filterVisible(
   const { viewerId, overlayMemberIds, hiddenCategoryIds } = args;
   return occ.filter(
     (o) =>
-      (o.ownerId === viewerId || overlayMemberIds.has(o.ownerId)) &&
+      (o.isShared || o.ownerId === viewerId || overlayMemberIds.has(o.ownerId)) &&
       !(o.categoryId !== null && hiddenCategoryIds.has(o.categoryId)),
   );
 }

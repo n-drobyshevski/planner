@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Plus, SquarePen, Focus, Eye, Trash2, CalendarPlus } from "lucide-react";
+import { Plus, SquarePen, Focus, Eye, Trash2, CalendarPlus, Users, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   ItemContextMenu,
   ItemMenuButton,
@@ -61,10 +63,12 @@ const ToggleRow = React.forwardRef<
     label: string;
     active: boolean;
     onToggle: () => void;
+    /** trailing indicator (e.g. the Shared-context glyph) shown before the menu */
+    badge?: React.ReactNode;
     /** when set (mobile), render the ⋮ affordance that opens the action sheet */
     onMenu?: () => void;
   } & React.HTMLAttributes<HTMLDivElement>
->(function ToggleRow({ color, label, active, onToggle, onMenu, className, ...rest }, ref) {
+>(function ToggleRow({ color, label, active, onToggle, badge, onMenu, className, ...rest }, ref) {
   return (
     <div
       ref={ref}
@@ -91,10 +95,28 @@ const ToggleRow = React.forwardRef<
           {label}
         </span>
       </button>
+      {badge}
       {onMenu && <ItemMenuButton onMenu={onMenu} className="mr-1 size-9" />}
     </div>
   );
 });
+
+/** Trailing glyph marking a Context as Shared (joint events; both can edit). */
+function SharedBadge() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="mr-0.5 flex size-7 shrink-0 items-center justify-center text-muted-foreground"
+          aria-label="Shared context — both attend and can edit"
+        >
+          <Users className="size-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Shared — you both attend and can edit</TooltipContent>
+    </Tooltip>
+  );
+}
 
 /**
  * A non-toggle calendar row (the signed-in member's own calendar, which is
@@ -148,9 +170,13 @@ export function CalendarFiltersContent({
 
   const [renaming, setRenaming] = React.useState<RenameTarget | null>(null);
   const [deleting, setDeleting] = React.useState<{ id: string; name: string } | null>(null);
+  const [converting, setConverting] = React.useState<
+    { id: string; name: string; toShared: boolean } | null
+  >(null);
 
   const ownMember = members.find((m) => m.id === currentMemberId) ?? null;
   const otherMembers = members.filter((m) => m.id !== currentMemberId);
+  const otherName = otherMembers[0]?.name ?? "the other member";
 
   /** Give a Context a default time-block on the calendar. */
   function addToCalendar(c: Category) {
@@ -221,45 +247,62 @@ export function CalendarFiltersContent({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Contexts
           </h3>
-          <AddCategoryPopover workspaceId={workspaceId} />
+          <AddCategoryPopover workspaceId={workspaceId} currentMemberId={currentMemberId} />
         </div>
         {categories.length === 0 ? (
           <p className="px-2 text-xs text-muted-foreground">No contexts yet</p>
         ) : (
-          categories.map((c) => (
-            <ItemContextMenu
-              key={c.id}
-              title={c.name}
-              color={c.color}
-              onColorChange={(color) => color && void mutations.recolorCategory(c.id, color)}
-              actions={[
-                {
-                  label: "Rename",
-                  icon: SquarePen,
-                  onSelect: () => setRenaming({ kind: "category", id: c.id, name: c.name }),
-                },
-                {
-                  label: "Add to calendar",
-                  icon: CalendarPlus,
-                  onSelect: () => addToCalendar(c),
-                },
-                ...categoryVisibility(c.id),
-                {
-                  label: "Delete",
-                  icon: Trash2,
-                  destructive: true,
-                  onSelect: () => setDeleting({ id: c.id, name: c.name }),
-                },
-              ]}
-            >
-              <ToggleRow
+          categories.map((c) => {
+            const shared = c.ownerId === null;
+            return (
+              <ItemContextMenu
+                key={c.id}
+                title={c.name}
                 color={c.color}
-                label={c.name}
-                active={!hiddenCategoryIds.has(c.id)}
-                onToggle={() => toggleCategory(c.id)}
-              />
-            </ItemContextMenu>
-          ))
+                onColorChange={(color) => color && void mutations.recolorCategory(c.id, color)}
+                actions={[
+                  {
+                    label: "Rename",
+                    icon: SquarePen,
+                    onSelect: () => setRenaming({ kind: "category", id: c.id, name: c.name }),
+                  },
+                  {
+                    label: "Add to calendar",
+                    icon: CalendarPlus,
+                    onSelect: () => addToCalendar(c),
+                  },
+                  shared
+                    ? {
+                        label: "Make personal",
+                        icon: User,
+                        onSelect: () =>
+                          setConverting({ id: c.id, name: c.name, toShared: false }),
+                      }
+                    : {
+                        label: "Make shared",
+                        icon: Users,
+                        onSelect: () =>
+                          setConverting({ id: c.id, name: c.name, toShared: true }),
+                      },
+                  ...categoryVisibility(c.id),
+                  {
+                    label: "Delete",
+                    icon: Trash2,
+                    destructive: true,
+                    onSelect: () => setDeleting({ id: c.id, name: c.name }),
+                  },
+                ]}
+              >
+                <ToggleRow
+                  color={c.color}
+                  label={c.name}
+                  active={!hiddenCategoryIds.has(c.id)}
+                  onToggle={() => toggleCategory(c.id)}
+                  badge={shared ? <SharedBadge /> : undefined}
+                />
+              </ItemContextMenu>
+            );
+          })
         )}
       </section>
 
@@ -292,6 +335,44 @@ export function CalendarFiltersContent({
               className="bg-destructive text-white hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={converting !== null} onOpenChange={(o) => !o && setConverting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {converting?.toShared ? "Make this context shared?" : "Make this context personal?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {converting?.toShared ? (
+                <>
+                  You&rsquo;ll both see and edit every event in &ldquo;{converting?.name}&rdquo;,
+                  and they&rsquo;ll show on both calendars.
+                </>
+              ) : (
+                <>
+                  &ldquo;{converting?.name}&rdquo; returns to your calendar only. Events {otherName}{" "}
+                  added here stay theirs and leave your shared view.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (converting)
+                  void mutations.makeContextShared(
+                    converting.id,
+                    converting.toShared ? null : currentMemberId,
+                  );
+                setConverting(null);
+              }}
+            >
+              {converting?.toShared ? "Make shared" : "Make personal"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -390,11 +471,20 @@ function RenameForm({
   );
 }
 
-function AddCategoryPopover({ workspaceId }: { workspaceId: string }) {
+function AddCategoryPopover({
+  workspaceId,
+  currentMemberId,
+}: {
+  workspaceId: string;
+  currentMemberId: string;
+}) {
   const qc = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [color, setColor] = React.useState(PALETTE[0]);
+  // Default to Shared: it preserves today's behavior (every context was shared)
+  // and is the common case for a two-person planner.
+  const [shared, setShared] = React.useState(true);
   const [pending, setPending] = React.useState(false);
 
   async function add() {
@@ -403,13 +493,14 @@ function AddCategoryPopover({ workspaceId }: { workspaceId: string }) {
     try {
       await createCategory(createClient(), {
         workspaceId,
-        ownerId: null,
+        ownerId: shared ? null : currentMemberId,
         name: name.trim(),
         color,
       });
       await qc.invalidateQueries({ queryKey: qk.workspace });
       setName("");
       setColor(PALETTE[0]);
+      setShared(true);
       setOpen(false);
     } finally {
       setPending(false);
@@ -447,6 +538,26 @@ function AddCategoryPopover({ workspaceId }: { workspaceId: string }) {
               />
             ))}
           </div>
+          <label className="flex items-center justify-between gap-2 text-sm">
+            <span className="flex items-center gap-2">
+              {shared ? (
+                <Users className="size-4 text-muted-foreground" />
+              ) : (
+                <User className="size-4 text-muted-foreground" />
+              )}
+              <span>{shared ? "Shared" : "Personal"}</span>
+            </span>
+            <Switch
+              checked={shared}
+              onCheckedChange={setShared}
+              aria-label="Shared context — you both attend and can edit"
+            />
+          </label>
+          <p className="text-xs text-muted-foreground">
+            {shared
+              ? "You both attend and can edit every event in it."
+              : "Only on your calendar; only you can edit its events."}
+          </p>
           <Button onClick={add} disabled={pending || !name.trim()} size="sm">
             Add context
           </Button>
