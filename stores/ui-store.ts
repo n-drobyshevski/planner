@@ -7,6 +7,12 @@ import { create } from "zustand";
  */
 interface UiState {
   selectedEventKey: string | null;
+  /**
+   * Multi-selection of event keys (Shift+click on the time grid). Source of
+   * truth for the ring highlight + bulk move/delete/recolor. A plain single
+   * selection collapses this to a one-element set (see `setSelectedEventKey`).
+   */
+  selectedEventKeys: Set<string>;
   sidebarOpen: boolean;
   /** category ids explicitly hidden from the calendar */
   hiddenCategoryIds: Set<string>;
@@ -18,6 +24,12 @@ interface UiState {
   taskBacklogOpen: boolean;
 
   setSelectedEventKey: (key: string | null) => void;
+  /** Replace the whole multi-selection set. */
+  setSelectedEventKeys: (next: Set<string>) => void;
+  /** Add/remove one key from the multi-selection (Shift+click). */
+  toggleSelectedEventKey: (key: string) => void;
+  /** Clear both the single selection and the multi-selection set. */
+  clearSelection: () => void;
   setSidebarOpen: (open: boolean) => void;
   toggleCategory: (id: string) => void;
   /** Overlay / un-overlay another member's calendar. */
@@ -32,13 +44,29 @@ interface UiState {
 
 export const useUiStore = create<UiState>((set) => ({
   selectedEventKey: null,
+  selectedEventKeys: new Set(),
   sidebarOpen: true,
   hiddenCategoryIds: new Set(),
   overlayMemberIds: new Set(),
   selectedTaskId: null,
   taskBacklogOpen: false,
 
-  setSelectedEventKey: (selectedEventKey) => set({ selectedEventKey }),
+  // A plain selection is also the (size-1) multi-selection, so the grid's ring
+  // highlight — which reads `selectedEventKeys` — always tracks single clicks.
+  setSelectedEventKey: (selectedEventKey) =>
+    set({
+      selectedEventKey,
+      selectedEventKeys: selectedEventKey ? new Set([selectedEventKey]) : new Set(),
+    }),
+  setSelectedEventKeys: (selectedEventKeys) => set({ selectedEventKeys }),
+  toggleSelectedEventKey: (key) =>
+    set((s) => {
+      const next = new Set(s.selectedEventKeys);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return { selectedEventKeys: next };
+    }),
+  clearSelection: () => set({ selectedEventKey: null, selectedEventKeys: new Set() }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setSelectedTaskId: (selectedTaskId) => set({ selectedTaskId }),
   setTaskBacklogOpen: (taskBacklogOpen) => set({ taskBacklogOpen }),

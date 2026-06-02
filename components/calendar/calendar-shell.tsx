@@ -25,6 +25,7 @@ import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { qk } from "@/lib/supabase/query-keys";
 import { fetchWindow, type WindowData } from "@/lib/supabase/queries";
+import type { EventInput } from "@/lib/supabase/mappers";
 import { createClient } from "@/lib/supabase/client";
 import { useUiStore } from "@/stores/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -77,14 +78,21 @@ interface PendingDelete {
 // Neighbour (prev/next) carousel panes are display-only: no selection, no
 // editing, no drag — those all act on the focused window via the centre pane.
 const NOOP = () => {};
+const EMPTY_SET: Set<string> = new Set();
 const DISPLAY_ONLY = {
   selectedKey: null,
+  selectedKeys: EMPTY_SET,
   onSelect: NOOP,
+  onToggleSelect: NOOP,
+  onClearSelection: NOOP,
   onPickDay: NOOP,
   onCreateRange: NOOP,
   onCreateDay: NOOP,
   onReschedule: NOOP,
+  onRescheduleMany: NOOP,
+  onDuplicate: NOOP,
   onChangeColor: NOOP,
+  onColorSelected: NOOP,
   onDeleteEvent: NOOP,
   onToggleTaskDone: NOOP,
   onScheduleTask: NOOP,
@@ -174,6 +182,9 @@ export function CalendarShell({
 
   const selectedKey = useUiStore((s) => s.selectedEventKey);
   const setSelected = useUiStore((s) => s.setSelectedEventKey);
+  const selectedKeys = useUiStore((s) => s.selectedEventKeys);
+  const toggleSelected = useUiStore((s) => s.toggleSelectedEventKey);
+  const clearSelection = useUiStore((s) => s.clearSelection);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
   const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
@@ -259,21 +270,26 @@ export function CalendarShell({
   function changeView(v: CalendarView) {
     setView(v);
     pushUrl(v, focusedDate);
+    clearSelection();
   }
   function go(dir: -1 | 1) {
     const next = navigate(view, focusedDate, dir, { timeZone: viewerTimeZone });
     setFocusedDate(next);
     pushUrl(view, next);
+    // Occurrence keys are window-specific; drop the selection on navigation.
+    clearSelection();
   }
   function goToday() {
     const t = getTime(startOfDay(Date.now(), { in: tz(viewerTimeZone) }));
     setFocusedDate(t);
     pushUrl(view, t);
+    clearSelection();
   }
   function pickDay(ms: number) {
     setView("day");
     setFocusedDate(ms);
     pushUrl("day", ms);
+    clearSelection();
   }
   function openNew() {
     // Default to the first day of the visible timeframe (1st of month / Monday
@@ -401,6 +417,115 @@ export function CalendarShell({
     }
   }
 
+  // --- Multi-selection (Shift+click) + bulk actions ---
+  /** Shift+click: toggle an editable occurrence in/out of the selection set. */
+  function onToggleSelect(occ: Occurrence) {
+    if (!canEditOcc(occ)) return; // overlay items aren't actionable in bulk
+    toggleSelected(occ.key);
+  }
+  /** Move every selected (non-recurring) block by the same delta in one pass. */
+  function onRescheduleMany(moves: { occ: Occurrence; start: number; end: number }[]) {
+    for (const { occ, start, end } of moves) {
+      if (!canEditOcc(occ)) continue;
+      const ev = events.find((e) => e.id === occ.eventId);
+      if (!ev || ev.rrule) continue; // recurring excluded from group move
+      optimisticMove(ev.id, start, end);
+      if (ev.kind === "context") {
+        void mutations.updateSingle(ev.id, { start, end });
+      } else {
+        void mutations.updateSingle(ev.id, {
+          start,
+          end,
+          contextId: contextIdForRange(contextOccs, start),
+        });
+      }
+    }
+  }
+  /** Ctrl/Cmd-drag drop: create a plain one-off copy at the dropped time. */
+  function onDuplicate(occ: Occurrence, start: number, end: number) {
+    if (!canEditOcc(occ)) return;
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev || !workspace.data) return;
+    const input: EventInput = {
+      workspaceId: ev.workspaceId,
+      ownerId: viewerId,
+      categoryId: ev.categoryId,
+      title: ev.title,
+      description: ev.description,
+      location: ev.location,
+      isPrivate: ev.isPrivate,
+      color: ev.color,
+      kind: ev.kind,
+      // Re-derive context membership by overlap at the drop (contexts get none).
+      contextId: ev.kind === "context" ? null : contextIdForRange(contextOccs, start),
+      allDay: ev.allDay,
+      inactive: ev.inactive,
+      start,
+      end,
+      timeZone: ev.timeZone,
+      rrule: null, // a single one-off copy, never a series
+      recurrenceEndsAt: null,
+      taskId: null, // a plain copy, not a second "part" of the task
+    };
+    void mutations.create(input);
+  }
+  /** Delete every selected event. A lone recurring item keeps its scope prompt;
+   *  in a multi-pick, recurring items are skipped (they'd each need a prompt). */
+  function deleteSelected() {
+    const keys = [...selectedKeys];
+    if (keys.length === 0) return;
+    if (keys.length === 1) {
+      const occ = visible.find((o) => o.key === keys[0]);
+      if (occ) onDeleteEvent(occ); // routes rrule items through the scope prompt
+      clearSelection();
+      return;
+    }
+    for (const key of keys) {
+      const occ = visible.find((o) => o.key === key);
+      if (!occ || !canEditOcc(occ)) continue;
+      const ev = events.find((e) => e.id === occ.eventId);
+      if (!ev || ev.rrule) continue; // recurring skipped in bulk delete
+      void mutations.remove(ev.id);
+    }
+    clearSelection();
+  }
+  /** Recolor the whole selection (series-level, mirrors onChangeEventColor). */
+  function colorSelected(color: string | null) {
+    for (const key of selectedKeys) {
+      const occ = visible.find((o) => o.key === key);
+      if (!occ || !canEditOcc(occ)) continue;
+      const ev = events.find((e) => e.id === occ.eventId);
+      if (ev) void mutations.updateSingle(ev.id, { color });
+    }
+  }
+
+  // Delete/Backspace removes the selection; Escape clears it. Kept in a ref so
+  // the listener binds once yet always runs the latest closures.
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandlerRef.current = (e: KeyboardEvent) => {
+    const inTimeGrid = view === "day" || view === "week" || view === "3day";
+    if (!inTimeGrid || selectedKeys.size === 0) return;
+    // Don't hijack keys while a dialog/sheet is open or while typing.
+    if (editor || details || pendingReschedule || pendingDelete || scheduling) return;
+    const ae = document.activeElement;
+    if (
+      ae instanceof HTMLElement &&
+      (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)
+    )
+      return;
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      deleteSelected();
+    } else if (e.key === "Escape") {
+      clearSelection();
+    }
+  };
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
   useEffect(() => setMounted(true), []);
 
   const days = useMemo(
@@ -512,12 +637,18 @@ export function CalendarShell({
                 focusedMs={focusedDate}
                 colorOf={colorOf}
                 selectedKey={selectedKey}
+                selectedKeys={selectedKeys}
                 onSelect={openDetails}
+                onToggleSelect={onToggleSelect}
+                onClearSelection={clearSelection}
                 onPickDay={pickDay}
                 onCreateRange={onCreateRange}
                 onCreateDay={createOnDay}
                 onReschedule={onReschedule}
+                onRescheduleMany={onRescheduleMany}
+                onDuplicate={onDuplicate}
                 onChangeColor={onChangeEventColor}
+                onColorSelected={colorSelected}
                 onDeleteEvent={onDeleteEvent}
                 onAssignContext={onAssignContext}
                 onRemoveContext={onRemoveContext}
