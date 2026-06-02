@@ -9,6 +9,16 @@ import type { EventInput } from "@/lib/supabase/mappers";
 import type { EventRow } from "@/lib/types";
 import type { OccurrencePatch } from "@/lib/recurrence/edit-semantics";
 
+/** One item of a batched move/resize: a master-row update or a single-occurrence modify. */
+export type RescheduleOp =
+  | { kind: "update"; id: string; patch: Partial<EventInput> }
+  | { kind: "override"; event: EventRow; occurrenceDate: number; patch: OccurrencePatch };
+
+/** One item of a batched delete: a whole row or a single-occurrence cancel. */
+export type DeleteOp =
+  | { kind: "delete"; id: string }
+  | { kind: "cancel"; event: EventRow; occurrenceDate: number };
+
 /**
  * Event write operations wrapped with cache invalidation + toasts. Realtime
  * also invalidates, so the other member sees changes live.
@@ -37,13 +47,44 @@ export function useEventMutations(workspaceId: string | undefined) {
     create: (input: EventInput) => run(m.createEvent(sb, input), "Event created"),
     updateSingle: (id: string, patch: Partial<EventInput>) =>
       run(m.updateEvent(sb, id, patch), "Event updated"),
-    /** Move/resize several events at once — one invalidate + one toast. */
-    rescheduleMany: (items: { id: string; patch: Partial<EventInput> }[]) =>
+    /**
+     * Move/resize several items at once — one invalidate + one toast. Mixes
+     * master-row updates (non-recurring, or a whole recurring series) with
+     * per-occurrence "modify" overrides (a single recurring instance).
+     */
+    rescheduleMany: (ops: RescheduleOp[]) =>
       run(
-        Promise.all(items.map((it) => m.updateEvent(sb, it.id, it.patch))),
-        `${items.length} events updated`,
+        Promise.all(
+          ops.map((o) =>
+            o.kind === "update"
+              ? m.updateEvent(sb, o.id, o.patch)
+              : m.applyOverride(sb, workspaceId!, {
+                  eventId: o.event.id,
+                  occurrenceDate: o.occurrenceDate,
+                  type: "modify",
+                  patch: o.patch,
+                }),
+          ),
+        ),
+        `${ops.length} events updated`,
       ),
     remove: (id: string) => run(m.deleteEvent(sb, id), "Event deleted"),
+    /** Delete several items — whole rows and/or single-occurrence cancels. */
+    removeMany: (ops: DeleteOp[]) =>
+      run(
+        Promise.all(
+          ops.map((o) =>
+            o.kind === "delete"
+              ? m.deleteEvent(sb, o.id)
+              : m.applyOverride(sb, workspaceId!, {
+                  eventId: o.event.id,
+                  occurrenceDate: o.occurrenceDate,
+                  type: "cancel",
+                }),
+          ),
+        ),
+        `${ops.length} events deleted`,
+      ),
 
     assignContext: (eventId: string, contextId: string) =>
       run(m.assignToContext(sb, eventId, contextId), "Added to context"),

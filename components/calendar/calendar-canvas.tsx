@@ -29,7 +29,10 @@ export interface CanvasProps {
   onCreateDay: (ms: number) => void;
   onReschedule: (occ: Occurrence, startMs: number, endMs: number) => void;
   /** Time-grid: move several selected blocks together. */
-  onRescheduleMany?: (moves: { occ: Occurrence; start: number; end: number }[]) => void;
+  onRescheduleMany?: (
+    moves: { occ: Occurrence; start: number; end: number }[],
+    family: boolean,
+  ) => void;
   /** Time-grid: Ctrl/Cmd-drag drops a one-off copy. */
   onDuplicate?: (occ: Occurrence, startMs: number, endMs: number) => void;
   onChangeColor: (occ: Occurrence, color: string | null) => void;
