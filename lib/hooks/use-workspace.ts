@@ -20,12 +20,13 @@ export function useWorkspace() {
     queryKey: qk.workspace,
     queryFn: async () => {
       const sb = createClient();
-      const {
-        data: { user },
-      } = await sb.auth.getUser();
+      // getClaims() reads the user id from the already-validated session cookie
+      // (no Auth-server roundtrip); we only need it to match the current member.
+      const { data: claims } = await sb.auth.getClaims();
+      const userId = claims?.claims?.sub;
       const bundle = await fetchWorkspaceBundle(sb);
       const currentMember =
-        bundle.members.find((m) => m.authUserId === user?.id) ?? null;
+        bundle.members.find((m) => m.authUserId === userId) ?? null;
       return {
         workspaceId: bundle.workspaceId,
         workspaceName: bundle.workspaceName,
@@ -34,5 +35,11 @@ export function useWorkspace() {
         currentMember,
       };
     },
+    // The bundle (workspace name, members, categories) changes rarely and is
+    // patched optimistically by member/category mutations, so keep it warm
+    // across navigation instead of refetching on every remount. Explicit
+    // invalidations still refetch regardless of this.
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }

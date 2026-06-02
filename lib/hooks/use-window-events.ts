@@ -1,19 +1,86 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchWindow } from "@/lib/supabase/queries";
-import { subscribeWorkspace } from "@/lib/supabase/realtime";
+import { subscribeWorkspace, type WorkspaceChange } from "@/lib/supabase/realtime";
 import { qk } from "@/lib/supabase/query-keys";
 import { expandEvents } from "@/lib/recurrence/expand";
 import type { EventRow, Occurrence, TimeWindow } from "@/lib/types";
+
+/** [start, end) epoch-ms span an event row touches, or null if untimed/recurring. */
+function rowSpan(row: Record<string, unknown> | undefined): [number, number] | null {
+  if (!row) return null;
+  const startsAt = row.starts_at;
+  if (typeof startsAt !== "string") return null;
+  const start = Date.parse(startsAt);
+  if (Number.isNaN(start)) return null;
+  const endsAt = typeof row.ends_at === "string" ? Date.parse(row.ends_at) : NaN;
+  return [start, Number.isNaN(endsAt) ? start : endsAt];
+}
+
+/**
+ * Decide which window queries a single event change affects, and invalidate only
+ * those. We can do this precisely only when the full new row is present and not
+ * recurring — i.e. INSERTs (an UPDATE/DELETE's `old` row carries only the PK
+ * under the default replica identity, so a moved/removed event could leave a
+ * stale neighbour window). For everything we can't bound — UPDATE, DELETE,
+ * recurring series, and override changes — fall back to invalidating all windows.
+ */
+function invalidateAffectedWindows(
+  qc: QueryClient,
+  workspaceId: string,
+  change: WorkspaceChange,
+) {
+  const fallback = () =>
+    qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
+
+  if (change.table !== "events" || change.eventType !== "INSERT") {
+    return fallback();
+  }
+  const newRow = change.new as Record<string, unknown> | undefined;
+  if (newRow?.rrule) return fallback(); // unbounded recurrence
+  const span = rowSpan(newRow);
+  if (!span) return fallback();
+
+  const [evStart, evEnd] = span;
+  qc.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey;
+      // Window keys are ["events", workspaceId, start, end]; the all-events
+      // prefix ["events", workspaceId] won't match (length guard).
+      if (
+        key.length !== 4 ||
+        key[0] !== "events" ||
+        key[1] !== workspaceId ||
+        typeof key[2] !== "number" ||
+        typeof key[3] !== "number"
+      ) {
+        return false;
+      }
+      const winStart = key[2];
+      const winEnd = key[3];
+      // Half-open overlap with fetchWindow's predicate (starts < winEnd, ends >= winStart).
+      return evStart < winEnd && evEnd >= winStart;
+    },
+  });
+}
 
 /**
  * Live-invalidate the workspace's event queries on any realtime change. Split
  * out of `useWindowEvents` so the calendar can fetch several windows at once
  * (the prev/current/next swipe panes) without opening duplicate realtime
  * channels — call this once per screen, then `useWindowEvents` per window.
+ *
+ * Reacts only to event/override changes (tasks/categories have their own
+ * subscribers) and narrows to the affected window(s) where possible, instead of
+ * refetching every cached window on every change.
  */
 export function useWorkspaceRealtime(workspaceId: string | undefined) {
   const qc = useQueryClient();
@@ -21,8 +88,11 @@ export function useWorkspaceRealtime(workspaceId: string | undefined) {
 
   useEffect(() => {
     if (!workspaceId) return;
-    return subscribeWorkspace(sb, workspaceId, () => {
-      qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
+    return subscribeWorkspace(sb, workspaceId, (change) => {
+      if (change.table !== "events" && change.table !== "event_overrides") {
+        return; // not an event-window concern
+      }
+      invalidateAffectedWindows(qc, workspaceId, change);
     });
   }, [workspaceId, qc, sb]);
 }

@@ -18,16 +18,20 @@ import {
   DEFAULT_PALETTE,
   paletteMode,
 } from "@/lib/theme/appearance";
+import { writeAppearanceCookie } from "@/lib/theme/appearance-cookie";
 import { localTimeZone } from "@/lib/datetime/local";
-import type { Member, Palette, ThemePreference } from "@/lib/types";
+import type { AccentId, Member, Palette, SurfaceTone, ThemePreference } from "@/lib/types";
 
-function applyAppearance(accent: string, tone: string, palette: Palette) {
+function applyAppearance(accent: AccentId, tone: SurfaceTone, palette: Palette) {
   const el = document.documentElement;
   el.dataset.accent = accent;
   el.dataset.palette = palette;
   // A Catppuccin flavor owns its surfaces, so neutralize the tone preset
   // (`warm` has no override block); only `default` honors the chosen tone.
   el.dataset.tone = palette === "default" ? tone : "warm";
+  // Mirror to the cookie so the layout's pre-paint script reproduces it with no
+  // flash on the next full load (and on first load on a fresh device/browser).
+  writeAppearanceCookie(accent, tone, palette);
 }
 
 /** Patch the cached workspace bundle so the current member's prefs update at once. */
@@ -106,18 +110,18 @@ export function usePreferences() {
 
   const setAccent = useCallback(
     (next: Member["accent"]) => {
-      document.documentElement.dataset.accent = next;
+      applyAppearance(next, tone, palette); // DOM + cookie
       void persist({ accent: next });
     },
-    [persist],
+    [persist, tone, palette],
   );
 
   const setTone = useCallback(
     (next: Member["surfaceTone"]) => {
-      document.documentElement.dataset.tone = next;
+      applyAppearance(accent, next, palette); // DOM + cookie
       void persist({ surfaceTone: next });
     },
-    [persist],
+    [persist, accent, palette],
   );
 
   const setThemePref = useCallback(
@@ -148,18 +152,17 @@ export function usePreferences() {
 
   const setPalette = useCallback(
     (next: Palette) => {
-      const el = document.documentElement;
-      el.dataset.palette = next;
+      // applyAppearance handles the data-tone rule (default honors tone, a
+      // Catppuccin flavor forces 'warm') and mirrors all three to the cookie.
+      applyAppearance(accent, tone, next);
       if (next === "default") {
-        el.dataset.tone = tone; // restore the member's chosen surface tone
-        setTheme(themePreference); // and their own light / dark / system
+        setTheme(themePreference); // their own light / dark / system
       } else {
-        el.dataset.tone = "warm"; // neutralize tone presets under Catppuccin
         setTheme(paletteMode(next) ?? "dark"); // the flavor owns light/dark
       }
       void persist({ palette: next });
     },
-    [persist, setTheme, tone, themePreference],
+    [persist, setTheme, accent, tone, themePreference],
   );
 
   return {

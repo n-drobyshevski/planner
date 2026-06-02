@@ -26,7 +26,12 @@ export function useTasks(workspaceId: string | undefined): {
     return subscribeWorkspace(
       sb,
       workspaceId,
-      () => qc.invalidateQueries({ queryKey: qk.tasks(workspaceId) }),
+      (change) => {
+        // Only react to task changes; event/override/category changes on this
+        // shared channel are not this list's concern.
+        if (change.table !== "tasks") return;
+        qc.invalidateQueries({ queryKey: qk.tasks(workspaceId) });
+      },
       "tasks",
     );
   }, [workspaceId, qc, sb]);
