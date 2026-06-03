@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
+import { useUiStore } from "@/stores/ui-store";
 import type { Member, TaskRow } from "@/lib/types";
 
 const PRIORITY: Record<number, { label: string; variant: "destructive" | "secondary" | "outline" }> = {
@@ -59,6 +60,7 @@ export const TaskCard = forwardRef<
   ref,
 ) {
   const done = task.status === "done";
+  const maskTitles = useUiStore((s) => s.maskTitles);
   const overdue =
     task.dueAt != null && !done && isBefore(task.dueAt, startOfDay(new Date()));
   const prio = task.priority ? PRIORITY[task.priority] : undefined;
@@ -101,6 +103,7 @@ export const TaskCard = forwardRef<
           className={cn(
             "text-sm leading-snug font-medium",
             done && "text-muted-foreground line-through",
+            maskTitles && "blur-[5px] select-none",
           )}
         >
           {task.title}

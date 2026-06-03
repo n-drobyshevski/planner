@@ -9,6 +9,7 @@ import { CalendarDays, Pencil, Trash2, Eye } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
 import { cn } from "@/lib/utils";
 import { toPaletteColor } from "@/lib/theme/appearance";
+import { useUiStore } from "@/stores/ui-store";
 import {
   Empty,
   EmptyDescription,
@@ -176,6 +177,7 @@ const AgendaRow = forwardRef<
     Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect">
 >(function AgendaRow({ occ, color, selected, onSelect, onMenu, className, ...rest }, ref) {
   const timeZone = useViewerTimeZone();
+  const maskTitles = useUiStore((s) => s.maskTitles);
   return (
     <div
       ref={ref}
@@ -206,7 +208,13 @@ const AgendaRow = forwardRef<
       />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className={cn("truncate font-medium", occ.status === "cancelled" && "line-through")}>
+          <span
+            className={cn(
+              "truncate font-medium",
+              occ.status === "cancelled" && "line-through",
+              maskTitles && "blur-[5px] select-none",
+            )}
+          >
             {occ.title}
           </span>
           {occ.kind === "context" && (
