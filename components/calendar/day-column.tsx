@@ -17,6 +17,10 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 // frame stays visible around them — that's what reads as "inside the zone".
 const NEST_L = 14; // left gutter (px) exposing the context's accent edge
 const NEST_R = 6; // right margin (px)
+// Width of the side-label strip (matches ContextBackdrop's `w-5`). In the side
+// variant, an event nested in its owner's context is indented past this so the
+// full-height vertical label stays visible.
+const SIDE_LABEL_PX = 20;
 
 export function DayColumn({
   dayStart,
@@ -25,6 +29,7 @@ export function DayColumn({
   isToday,
   singleColumn,
   labelStyle = "bar",
+  twoCalendars,
   colorOf,
   selectedKeys,
   onSelect,
@@ -48,6 +53,9 @@ export function DayColumn({
   singleColumn?: boolean;
   /** How context backdrops are labelled (top bar vs vertical side label). */
   labelStyle?: ContextLabel;
+  /** True when the partner's calendar is overlaid: contexts shrink to 4/5 width
+      and anchor by owner (mine left, partner right), like the event lanes. */
+  twoCalendars?: boolean;
   colorOf: (o: Occurrence) => string;
   /** Multi-selection set; an occurrence is highlighted when its key is in it. */
   selectedKeys: Set<string>;
@@ -184,8 +192,11 @@ export function DayColumn({
               style={{
                 top: msToY(seg.start, dayStart, hourPx),
                 height: durationToHeight(seg.start, seg.end, hourPx),
-                left: 1,
-                right: 1,
+                // With both calendars overlaid, shrink to 4/5 and anchor by
+                // owner (mine left, partner right) so the two separate; alone,
+                // span the full column.
+                left: twoCalendars && !editable ? "20%" : 1,
+                right: twoCalendars && editable ? "20%" : 1,
               }}
             />
           </ItemContextMenu>
@@ -196,13 +207,18 @@ export function DayColumn({
         const p = packed[i];
         const taskId = seg.occ.taskId;
         // Nested children are indented within the column so the context's
-        // tinted frame shows around them; free events keep the full width.
+        // tinted frame shows around them; free events keep the full width. In
+        // the side variant the indent on the event owner's label side is
+        // widened to the strip width so the vertical label isn't covered.
         const nested = nestedFlags[i];
+        const sideLabel = labelStyle === "side";
+        const gutterL = sideLabel ? (seg.mine ? SIDE_LABEL_PX : NEST_R) : NEST_L;
+        const gutterR = sideLabel ? (seg.mine ? NEST_R : SIDE_LABEL_PX) : NEST_R;
         const left = nested
-          ? `calc(${p.leftPct}% + ${NEST_L}px)`
+          ? `calc(${p.leftPct}% + ${gutterL}px)`
           : `calc(${p.leftPct}% + 1px)`;
         const width = nested
-          ? `calc(${p.widthPct}% - ${NEST_L + NEST_R}px)`
+          ? `calc(${p.widthPct}% - ${gutterL + gutterR}px)`
           : `calc(${p.widthPct}% - 3px)`;
         const editable = canEdit(seg.occ);
         return (
