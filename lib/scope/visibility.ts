@@ -38,9 +38,11 @@ export function layerOf(e: { ownerId: string }): string {
  * Filter occurrences for the calendar view. Keep `o` iff it is joint (a Shared
  * context — always shown to both), or belongs to the viewer's own calendar, or
  * to an explicitly-overlaid member's calendar — and its category (when set)
- * isn't hidden. The viewer's own calendar is always shown; other members appear
- * only when toggled on in the sidebar. Hiding a context still hides its joint
- * items (the hidden-category clause applies to everything).
+ * isn't hidden. The viewer's own calendar is shown by default; setting
+ * `selfHidden` hides the viewer's own personal items (joint/Shared items still
+ * show). Other members appear only when toggled on in the sidebar. Hiding a
+ * context still hides its joint items (the hidden-category clause applies to
+ * everything).
  */
 export function filterVisible(
   occ: Occurrence[],
@@ -48,12 +50,15 @@ export function filterVisible(
     viewerId: string;
     overlayMemberIds: Set<string>;
     hiddenCategoryIds: Set<string>;
+    selfHidden: boolean;
   },
 ): Occurrence[] {
-  const { viewerId, overlayMemberIds, hiddenCategoryIds } = args;
+  const { viewerId, overlayMemberIds, hiddenCategoryIds, selfHidden } = args;
   return occ.filter(
     (o) =>
-      (o.isShared || o.ownerId === viewerId || overlayMemberIds.has(o.ownerId)) &&
+      ((!selfHidden && o.ownerId === viewerId) ||
+        o.isShared ||
+        overlayMemberIds.has(o.ownerId)) &&
       !(o.categoryId !== null && hiddenCategoryIds.has(o.categoryId)),
   );
 }

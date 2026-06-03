@@ -19,6 +19,8 @@ interface UiState {
   hiddenCategoryIds: Set<string>;
   /** other members' calendars overlaid onto my view (memberIds); own is always shown */
   overlayMemberIds: Set<string>;
+  /** hide my own calendar's personal events; shared/joint events still show */
+  ownCalendarHidden: boolean;
   /** task selected for editing (tasks views) */
   selectedTaskId: string | null;
   /** the "Unscheduled tasks" rail on the calendar (T4) */
@@ -37,6 +39,8 @@ interface UiState {
   toggleCategory: (id: string) => void;
   /** Overlay / un-overlay another member's calendar. */
   toggleOverlay: (memberId: string) => void;
+  /** Show / hide my own calendar (personal events). */
+  toggleOwnCalendar: () => void;
   /** Replace the whole hidden-categories set (e.g. "show only this" / "show all"). */
   setHiddenCategoryIds: (next: Set<string>) => void;
   /** Replace the whole overlaid-members set. */
@@ -53,6 +57,7 @@ export const useUiStore = create<UiState>((set) => ({
   sidebarOpen: true,
   hiddenCategoryIds: new Set(),
   overlayMemberIds: new Set(),
+  ownCalendarHidden: false,
   selectedTaskId: null,
   taskBacklogOpen: false,
   hourPx: DEFAULT_HOUR_PX,
@@ -90,6 +95,7 @@ export const useUiStore = create<UiState>((set) => ({
       else next.add(memberId);
       return { overlayMemberIds: next };
     }),
+  toggleOwnCalendar: () => set((s) => ({ ownCalendarHidden: !s.ownCalendarHidden })),
   setHiddenCategoryIds: (hiddenCategoryIds) => set({ hiddenCategoryIds }),
   setOverlayMemberIds: (overlayMemberIds) => set({ overlayMemberIds }),
   setHourPx: (px) => set({ hourPx: clampHourPx(px) }),

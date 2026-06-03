@@ -203,6 +203,7 @@ export function CalendarShell({
   const clearSelection = useUiStore((s) => s.clearSelection);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
   const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
+  const ownCalendarHidden = useUiStore((s) => s.ownCalendarHidden);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const backlogOpen = useUiStore((s) => s.taskBacklogOpen);
@@ -223,17 +224,35 @@ export function CalendarShell({
     [viewerId],
   );
   const visible = useMemo(
-    () => filterVisible(occurrences, { viewerId, overlayMemberIds, hiddenCategoryIds }),
-    [occurrences, viewerId, overlayMemberIds, hiddenCategoryIds],
+    () =>
+      filterVisible(occurrences, {
+        viewerId,
+        overlayMemberIds,
+        hiddenCategoryIds,
+        selfHidden: ownCalendarHidden,
+      }),
+    [occurrences, viewerId, overlayMemberIds, hiddenCategoryIds, ownCalendarHidden],
   );
   // Same visibility filter for the neighbour panes (display-only).
   const prevVisible = useMemo(
-    () => filterVisible(prevWin.occurrences, { viewerId, overlayMemberIds, hiddenCategoryIds }),
-    [prevWin.occurrences, viewerId, overlayMemberIds, hiddenCategoryIds],
+    () =>
+      filterVisible(prevWin.occurrences, {
+        viewerId,
+        overlayMemberIds,
+        hiddenCategoryIds,
+        selfHidden: ownCalendarHidden,
+      }),
+    [prevWin.occurrences, viewerId, overlayMemberIds, hiddenCategoryIds, ownCalendarHidden],
   );
   const nextVisible = useMemo(
-    () => filterVisible(nextWin.occurrences, { viewerId, overlayMemberIds, hiddenCategoryIds }),
-    [nextWin.occurrences, viewerId, overlayMemberIds, hiddenCategoryIds],
+    () =>
+      filterVisible(nextWin.occurrences, {
+        viewerId,
+        overlayMemberIds,
+        hiddenCategoryIds,
+        selfHidden: ownCalendarHidden,
+      }),
+    [nextWin.occurrences, viewerId, overlayMemberIds, hiddenCategoryIds, ownCalendarHidden],
   );
 
   const memberMap = useMemo(
