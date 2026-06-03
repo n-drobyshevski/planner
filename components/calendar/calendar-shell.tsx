@@ -201,6 +201,7 @@ export function CalendarShell({
   const selectedKeys = useUiStore((s) => s.selectedEventKeys);
   const toggleSelected = useUiStore((s) => s.toggleSelectedEventKey);
   const clearSelection = useUiStore((s) => s.clearSelection);
+  const toggleMaskTitles = useUiStore((s) => s.toggleMaskTitles);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
   const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
   const ownCalendarHidden = useUiStore((s) => s.ownCalendarHidden);
@@ -681,9 +682,8 @@ export function CalendarShell({
   // the listener binds once yet always runs the latest closures.
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyHandlerRef.current = (e: KeyboardEvent) => {
-    const inTimeGrid = view === "day" || view === "week" || view === "3day";
-    if (!inTimeGrid || selectedKeys.size === 0) return;
-    // Don't hijack keys while a dialog/sheet is open or while typing.
+    // Don't hijack keys while a dialog/sheet is open or while typing — applies
+    // to every shortcut below (incl. Shift+M, so typing "M" never toggles).
     if (editor || details || pendingReschedule || pendingDelete || scheduling) return;
     const ae = document.activeElement;
     if (
@@ -691,6 +691,14 @@ export function CalendarShell({
       (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)
     )
       return;
+    // Shift+M blurs/un-blurs all titles — works in every view, no selection needed.
+    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "m") {
+      e.preventDefault();
+      toggleMaskTitles();
+      return;
+    }
+    const inTimeGrid = view === "day" || view === "week" || view === "3day";
+    if (!inTimeGrid || selectedKeys.size === 0) return;
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
       deleteSelected(e.altKey); // Alt → delete the whole recurring family

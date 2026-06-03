@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { ItemContextMenu, type ItemAction } from "@/components/shared/item-context-menu";
 import { packMonthWeek, occurrencesOnDay, type MonthItem } from "@/lib/layout/pack-month";
+import { useUiStore } from "@/stores/ui-store";
 import type { Occurrence } from "@/lib/types";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -215,6 +216,7 @@ const MonthItemEl = forwardRef<
     onSelect: (o: Occurrence) => void;
   } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onSelect">
 >(function MonthItemEl({ item, color, selected, onSelect, className, ...rest }, ref) {
+  const maskTitles = useUiStore((s) => s.maskTitles);
   const style: React.CSSProperties = {
     gridColumn: `${item.colStart + 1} / ${item.colEnd + 2}`,
   };
@@ -236,7 +238,9 @@ const MonthItemEl = forwardRef<
         )}
         {...rest}
       >
-        {item.occ.title}
+        <span className={cn(maskTitles && "inline-block blur-[5px] select-none")}>
+          {item.occ.title}
+        </span>
       </button>
     );
   }
@@ -261,7 +265,9 @@ const MonthItemEl = forwardRef<
         className="size-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: toPaletteColor(color) }}
       />
-      <span className="truncate text-foreground">{item.occ.title}</span>
+      <span className={cn("truncate text-foreground", maskTitles && "blur-[5px] select-none")}>
+        {item.occ.title}
+      </span>
     </button>
   );
 });
@@ -280,6 +286,7 @@ function MoreButton({
   onSelect: (o: Occurrence) => void;
 }) {
   const timeZone = useViewerTimeZone();
+  const maskTitles = useUiStore((s) => s.maskTitles);
   const items = occurrencesOnDay(occurrences, day, timeZone);
   return (
     <Popover>
@@ -312,7 +319,9 @@ function MoreButton({
                 className="size-2 shrink-0 rounded-full"
                 style={{ backgroundColor: toPaletteColor(colorOf(o)) }}
               />
-              <span className="truncate">{o.title}</span>
+              <span className={cn("truncate", maskTitles && "blur-[5px] select-none")}>
+                {o.title}
+              </span>
               {!o.allDay && (
                 <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
                   {formatTime(o.start, timeZone)}

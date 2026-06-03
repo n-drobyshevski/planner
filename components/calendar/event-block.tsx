@@ -7,6 +7,7 @@ import { CheckCircle2, Circle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-context-menu";
 import { eventStatusClass, eventFillStyle } from "@/lib/theme/appearance";
+import { useUiStore } from "@/stores/ui-store";
 import type { Occurrence } from "@/lib/types";
 
 /**
@@ -37,6 +38,7 @@ export const EventBlock = forwardRef<
   ref,
 ) {
   const timeZone = useViewerTimeZone();
+  const maskTitles = useUiStore((s) => s.maskTitles);
   const isTask = occ.taskId != null && onToggleTaskDone != null;
   // Another member's read-only overlay (`!editable`) renders OUTLINED so it
   // reads as "not mine, look don't touch"; my own and shared/joint events stay
@@ -93,6 +95,7 @@ export const EventBlock = forwardRef<
             "truncate font-semibold leading-tight",
             taskDone && "line-through opacity-80",
             occ.status === "cancelled" && "line-through",
+            maskTitles && "blur-[5px] select-none",
           )}
         >
           {occ.title}
