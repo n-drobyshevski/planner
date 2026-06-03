@@ -14,13 +14,10 @@ import type { ContextLabel, Occurrence } from "@/lib/types";
 const DAY_MS = 86_400_000;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 // Children that nest inside a context are indented so the context's tinted
-// frame stays visible around them — that's what reads as "inside the zone".
-const NEST_L = 14; // left gutter (px) exposing the context's accent edge
-const NEST_R = 6; // right margin (px)
-// Width of the side-label strip (matches ContextBackdrop's `w-3.5`). In the side
-// variant, an event nested in its owner's context is indented past this so the
-// full-height vertical label stays visible.
-const SIDE_LABEL_PX = 14;
+// frame / side label stays visible around them — that's what reads as "inside
+// the zone". 15px clears the side-label strip (w-3.5 = 14px) with 1px to spare.
+const NEST_L = 15; // left inset (px) for a nested event
+const NEST_R = 6; // right margin (px) for a nested event (no right label)
 
 export function DayColumn({
   dayStart,
@@ -206,14 +203,15 @@ export function DayColumn({
       {segments.map((seg, i) => {
         const p = packed[i];
         const taskId = seg.occ.taskId;
-        // Nested children are indented within the column so the context's
-        // tinted frame shows around them; free events keep the full width. In
-        // the side variant the indent on the event owner's label side is
-        // widened to the strip width so the vertical label isn't covered.
+        // A nested event is inset so the context label stays visible: NEST_L on
+        // the left always (also exposes the tinted frame edge), plus a matching
+        // right inset in the side variant when both calendars are shown — there
+        // the partner's label sits on the right edge and a full-width event
+        // (pack-day gives non-overlapping items 0→100%) would otherwise cover
+        // it. Free (non-nested) events keep the full width.
         const nested = nestedFlags[i];
-        const sideLabel = labelStyle === "side";
-        const gutterL = sideLabel ? (seg.mine ? SIDE_LABEL_PX : NEST_R) : NEST_L;
-        const gutterR = sideLabel ? (seg.mine ? NEST_R : SIDE_LABEL_PX) : NEST_R;
+        const gutterL = NEST_L;
+        const gutterR = twoCalendars && labelStyle === "side" ? NEST_L : NEST_R;
         const left = nested
           ? `calc(${p.leftPct}% + ${gutterL}px)`
           : `calc(${p.leftPct}% + 1px)`;
