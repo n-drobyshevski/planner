@@ -29,12 +29,13 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
-import { Lock, Eye, Trash2, Loader2, Users, ChevronDown } from "lucide-react";
+import { Lock, Eye, Trash2, Loader2, Users, ChevronDown, Plus } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { RecurrenceScopePrompt, type RecurrenceScope } from "./recurrence-scope-prompt";
 import { ColorField } from "@/components/shared/color-field";
+import { CreateContextDialog } from "@/components/shared/create-context-dialog";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
 import { buildRRule, parseRRule, type RecurrenceForm } from "@/lib/recurrence/rrule-build";
 import {
@@ -57,6 +58,9 @@ import type { EventInput } from "@/lib/supabase/mappers";
  *  - shared: joint — both see it on their own calendars and both can edit it
  */
 type EventVisibility = "private" | "visible" | "shared";
+
+/** Sentinel Select value for the inline "Create new context…" action. */
+const CREATE_CONTEXT_VALUE = "__create__";
 
 interface FormState {
   itemKind: EventKind;
@@ -118,6 +122,7 @@ export function EventDialog(props: EventDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [scopePrompt, setScopePrompt] = useState<null | "edit" | "delete">(null);
+  const [creatingContext, setCreatingContext] = useState(false);
 
   // Re-initialize when (re)opened for a different event/slot.
   useEffect(() => {
@@ -448,7 +453,14 @@ export function EventDialog(props: EventDialogProps) {
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel htmlFor="ev-context">Context</FieldLabel>
-                <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
+                <Select
+                  value={form.categoryId}
+                  onValueChange={(v) =>
+                    v === CREATE_CONTEXT_VALUE
+                      ? setCreatingContext(true)
+                      : set("categoryId", v)
+                  }
+                >
                   <SelectTrigger id="ev-context">
                     <SelectValue placeholder="No context" />
                   </SelectTrigger>
@@ -460,6 +472,10 @@ export function EventDialog(props: EventDialogProps) {
                           {c.name}
                         </SelectItem>
                       ))}
+                      <SelectItem value={CREATE_CONTEXT_VALUE} className="text-muted-foreground">
+                        <Plus className="size-4" />
+                        Create new context…
+                      </SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -626,6 +642,14 @@ export function EventDialog(props: EventDialogProps) {
         onOpenChange={(o) => !o && setScopePrompt(null)}
         mode={scopePrompt === "delete" ? "delete" : "edit"}
         onChoose={(s) => (scopePrompt === "delete" ? onDeleteScope(s) : onEditScope(s))}
+      />
+
+      <CreateContextDialog
+        open={creatingContext}
+        onOpenChange={setCreatingContext}
+        workspaceId={workspaceId}
+        currentMemberId={currentMemberId}
+        onCreated={(id) => set("categoryId", id)}
       />
     </>
   );

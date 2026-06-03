@@ -317,15 +317,20 @@ export async function deleteThisAndFuture(
 export async function createCategory(
   sb: SupabaseClient,
   input: { workspaceId: string; ownerId: string | null; name: string; color: string; sortOrder?: number },
-): Promise<void> {
-  const { error } = await sb.from("categories").insert({
-    workspace_id: input.workspaceId,
-    owner_id: input.ownerId,
-    name: input.name,
-    color: input.color,
-    sort_order: input.sortOrder ?? 0,
-  });
+): Promise<string> {
+  const { data, error } = await sb
+    .from("categories")
+    .insert({
+      workspace_id: input.workspaceId,
+      owner_id: input.ownerId,
+      name: input.name,
+      color: input.color,
+      sort_order: input.sortOrder ?? 0,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  return data.id as string;
 }
 
 export async function updateCategory(
