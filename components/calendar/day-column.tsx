@@ -9,7 +9,7 @@ import { EventBlock } from "./event-block";
 import { ContextBackdrop } from "./context-backdrop";
 import { NowLine } from "./now-line";
 import { ItemContextMenu, type ItemAction } from "@/components/shared/item-context-menu";
-import type { Occurrence } from "@/lib/types";
+import type { ContextLabel, Occurrence } from "@/lib/types";
 
 const DAY_MS = 86_400_000;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -24,6 +24,7 @@ export function DayColumn({
   occurrences,
   isToday,
   singleColumn,
+  labelStyle = "bar",
   colorOf,
   selectedKeys,
   onSelect,
@@ -45,6 +46,8 @@ export function DayColumn({
   isToday: boolean;
   /** True in day view — its one wide column keeps the context time range on phones. */
   singleColumn?: boolean;
+  /** How context backdrops are labelled (top bar vs vertical side label). */
+  labelStyle?: ContextLabel;
   colorOf: (o: Occurrence) => string;
   /** Multi-selection set; an occurrence is highlighted when its key is in it. */
   selectedKeys: Set<string>;
@@ -176,6 +179,7 @@ export function DayColumn({
               color={colorOf(seg.occ)}
               selected={selectedKeys.has(seg.occ.key)}
               singleColumn={singleColumn}
+              labelStyle={labelStyle}
               editable={editable}
               style={{
                 top: msToY(seg.start, dayStart, hourPx),

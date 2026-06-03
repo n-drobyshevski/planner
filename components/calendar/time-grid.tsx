@@ -23,7 +23,7 @@ import {
 import { DayColumn } from "./day-column";
 import { useUiStore } from "@/stores/ui-store";
 import { useTimelineZoom } from "@/hooks/use-timeline-zoom";
-import type { Occurrence } from "@/lib/types";
+import type { ContextLabel, Occurrence } from "@/lib/types";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAY_MS = 86_400_000;
@@ -91,6 +91,8 @@ interface Props {
   onToggleTaskDone?: (taskId: string) => void;
   /** Drop a backlog task onto a slot to schedule a default 1h block. */
   onScheduleTask?: (taskId: string, startMs: number, endMs: number) => void;
+  /** How context backdrops are labelled (top bar vs vertical side label). */
+  labelStyle?: ContextLabel;
 }
 
 const SCHED_MIN = 60; // default minutes for a task dropped onto the grid
@@ -167,6 +169,7 @@ export function TimeGrid({
   taskDoneById,
   onToggleTaskDone,
   onScheduleTask,
+  labelStyle = "bar",
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -817,6 +820,7 @@ export function TimeGrid({
                 hourPx={hourPx}
                 isToday={d === today}
                 singleColumn={days.length === 1}
+                labelStyle={labelStyle}
                 occurrences={occurrences}
                 colorOf={colorOf}
                 selectedKeys={selectedKeys}

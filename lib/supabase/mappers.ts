@@ -12,6 +12,7 @@ import type {
   AccentId,
   SurfaceTone,
   Palette,
+  ContextLabel,
 } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -39,6 +40,7 @@ export function mapMember(r: Row): Member {
     secondaryTimezone: (r.secondary_timezone as string | null) ?? null,
     showInactiveInMonth:
       r.show_inactive_in_month == null ? true : Boolean(r.show_inactive_in_month),
+    contextLabel: (r.context_label as ContextLabel | null) ?? "bar",
   };
 }
 

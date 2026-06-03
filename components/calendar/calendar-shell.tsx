@@ -211,6 +211,8 @@ export function CalendarShell({
   const viewerId = workspace.data?.currentMember?.id ?? "";
   // Month-view display preference (week/day always show inactive events).
   const showInactiveInMonth = workspace.data?.currentMember?.showInactiveInMonth ?? true;
+  // Week/day display: how context blocks are labelled (top bar vs side label).
+  const contextLabel = workspace.data?.currentMember?.contextLabel ?? "bar";
   // My own items are editable, plus any JOINT item (filed under a Shared
   // context — both members co-edit); overlaid members' personal items are
   // read-only. Mirrors the widened events_write RLS.
@@ -766,6 +768,7 @@ export function CalendarShell({
                   canEdit={canEditOcc}
                   taskDoneById={taskDoneById}
                   showInactiveInMonth={showInactiveInMonth}
+                  contextLabel={contextLabel}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || prevWin.isLoading}
                   error={workspace.isError || prevWin.isError}
@@ -781,6 +784,7 @@ export function CalendarShell({
                   canEdit={canEditOcc}
                   taskDoneById={taskDoneById}
                   showInactiveInMonth={showInactiveInMonth}
+                  contextLabel={contextLabel}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || nextWin.isLoading}
                   error={workspace.isError || nextWin.isError}
@@ -817,6 +821,7 @@ export function CalendarShell({
                 onToggleTaskDone={onToggleTaskDone}
                 onScheduleTask={onScheduleTask}
                 showInactiveInMonth={showInactiveInMonth}
+                contextLabel={contextLabel}
                 loading={workspace.isLoading || eventsLoading}
                 error={workspace.isError || eventsError}
               />

@@ -22,7 +22,12 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePreferences } from "@/lib/hooks/use-preferences";
 import { ACCENTS, PALETTES, TONES } from "@/lib/theme/appearance";
-import type { ThemePreference } from "@/lib/types";
+import type { ContextLabel, ThemePreference } from "@/lib/types";
+
+const CONTEXT_LABEL_OPTIONS = [
+  { value: "bar", label: "Title bar" },
+  { value: "side", label: "Side label" },
+] as const;
 
 const THEME_OPTIONS = [
   { value: "light", label: "Light", icon: Sun },
@@ -42,11 +47,13 @@ export function AppearanceSettings() {
     tone,
     palette,
     showInactiveInMonth,
+    contextLabel,
     setThemePref,
     setAccent,
     setTone,
     setPalette,
     setShowInactiveInMonth,
+    setContextLabel,
     isReady,
   } = usePreferences();
 
@@ -242,7 +249,7 @@ export function AppearanceSettings() {
             How your calendar reads. These also follow you across devices.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-8">
           <Field orientation="horizontal">
             <FieldContent>
               <FieldLabel htmlFor="show-inactive-month">
@@ -260,6 +267,34 @@ export function AppearanceSettings() {
               disabled={disabled}
             />
           </Field>
+
+          {/* Context label variant (week/day grid) */}
+          <FieldSet>
+            <FieldLegend variant="label">Context label</FieldLegend>
+            <FieldDescription>
+              How a context block is labelled in the week and day grids: a title
+              bar across the top, or a vertical label down the right edge.
+            </FieldDescription>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              value={contextLabel}
+              onValueChange={(v) => v && setContextLabel(v as ContextLabel)}
+              disabled={disabled}
+              aria-label="Context label"
+            >
+              {CONTEXT_LABEL_OPTIONS.map(({ value, label }) => (
+                <ToggleGroupItem
+                  key={value}
+                  value={value}
+                  aria-label={label}
+                  className={SELECTED_SEGMENT}
+                >
+                  {label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </FieldSet>
         </CardContent>
       </Card>
 

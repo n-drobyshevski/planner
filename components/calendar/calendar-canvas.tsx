@@ -7,7 +7,7 @@ import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TimeGrid } from "./time-grid";
 import { MonthGrid } from "./month-grid";
 import { AgendaView } from "./agenda-view";
-import type { CalendarView, Occurrence } from "@/lib/types";
+import type { CalendarView, ContextLabel, Occurrence } from "@/lib/types";
 import type { ItemAction } from "@/components/shared/item-context-menu";
 
 export interface CanvasProps {
@@ -60,6 +60,8 @@ export interface CanvasProps {
   onScheduleTask?: (taskId: string, startMs: number, endMs: number) => void;
   /** Month-view only: when false, inactive (grayed-out) events are hidden there. */
   showInactiveInMonth?: boolean;
+  /** Time-grid: how context blocks are labelled (top bar vs vertical side label). */
+  contextLabel?: ContextLabel;
   loading: boolean;
   error: boolean;
 }
@@ -92,6 +94,7 @@ export function CalendarCanvas(props: CanvasProps) {
     onToggleTaskDone,
     onScheduleTask,
     showInactiveInMonth = true,
+    contextLabel = "bar",
     error,
   } = props;
   const timeZone = useViewerTimeZone();
@@ -188,6 +191,7 @@ export function CalendarCanvas(props: CanvasProps) {
       taskDoneById={taskDoneById}
       onToggleTaskDone={onToggleTaskDone}
       onScheduleTask={onScheduleTask}
+      labelStyle={contextLabel}
     />
   );
 }
