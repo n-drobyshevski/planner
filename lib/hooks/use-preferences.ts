@@ -16,11 +16,19 @@ import {
   DEFAULT_TONE,
   DEFAULT_THEME,
   DEFAULT_PALETTE,
+  DEFAULT_CONTEXT_LABEL,
   paletteMode,
 } from "@/lib/theme/appearance";
 import { writeAppearanceCookie } from "@/lib/theme/appearance-cookie";
 import { localTimeZone } from "@/lib/datetime/local";
-import type { AccentId, Member, Palette, SurfaceTone, ThemePreference } from "@/lib/types";
+import type {
+  AccentId,
+  ContextLabel,
+  Member,
+  Palette,
+  SurfaceTone,
+  ThemePreference,
+} from "@/lib/types";
 
 function applyAppearance(accent: AccentId, tone: SurfaceTone, palette: Palette) {
   const el = document.documentElement;
@@ -75,6 +83,8 @@ export function usePreferences() {
   const secondaryTimeZone = member?.secondaryTimezone ?? null;
   // Month-view display: whether inactive (grayed-out) events are shown there.
   const showInactiveInMonth = member?.showInactiveInMonth ?? true;
+  // Week/day display: how context time-blocks are labelled (top bar vs side).
+  const contextLabel = member?.contextLabel ?? DEFAULT_CONTEXT_LABEL;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
   // its own (Latte light, the rest dark); `default` defers to themePreference.
@@ -161,6 +171,15 @@ export function usePreferences() {
     [persist],
   );
 
+  // No DOM side-effect: the week/day grid re-reads the variant from the
+  // workspace cache that `persist` patches.
+  const setContextLabel = useCallback(
+    (next: ContextLabel) => {
+      void persist({ contextLabel: next });
+    },
+    [persist],
+  );
+
   const setPalette = useCallback(
     (next: Palette) => {
       // applyAppearance handles the data-tone rule (default honors tone, a
@@ -189,6 +208,8 @@ export function usePreferences() {
     secondaryTimeZone,
     /** Whether inactive events are shown in the month view. */
     showInactiveInMonth,
+    /** How context time-blocks are labelled in the week/day grid. */
+    contextLabel,
     setThemePref,
     setAccent,
     setTone,
@@ -196,6 +217,7 @@ export function usePreferences() {
     setTimezone,
     setSecondaryTimezone,
     setShowInactiveInMonth,
+    setContextLabel,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,
   };

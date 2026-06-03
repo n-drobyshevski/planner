@@ -5,6 +5,7 @@
 
 import type {
   AccentId,
+  ContextLabel,
   EventStatus,
   Palette,
   SurfaceTone,
@@ -15,6 +16,7 @@ export const DEFAULT_THEME: ThemePreference = "system";
 export const DEFAULT_ACCENT: AccentId = "peach";
 export const DEFAULT_TONE: SurfaceTone = "warm";
 export const DEFAULT_PALETTE: Palette = "default";
+export const DEFAULT_CONTEXT_LABEL: ContextLabel = "bar";
 
 export interface AccentPreset {
   id: AccentId;

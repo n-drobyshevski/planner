@@ -42,6 +42,13 @@ export type Palette =
   | "catppuccin-frappe"
   | "catppuccin-macchiato"
   | "catppuccin-mocha";
+/**
+ * How a context time-block is labelled in the week/day grid. `bar` is the
+ * default horizontal title bar across the top; `side` moves the name (and time,
+ * when there's room) to a vertical strip on the right edge, rotated so the
+ * glyph-tops face left. Mirror the DB CHECK constraint.
+ */
+export type ContextLabel = "bar" | "side";
 
 export interface Member {
   id: string;
@@ -62,6 +69,8 @@ export interface Member {
   // When false, inactive (grayed-out) events are hidden in the cramped month
   // view; they always show in the denser week/day grids. Defaults to true.
   showInactiveInMonth: boolean;
+  // How context time-blocks are labelled in the week/day grid. Defaults to "bar".
+  contextLabel: ContextLabel;
 }
 
 export interface Category {

@@ -6,6 +6,7 @@ import type {
   AccentId,
   SurfaceTone,
   Palette,
+  ContextLabel,
 } from "@/lib/types";
 import {
   mapEvent,
@@ -489,6 +490,8 @@ export interface MemberPreferencesPatch {
   secondaryTimezone?: string | null;
   /** Whether inactive events are shown in the month view. */
   showInactiveInMonth?: boolean;
+  /** How context time-blocks are labelled in the week/day grid. */
+  contextLabel?: ContextLabel;
 }
 
 /**
@@ -538,6 +541,7 @@ export async function updateMemberPreferences(
   if ("timezone" in patch) row.timezone = patch.timezone ?? null;
   if ("secondaryTimezone" in patch) row.secondary_timezone = patch.secondaryTimezone ?? null;
   if (patch.showInactiveInMonth != null) row.show_inactive_in_month = patch.showInactiveInMonth;
+  if (patch.contextLabel != null) row.context_label = patch.contextLabel;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;
