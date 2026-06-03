@@ -42,8 +42,7 @@ import { cn } from "@/lib/utils";
 import { localTimeZone } from "@/lib/datetime/local";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import type { Member, Category } from "@/lib/types";
-
-const PALETTE = ["#c0492a", "#0f766e", "#b45309", "#15803d", "#0369a1", "#be185d", "#7c3aed"];
+import { CONTEXT_PALETTE as PALETTE } from "@/lib/contexts/palette";
 
 interface FiltersProps {
   workspaceId: string;
@@ -481,7 +480,7 @@ function AddCategoryPopover({
   const qc = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
-  const [color, setColor] = React.useState(PALETTE[0]);
+  const [color, setColor] = React.useState<string>(PALETTE[0]);
   // Default to Shared: it preserves today's behavior (every context was shared)
   // and is the common case for a two-person planner.
   const [shared, setShared] = React.useState(true);
