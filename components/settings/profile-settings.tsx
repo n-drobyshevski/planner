@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -341,22 +341,38 @@ function PinInput({
   onChange: (v: string) => void;
   autoFocus?: boolean;
 }) {
+  const [show, setShow] = React.useState(false);
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <button
+          type="button"
+          onClick={() => setShow((s) => !s)}
+          className="flex items-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={show ? `Hide ${label}` : `Show ${label}`}
+          aria-pressed={show}
+        >
+          {show ? (
+            <EyeOff className="size-3.5" aria-hidden />
+          ) : (
+            <Eye className="size-3.5" aria-hidden />
+          )}
+        </button>
+      </div>
       <InputOTP maxLength={8} value={value} onChange={onChange} autoFocus={autoFocus}>
         <InputOTPGroup>
-          <InputOTPSlot index={0} />
-          <InputOTPSlot index={1} />
-          <InputOTPSlot index={2} />
-          <InputOTPSlot index={3} />
+          <InputOTPSlot index={0} mask={!show} />
+          <InputOTPSlot index={1} mask={!show} />
+          <InputOTPSlot index={2} mask={!show} />
+          <InputOTPSlot index={3} mask={!show} />
         </InputOTPGroup>
         <InputOTPSeparator />
         <InputOTPGroup>
-          <InputOTPSlot index={4} />
-          <InputOTPSlot index={5} />
-          <InputOTPSlot index={6} />
-          <InputOTPSlot index={7} />
+          <InputOTPSlot index={4} mask={!show} />
+          <InputOTPSlot index={5} mask={!show} />
+          <InputOTPSlot index={6} mask={!show} />
+          <InputOTPSlot index={7} mask={!show} />
         </InputOTPGroup>
       </InputOTP>
     </div>
