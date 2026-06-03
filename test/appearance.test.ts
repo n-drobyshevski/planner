@@ -14,9 +14,11 @@ describe("eventFillStyle", () => {
     });
   });
 
-  it("outlined (other member's read-only event): faint wash, colored border, theme ink", () => {
+  it("outlined (other member's read-only event): solid calendar-background fill, colored border, theme ink", () => {
     expect(eventFillStyle(TEAL, true)).toEqual({
-      backgroundColor: "color-mix(in oklab, var(--swatch-teal) 14%, transparent)",
+      // Opaque fill matching the calendar background, so it reads as a hollow
+      // card rather than a see-through wash.
+      backgroundColor: "var(--background)",
       borderColor: "var(--swatch-teal)",
       // Theme foreground (not white-on-fill) keeps outlined blocks legible in
       // both light and dark mode.
@@ -24,7 +26,7 @@ describe("eventFillStyle", () => {
     });
   });
 
-  it("passes unknown/custom hexes through unchanged (still re-tinted via color-mix when outlined)", () => {
+  it("passes unknown/custom hexes through unchanged (still background-filled when outlined)", () => {
     const CUSTOM = "#123456";
     expect(eventFillStyle(CUSTOM, false)).toMatchObject({
       backgroundColor: "#123456",
@@ -32,7 +34,7 @@ describe("eventFillStyle", () => {
       color: "var(--swatch-ink)",
     });
     expect(eventFillStyle(CUSTOM, true)).toMatchObject({
-      backgroundColor: "color-mix(in oklab, #123456 14%, transparent)",
+      backgroundColor: "var(--background)",
       borderColor: "#123456",
       color: "var(--foreground)",
     });
