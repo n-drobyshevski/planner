@@ -111,6 +111,21 @@ async function main() {
   const social = cats.find((c) => c.name === "Social")!;
   console.log(`✓ ${cats.length} categories`);
 
+  // Boards: a shared default + a second shared board, plus one personal board
+  // (left empty, handy for trying the delete flow).
+  const { data: boards, error: boardErr } = await admin
+    .from("boards")
+    .insert([
+      { workspace_id: ws.id, owner_id: null, name: "Tasks", color: "#c0492a", sort_order: 0 },
+      { workspace_id: ws.id, owner_id: null, name: "Errands", color: "#0369a1", sort_order: 1 },
+      { workspace_id: ws.id, owner_id: memA.id, name: `${memA.name} · Focus`, color: "#7c3aed", sort_order: 2 },
+    ])
+    .select();
+  if (boardErr) throw boardErr;
+  const boardMain = boards.find((b) => b.name === "Tasks")!;
+  const boardErrands = boards.find((b) => b.name === "Errands")!;
+  console.log(`✓ ${boards.length} boards`);
+
   // Sample events around "today".
   const tz = "Europe/Berlin";
   const at = (dayOffset: number, hour: number, min = 0) => {
@@ -130,30 +145,30 @@ async function main() {
   const { error: evErr } = await admin.from("events").insert([
     {
       workspace_id: ws.id, owner_id: memA.id, category_id: social.id,
-      title: "Coffee together", scope: "shared", visibility: "shared",
+      title: "Coffee together",
       all_day: false, starts_at: s1, ends_at: plus(s1, 60), time_zone: tz,
     },
     {
       workspace_id: ws.id, owner_id: memB.id, category_id: cats.find((c) => c.owner_id === memB.id)!.id,
-      title: "Standup", scope: "personal", visibility: "private",
+      title: "Standup", is_private: true,
       all_day: false, starts_at: s2, ends_at: plus(s2, 30), time_zone: tz,
     },
     {
       workspace_id: ws.id, owner_id: memA.id, category_id: home.id,
-      title: "Grocery run", scope: "shared", visibility: "shared",
+      title: "Grocery run",
       all_day: false, starts_at: s3, ends_at: plus(s3, 90), time_zone: tz,
     },
     {
       // Weekly recurring shared event (Mon/Wed/Fri 18:00 dinner).
       workspace_id: ws.id, owner_id: memB.id, category_id: home.id,
-      title: "Dinner", scope: "shared", visibility: "shared",
+      title: "Dinner",
       all_day: false, starts_at: at(0, 18), ends_at: at(0, 19), time_zone: tz,
       rrule: "FREQ=WEEKLY;BYDAY=MO,WE,FR",
     },
     {
       // Multi-day, all-day shared event -> renders as a spanning bar in month view.
       workspace_id: ws.id, owner_id: memA.id, category_id: null,
-      title: "Weekend getaway", scope: "shared", visibility: "shared",
+      title: "Weekend getaway",
       all_day: true, starts_at: at(5, 0), ends_at: at(8, 0), time_zone: tz,
     },
   ]);
@@ -166,23 +181,23 @@ async function main() {
     .from("tasks")
     .insert([
       {
-        workspace_id: ws.id, owner_id: memA.id, category_id: home.id,
-        title: "Plan spring garden", scope: "shared", visibility: "shared",
+        workspace_id: ws.id, owner_id: memA.id, category_id: home.id, board_id: boardMain.id,
+        title: "Plan spring garden",
         status: "todo", position: 1, sequential: true,
       },
       {
-        workspace_id: ws.id, owner_id: memB.id, category_id: memBWork.id,
-        title: "Performance review prep", scope: "personal", visibility: "private",
+        workspace_id: ws.id, owner_id: memB.id, category_id: memBWork.id, board_id: boardMain.id,
+        title: "Performance review prep", is_private: true,
         status: "in_progress", position: 2, sequential: false,
       },
       {
-        workspace_id: ws.id, owner_id: memA.id, category_id: home.id,
-        title: "Pay rent", scope: "shared", visibility: "shared",
+        workspace_id: ws.id, owner_id: memA.id, category_id: home.id, board_id: boardErrands.id,
+        title: "Pay rent",
         status: "todo", position: 3, priority: 3, due_at: at(3, 0), sequential: false,
       },
       {
-        workspace_id: ws.id, owner_id: memA.id, assignee_id: memA.id,
-        title: "Write report", scope: "shared", visibility: "shared",
+        workspace_id: ws.id, owner_id: memA.id, assignee_id: memA.id, board_id: boardMain.id,
+        title: "Write report",
         status: "todo", position: 4, sequential: false,
       },
     ])
@@ -195,18 +210,18 @@ async function main() {
   // "Buy seeds" is done ("Clear the beds" is already done -> 1/3 progress).
   const { error: stErr } = await admin.from("tasks").insert([
     {
-      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id,
-      title: "Clear the beds", scope: "shared", visibility: "shared",
+      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, board_id: garden.board_id,
+      title: "Clear the beds",
       status: "done", position: 1, completed_at: new Date().toISOString(),
     },
     {
-      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id,
-      title: "Buy seeds", scope: "shared", visibility: "shared",
+      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, board_id: garden.board_id,
+      title: "Buy seeds",
       status: "todo", position: 2,
     },
     {
-      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id,
-      title: "Plant", scope: "shared", visibility: "shared",
+      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, board_id: garden.board_id,
+      title: "Plant",
       status: "todo", position: 3,
     },
   ]);
@@ -215,7 +230,7 @@ async function main() {
   // "Write report" already scheduled as a 90-min block tomorrow (linked via task_id).
   const { error: blkErr } = await admin.from("events").insert({
     workspace_id: ws.id, owner_id: memA.id, category_id: null, task_id: report.id,
-    title: "Write report", scope: "shared", visibility: "shared",
+    title: "Write report",
     all_day: false, starts_at: at(1, 10), ends_at: at(1, 11, 30), time_zone: tz,
   });
   if (blkErr) throw blkErr;

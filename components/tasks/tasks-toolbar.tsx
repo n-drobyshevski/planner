@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AppNav } from "@/components/app-nav";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
+import { BoardSwitcher } from "./board-switcher";
 import type { Member } from "@/lib/types";
 
 export type TasksView = "board" | "list";
@@ -14,22 +15,28 @@ export function TasksToolbar({
   onViewChange,
   onNewTask,
   currentMember,
+  activeBoardId,
+  onBoardChange,
+  taskCountByBoard,
 }: {
   view: TasksView;
   onViewChange: (v: TasksView) => void;
   onNewTask: () => void;
   currentMember: Member | null;
+  activeBoardId: string | null;
+  onBoardChange: (boardId: string) => void;
+  taskCountByBoard: Map<string, number>;
 }) {
   return (
     <header className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4">
-      <div className="flex items-center gap-2">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <ListChecks className="size-4" />
-        </span>
-        <span className="hidden font-heading text-sm font-semibold lg:inline">
-          Tasks
-        </span>
-      </div>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <ListChecks className="size-4" />
+      </span>
+      <BoardSwitcher
+        activeBoardId={activeBoardId}
+        onActiveBoardChange={onBoardChange}
+        taskCountByBoard={taskCountByBoard}
+      />
       <AppNav />
 
       <div className="ml-auto flex items-center gap-2">

@@ -85,6 +85,17 @@ export interface Category {
   sortOrder: number;
 }
 
+/** A task board — a named collection of tasks. Personal (owner = a member) or
+ *  Shared (ownerId null, both members see + edit). Mirrors Category. */
+export interface Board {
+  id: string;
+  workspaceId: string;
+  ownerId: string | null; // null = shared board
+  name: string;
+  color: string; // hex
+  sortOrder: number;
+}
+
 export interface EventRow {
   id: string;
   workspaceId: string;
@@ -133,6 +144,7 @@ export interface TaskRow {
   ownerId: string; // creator; drives edit rights
   assigneeId: string | null; // responsible member; null = unassigned
   parentId: string | null; // subtask -> parent; null = top-level
+  boardId: string | null; // the board this task lives on
   categoryId: string | null;
   title: string;
   description: string | null;

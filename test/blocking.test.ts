@@ -9,6 +9,7 @@ function mk(id: string, status: TaskStatus): TaskRow {
     ownerId: "m1",
     assigneeId: null,
     parentId: "p",
+    boardId: null,
     categoryId: null,
     title: id,
     description: null,

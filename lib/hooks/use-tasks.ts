@@ -27,8 +27,15 @@ export function useTasks(workspaceId: string | undefined): {
       sb,
       workspaceId,
       (change) => {
-        // Only react to task changes; event/override/category changes on this
-        // shared channel are not this list's concern.
+        // Board changes alter the switcher / which tasks are in scope, and
+        // boards live in the workspace bundle — refresh it so the other member
+        // sees new/removed boards live.
+        if (change.table === "boards") {
+          qc.invalidateQueries({ queryKey: qk.workspace });
+          return;
+        }
+        // Only react to task changes otherwise; event/override/category changes
+        // on this shared channel are not this list's concern.
         if (change.table !== "tasks") return;
         qc.invalidateQueries({ queryKey: qk.tasks(workspaceId) });
       },

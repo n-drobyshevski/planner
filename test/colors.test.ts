@@ -64,6 +64,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     ownerId: "m1",
     assigneeId: null,
     parentId: null,
+    boardId: null,
     categoryId: null,
     title: "t",
     description: null,

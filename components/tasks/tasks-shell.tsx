@@ -33,12 +33,15 @@ type EditorState =
 export function TasksShell({
   initialView,
   viewFromUrl,
+  initialBoardId,
 }: {
   initialView: TasksView;
   viewFromUrl: boolean;
+  initialBoardId: string | null;
 }) {
   const router = useRouter();
   const [view, setView] = useState<TasksView>(initialView);
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(initialBoardId);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [scheduling, setScheduling] = useState<TaskRow | null>(null);
   const [deleting, setDeleting] = useState<TaskRow | null>(null);
@@ -69,11 +72,35 @@ export function TasksShell({
 
   const members = workspace.data?.members ?? [];
   const categories = workspace.data?.categories ?? [];
+  const boards = useMemo(() => workspace.data?.boards ?? [], [workspace.data?.boards]);
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const colorOf = (t: TaskRow) => resolveTaskColor(t, catMap, memberMap);
 
-  const childrenByParent = useMemo(() => groupByParent(tasks), [tasks]);
+  // The active board: the URL/selected one if it still exists, else the first.
+  // Deriving (rather than syncing into state) means a deleted/stale selection
+  // transparently falls back to the first board — every consumer reads
+  // `activeBoard?.id`, so creation and filtering stay correct without an effect.
+  const activeBoard =
+    boards.find((b) => b.id === activeBoardId) ?? boards[0] ?? null;
+
+  // Only this board's tasks (subtasks inherit their parent's board).
+  const boardTasks = useMemo(
+    () => (activeBoard ? tasks.filter((t) => t.boardId === activeBoard.id) : []),
+    [tasks, activeBoard],
+  );
+
+  // Tasks (incl. subtasks) per board, from the full set — for the switcher's
+  // delete guard. Computed once here so the switcher needn't re-subscribe.
+  const taskCountByBoard = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of tasks) {
+      if (t.boardId) counts.set(t.boardId, (counts.get(t.boardId) ?? 0) + 1);
+    }
+    return counts;
+  }, [tasks]);
+
+  const childrenByParent = useMemo(() => groupByParent(boardTasks), [boardTasks]);
   const topLevel = childrenByParent.get(null) ?? [];
   const progressFor = (t: TaskRow) => {
     const c = childrenByParent.get(t.id) ?? [];
@@ -87,9 +114,21 @@ export function TasksShell({
     ? childrenByParent.get(editingTask.id) ?? []
     : [];
 
+  function syncUrl(v: TasksView, boardId: string | null) {
+    const params = new URLSearchParams();
+    params.set("view", v);
+    if (boardId) params.set("board", boardId);
+    router.replace(`/tasks?${params.toString()}`, { scroll: false });
+  }
+
   function changeView(v: TasksView) {
     setView(v);
-    router.replace(`/tasks?view=${v}`, { scroll: false });
+    syncUrl(v, activeBoard?.id ?? null);
+  }
+
+  function changeBoard(boardId: string) {
+    setActiveBoardId(boardId);
+    syncUrl(view, boardId);
   }
 
   const loading = workspace.isLoading || isLoading;
@@ -102,6 +141,9 @@ export function TasksShell({
         onViewChange={changeView}
         onNewTask={() => setEditor({ mode: "create" })}
         currentMember={workspace.data?.currentMember ?? null}
+        activeBoardId={activeBoard?.id ?? null}
+        onBoardChange={changeBoard}
+        taskCountByBoard={taskCountByBoard}
       />
 
       <main className="min-h-0 flex-1 overflow-hidden">
@@ -115,6 +157,11 @@ export function TasksShell({
         ) : loading ? (
           <Centered>
             <Loader2 className="size-5 animate-spin" />
+          </Centered>
+        ) : !activeBoard ? (
+          <Centered>
+            You don&apos;t have any boards yet. Use the “New board” button up top to
+            create your first one.
           </Centered>
         ) : view === "board" ? (
           <TaskBoard
@@ -154,6 +201,7 @@ export function TasksShell({
             mode={editor.mode}
             workspaceId={workspace.data.workspaceId}
             currentMemberId={workspace.data.currentMember.id}
+            boardId={activeBoard?.id ?? null}
             members={members}
             categories={categories}
             task={editingTask}
