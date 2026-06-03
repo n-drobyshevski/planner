@@ -17,10 +17,10 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 // frame stays visible around them — that's what reads as "inside the zone".
 const NEST_L = 14; // left gutter (px) exposing the context's accent edge
 const NEST_R = 6; // right margin (px)
-// Width of the side-label strip (matches ContextBackdrop's `w-5`). In the side
+// Width of the side-label strip (matches ContextBackdrop's `w-3.5`). In the side
 // variant, an event nested in its owner's context is indented past this so the
 // full-height vertical label stays visible.
-const SIDE_LABEL_PX = 20;
+const SIDE_LABEL_PX = 14;
 
 export function DayColumn({
   dayStart,

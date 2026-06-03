@@ -98,7 +98,7 @@ export const ContextBackdrop = forwardRef<
            the strip is the move / menu handle. */
         <div
           className={cn(
-            "pointer-events-auto absolute inset-y-0 z-10 flex w-5 items-start justify-center overflow-hidden select-none",
+            "pointer-events-auto absolute inset-y-0 z-10 flex w-3.5 items-start justify-center overflow-hidden select-none",
             editable ? "left-0 cursor-grab" : "right-0 cursor-pointer",
           )}
           style={{ backgroundColor: toPaletteColor(color), color: toPaletteInk(color) }}
