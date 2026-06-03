@@ -66,20 +66,21 @@ describe("filterVisible", () => {
   it("keeps the viewer's own items without overlaying anyone", () => {
     const o = occ({ ownerId: OWNER });
     expect(
-      filterVisible([o], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none }),
+      filterVisible([o], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none, selfHidden: false }),
     ).toEqual([o]);
   });
 
   it("hides another member's items until their calendar is overlaid", () => {
     const o = occ({ ownerId: OTHER });
     expect(
-      filterVisible([o], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none }),
+      filterVisible([o], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none, selfHidden: false }),
     ).toEqual([]);
     expect(
       filterVisible([o], {
         viewerId: OWNER,
         overlayMemberIds: new Set([OTHER]),
         hiddenCategoryIds: none,
+        selfHidden: false,
       }),
     ).toEqual([o]);
   });
@@ -91,6 +92,7 @@ describe("filterVisible", () => {
         viewerId: OWNER,
         overlayMemberIds: none,
         hiddenCategoryIds: new Set(["cat-x"]),
+        selfHidden: false,
       }),
     ).toEqual([]);
   });
@@ -102,6 +104,7 @@ describe("filterVisible", () => {
         viewerId: OWNER,
         overlayMemberIds: none,
         hiddenCategoryIds: new Set(["cat-x"]),
+        selfHidden: false,
       }),
     ).toEqual([o]);
   });
@@ -113,6 +116,7 @@ describe("filterVisible", () => {
         viewerId: OWNER,
         overlayMemberIds: none,
         hiddenCategoryIds: new Set(["cat-x"]),
+        selfHidden: false,
       }),
     ).toEqual([]);
   });
@@ -124,6 +128,7 @@ describe("filterVisible", () => {
         viewerId: OWNER,
         overlayMemberIds: none,
         hiddenCategoryIds: new Set(["cat-x"]),
+        selfHidden: false,
       }),
     ).toEqual([window]);
   });
@@ -138,6 +143,7 @@ describe("filterVisible", () => {
       viewerId: OWNER,
       overlayMemberIds: new Set([OTHER]),
       hiddenCategoryIds: new Set(["cat-hidden"]),
+      selfHidden: false,
     });
 
     // mine kept; mine-hidden-cat dropped; OTHER overlaid kept; member-3 not overlaid dropped.
@@ -152,15 +158,53 @@ describe("filterVisible", () => {
       viewerId: OWNER,
       overlayMemberIds: none,
       hiddenCategoryIds: none,
+      selfHidden: false,
     });
     expect(out).toEqual([a, b, c]);
     expect(out[0]).toBe(a);
     expect(out[2]).toBe(c);
   });
 
+  it("hides the viewer's own personal items when selfHidden is set", () => {
+    const mine = occ({ ownerId: OWNER });
+    expect(
+      filterVisible([mine], {
+        viewerId: OWNER,
+        overlayMemberIds: none,
+        hiddenCategoryIds: none,
+        selfHidden: true,
+      }),
+    ).toEqual([]);
+  });
+
+  it("still shows the viewer's own JOINT items when selfHidden is set", () => {
+    const mineJoint = occ({ ownerId: OWNER, isShared: true });
+    expect(
+      filterVisible([mineJoint], {
+        viewerId: OWNER,
+        overlayMemberIds: none,
+        hiddenCategoryIds: none,
+        selfHidden: true,
+      }),
+    ).toEqual([mineJoint]);
+  });
+
+  it("selfHidden leaves overlaid members' items visible (only my own layer hides)", () => {
+    const mine = occ({ key: "a:1", eventId: "a", ownerId: OWNER });
+    const theirs = occ({ key: "b:1", eventId: "b", ownerId: OTHER });
+    expect(
+      filterVisible([mine, theirs], {
+        viewerId: OWNER,
+        overlayMemberIds: new Set([OTHER]),
+        hiddenCategoryIds: none,
+        selfHidden: true,
+      }),
+    ).toEqual([theirs]);
+  });
+
   it("returns empty for empty input", () => {
     expect(
-      filterVisible([], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none }),
+      filterVisible([], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none, selfHidden: false }),
     ).toEqual([]);
   });
 
@@ -170,7 +214,7 @@ describe("filterVisible", () => {
     const input = [a, b];
     const overlayMemberIds = new Set<string>([OTHER]);
     const hiddenCategoryIds = new Set<string>(["cat-x"]);
-    filterVisible(input, { viewerId: OWNER, overlayMemberIds, hiddenCategoryIds });
+    filterVisible(input, { viewerId: OWNER, overlayMemberIds, hiddenCategoryIds, selfHidden: false });
     expect(input).toEqual([a, b]);
     expect(overlayMemberIds).toEqual(new Set([OTHER]));
     expect(hiddenCategoryIds).toEqual(new Set(["cat-x"]));
@@ -195,7 +239,7 @@ describe("joint events (filed under a Shared context)", () => {
   it("filterVisible: keeps another member's joint event WITHOUT overlaying their calendar", () => {
     const o = occ({ ownerId: OTHER, isShared: true });
     expect(
-      filterVisible([o], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none }),
+      filterVisible([o], { viewerId: OWNER, overlayMemberIds: none, hiddenCategoryIds: none, selfHidden: false }),
     ).toEqual([o]);
   });
 
@@ -206,6 +250,7 @@ describe("joint events (filed under a Shared context)", () => {
         viewerId: OWNER,
         overlayMemberIds: none,
         hiddenCategoryIds: new Set(["cat-x"]),
+        selfHidden: false,
       }),
     ).toEqual([]);
   });

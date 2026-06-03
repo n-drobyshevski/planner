@@ -118,38 +118,12 @@ function SharedBadge() {
 }
 
 /**
- * A non-toggle calendar row (the signed-in member's own calendar, which is
- * always shown). The colour dot is a legend; the row still hosts the right-click
- * / ⋮ menu for rename + recolor.
- */
-const LegendRow = React.forwardRef<
-  HTMLDivElement,
-  { color: string; label: string; onMenu?: () => void } & React.HTMLAttributes<HTMLDivElement>
->(function LegendRow({ color, label, onMenu, className, ...rest }, ref) {
-  return (
-    <div
-      ref={ref}
-      className={cn("flex items-center rounded-md hover:bg-sidebar-accent", className)}
-      {...rest}
-    >
-      <span className="flex min-h-11 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm md:min-h-0">
-        <span
-          className="size-3.5 shrink-0 rounded-[4px]"
-          style={{ backgroundColor: toPaletteColor(color) }}
-        />
-        <span className="truncate">{label}</span>
-      </span>
-      {onMenu && <ItemMenuButton onMenu={onMenu} className="mr-1 size-9" />}
-    </div>
-  );
-});
-
-/**
  * Layer + category filter controls, shared by the desktop sidebar and the
  * mobile bottom sheet so the two presentations never drift apart.
  *
- * My own calendar is always shown; other members are overlaid onto it only when
- * toggled on. Each row carries a right-click (desktop) / long-press ⋮ (mobile)
+ * My own calendar is shown by default but can be toggled off (to review only
+ * the other member's / shared events); other members are overlaid onto it only
+ * when toggled on. Each row carries a right-click (desktop) / long-press ⋮ (mobile)
  * menu: the signed-in member's own row gets rename + recolor (RLS restricts
  * member edits to the self row); categories get rename, recolor,
  * show-only/show-all, and delete.
@@ -162,7 +136,9 @@ export function CalendarFiltersContent({
 }: FiltersProps) {
   const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
+  const ownCalendarHidden = useUiStore((s) => s.ownCalendarHidden);
   const toggleOverlay = useUiStore((s) => s.toggleOverlay);
+  const toggleOwnCalendar = useUiStore((s) => s.toggleOwnCalendar);
   const toggleCategory = useUiStore((s) => s.toggleCategory);
   const setHiddenCategoryIds = useUiStore((s) => s.setHiddenCategoryIds);
   const mutations = useSidebarMutations(workspaceId);
@@ -218,8 +194,13 @@ export function CalendarFiltersContent({
               },
             ]}
           >
-            {/* Own calendar is always shown ("my normal view"); the dot is just a colour legend. */}
-            <LegendRow color={ownMember.color} label={ownMember.name} />
+            {/* Toggle my own calendar off to review only the other member's / shared events. */}
+            <ToggleRow
+              color={ownMember.color}
+              label={ownMember.name}
+              active={!ownCalendarHidden}
+              onToggle={toggleOwnCalendar}
+            />
           </ItemContextMenu>
         )}
       </section>
