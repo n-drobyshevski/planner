@@ -5,6 +5,7 @@ export const qk = {
   workspace: ["workspace"] as const,
   members: (workspaceId: string) => ["members", workspaceId] as const,
   categories: (workspaceId: string) => ["categories", workspaceId] as const,
+  boards: (workspaceId: string) => ["boards", workspaceId] as const,
   /** Events + overrides for a visible window. */
   window: (workspaceId: string, start: number, end: number) =>
     ["events", workspaceId, start, end] as const,

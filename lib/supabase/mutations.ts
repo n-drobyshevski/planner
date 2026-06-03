@@ -477,6 +477,105 @@ export async function restoreCategory(
   }
 }
 
+// --- Boards ----------------------------------------------------------------
+
+/** A board still holds tasks, so it can't be deleted (block-if-non-empty). */
+export class BoardNotEmptyError extends Error {
+  constructor(public readonly taskCount: number) {
+    super(
+      taskCount === 1
+        ? "This board still has 1 task. Move or delete it first."
+        : `This board still has ${taskCount} tasks. Move or delete them first.`,
+    );
+    this.name = "BoardNotEmptyError";
+  }
+}
+
+export async function createBoard(
+  sb: SupabaseClient,
+  input: { workspaceId: string; ownerId: string | null; name: string; color: string; sortOrder?: number },
+): Promise<string> {
+  const { data, error } = await sb
+    .from("boards")
+    .insert({
+      workspace_id: input.workspaceId,
+      owner_id: input.ownerId,
+      name: input.name,
+      color: input.color,
+      sort_order: input.sortOrder ?? 0,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function updateBoard(
+  sb: SupabaseClient,
+  id: string,
+  patch: { name?: string; color?: string; sortOrder?: number },
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.name != null) row.name = patch.name;
+  if (patch.color != null) row.color = patch.color;
+  if (patch.sortOrder != null) row.sort_order = patch.sortOrder;
+  if (Object.keys(row).length === 0) return;
+  const { error } = await sb.from("boards").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Convert a board between Personal and Shared by setting its owner: `null` makes
+ * it Shared (both members see + edit it), a member id makes it Personal. Mirrors
+ * `setCategoryOwner`; `boards_write` only permits `owner_id` null or self, so a
+ * member can only re-own a board they can already edit.
+ */
+export async function setBoardOwner(
+  sb: SupabaseClient,
+  id: string,
+  ownerId: string | null,
+): Promise<void> {
+  const { error } = await sb.from("boards").update({ owner_id: ownerId }).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Delete a board, but only when it holds no tasks (block-if-non-empty). Throws
+ * `BoardNotEmptyError` otherwise. Returns the deleted row so the delete can be
+ * undone by `restoreBoard`.
+ */
+export async function deleteBoard(
+  sb: SupabaseClient,
+  id: string,
+): Promise<Record<string, unknown>> {
+  const { count, error: cntErr } = await sb
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("board_id", id);
+  if (cntErr) throw cntErr;
+  if (count && count > 0) throw new BoardNotEmptyError(count);
+
+  const { data: board, error: selErr } = await sb
+    .from("boards")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (selErr) throw selErr;
+
+  const { error } = await sb.from("boards").delete().eq("id", id);
+  if (error) throw error;
+  return board as Record<string, unknown>;
+}
+
+/** Re-insert a deleted board (undo). */
+export async function restoreBoard(
+  sb: SupabaseClient,
+  board: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await sb.from("boards").insert(board);
+  if (error) throw error;
+}
+
 // --- Member preferences ----------------------------------------------------
 
 export interface MemberPreferencesPatch {

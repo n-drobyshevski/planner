@@ -59,6 +59,8 @@ export interface TaskDialogProps {
   mode: "create" | "edit";
   workspaceId: string;
   currentMemberId: string;
+  /** Board the new task is filed under (create mode). */
+  boardId?: string | null;
   members: Member[];
   categories: Category[];
   task?: TaskRow | null;
@@ -126,6 +128,7 @@ export function TaskDialog(props: TaskDialogProps) {
       const input: TaskInput = {
         workspaceId,
         ownerId: currentMemberId,
+        boardId: props.boardId ?? null,
         position: Date.now(), // new tasks sort to the bottom of their column
         ...payload,
         completedAt: payload.status === "done" ? Date.now() : null,

@@ -13,6 +13,7 @@ function mk(p: Partial<TaskRow> & { id: string }): TaskRow {
     ownerId: "m1",
     assigneeId: null,
     parentId: null,
+    boardId: null,
     categoryId: null,
     title: p.id,
     description: null,

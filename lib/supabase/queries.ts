@@ -4,36 +4,48 @@ import type {
   OverrideRow,
   Member,
   Category,
+  Board,
   TaskRow,
   TimeWindow,
 } from "@/lib/types";
-import { mapEvent, mapOverride, mapMember, mapCategory, mapTask } from "./mappers";
+import {
+  mapEvent,
+  mapOverride,
+  mapMember,
+  mapCategory,
+  mapBoard,
+  mapTask,
+} from "./mappers";
 
 export interface WorkspaceBundle {
   workspaceId: string;
   workspaceName: string;
   members: Member[];
   categories: Category[];
+  boards: Board[];
 }
 
 /** Load the (single) workspace the signed-in member belongs to. RLS scopes it. */
 export async function fetchWorkspaceBundle(
   sb: SupabaseClient,
 ): Promise<WorkspaceBundle> {
-  const [wsRes, memRes, catRes] = await Promise.all([
+  const [wsRes, memRes, catRes, boardRes] = await Promise.all([
     sb.from("workspaces").select("*").limit(1).single(),
     sb.from("members").select("*").order("created_at"),
     sb.from("categories").select("*").order("sort_order"),
+    sb.from("boards").select("*").order("sort_order"),
   ]);
   if (wsRes.error) throw wsRes.error;
   if (memRes.error) throw memRes.error;
   if (catRes.error) throw catRes.error;
+  if (boardRes.error) throw boardRes.error;
 
   return {
     workspaceId: wsRes.data.id as string,
     workspaceName: wsRes.data.name as string,
     members: (memRes.data ?? []).map(mapMember),
     categories: (catRes.data ?? []).map(mapCategory),
+    boards: (boardRes.data ?? []).map(mapBoard),
   };
 }
 
