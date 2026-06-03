@@ -10,6 +10,7 @@ import type { EventInput } from "@/lib/supabase/mappers";
 import type { EventRow } from "@/lib/types";
 import type { OccurrencePatch } from "@/lib/recurrence/edit-semantics";
 import { useHistoryStore } from "@/stores/history-store";
+import { useNotify } from "@/lib/hooks/use-notify";
 
 /** One item of a batched move/resize: a master-row update or a single-occurrence modify. */
 export type RescheduleOp =
@@ -39,6 +40,7 @@ export function useEventMutations(workspaceId: string | undefined) {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
+  const notify = useNotify();
 
   const invalidate = () => {
     if (workspaceId) qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
@@ -69,7 +71,7 @@ export function useEventMutations(workspaceId: string | undefined) {
       invalidate();
       const spec = undo?.(result) ?? null;
       if (spec) pushUndo(spec);
-      toast.success(okMsg);
+      notify.success(okMsg);
       return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");

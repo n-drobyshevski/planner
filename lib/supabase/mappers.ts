@@ -40,6 +40,8 @@ export function mapMember(r: Row): Member {
     secondaryTimezone: (r.secondary_timezone as string | null) ?? null,
     showInactiveInMonth:
       r.show_inactive_in_month == null ? true : Boolean(r.show_inactive_in_month),
+    showSuccessToasts:
+      r.show_success_toasts == null ? true : Boolean(r.show_success_toasts),
     contextLabel: (r.context_label as ContextLabel | null) ?? "bar",
   };
 }

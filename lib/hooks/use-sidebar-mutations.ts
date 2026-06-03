@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import { useHistoryStore } from "@/stores/history-store";
+import { useNotify } from "@/lib/hooks/use-notify";
 
 const HOUR_MS = 3_600_000;
 
@@ -25,6 +26,7 @@ export function useSidebarMutations(workspaceId?: string) {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
+  const notify = useNotify();
 
   const invalidateWorkspace = () => qc.invalidateQueries({ queryKey: qk.workspace });
   const invalidateEvents = () => {
@@ -35,7 +37,7 @@ export function useSidebarMutations(workspaceId?: string) {
     try {
       await p;
       await invalidateWorkspace();
-      toast.success(okMsg);
+      notify.success(okMsg);
       return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");
@@ -82,7 +84,7 @@ export function useSidebarMutations(workspaceId?: string) {
                 return false;
               }),
         });
-        toast.success("Context deleted");
+        notify.success("Context deleted");
         return true;
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Something went wrong");
@@ -109,7 +111,7 @@ export function useSidebarMutations(workspaceId?: string) {
           timeZone: args.timeZone,
         });
         invalidateEvents();
-        toast.success("Added to calendar");
+        notify.success("Added to calendar");
         return true;
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Something went wrong");

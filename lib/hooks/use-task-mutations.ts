@@ -8,6 +8,7 @@ import * as m from "@/lib/supabase/mutations";
 import type { TaskInput } from "@/lib/supabase/mappers";
 import type { TaskRow } from "@/lib/types";
 import { useHistoryStore } from "@/stores/history-store";
+import { useNotify } from "@/lib/hooks/use-notify";
 
 /** A reversible action: a label for the toast + the inverse to run. */
 type UndoSpec = { label: string; undo: () => Promise<boolean> };
@@ -22,6 +23,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
+  const notify = useNotify();
 
   const invalidate = (alsoEvents = false) => {
     if (!workspaceId) return;
@@ -58,7 +60,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
       invalidate(opts?.alsoEvents);
       const spec = opts?.undo?.(result) ?? null;
       if (spec) pushUndo(spec);
-      toast.success(okMsg);
+      notify.success(okMsg);
       return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");

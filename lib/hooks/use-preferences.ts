@@ -83,6 +83,8 @@ export function usePreferences() {
   const secondaryTimeZone = member?.secondaryTimezone ?? null;
   // Month-view display: whether inactive (grayed-out) events are shown there.
   const showInactiveInMonth = member?.showInactiveInMonth ?? true;
+  // Toasts: whether success/confirmation toasts are shown (errors always are).
+  const showSuccessToasts = member?.showSuccessToasts ?? true;
   // Week/day display: how context time-blocks are labelled (top bar vs side).
   const contextLabel = member?.contextLabel ?? DEFAULT_CONTEXT_LABEL;
 
@@ -171,6 +173,15 @@ export function usePreferences() {
     [persist],
   );
 
+  // No DOM side-effect: `useNotify` re-reads the flag from the workspace cache
+  // that `persist` patches, so the next toast is gated immediately.
+  const setShowSuccessToasts = useCallback(
+    (next: boolean) => {
+      void persist({ showSuccessToasts: next });
+    },
+    [persist],
+  );
+
   // No DOM side-effect: the week/day grid re-reads the variant from the
   // workspace cache that `persist` patches.
   const setContextLabel = useCallback(
@@ -208,6 +219,8 @@ export function usePreferences() {
     secondaryTimeZone,
     /** Whether inactive events are shown in the month view. */
     showInactiveInMonth,
+    /** Whether success/confirmation toasts are shown (errors always are). */
+    showSuccessToasts,
     /** How context time-blocks are labelled in the week/day grid. */
     contextLabel,
     setThemePref,
@@ -217,6 +230,7 @@ export function usePreferences() {
     setTimezone,
     setSecondaryTimezone,
     setShowInactiveInMonth,
+    setShowSuccessToasts,
     setContextLabel,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,

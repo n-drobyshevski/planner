@@ -574,6 +574,58 @@
   filter: grayscale(0.75);
 }
 
+/* ---- Toasts (Sonner) ----
+   The Toaster sets --normal-* to the popover tokens; this styles `.cn-toast`
+   (set via toastOptions.classNames) and tints each type from the theme-aware
+   --swatch-* tokens so success/error/warning/info match the active palette
+   (default warm + the 4 Catppuccin flavors) in both light and dark — no
+   `richColors` (its built-in green/red clashed with the warm/Catppuccin look).
+   A soft tint over --popover keeps it reading as a colored card, like the
+   app's chips; the icon carries the type accent at full strength. */
+.cn-toast {
+  border-radius: var(--radius);
+  border: 1px solid var(--normal-border, var(--border));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 8px 24px -8px rgb(0 0 0 / 0.18);
+  font-size: 0.875rem;
+}
+.cn-toast[data-type="success"] {
+  --toast-accent: var(--swatch-green);
+}
+.cn-toast[data-type="error"] {
+  --toast-accent: var(--swatch-red);
+}
+.cn-toast[data-type="warning"] {
+  --toast-accent: var(--swatch-yellow);
+}
+.cn-toast[data-type="info"] {
+  --toast-accent: var(--swatch-sky);
+}
+.cn-toast[data-type="success"],
+.cn-toast[data-type="error"],
+.cn-toast[data-type="warning"],
+.cn-toast[data-type="info"] {
+  background: color-mix(in oklab, var(--toast-accent) 12%, var(--popover));
+  border-color: color-mix(in oklab, var(--toast-accent) 40%, var(--border));
+  color: var(--popover-foreground);
+}
+.cn-toast[data-type] [data-icon] {
+  color: var(--toast-accent);
+}
+/* Dark default doesn't re-tint the swatches, so lift the icon for contrast. */
+.dark .cn-toast[data-type] [data-icon] {
+  color: color-mix(in oklab, var(--toast-accent) 65%, white);
+}
+.cn-toast [data-close-button] {
+  color: var(--popover-foreground);
+  opacity: 0.6;
+  border-radius: var(--radius-sm);
+}
+.cn-toast [data-close-button]:hover {
+  opacity: 1;
+}
+
 /* ---- iOS zoom guard: Safari auto-zooms when a focused field is < 16px ---- */
 @media (max-width: 767px) {
   input,
