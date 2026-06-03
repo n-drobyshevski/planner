@@ -54,7 +54,7 @@ export const EventBlock = forwardRef<
         "absolute z-[var(--evt-z,10)] flex touch-none flex-col overflow-hidden rounded-md border-[1.5px] px-1.5 py-1 text-left text-xs shadow-soft select-none hover:z-30",
         editable ? "cursor-grab" : "cursor-pointer",
         selected && "z-30 ring-2 ring-foreground",
-        occ.inactive && "opacity-55 grayscale",
+        occ.inactive && "evt-inactive",
         eventStatusClass(occ.status),
         className,
       )}
