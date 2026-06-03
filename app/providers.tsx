@@ -32,7 +32,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <TooltipProvider delayDuration={200}>
           {children}
           <UndoHotkey />
-          <Toaster richColors closeButton position="bottom-right" />
+          <Toaster closeButton position="bottom-right" />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

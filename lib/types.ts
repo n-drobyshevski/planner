@@ -69,6 +69,9 @@ export interface Member {
   // When false, inactive (grayed-out) events are hidden in the cramped month
   // view; they always show in the denser week/day grids. Defaults to true.
   showInactiveInMonth: boolean;
+  // When false, success/confirmation toasts are suppressed; error and warning
+  // toasts always show. Defaults to true.
+  showSuccessToasts: boolean;
   // How context time-blocks are labelled in the week/day grid. Defaults to "bar".
   contextLabel: ContextLabel;
 }

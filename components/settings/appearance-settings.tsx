@@ -47,12 +47,14 @@ export function AppearanceSettings() {
     tone,
     palette,
     showInactiveInMonth,
+    showSuccessToasts,
     contextLabel,
     setThemePref,
     setAccent,
     setTone,
     setPalette,
     setShowInactiveInMonth,
+    setShowSuccessToasts,
     setContextLabel,
     isReady,
   } = usePreferences();
@@ -295,6 +297,25 @@ export function AppearanceSettings() {
               ))}
             </ToggleGroup>
           </FieldSet>
+
+          {/* Success toasts (confirmation pop-ups) */}
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldLabel htmlFor="show-success-toasts">
+                Show success notifications
+              </FieldLabel>
+              <FieldDescription>
+                Brief confirmations after an action (like “Task created”). Turn
+                off to mute them — errors and warnings always show.
+              </FieldDescription>
+            </FieldContent>
+            <Switch
+              id="show-success-toasts"
+              checked={showSuccessToasts}
+              onCheckedChange={setShowSuccessToasts}
+              disabled={disabled}
+            />
+          </Field>
         </CardContent>
       </Card>
 

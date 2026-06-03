@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { toast } from "sonner";
 import { useHistoryStore } from "@/stores/history-store";
+import { useNotify } from "@/lib/hooks/use-notify";
 
 /**
  * Global Ctrl+Z / Cmd+Z listener. Mounted once (in providers) so undo works on
@@ -15,6 +15,7 @@ import { useHistoryStore } from "@/stores/history-store";
  */
 export function UndoHotkey() {
   const runUndo = useHistoryStore((s) => s.runUndo);
+  const { success: notifySuccess } = useNotify();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -38,12 +39,12 @@ export function UndoHotkey() {
 
       e.preventDefault();
       void runUndo().then((label) => {
-        if (label) toast.success(`Undone: ${label}`);
+        if (label) notifySuccess(`Undone: ${label}`);
       });
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [runUndo]);
+  }, [runUndo, notifySuccess]);
 
   return null;
 }

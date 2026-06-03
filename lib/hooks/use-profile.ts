@@ -8,6 +8,7 @@ import { updateMember, updateMemberPin } from "@/lib/supabase/mutations";
 import { useWorkspace, type WorkspaceData } from "@/lib/hooks/use-workspace";
 import { qk } from "@/lib/supabase/query-keys";
 import { sha256Hex } from "@/lib/auth/pin";
+import { useNotify } from "@/lib/hooks/use-notify";
 import type { Member } from "@/lib/types";
 
 /** Patch the cached workspace bundle so the current member updates everywhere at once. */
@@ -36,6 +37,7 @@ export function useProfile() {
   const workspace = useWorkspace();
   const member = workspace.data?.currentMember ?? null;
   const qc = useQueryClient();
+  const { success: notifySuccess } = useNotify();
 
   const optimistic = useCallback(
     async (patch: Partial<Member>, run: () => Promise<void>, okMsg: string) => {
@@ -46,7 +48,7 @@ export function useProfile() {
       );
       try {
         await run();
-        toast.success(okMsg);
+        notifySuccess(okMsg);
         return true;
       } catch (e) {
         if (prev) qc.setQueryData(qk.workspace, prev); // roll back
@@ -54,7 +56,7 @@ export function useProfile() {
         return false;
       }
     },
-    [member, qc],
+    [member, qc, notifySuccess],
   );
 
   const saveName = useCallback(
