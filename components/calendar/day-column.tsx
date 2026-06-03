@@ -93,10 +93,13 @@ export function DayColumn({
         occ: o,
         start: Math.max(o.start, dayStart),
         end: Math.min(o.end, dayEnd),
+        // Owner side drives the overlap lane: mine (editable) anchors left,
+        // the other person's (read-only) anchors right. See packDay.
+        mine: canEdit(o),
       }));
     const nested = segs.map((s) => enclosingContext(ctxOccs, s.occ.start) !== null);
     return { segments: segs, packed: packDay(segs), nestedFlags: nested };
-  }, [occurrences, dayStart, dayEnd, contextSegs]);
+  }, [occurrences, dayStart, dayEnd, contextSegs, canEdit]);
 
   // Recolor routes to the whole selection when the item is part of a multi-pick,
   // otherwise just the one item.
