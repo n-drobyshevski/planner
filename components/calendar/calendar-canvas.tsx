@@ -62,6 +62,8 @@ export interface CanvasProps {
   showInactiveInMonth?: boolean;
   /** Time-grid: how context blocks are labelled (top bar vs vertical side label). */
   contextLabel?: ContextLabel;
+  /** Time-grid: partner's calendar overlaid — splits contexts 4/5 by owner. */
+  twoCalendars?: boolean;
   loading: boolean;
   error: boolean;
 }
@@ -95,6 +97,7 @@ export function CalendarCanvas(props: CanvasProps) {
     onScheduleTask,
     showInactiveInMonth = true,
     contextLabel = "bar",
+    twoCalendars = false,
     error,
   } = props;
   const timeZone = useViewerTimeZone();
@@ -192,6 +195,7 @@ export function CalendarCanvas(props: CanvasProps) {
       onToggleTaskDone={onToggleTaskDone}
       onScheduleTask={onScheduleTask}
       labelStyle={contextLabel}
+      twoCalendars={twoCalendars}
     />
   );
 }

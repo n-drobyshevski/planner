@@ -93,6 +93,8 @@ interface Props {
   onScheduleTask?: (taskId: string, startMs: number, endMs: number) => void;
   /** How context backdrops are labelled (top bar vs vertical side label). */
   labelStyle?: ContextLabel;
+  /** True when the partner's calendar is overlaid (drives the 4/5 context split). */
+  twoCalendars?: boolean;
 }
 
 const SCHED_MIN = 60; // default minutes for a task dropped onto the grid
@@ -170,6 +172,7 @@ export function TimeGrid({
   onToggleTaskDone,
   onScheduleTask,
   labelStyle = "bar",
+  twoCalendars,
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -821,6 +824,7 @@ export function TimeGrid({
                 isToday={d === today}
                 singleColumn={days.length === 1}
                 labelStyle={labelStyle}
+                twoCalendars={twoCalendars}
                 occurrences={occurrences}
                 colorOf={colorOf}
                 selectedKeys={selectedKeys}

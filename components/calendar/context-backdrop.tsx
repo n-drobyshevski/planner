@@ -90,14 +90,16 @@ export const ContextBackdrop = forwardRef<
       )}
 
       {labelStyle === "side" ? (
-        /* Side label: a vertical strip down the right edge. The name (and time,
+        /* Side label: a vertical strip down one edge. It sits on the LEFT for my
+           (editable) contexts and the RIGHT for the partner's read-only ones, so
+           the two calendars' labels separate when overlaid. The name (and time,
            when the block is tall enough) is rotated 180° on top of a vertical
            writing mode so the glyph-tops face left and it reads bottom-to-top;
            the strip is the move / menu handle. */
         <div
           className={cn(
-            "pointer-events-auto absolute inset-y-0 right-0 z-10 flex w-5 items-start justify-center overflow-hidden select-none",
-            editable ? "cursor-grab" : "cursor-pointer",
+            "pointer-events-auto absolute inset-y-0 z-10 flex w-5 items-start justify-center overflow-hidden select-none",
+            editable ? "left-0 cursor-grab" : "right-0 cursor-pointer",
           )}
           style={{ backgroundColor: toPaletteColor(color), color: toPaletteInk(color) }}
         >

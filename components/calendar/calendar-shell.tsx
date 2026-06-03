@@ -213,6 +213,8 @@ export function CalendarShell({
   const showInactiveInMonth = workspace.data?.currentMember?.showInactiveInMonth ?? true;
   // Week/day display: how context blocks are labelled (top bar vs side label).
   const contextLabel = workspace.data?.currentMember?.contextLabel ?? "bar";
+  // Partner's calendar overlaid: contexts split 4/5 by owner in the time grid.
+  const twoCalendars = overlayMemberIds.size > 0;
   // My own items are editable, plus any JOINT item (filed under a Shared
   // context — both members co-edit); overlaid members' personal items are
   // read-only. Mirrors the widened events_write RLS.
@@ -769,6 +771,7 @@ export function CalendarShell({
                   taskDoneById={taskDoneById}
                   showInactiveInMonth={showInactiveInMonth}
                   contextLabel={contextLabel}
+                  twoCalendars={twoCalendars}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || prevWin.isLoading}
                   error={workspace.isError || prevWin.isError}
@@ -785,6 +788,7 @@ export function CalendarShell({
                   taskDoneById={taskDoneById}
                   showInactiveInMonth={showInactiveInMonth}
                   contextLabel={contextLabel}
+                  twoCalendars={twoCalendars}
                   {...DISPLAY_ONLY}
                   loading={workspace.isLoading || nextWin.isLoading}
                   error={workspace.isError || nextWin.isError}
@@ -822,6 +826,7 @@ export function CalendarShell({
                 onScheduleTask={onScheduleTask}
                 showInactiveInMonth={showInactiveInMonth}
                 contextLabel={contextLabel}
+                twoCalendars={twoCalendars}
                 loading={workspace.isLoading || eventsLoading}
                 error={workspace.isError || eventsError}
               />
