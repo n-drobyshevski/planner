@@ -56,7 +56,7 @@ export const ContextBackdrop = forwardRef<
       className={cn(
         "pointer-events-none absolute z-0 overflow-hidden rounded-lg",
         selected && "ring-2 ring-foreground ring-offset-1",
-        occ.inactive && "opacity-55 grayscale",
+        occ.inactive && "evt-inactive",
         eventStatusClass(occ.status),
         className,
       )}

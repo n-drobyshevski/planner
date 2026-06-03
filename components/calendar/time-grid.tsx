@@ -751,7 +751,7 @@ export function TimeGrid({
                       className={cn(
                         "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium",
                         selectedKeys.has(o.key) && "ring-2 ring-foreground",
-                        o.inactive && "opacity-55 grayscale",
+                        o.inactive && "evt-inactive",
                         eventStatusClass(o.status),
                         o.status === "cancelled" && "line-through",
                       )}

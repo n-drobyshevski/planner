@@ -567,6 +567,12 @@
   outline: 2px dotted var(--foreground);
   outline-offset: -3px;
 }
+@utility evt-inactive {
+  /* De-emphasize without transparency: keep the assigned color but pull it
+     most of the way toward gray so it reads as muted/dimmed (e.g. sleep
+     hours). Stays fully opaque so nothing bleeds through from behind. */
+  filter: grayscale(0.75);
+}
 
 /* ---- iOS zoom guard: Safari auto-zooms when a focused field is < 16px ---- */
 @media (max-width: 767px) {
