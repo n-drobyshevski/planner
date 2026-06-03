@@ -23,7 +23,13 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Lock, Eye, Trash2, Loader2, Users } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
+import { Lock, Eye, Trash2, Loader2, Users, ChevronDown } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
@@ -108,6 +114,7 @@ export function EventDialog(props: EventDialogProps) {
   const timeZone = useViewerTimeZone();
 
   const [form, setForm] = useState<FormState>(() => buildInitial(props, timeZone));
+  const [showMore, setShowMore] = useState(() => hasAdvanced(form));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [scopePrompt, setScopePrompt] = useState<null | "edit" | "delete">(null);
@@ -115,7 +122,9 @@ export function EventDialog(props: EventDialogProps) {
   // Re-initialize when (re)opened for a different event/slot.
   useEffect(() => {
     if (open) {
-      setForm(buildInitial(props, timeZone));
+      const next = buildInitial(props, timeZone);
+      setForm(next);
+      setShowMore(hasAdvanced(next));
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,15 +337,31 @@ export function EventDialog(props: EventDialogProps) {
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>
-              {mode === "create"
-                ? isContext
-                  ? "New context"
-                  : "New event"
-                : isContext
-                  ? "Edit context"
-                  : "Edit event"}
-            </ResponsiveDialogTitle>
+            <div className="flex items-center justify-between gap-3">
+              <ResponsiveDialogTitle>
+                {mode === "create"
+                  ? isContext
+                    ? "New context"
+                    : "New event"
+                  : isContext
+                    ? "Edit context"
+                    : "Edit event"}
+              </ResponsiveDialogTitle>
+              {mode === "create" && !readOnly && (
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={form.itemKind}
+                  onValueChange={(v) => v && set("itemKind", v as EventKind)}
+                  aria-label="Item type"
+                  className="shrink-0"
+                >
+                  <ToggleGroupItem value="event">Event</ToggleGroupItem>
+                  <ToggleGroupItem value="context">Context</ToggleGroupItem>
+                </ToggleGroup>
+              )}
+            </div>
           </ResponsiveDialogHeader>
 
           <ResponsiveDialogBody>
@@ -349,141 +374,108 @@ export function EventDialog(props: EventDialogProps) {
             </div>
           )}
           <fieldset disabled={readOnly} className="contents">
-          <FieldGroup>
-            {mode === "create" && (
-              <Field>
-                <FieldLabel>Type</FieldLabel>
-                <ToggleGroup
-                  type="single"
-                  variant="outline"
-                  value={form.itemKind}
-                  onValueChange={(v) => v && set("itemKind", v as EventKind)}
-                  className="justify-start"
-                >
-                  <ToggleGroupItem value="event">Event</ToggleGroupItem>
-                  <ToggleGroupItem value="context">Context</ToggleGroupItem>
-                </ToggleGroup>
-              </Field>
-            )}
+          <FieldGroup className="gap-4">
+            {/* Title — prominent, borderless */}
+            <Input
+              id="ev-title"
+              value={form.title}
+              onChange={(e) => set("title", e.target.value)}
+              placeholder={isContext ? "Name this context" : "Add title"}
+              aria-label={isContext ? "Context name" : "Event title"}
+              autoFocus
+              className="h-auto border-0 bg-transparent px-0 py-1 text-lg font-medium md:text-lg shadow-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-transparent"
+            />
 
-            <Field>
-              <FieldLabel htmlFor="ev-title">
-                {isContext ? "Name" : "Title"}
-              </FieldLabel>
-              <Input
-                id="ev-title"
-                value={form.title}
-                onChange={(e) => set("title", e.target.value)}
-                placeholder={isContext ? "Name this context (e.g. Work)" : "Add a title"}
-                autoFocus
-              />
-            </Field>
+            {/* When — schedule card grouping all-day + start/end */}
+            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">When</span>
+                {!isContext && (
+                  <label
+                    htmlFor="ev-allday"
+                    className="flex cursor-pointer items-center gap-2 text-sm"
+                  >
+                    <span>All day</span>
+                    <Switch
+                      id="ev-allday"
+                      checked={form.allDay}
+                      onCheckedChange={(v) => set("allDay", v)}
+                    />
+                  </label>
+                )}
+              </div>
 
-            {!isContext && (
-              <Field orientation="horizontal">
-                <Switch
-                  id="ev-allday"
-                  checked={form.allDay}
-                  onCheckedChange={(v) => set("allDay", v)}
-                />
-                <FieldLabel htmlFor="ev-allday">All day</FieldLabel>
-              </Field>
-            )}
-
-            <Field orientation="horizontal">
-              <Switch
-                id="ev-inactive"
-                checked={form.inactive}
-                onCheckedChange={(v) => set("inactive", v)}
-              />
-              <FieldLabel htmlFor="ev-inactive">Inactive (grayed out)</FieldLabel>
-            </Field>
-
-            <Field>
-              <FieldLabel>Status</FieldLabel>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={form.status}
-                onValueChange={(v) => v && set("status", v as EventStatus)}
-                className="justify-start"
-              >
-                <ToggleGroupItem value="planned">Planned</ToggleGroupItem>
-                <ToggleGroupItem value="confirmed">Confirmed</ToggleGroupItem>
-                <ToggleGroupItem value="cancelled">Cancelled</ToggleGroupItem>
-              </ToggleGroup>
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Starts</FieldLabel>
+              <div className="grid grid-cols-[3rem_1fr_auto] items-center gap-2">
+                <span className="text-sm text-muted-foreground">Start</span>
                 <DatePicker
                   value={form.startDate}
                   onChange={(v) => set("startDate", v)}
                   aria-label="Start date"
                 />
-              </Field>
-              {!form.allDay && (
-                <Field>
-                  <FieldLabel>&nbsp;</FieldLabel>
+                {!form.allDay ? (
                   <TimeField
                     value={form.startTime}
                     onChange={(v) => set("startTime", v)}
                     aria-label="Start time"
+                    className="w-20"
                   />
-                </Field>
-              )}
-            </div>
+                ) : (
+                  <span className="w-20" aria-hidden />
+                )}
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Ends</FieldLabel>
+              <div className="grid grid-cols-[3rem_1fr_auto] items-center gap-2">
+                <span className="text-sm text-muted-foreground">End</span>
                 <DatePicker
                   value={form.endDate}
                   onChange={(v) => set("endDate", v)}
                   aria-label="End date"
                 />
-              </Field>
-              {!form.allDay && (
-                <Field>
-                  <FieldLabel>&nbsp;</FieldLabel>
+                {!form.allDay ? (
                   <TimeField
                     value={form.endTime}
                     onChange={(v) => set("endTime", v)}
                     aria-label="End time"
+                    className="w-20"
                   />
-                </Field>
-              )}
+                ) : (
+                  <span className="w-20" aria-hidden />
+                )}
+              </div>
             </div>
 
-            <Field>
-              <FieldLabel>Context</FieldLabel>
-              <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="No context" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="none">No context</SelectItem>
-                    {usableCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
+            {/* Context + Color — paired row */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor="ev-context">Context</FieldLabel>
+                <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
+                  <SelectTrigger id="ev-context">
+                    <SelectValue placeholder="No context" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="none">No context</SelectItem>
+                      {usableCategories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <Field>
-              <FieldLabel htmlFor="ev-color">Color</FieldLabel>
-              <ColorField
-                id="ev-color"
-                value={form.color}
-                onChange={(c) => set("color", c)}
-              />
-            </Field>
+              <Field>
+                <FieldLabel htmlFor="ev-color">Color</FieldLabel>
+                <ColorField
+                  id="ev-color"
+                  value={form.color}
+                  onChange={(c) => set("color", c)}
+                />
+              </Field>
+            </div>
 
+            {/* Sharing — or shared-context banner */}
             {sharedContext ? (
               <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                 <Users className="size-4 shrink-0" />
@@ -522,29 +514,77 @@ export function EventDialog(props: EventDialogProps) {
               </Field>
             )}
 
-            <Field>
-              <FieldLabel>Location</FieldLabel>
-              <Input
-                value={form.location}
-                onChange={(e) => set("location", e.target.value)}
-                placeholder="Add a location"
-              />
-            </Field>
+            <Separator />
 
-            <Field>
-              <FieldLabel>Notes</FieldLabel>
-              <Textarea
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-                rows={2}
-              />
-            </Field>
+            {/* More options — progressive disclosure for the secondary fields */}
+            <Collapsible open={readOnly ? true : showMore} onOpenChange={setShowMore}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                >
+                  More options
+                  <ChevronDown
+                    className={`size-4 transition-transform ${
+                      readOnly || showMore ? "rotate-180" : ""
+                    }`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="flex flex-col gap-4 pt-4">
+                <Field>
+                  <FieldLabel>Status</FieldLabel>
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={form.status}
+                    onValueChange={(v) => v && set("status", v as EventStatus)}
+                    className="justify-start"
+                  >
+                    <ToggleGroupItem value="planned">Planned</ToggleGroupItem>
+                    <ToggleGroupItem value="confirmed">Confirmed</ToggleGroupItem>
+                    <ToggleGroupItem value="cancelled">Cancelled</ToggleGroupItem>
+                  </ToggleGroup>
+                </Field>
 
-            <RecurrenceEditor
-              value={form.recurrence}
-              onChange={(v) => set("recurrence", v)}
-              startMs={computeTimes().start}
-            />
+                <Field>
+                  <FieldLabel htmlFor="ev-location">Location</FieldLabel>
+                  <Input
+                    id="ev-location"
+                    value={form.location}
+                    onChange={(e) => set("location", e.target.value)}
+                    placeholder="Add a location"
+                  />
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="ev-notes">Notes</FieldLabel>
+                  <Textarea
+                    id="ev-notes"
+                    value={form.description}
+                    onChange={(e) => set("description", e.target.value)}
+                    rows={2}
+                  />
+                </Field>
+
+                <RecurrenceEditor
+                  value={form.recurrence}
+                  onChange={(v) => set("recurrence", v)}
+                  startMs={computeTimes().start}
+                />
+
+                <Field orientation="horizontal">
+                  <Switch
+                    id="ev-inactive"
+                    checked={form.inactive}
+                    onCheckedChange={(v) => set("inactive", v)}
+                  />
+                  <FieldLabel htmlFor="ev-inactive">Inactive (grayed out)</FieldLabel>
+                </Field>
+              </CollapsibleContent>
+            </Collapsible>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </FieldGroup>
@@ -588,6 +628,21 @@ export function EventDialog(props: EventDialogProps) {
         onChoose={(s) => (scopePrompt === "delete" ? onDeleteScope(s) : onEditScope(s))}
       />
     </>
+  );
+}
+
+/**
+ * Whether any of the fields tucked behind "More options" carries a non-default
+ * value — used to auto-expand that section when editing an event that already
+ * uses them (so nothing is hidden), while keeping it collapsed for quick adds.
+ */
+function hasAdvanced(form: FormState): boolean {
+  return (
+    form.status !== "confirmed" ||
+    form.inactive ||
+    form.location.trim() !== "" ||
+    form.description.trim() !== "" ||
+    form.recurrence !== null
   );
 }
 
