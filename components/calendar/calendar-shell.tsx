@@ -697,6 +697,19 @@ export function CalendarShell({
       toggleMaskTitles();
       return;
     }
+    // Ctrl+Alt+Left / Right toggle the left sidebar / right task-backlog panel.
+    if (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey) {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setSidebarOpen(!sidebarOpen);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setBacklogOpen(!backlogOpen);
+        return;
+      }
+    }
     const inTimeGrid = view === "day" || view === "week" || view === "3day";
     if (!inTimeGrid || selectedKeys.size === 0) return;
     if (e.key === "Delete" || e.key === "Backspace") {
