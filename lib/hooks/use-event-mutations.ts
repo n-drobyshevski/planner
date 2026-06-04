@@ -40,6 +40,7 @@ export function useEventMutations(workspaceId: string | undefined) {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
+  const undoById = useHistoryStore((s) => s.undoById);
   const notify = useNotify();
 
   const invalidate = () => {
@@ -65,13 +66,31 @@ export function useEventMutations(workspaceId: string | undefined) {
     p: Promise<T>,
     okMsg: string,
     undo?: (result: T) => UndoSpec | null,
+    opts?: { description?: string; offerUndo?: boolean },
   ): Promise<boolean> {
     try {
       const result = await p;
       invalidate();
       const spec = undo?.(result) ?? null;
-      if (spec) pushUndo(spec);
-      notify.success(okMsg);
+      const undoId = spec ? pushUndo(spec) : null;
+      const showUndo = undoId != null && opts?.offerUndo;
+      // Surface the (already-working) Ctrl+Z undo as a visible button on
+      // destructive toasts, reversing exactly THIS action, and hold the toast
+      // a little longer so there's time to reach for it. Goes through notify so
+      // it respects the member's showSuccessToasts pref; Ctrl+Z works regardless.
+      notify.success(okMsg, {
+        description: opts?.description,
+        duration: showUndo ? 8000 : undefined,
+        action: showUndo
+          ? {
+              label: "Undo",
+              onClick: () =>
+                void undoById(undoId).then(
+                  (label) => label && notify.success(`Undone: ${label}`),
+                ),
+            }
+          : undefined,
+      });
       return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");
@@ -136,9 +155,12 @@ export function useEventMutations(workspaceId: string | undefined) {
               );
         },
       ),
-    remove: (id: string) =>
-      run(m.deleteEventDeep(sb, id), "Event deleted", (snap) =>
-        inverse("delete", () => m.restoreDeleted(sb, snap)),
+    remove: (id: string, opts?: { description?: string }) =>
+      run(
+        m.deleteEventDeep(sb, id),
+        "Event deleted",
+        (snap) => inverse("delete", () => m.restoreDeleted(sb, snap)),
+        { description: opts?.description, offerUndo: true },
       ),
     /** Delete several items — whole rows and/or single-occurrence cancels. */
     removeMany: (ops: DeleteOp[]) =>
@@ -167,23 +189,7 @@ export function useEventMutations(workspaceId: string | undefined) {
           };
           return inverse("delete", () => m.restoreDeleted(sb, merged));
         },
-      ),
-
-    /** Assign an event to a Context (category), or clear it (categoryId = null). */
-    assignCategory: (
-      eventId: string,
-      categoryId: string | null,
-      prevCategoryId?: string | null,
-    ) =>
-      run(
-        m.updateEvent(sb, eventId, { categoryId }),
-        categoryId ? "Assigned to context" : "Removed from context",
-        (row) =>
-          prevCategoryId !== undefined
-            ? inverse("context change", () =>
-                m.updateEvent(sb, eventId, { categoryId: prevCategoryId }, row.updatedAt),
-              )
-            : null,
+        { offerUndo: true },
       ),
 
     editThis: (event: EventRow, occurrenceMs: number, patch: OccurrencePatch) =>
@@ -221,8 +227,11 @@ export function useEventMutations(workspaceId: string | undefined) {
     deleteFuture: (event: EventRow, occurrenceMs: number) =>
       run(m.deleteThisAndFuture(sb, event, occurrenceMs), "This and future deleted"),
     deleteAll: (id: string) =>
-      run(m.deleteEventDeep(sb, id), "Series deleted", (snap) =>
-        inverse("delete series", () => m.restoreDeleted(sb, snap)),
+      run(
+        m.deleteEventDeep(sb, id),
+        "Series deleted",
+        (snap) => inverse("delete series", () => m.restoreDeleted(sb, snap)),
+        { offerUndo: true },
       ),
   };
 }

@@ -25,9 +25,14 @@ interface HistoryState {
   stack: UndoEntry[];
   /** Re-entrancy guard (Ctrl+Z held / double-fire). */
   undoing: boolean;
-  push: (entry: Omit<UndoEntry, "id" | "at">) => void;
+  /** Push an inverse; returns the new entry's id so a caller (e.g. a toast
+   *  "Undo" button) can later reverse exactly this action via `undoById`. */
+  push: (entry: Omit<UndoEntry, "id" | "at">) => string;
   /** Pop + run the newest live entry. Returns its label on success, else null. */
   runUndo: () => Promise<string | null>;
+  /** Run + remove one specific entry by id (the toast "Undo" affordance), so it
+   *  targets that action rather than whatever is newest. No-op if already gone. */
+  undoById: (id: string) => Promise<string | null>;
   clear: () => void;
 }
 
@@ -40,15 +45,15 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   stack: [],
   undoing: false,
 
-  push: (entry) =>
+  push: (entry) => {
+    const id = crypto.randomUUID();
     set((s) => {
-      const next = [
-        ...s.stack,
-        { ...entry, id: crypto.randomUUID(), at: Date.now() },
-      ];
+      const next = [...s.stack, { ...entry, id, at: Date.now() }];
       // Trim to the newest MAX entries.
       return { stack: next.length > MAX ? next.slice(next.length - MAX) : next };
-    }),
+    });
+    return id;
+  },
 
   runUndo: async () => {
     if (get().undoing) return null;
@@ -67,6 +72,21 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       return { stack, undoing: entry != null };
     });
     if (!entry) return null;
+    try {
+      const ok = await entry.undo();
+      return ok ? entry.label : null;
+    } catch {
+      return null;
+    } finally {
+      set({ undoing: false });
+    }
+  },
+
+  undoById: async (id) => {
+    if (get().undoing) return null;
+    const entry = get().stack.find((e) => e.id === id);
+    if (!entry) return null; // already undone, or trimmed away
+    set((s) => ({ stack: s.stack.filter((e) => e.id !== id), undoing: true }));
     try {
       const ok = await entry.undo();
       return ok ? entry.label : null;

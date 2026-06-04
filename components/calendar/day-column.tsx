@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, type CSSProperties } from "react";
-import { FolderPlus, FolderMinus, Pencil, Trash2, Eye } from "lucide-react";
+import { Pencil, Trash2, Eye } from "lucide-react";
 import { packDay } from "@/lib/layout/pack-day";
+import { clashRanges } from "@/lib/layout/clash-seams";
 import { enclosingContext } from "@/lib/calendar/contexts";
-import { msToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
+import { msToY, minutesToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
 import { EventBlock } from "./event-block";
 import { ContextBackdrop } from "./context-backdrop";
 import { NowLine } from "./now-line";
@@ -33,8 +34,6 @@ export function DayColumn({
   onChangeColor,
   onColorSelected,
   onDeleteEvent,
-  onAssignCategory,
-  categoryChoices,
   eventShareAction,
   eventCopyAction,
   canEdit,
@@ -61,9 +60,6 @@ export function DayColumn({
   /** Recolor the whole multi-selection (used when the item is part of it). */
   onColorSelected: (color: string | null) => void;
   onDeleteEvent: (o: Occurrence) => void;
-  onAssignCategory?: (o: Occurrence, categoryId: string | null) => void;
-  /** Contexts the viewer may assign, for the right-click menu. */
-  categoryChoices?: { id: string; name: string }[];
   /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
   eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Builds the "Copy to my calendar" menu action for another member's event (null = N/A). */
@@ -109,36 +105,16 @@ export function DayColumn({
     return { segments: segs, packed: packDay(segs), nestedFlags: nested };
   }, [occurrences, dayStart, dayEnd, contextSegs, canEdit]);
 
+  // Direct time-overlaps within the day → a whisper hairline "seam" on the front
+  // (right-staggered) block of each clashing pair, so a double-booking reads as
+  // a clash instead of two innocent neighbours. Derived from the same packing.
+  const clashes = useMemo(() => clashRanges(segments, packed), [segments, packed]);
+
   // Recolor routes to the whole selection when the item is part of a multi-pick,
   // otherwise just the one item.
   function colorChange(occ: Occurrence, color: string | null) {
     if (selectedKeys.has(occ.key) && selectedKeys.size > 1) onColorSelected(color);
     else onChangeColor(occ, color);
-  }
-
-  function contextActions(occ: Occurrence): ItemAction[] {
-    // A context block paints its own category; its membership isn't reassignable.
-    if (!onAssignCategory || occ.kind === "context") return [];
-    const actions: ItemAction[] = [];
-    const targets = (categoryChoices ?? []).filter((c) => c.id !== occ.categoryId);
-    if (targets.length > 0) {
-      actions.push({
-        label: "Assign to context",
-        icon: FolderPlus,
-        submenu: targets.map((c) => ({
-          label: c.name || "Untitled",
-          onSelect: () => onAssignCategory(occ, c.id),
-        })),
-      });
-    }
-    if (occ.categoryId) {
-      actions.push({
-        label: "Clear context",
-        icon: FolderMinus,
-        onSelect: () => onAssignCategory(occ, null),
-      });
-    }
-    return actions;
   }
 
   return (
@@ -219,6 +195,14 @@ export function DayColumn({
           ? `calc(${p.widthPct}% - ${gutterL + gutterR}px)`
           : `calc(${p.widthPct}% - 3px)`;
         const editable = canEdit(seg.occ);
+        // Pixel range (relative to this block's top) for the clash seam, if any.
+        const cr = clashes[i];
+        const clash = cr
+          ? {
+              topPx: minutesToY((cr.start - seg.start) / 60000, hourPx),
+              heightPx: minutesToY((cr.end - cr.start) / 60000, hourPx),
+            }
+          : null;
         return (
           <ItemContextMenu
             key={seg.occ.key}
@@ -229,7 +213,6 @@ export function DayColumn({
               editable
                 ? [
                     { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
-                    ...contextActions(seg.occ),
                     ...(eventShareAction && eventShareAction(seg.occ)
                       ? [eventShareAction(seg.occ)!]
                       : []),
@@ -253,12 +236,14 @@ export function DayColumn({
               color={colorOf(seg.occ)}
               selected={selectedKeys.has(seg.occ.key)}
               editable={editable}
+              onActivate={() => onSelect(seg.occ)}
               taskDone={taskId ? taskDoneById?.get(taskId) ?? false : undefined}
               onToggleTaskDone={
                 taskId && onToggleTaskDone
                   ? () => onToggleTaskDone(taskId)
                   : undefined
               }
+              clash={clash}
               style={
                 {
                   top: msToY(seg.start, dayStart, hourPx),

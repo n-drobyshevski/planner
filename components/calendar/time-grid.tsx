@@ -9,7 +9,7 @@ import {
   useViewerTimeZone,
   useSecondaryTimeZone,
 } from "@/lib/datetime/timezone-context";
-import { Pencil, Trash2, Eye } from "lucide-react";
+import { Pencil, Trash2, Eye, Repeat, Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
@@ -79,8 +79,6 @@ interface Props {
   /** Recolor the whole multi-selection (context menu on a grouped item). */
   onColorSelected: (color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
-  onAssignCategory?: (occ: Occurrence, categoryId: string | null) => void;
-  categoryChoices?: { id: string; name: string }[];
   /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
   eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Builds the "Copy to my calendar" menu action for another member's event (null = N/A). */
@@ -163,8 +161,6 @@ export function TimeGrid({
   onChangeColor,
   onColorSelected,
   onDeleteEvent,
-  onAssignCategory,
-  categoryChoices,
   eventShareAction,
   eventCopyAction,
   canEdit,
@@ -459,7 +455,7 @@ export function TimeGrid({
         dayIndex: d.dayIndex,
         topMin: top,
         heightMin: Math.max(bot - top, SLOT_MIN),
-        label: `${timeLabel(d.dayIndex, top)} – ${timeLabel(d.dayIndex, Math.max(bot, top + SLOT_MIN))}`,
+        label: `${timeLabel(d.dayIndex, top)}–${timeLabel(d.dayIndex, Math.max(bot, top + SLOT_MIN))}`,
       });
     } else if (d.kind === "move") {
       const dur = d.durationMin!;
@@ -649,7 +645,7 @@ export function TimeGrid({
       dayIndex,
       topMin: startMin,
       heightMin: SCHED_MIN,
-      label: `${timeLabel(dayIndex, startMin)} – ${timeLabel(dayIndex, startMin + SCHED_MIN)}`,
+      label: `${timeLabel(dayIndex, startMin)}–${timeLabel(dayIndex, startMin + SCHED_MIN)}`,
     });
   }
   function onDrop(e: React.DragEvent) {
@@ -832,8 +828,6 @@ export function TimeGrid({
                 onChangeColor={onChangeColor}
                 onColorSelected={onColorSelected}
                 onDeleteEvent={onDeleteEvent}
-                onAssignCategory={onAssignCategory}
-                categoryChoices={categoryChoices}
                 eventShareAction={eventShareAction}
                 eventCopyAction={eventCopyAction}
                 canEdit={canEdit}
@@ -870,15 +864,19 @@ export function TimeGrid({
               >
                 {preview.copy && (
                   <span
-                    className="mt-px shrink-0 rounded bg-primary px-1 text-[10px] font-bold leading-tight text-primary-foreground"
                     aria-hidden
+                    className="mt-px flex shrink-0 items-center rounded bg-primary p-0.5 text-primary-foreground"
                   >
-                    +
+                    <Plus className="size-2.5" />
                   </span>
                 )}
                 {preview.series && (
-                  <span className="mt-px shrink-0 rounded bg-primary px-1 text-[10px] font-medium leading-tight text-primary-foreground">
-                    ⟳ series
+                  <span
+                    aria-hidden
+                    className="mt-px flex shrink-0 items-center gap-0.5 rounded bg-primary px-1 py-0.5 text-[10px] font-medium leading-tight text-primary-foreground"
+                  >
+                    <Repeat className="size-2.5" />
+                    Series
                   </span>
                 )}
                 <span className="truncate text-xs font-medium text-primary">

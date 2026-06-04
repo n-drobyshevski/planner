@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   Minimize2,
+  Keyboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +58,7 @@ export function CalendarToolbar({
   onToggleSidebar,
   onToggleBacklog,
   onOpenFilters,
+  onOpenShortcuts,
   backlogOpen,
   workspace,
 }: {
@@ -70,6 +72,7 @@ export function CalendarToolbar({
   onToggleSidebar: () => void;
   onToggleBacklog: () => void;
   onOpenFilters: () => void;
+  onOpenShortcuts: () => void;
   backlogOpen: boolean;
   workspace: WorkspaceData | null;
 }) {
@@ -119,6 +122,15 @@ export function CalendarToolbar({
         </h2>
 
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            onClick={onOpenShortcuts}
+          >
+            <Keyboard />
+          </Button>
           {zoomed && (
             <Button
               variant="ghost"

@@ -10,6 +10,7 @@ import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { TimezoneProvider } from "@/lib/datetime/timezone-context";
 import { filterVisible, canEdit } from "@/lib/scope/visibility";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
+import { sharedRemovalNote } from "@/lib/calendar/delete-copy";
 import {
   contextOccurrences,
   enclosingContext,
@@ -30,6 +31,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTimelineZoomPersistence } from "@/hooks/use-timeline-zoom";
 import { CalendarToolbar } from "./calendar-toolbar";
+import { ShortcutsDialog } from "./shortcuts-dialog";
 import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
@@ -117,6 +119,7 @@ export function CalendarShell({
   const autoMobileApplied = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const workspace = useWorkspace();
   const wsId = workspace.data?.workspaceId;
@@ -211,6 +214,13 @@ export function CalendarShell({
   const setBacklogOpen = useUiStore((s) => s.setTaskBacklogOpen);
 
   const viewerId = workspace.data?.currentMember?.id ?? "";
+  // The other member in this two-person workspace — for "also removed from
+  // <partner>'s calendar" copy when a JOINT event is deleted. null if it can't
+  // be resolved (e.g. solo workspace), where the copy falls back to generic.
+  const partnerName = useMemo(() => {
+    const others = (workspace.data?.members ?? []).filter((m) => m.id !== viewerId);
+    return others.length === 1 ? others[0].name : null;
+  }, [workspace.data, viewerId]);
   // Month-view display preference (week/day always show inactive events).
   const showInactiveInMonth = workspace.data?.currentMember?.showInactiveInMonth ?? true;
   // Week/day display: how context blocks are labelled (top bar vs side label).
@@ -271,15 +281,6 @@ export function CalendarShell({
   // Context backdrops (expanded occurrences) for auto-assigning a Context when
   // an item is created inside one.
   const contextOccs = useMemo(() => contextOccurrences(occurrences), [occurrences]);
-  // The Contexts (categories) the viewer can file an item under: shared ones and
-  // their own. Drives the calendar's right-click "Assign to context" menu.
-  const categoryChoices = useMemo(
-    () =>
-      (workspace.data?.categories ?? [])
-        .filter((c) => c.ownerId === null || c.ownerId === viewerId)
-        .map((c) => ({ id: c.id, name: c.name })),
-    [workspace.data, viewerId],
-  );
   const taskColorOf = (t: TaskRow) => resolveTaskColor(t, categoryMap, memberMap);
 
   // --- Tasks (for calendar blocks + backlog rail) ---
@@ -332,6 +333,12 @@ export function CalendarShell({
     pushUrl(view, t);
     clearSelection();
   }
+  /** Retry a failed load: re-run the workspace bundle and the event windows
+   *  (whichever errored). Wired to the calendar's error-state "Try again". */
+  function retryLoad() {
+    void workspace.refetch();
+    if (wsId) void qc.invalidateQueries({ queryKey: qk.eventsAll(wsId) });
+  }
   function pickDay(ms: number) {
     setView("day");
     setFocusedDate(ms);
@@ -375,11 +382,6 @@ export function CalendarShell({
     const s = defaultStartOnDay(dayMs, viewerTimeZone);
     onCreateRange(s, s + 3_600_000);
   }
-  /** Assign an item to a Context (categoryId), or clear it (null). Series-level. */
-  function onAssignCategory(occ: Occurrence, categoryId: string | null) {
-    if (!canEditOcc(occ)) return;
-    void mutations.assignCategory(occ.eventId, categoryId, occ.categoryId);
-  }
   /** Recolor an event (series-level: writes the master row's color). */
   function onChangeEventColor(occ: Occurrence, color: string | null) {
     if (!canEditOcc(occ)) return;
@@ -418,7 +420,10 @@ export function CalendarShell({
     if (!ev) return;
     if (ev.rrule) setPendingDelete({ event: ev, occurrence: occ });
     else if (ev.kind === "context") setDeletingContext(ev);
-    else void mutations.remove(ev.id);
+    else
+      void mutations.remove(ev.id, {
+        description: sharedRemovalNote(occ.isShared, partnerName),
+      });
   }
   function onDeleteScope(scope: RecurrenceScope) {
     const p = pendingDelete;
@@ -711,16 +716,57 @@ export function CalendarShell({
       }
     }
     const inTimeGrid = view === "day" || view === "week" || view === "3day";
-    if (!inTimeGrid || selectedKeys.size === 0) return;
+    // No selection guard here: a single keyboard-FOCUSED block is deletable even
+    // with nothing multi-selected (see the focused-block branch below).
+    if (!inTimeGrid) return;
     if (e.key === "Delete" || e.key === "Backspace") {
-      e.preventDefault();
-      deleteSelected(e.altKey); // Alt → delete the whole recurring family
-    } else if (e.key === "Escape") {
+      // A pointer-built multi-selection deletes as a batch (Alt → whole family)…
+      if (selectedKeys.size > 0) {
+        e.preventDefault();
+        deleteSelected(e.altKey);
+        return;
+      }
+      // …otherwise delete the single keyboard-focused block, if it's editable.
+      // (onDeleteEvent still routes recurring → scope prompt, context → confirm.)
+      const key =
+        ae instanceof HTMLElement
+          ? ae.closest("[data-occ-key]")?.getAttribute("data-occ-key") ?? null
+          : null;
+      const occ = key ? visible.find((o) => o.key === key) : undefined;
+      if (occ && canEditOcc(occ)) {
+        e.preventDefault();
+        onDeleteEvent(occ);
+      }
+    } else if (e.key === "Escape" && selectedKeys.size > 0) {
       clearSelection();
     }
   };
   useEffect(() => {
     const h = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  // `?` opens the keyboard/gesture cheat-sheet from any calendar view. Ignored
+  // while typing, or when another dialog/sheet is already open.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== "?") return;
+      const ae = document.activeElement;
+      if (
+        ae instanceof HTMLElement &&
+        (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)
+      )
+        return;
+      if (
+        document.querySelector(
+          "[role='dialog'][data-state='open'], [role='alertdialog'][data-state='open']",
+        )
+      )
+        return;
+      e.preventDefault();
+      setShortcutsOpen(true);
+    };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
@@ -782,6 +828,7 @@ export function CalendarShell({
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onToggleBacklog={() => setBacklogOpen(!backlogOpen)}
         onOpenFilters={() => setFiltersOpen(true)}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
         backlogOpen={backlogOpen}
         workspace={workspace.data ?? null}
       />
@@ -856,8 +903,6 @@ export function CalendarShell({
                 onChangeColor={onChangeEventColor}
                 onColorSelected={colorSelected}
                 onDeleteEvent={onDeleteEvent}
-                onAssignCategory={onAssignCategory}
-                categoryChoices={categoryChoices}
                 eventShareAction={eventShareAction}
                 eventCopyAction={eventCopyAction}
                 canEdit={canEditOcc}
@@ -869,6 +914,7 @@ export function CalendarShell({
                 twoCalendars={twoCalendars}
                 loading={workspace.isLoading || eventsLoading}
                 error={workspace.isError || eventsError}
+                onRetry={retryLoad}
               />
             </CalendarPager>
           ) : (
@@ -1088,6 +1134,8 @@ export function CalendarShell({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       </div>
     </TimezoneProvider>
   );

@@ -9,6 +9,8 @@ import { MonthGrid } from "./month-grid";
 import { AgendaView } from "./agenda-view";
 import type { CalendarView, ContextLabel, Occurrence } from "@/lib/types";
 import type { ItemAction } from "@/components/shared/item-context-menu";
+import { Button } from "@/components/ui/button";
+import { RotateCw } from "lucide-react";
 
 export interface CanvasProps {
   view: CalendarView;
@@ -45,10 +47,6 @@ export interface CanvasProps {
   /** Time-grid: recolor the whole multi-selection. */
   onColorSelected?: (color: string | null) => void;
   onDeleteEvent: (occ: Occurrence) => void;
-  /** Assign an item to a Context (categoryId), or clear it (null). */
-  onAssignCategory?: (occ: Occurrence, categoryId: string | null) => void;
-  /** Contexts the viewer may assign, for the right-click menu. */
-  categoryChoices?: { id: string; name: string }[];
   /** Builds the "Share / Make personal" menu action for an event (null = N/A). */
   eventShareAction?: (o: Occurrence) => ItemAction | null;
   /** Builds the "Copy to my calendar" menu action for another member's event (null = N/A). */
@@ -66,6 +64,9 @@ export interface CanvasProps {
   twoCalendars?: boolean;
   loading: boolean;
   error: boolean;
+  /** Re-run the failed load (workspace bundle + event windows). Rendered as a
+   *  Retry button in the error state; omitted on display-only neighbour panes. */
+  onRetry?: () => void;
 }
 
 const ALWAYS_EDITABLE = () => true;
@@ -87,8 +88,6 @@ export function CalendarCanvas(props: CanvasProps) {
     onReschedule,
     onChangeColor,
     onDeleteEvent,
-    onAssignCategory,
-    categoryChoices,
     eventShareAction,
     eventCopyAction,
     canEdit = ALWAYS_EDITABLE,
@@ -122,10 +121,31 @@ export function CalendarCanvas(props: CanvasProps) {
 
   if (error) {
     return (
-      <Centered>
-        Couldn&apos;t load your calendar. Make sure the database schema is applied
-        and seeded.
-      </Centered>
+      <div
+        role="alert"
+        className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center"
+      >
+        <p className="text-sm font-medium text-foreground">
+          We couldn&apos;t load your calendar.
+        </p>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          Check your connection and try again.
+        </p>
+        {props.onRetry && (
+          <Button variant="outline" size="sm" onClick={props.onRetry}>
+            <RotateCw />
+            Try again
+          </Button>
+        )}
+        {process.env.NODE_ENV === "development" && (
+          <p className="mt-2 max-w-xs text-xs text-muted-foreground/80">
+            Dev note: the schema may not be applied or seeded —{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+              pnpm db:reset &amp;&amp; pnpm seed
+            </code>
+          </p>
+        )}
+      </div>
     );
   }
 
@@ -186,8 +206,6 @@ export function CalendarCanvas(props: CanvasProps) {
       onChangeColor={onChangeColor}
       onColorSelected={props.onColorSelected ?? NOOP}
       onDeleteEvent={onDeleteEvent}
-      onAssignCategory={onAssignCategory}
-      categoryChoices={categoryChoices}
       eventShareAction={eventShareAction}
       eventCopyAction={eventCopyAction}
       canEdit={canEdit}
@@ -197,13 +215,5 @@ export function CalendarCanvas(props: CanvasProps) {
       labelStyle={contextLabel}
       twoCalendars={twoCalendars}
     />
-  );
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
-      <p className="max-w-xs">{children}</p>
-    </div>
   );
 }

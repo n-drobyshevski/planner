@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, fireEvent } from "@testing-library/react";
 import { EventBlock } from "@/components/calendar/event-block";
 import { ContextBackdrop } from "@/components/calendar/context-backdrop";
 import type { Occurrence } from "@/lib/types";
@@ -66,5 +66,63 @@ describe("ContextBackdrop — composes an injected className (asChild)", () => {
     const el = container.querySelector("[data-occ-key]")!;
     expect(el).toHaveClass("absolute");
     expect(el).toHaveClass("injected-by-slot");
+  });
+});
+
+describe("EventBlock — keyboard accessibility", () => {
+  it("is a focusable, labelled button", () => {
+    const { container } = render(
+      <EventBlock
+        occ={occ({ title: "Dinner", isShared: true })}
+        color="#ffffff"
+        selected={false}
+        style={{}}
+      />,
+    );
+    const el = container.querySelector("[data-occ-key]")!;
+    expect(el).toHaveAttribute("role", "button");
+    expect(el).toHaveAttribute("tabindex", "0");
+    const label = el.getAttribute("aria-label") ?? "";
+    expect(label).toMatch(/Dinner/);
+    expect(label).toMatch(/shared/); // joint events announce their shared state
+  });
+
+  it("a read-only (another member's) block announces it and stays focusable", () => {
+    const { container } = render(
+      <EventBlock occ={occ()} color="#ffffff" selected={false} editable={false} style={{}} />,
+    );
+    const el = container.querySelector("[data-occ-key]")!;
+    expect(el).toHaveAttribute("tabindex", "0"); // still reachable (to open / copy)
+    expect(el.getAttribute("aria-label")).toMatch(/read-only/);
+  });
+
+  it("opens on Enter and Space via onActivate", () => {
+    const onActivate = vi.fn();
+    const { container } = render(
+      <EventBlock occ={occ()} color="#ffffff" selected={false} style={{}} onActivate={onActivate} />,
+    );
+    const el = container.querySelector("[data-occ-key]")!;
+    fireEvent.keyDown(el, { key: "Enter" });
+    fireEvent.keyDown(el, { key: " " });
+    expect(onActivate).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores activation keys that bubble up from an inner control", () => {
+    const onActivate = vi.fn();
+    const { container } = render(
+      <EventBlock
+        occ={occ({ taskId: "t" })}
+        color="#ffffff"
+        selected={false}
+        style={{}}
+        onActivate={onActivate}
+        taskDone={false}
+        onToggleTaskDone={() => {}}
+      />,
+    );
+    // Enter on the inner task-toggle button must NOT also open the block.
+    const toggle = container.querySelector("button[aria-label]")!;
+    fireEvent.keyDown(toggle, { key: "Enter" });
+    expect(onActivate).not.toHaveBeenCalled();
   });
 });
