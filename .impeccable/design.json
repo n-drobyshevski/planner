@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-03",
+  "title": "Design System: Planner",
+  "extensions": {
+    "colorMeta": {
+      "terracotta": {
+        "role": "primary",
+        "displayName": "Terracotta Coral",
+        "canonical": "#c0492a",
+        "tonalRamp": ["#3a1109", "#5e1d10", "#84291a", "#a83a22", "#c0492a", "#d4744f", "#e3a385", "#f3d4c4"]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#faf8f5",
+        "tonalRamp": ["#1c1917", "#292524", "#44403c", "#78716c", "#a8a29e", "#d6cfc6", "#e7e0d7", "#faf8f5"]
+      },
+      "member-b": {
+        "role": "secondary",
+        "displayName": "Member B Teal",
+        "canonical": "#0f766e"
+      },
+      "shared-amber": {
+        "role": "tertiary",
+        "displayName": "Shared Amber",
+        "canonical": "#b45309"
+      },
+      "stone-ink": {
+        "role": "neutral",
+        "displayName": "Stone Ink",
+        "canonical": "#292524"
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Card titles, dialog headers, section labels. Top of a deliberately shallow scale." },
+      "body": { "displayName": "Body", "purpose": "Default reading size across the app." },
+      "label": { "displayName": "Label", "purpose": "Badges, chips, metadata, secondary controls." },
+      "mono": { "displayName": "Time / Mono", "purpose": "Event times and aligned figures, Geist Mono with tabular numerals." }
+    },
+    "shadows": [
+      { "name": "soft", "value": "0 1px 2px rgb(28 25 23 / 0.06), 0 4px 12px rgb(28 25 23 / 0.06)", "purpose": "Event blocks and lightly-raised elements; a gentle warm-tinted lift." },
+      { "name": "soft-lg", "value": "0 2px 6px rgb(28 25 23 / 0.07), 0 12px 28px rgb(28 25 23 / 0.08)", "purpose": "Popovers, dialogs, menus — surfaces that clearly leave the page." },
+      { "name": "ring-hairline", "value": "inset 0 0 0 1px color-mix(in oklch, var(--foreground), transparent 90%)", "purpose": "Resting-state card edge. Depth without weight; the default instead of a drop shadow." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for color/border state transitions (~150ms)." },
+      { "name": "press", "value": "translateY(1px)", "purpose": "Active-state tactile press on buttons; no hover lift." },
+      { "name": "reduced-motion", "value": "animation/transition near-disabled (0.01ms)", "purpose": "Global @media (prefers-reduced-motion: reduce) override; motion is restrained by default and removed entirely on request." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single loud action on a screen; terracotta fill, used rarely.",
+      "html": "<button class=\"ds-btn-primary\">Save changes</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; height:2rem; padding:0 0.625rem; gap:0.375rem; border:1px solid transparent; border-radius:0.75rem; background:var(--primary); color:var(--primary-foreground); font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif; font-size:0.875rem; font-weight:500; line-height:1; white-space:nowrap; cursor:pointer; transition:background-color .15s cubic-bezier(0.4,0,0.2,1), transform .05s; } .ds-btn-primary:hover { background:color-mix(in oklch, var(--primary), transparent 20%); } .ds-btn-primary:active { transform:translateY(1px); } .ds-btn-primary:focus-visible { outline:none; border-color:var(--ring); box-shadow:0 0 0 3px color-mix(in oklch, var(--ring), transparent 50%); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The workhorse action; carries most of the app so primary stays rare.",
+      "html": "<button class=\"ds-btn-outline\">Today</button>",
+      "css": ".ds-btn-outline { display:inline-flex; align-items:center; justify-content:center; height:2rem; padding:0 0.625rem; gap:0.375rem; border:1px solid var(--border); border-radius:0.75rem; background:var(--background); color:var(--foreground); font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif; font-size:0.875rem; font-weight:500; line-height:1; cursor:pointer; transition:background-color .15s cubic-bezier(0.4,0,0.2,1); } .ds-btn-outline:hover { background:var(--muted); } .ds-btn-outline:active { transform:translateY(1px); } .ds-btn-outline:focus-visible { outline:none; border-color:var(--ring); box-shadow:0 0 0 3px color-mix(in oklch, var(--ring), transparent 50%); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Transparent field with a warm hairline border; terracotta focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Add a title\" />",
+      "css": ".ds-input { height:2rem; width:100%; min-width:0; border:1px solid var(--input); border-radius:0.75rem; background:transparent; padding:0.25rem 0.625rem; font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif; font-size:0.875rem; color:var(--foreground); outline:none; transition:border-color .15s, box-shadow .15s; } .ds-input::placeholder { color:var(--muted-foreground); } .ds-input:focus-visible { border-color:var(--ring); box-shadow:0 0 0 3px color-mix(in oklch, var(--ring), transparent 50%); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat at rest, held by a hairline ring rather than a shadow.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card__title\">This weekend</div><div class=\"ds-card__body\">Two events, one shared.</div></div>",
+      "css": ".ds-card { display:flex; flex-direction:column; gap:1rem; border-radius:1.05rem; background:var(--card); color:var(--card-foreground); padding:1rem; font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif; font-size:0.875rem; box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--foreground), transparent 90%); } .ds-card__title { font-size:1rem; font-weight:500; line-height:1.375; } .ds-card__body { color:var(--muted-foreground); }"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Full-pill status/category marker.",
+      "html": "<span class=\"ds-badge\">Shared</span>",
+      "css": ".ds-badge { display:inline-flex; align-items:center; gap:0.25rem; height:1.25rem; padding:0.125rem 0.5rem; border-radius:1.95rem; background:var(--primary); color:var(--primary-foreground); font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif; font-size:0.75rem; font-weight:500; line-height:1; white-space:nowrap; }"
+    },
+    {
+      "name": "Event Block — mine / shared (filled)",
+      "kind": "custom",
+      "refersTo": "event-block",
+      "description": "Signature component. Solid fill = mine or shared; white text; soft warm shadow. Shared events carry a Users icon.",
+      "html": "<div class=\"ds-event\"><div class=\"ds-event__row\"><span class=\"ds-event__title\">Dinner with Sam</span><svg class=\"ds-event__icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-label=\"Shared\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/></svg></div><span class=\"ds-event__time\">18:30–20:00</span></div>",
+      "css": ".ds-event { position:relative; display:flex; flex-direction:column; width:11rem; border-radius:0.6rem; border:1.5px solid color-mix(in oklch, #b45309, black 12%); background:#b45309; color:#fff; padding:0.25rem 0.375rem; font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif; font-size:0.75rem; text-align:left; box-shadow:0 1px 2px rgb(28 25 23 / 0.06), 0 4px 12px rgb(28 25 23 / 0.06); } .ds-event__row { display:flex; align-items:flex-start; gap:0.25rem; } .ds-event__title { flex:1; font-weight:600; line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .ds-event__icon { width:0.75rem; height:0.75rem; margin-top:1px; flex-shrink:0; opacity:0.9; } .ds-event__time { font-size:0.6875rem; line-height:1.1; opacity:0.9; font-variant-numeric:tabular-nums; }"
+    },
+    {
+      "name": "Event Block — partner's (outlined)",
+      "kind": "custom",
+      "refersTo": "event-block",
+      "description": "Another person's event: outlined, tinted fill, colored text — 'look, don't touch,' not editable by you.",
+      "html": "<div class=\"ds-event-outline\"><span class=\"ds-event-outline__title\">Gym</span><span class=\"ds-event-outline__time\">07:00–08:00</span></div>",
+      "css": ".ds-event-outline { position:relative; display:flex; flex-direction:column; width:11rem; border-radius:0.6rem; border:1.5px solid #0f766e; background:color-mix(in oklch, #0f766e, transparent 88%); color:#0f766e; padding:0.25rem 0.375rem; font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif; font-size:0.75rem; text-align:left; } .ds-event-outline__title { font-weight:600; line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .ds-event-outline__time { font-size:0.6875rem; line-height:1.1; opacity:0.9; font-variant-numeric:tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shared Almanac",
+    "overview": "Planner is the digital version of a well-kept household almanac that two people write in together: a warm paper surface, exact about dates and times, calm to the touch, and never shouting for attention. It is a tool, not a destination — its job is to let two people answer 'are we both free, and whose is this?' at a glance and then get on with their day. The surface is warm paper with stone ink and a single committed terracotta-coral accent; warmth is the material, not a decoration layered on top, which is what lets the interface stay quiet without turning cold. Hierarchy is built from a deliberately shallow type scale and generous spacing rather than big display type — a product register, no hero tier, no marketing voice. What it rejects is as defining as what it embraces: not a gamified productivity app, not a generic SaaS dashboard, not a cold minimal mono tool. Quiet and precise, yet human.",
+    "keyCharacteristics": [
+      "Warm, paper-toned light surface; warm-charcoal dark mode — never pure white or pure black.",
+      "One committed terracotta accent, used sparingly; color otherwise carries meaning (whose, what, what-state).",
+      "Shallow type scale, single family in weight contrast; precision over flourish.",
+      "Soft warm-tinted shadows and hairline rings; mostly flat, depth only where it means 'floating.'",
+      "Rounded, gentle geometry (0.75rem base radius) — approachable, not bubbly.",
+      "Accessibility and color-meaning are load-bearing (WCAG AA throughout, never color-only signals)."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Terracotta is the only decorative accent, and it stays rare — primary action, focus, active state, selection. Two terracotta things competing for 'the' action means one is wrong.", "section": "colors" },
+      { "name": "The Color-Means-Something Rule", "body": "Outside the single accent, color is never decorative. A hue answers a question: whose is this (Member A coral / Member B teal), is it ours (shared amber), or what category. Color 'for visual interest' is prohibited.", "section": "colors" },
+      { "name": "The Warm-Neutral Rule", "body": "Every neutral is tinted warm (stone, not zinc/slate). Pure #000, pure #fff text, and cold grays are forbidden in the default theme.", "section": "colors" },
+      { "name": "The Shallow-Scale Rule", "body": "The type scale tops out near 1rem. Hierarchy comes from weight, color, and spacing — not from large type.", "section": "typography" },
+      { "name": "The Tabular-Time Rule", "body": "Times and aligned figures are always tabular-nums so a schedule does not jitter as digits change width.", "section": "typography" },
+      { "name": "The Flat-At-Rest Rule", "body": "Surfaces are flat by default, held by a hairline ring. A shadow appears only when an element is genuinely floating (overlay, dragged event, open menu).", "section": "elevation" },
+      { "name": "The Warm-Shadow Rule", "body": "Shadow color is warm stone (28 25 23), never 0 0 0. A cold shadow reads as a foreign element pasted onto the paper.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep terracotta rare — primary action, focus, active, selection only.",
+      "Do let color mean something outside the accent: whose (coral / teal), ours (amber), or category (the swatch set).",
+      "Do tint every neutral and every shadow warm; use warm near-black #292524 for text, never #000.",
+      "Do build hierarchy from weight, color, and spacing on a shallow scale that tops out near 1rem.",
+      "Do keep surfaces flat at rest with a hairline ring; reserve soft shadows for genuinely-floating elements.",
+      "Do encode event ownership as filled (mine/shared) vs outlined (theirs), and carry status with texture/outline, not color alone.",
+      "Do hold WCAG AA on body and large text in every theme, keep placeholders at full contrast, and honor prefers-reduced-motion.",
+      "Do keep tabular-nums on all times and aligned figures."
+    ],
+    "donts": [
+      "Don't add gamification — no streaks, badges, confetti, XP, or dopamine nudges.",
+      "Don't reach for generic SaaS-dashboard patterns: no card-grid-everything, no gradient accents, no hero-metric templates, no marketing-landing chrome inside the app.",
+      "Don't drift cold or sterile: stark black-on-white, zero-warmth, designer-brutalist coldness is the wrong kind of quiet.",
+      "Don't use border-left/border-right > 1px as a colored side-stripe; use full borders, a background tint, or a leading icon.",
+      "Don't use gradient text or decorative glassmorphism; emphasis comes from weight and size.",
+      "Don't introduce a second decorative accent or a display type tier.",
+      "Don't ship cold/neutral shadows or pure-gray borders.",
+      "Don't convey status, ownership, or errors with color alone."
+    ]
+  }
+}
