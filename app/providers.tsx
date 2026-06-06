@@ -13,7 +13,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30_000,
+            // Supabase realtime invalidates these queries on every change, so
+            // data stays fresh without time-based refetching. A long staleTime
+            // (matching the workspace bundle) avoids redundant refetches on
+            // remount/navigation; realtime is the real freshness mechanism.
+            staleTime: 5 * 60_000,
             refetchOnWindowFocus: false,
             retry: 1,
           },

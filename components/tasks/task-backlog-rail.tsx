@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import {
   CalendarPlus,
   GripVertical,
@@ -25,11 +26,40 @@ import {
   ItemMenuButton,
   type MenuableProps,
 } from "@/components/shared/item-context-menu";
-import { UsageTab, type UsageTabProps } from "@/components/analytics/usage-tab";
+import { type UsageTabProps } from "@/components/analytics/usage-tab";
 import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-width";
 import { cn } from "@/lib/utils";
 import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import type { Member, TaskRow } from "@/lib/types";
+
+/** Skeleton shown while the lazy Insights chunk (recharts) loads. Reserves the
+ *  panel's rough height to avoid layout shift; pulse only when motion is allowed. */
+function UsageTabFallback() {
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-4 p-3 motion-safe:animate-pulse"
+      aria-hidden
+    >
+      <div className="h-8 w-40 rounded bg-muted/60" />
+      <div className="grid grid-cols-2 gap-2">
+        <div className="h-14 rounded-lg bg-muted/40" />
+        <div className="h-14 rounded-lg bg-muted/40" />
+        <div className="h-14 rounded-lg bg-muted/40" />
+        <div className="h-14 rounded-lg bg-muted/40" />
+      </div>
+      <div className="h-[140px] rounded-lg bg-muted/40" />
+      <div className="h-[150px] rounded-lg bg-muted/40" />
+    </div>
+  );
+}
+
+/** recharts (~100KB+ with its d3 deps) is only used by the Insights tab, which
+ *  isn't the default tab — lazy-load it so it stays out of the rail's initial
+ *  chunk and downloads only when the user opens Insights. */
+const UsageTab = dynamic(
+  () => import("@/components/analytics/usage-tab").then((m) => m.UsageTab),
+  { ssr: false, loading: () => <UsageTabFallback /> },
+);
 
 interface BacklogProps {
   tasks: TaskRow[];
