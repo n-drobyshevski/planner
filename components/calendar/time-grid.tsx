@@ -28,6 +28,10 @@ import type { ContextLabel, Occurrence } from "@/lib/types";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAY_MS = 86_400_000;
 const MIN_NEW = 30; // minimum minutes for a drag-created event
+// How long a just-dropped block keeps its one-shot position transition (the
+// "settle" easing) before it goes back to a plain, transition-free block.
+const SETTLE_MS = 340;
+const EMPTY_KEYS: ReadonlySet<string> = new Set();
 const LONG_PRESS_MS = 350; // touch hold before a move-drag arms
 const TAP_TOL = 10; // px a finger may drift before a press becomes a scroll
 
@@ -193,6 +197,29 @@ export function TimeGrid({
   const [armed, setArmed] = useState(false);
   const timeZone = useViewerTimeZone();
   const secondaryTimeZone = useSecondaryTimeZone();
+
+  // Keys of blocks that just landed from a drag/resize commit. They get a brief
+  // one-shot position transition in DayColumn (a calm settle into place instead
+  // of a teleport), scoped to only the committed blocks and cleared after the
+  // settle — so a repack or zoom never animates and there's no cost at rest.
+  // Reduced motion neutralizes it via the global transition-duration rule.
+  const [settleKeys, setSettleKeys] = useState<ReadonlySet<string>>(EMPTY_KEYS);
+  const settleTimer = useRef<number | null>(null);
+  const settle = (keys: string[]) => {
+    if (keys.length === 0) return;
+    if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
+    setSettleKeys(new Set(keys));
+    settleTimer.current = window.setTimeout(() => {
+      setSettleKeys(EMPTY_KEYS);
+      settleTimer.current = null;
+    }, SETTLE_MS);
+  };
+  useEffect(
+    () => () => {
+      if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
+    },
+    [],
+  );
 
   // --- Roving keyboard navigation -----------------------------------------
   // The columns container is the grid's one Tab stop; from it the arrow keys
@@ -730,11 +757,15 @@ export function TimeGrid({
           return { occ: m.occ, start: mStart, end: mStart + m.durationMin * 60_000 };
         });
         if (e.ctrlKey || e.metaKey) onDuplicateMany(moves, e.altKey);
-        else onRescheduleMany(moves, e.altKey);
+        else {
+          settle(moves.map((mv) => mv.occ.key));
+          onRescheduleMany(moves, e.altKey);
+        }
       } else if (e.ctrlKey || e.metaKey) {
         // Ctrl/Cmd-drag → copy, leaving the original in place. Alt = whole series.
         onDuplicate(occ, start, end, e.altKey);
       } else {
+        settle([occ.key]);
         onReschedule(occ, start, end);
       }
     } else {
@@ -748,6 +779,7 @@ export function TimeGrid({
       if (d.group) {
         const edge = d.edge;
         const deltaMin = edge === "start" ? d.curStart! - d.startMin! : d.curEnd! - d.endMin!;
+        settle(d.group.map((mem) => mem.occ.key));
         onRescheduleMany(
           d.group.map((mem) => {
             const base = days[mem.dayIndex];
@@ -762,8 +794,10 @@ export function TimeGrid({
           e.altKey,
         );
       } else if (d.edge === "start") {
+        settle([occ.key]);
         onReschedule(occ, days[d.dayIndex] + d.curStart! * 60_000, occ.end);
       } else {
+        settle([occ.key]);
         onReschedule(occ, occ.start, days[d.dayIndex] + d.curEnd! * 60_000);
       }
     }
@@ -994,6 +1028,7 @@ export function TimeGrid({
                 canEdit={canEdit}
                 taskDoneById={taskDoneById}
                 onToggleTaskDone={onToggleTaskDone}
+                settleKeys={settleKeys}
               />
             ))}
 

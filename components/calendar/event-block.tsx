@@ -65,6 +65,11 @@ export const EventBlock = forwardRef<
         "absolute z-[var(--evt-z,10)] flex touch-none flex-col overflow-hidden rounded-md border-[1.5px] px-1.5 text-left text-xs shadow-soft transition-shadow duration-150 ease-out-quint select-none hover:z-30 hover:shadow-soft-lg",
         compact ? "py-0.5" : "py-1",
         editable ? "cursor-grab" : "cursor-pointer",
+        // Read-only (partner) blocks are outlined and can't be dragged, so the
+        // grab cursor + fill that signal "mine" are absent. A faint hover ring
+        // gives them their own "openable, look-don't-touch" affordance without
+        // implying a drag. Skipped when selected/focused (those own the ring).
+        !editable && !selected && "hover:ring-1 hover:ring-foreground/20",
         selected && "z-30 ring-2 ring-foreground",
         "focus-visible:z-30 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none",
         // Inactive styling (faint wash + flat) is handled by eventFillStyle's

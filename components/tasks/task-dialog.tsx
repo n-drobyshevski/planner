@@ -116,15 +116,23 @@ export function TaskDialog(props: TaskDialogProps) {
     if (ok) onOpenChange(false);
   }
 
+  // Edit/delete close immediately: the mutation patches the cache optimistically
+  // and failures surface via toast + undo, so there's no spinner wait. Create
+  // keeps the await path (finish/pending) so a failed insert doesn't discard the
+  // unsaved form.
+  function close() {
+    onOpenChange(false);
+  }
+
   async function onSave() {
     if (!form.title.trim()) {
       setError("Please add a title.");
       return;
     }
-    setPending(true);
     const payload = buildPayload();
 
     if (mode === "create") {
+      setPending(true);
       const input: TaskInput = {
         workspaceId,
         ownerId: currentMemberId,
@@ -141,14 +149,17 @@ export function TaskDialog(props: TaskDialogProps) {
       payload.status === "done"
         ? task.completedAt ?? Date.now()
         : null;
-    finish(await mutations.update(task.id, { ...payload, completedAt }));
+    // The payload is TaskRow-shaped, so it doubles as the optimistic row patch.
+    const rowPatch = { ...payload, completedAt };
+    close();
+    void mutations.update(task.id, rowPatch, undefined, rowPatch);
   }
 
-  async function onDelete() {
+  function onDelete() {
     if (!task) return;
     setConfirmDelete(false);
-    setPending(true);
-    finish(await mutations.remove(task.id));
+    close();
+    void mutations.remove(task.id);
   }
 
   return (

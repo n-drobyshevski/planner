@@ -19,6 +19,13 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 // the zone". 15px clears the side-label strip (w-3.5 = 14px) with 1px to spare.
 const NEST_L = 15; // left inset (px) for a nested event
 const NEST_R = 6; // right margin (px) for a nested event (no right label)
+// One-shot transition for a block that just landed from a drag/resize: ease its
+// top/height/left/width into place (a calm settle, not a teleport) on the slow
+// token, keeping the shadow on the fast token. Applied inline only to the
+// just-committed block (see `settleKeys`); reduced motion zeroes the duration
+// via the global rule. Inline overrides the block's default `transition-shadow`.
+const SETTLE_TRANSITION =
+  "top var(--dur-slow) var(--ease-out-quint), height var(--dur-slow) var(--ease-out-quint), left var(--dur-slow) var(--ease-out-quint), width var(--dur-slow) var(--ease-out-quint), box-shadow var(--dur-fast) var(--ease-out-quint)";
 
 export function DayColumn({
   dayStart,
@@ -41,6 +48,7 @@ export function DayColumn({
   canEdit,
   taskDoneById,
   onToggleTaskDone,
+  settleKeys,
 }: {
   dayStart: number;
   /** Vertical scale (px per hour); defaults to the un-zoomed HOUR_PX. */
@@ -73,6 +81,9 @@ export function DayColumn({
   canEdit: (o: Occurrence) => boolean;
   taskDoneById?: Map<string, boolean>;
   onToggleTaskDone?: (taskId: string) => void;
+  /** Occurrence keys that just landed from a drag/resize — they ease into place
+   *  once (see SETTLE_TRANSITION). Empty/undefined at rest. */
+  settleKeys?: ReadonlySet<string>;
 }) {
   const dayEnd = dayStart + DAY_MS;
 
@@ -225,6 +236,7 @@ export function DayColumn({
           ? `calc(${p.widthPct}% - ${gutterL + gutterR}px)`
           : `calc(${p.widthPct}% - 3px)`;
         const editable = canEdit(seg.occ);
+        const settling = settleKeys?.has(seg.occ.key) ?? false;
         return (
           <ItemContextMenu
             key={seg.occ.key}
@@ -275,6 +287,8 @@ export function DayColumn({
                   // Cascade stacking order (later-starting events sit in front);
                   // EventBlock reads it as z-[var(--evt-z,10)].
                   "--evt-z": p.zIndex,
+                  // Just-landed blocks ease into their new position once.
+                  ...(settling ? { transition: SETTLE_TRANSITION } : null),
                 } as CSSProperties
               }
             />

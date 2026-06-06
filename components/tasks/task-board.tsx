@@ -21,9 +21,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { m } from "motion/react";
+import { m, AnimatePresence } from "motion/react";
 import { Plus, ListChecks } from "lucide-react";
-import { tweenFast } from "@/lib/motion";
+import { tween, tweenFast } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { TaskContextMenu } from "./task-context-menu";
 import {
@@ -241,8 +241,22 @@ export function TaskBoard({
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-          <div className="min-h-0 flex-1" {...swipe}>
-            {renderColumn(COLUMNS.find((c) => c.status === activeStatus)!)}
+          <div className="relative min-h-0 flex-1" {...swipe}>
+            {/* Crossfade the swapped column instead of an instant cut.
+                `initial={false}` paints the first column at once; only the swap
+                (toggle or swipe) animates. Column swaps never happen mid-drag,
+                so this doesn't interfere with dnd-kit. */}
+            <AnimatePresence mode="wait" initial={false}>
+              <m.div
+                key={activeStatus}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: tween }}
+                exit={{ opacity: 0, transition: tweenFast }}
+                className="h-full"
+              >
+                {renderColumn(COLUMNS.find((c) => c.status === activeStatus)!)}
+              </m.div>
+            </AnimatePresence>
           </div>
         </div>
       ) : (
@@ -312,7 +326,7 @@ function Column({
       <div
         ref={setNodeRef}
         data-over={isOver || undefined}
-        className="flex flex-1 flex-col gap-2 overflow-y-auto rounded-b-xl p-2 data-[over]:bg-muted/70"
+        className="flex flex-1 flex-col gap-2 overflow-y-auto rounded-b-xl p-2 transition-colors duration-150 ease-out-quint data-[over]:bg-muted/70"
       >
         {children}
       </div>

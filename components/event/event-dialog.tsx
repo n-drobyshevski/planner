@@ -188,6 +188,15 @@ export function EventDialog(props: EventDialogProps) {
     if (ok) onOpenChange(false);
   }
 
+  // Edit/delete close immediately: the mutation's optimistic cache patch (or a
+  // background refetch for the series-split paths) updates the grid, and any
+  // failure surfaces via toast + undo — so there's no spinner wait. Create keeps
+  // the await path (finish/pending) so a failed insert never discards the
+  // unsaved form.
+  function close() {
+    onOpenChange(false);
+  }
+
   async function onSave() {
     const times = validate();
     if (!times) return;
@@ -226,29 +235,29 @@ export function EventDialog(props: EventDialogProps) {
       setScopePrompt("edit");
       return;
     }
-    // single event (may gain recurrence)
-    setPending(true);
-    finish(
-      await mutations.updateSingle(event.id, {
-        categoryId: form.categoryId === "none" ? null : form.categoryId,
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        location: form.location.trim() || null,
-        isPrivate,
-        isShared,
-        color: form.color,
-        allDay: isContext ? false : form.allDay,
-        inactive: form.inactive,
-        status: form.status,
-        start,
-        end,
-        rrule: buildRRule(form.recurrence),
-        recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
-      }),
-    );
+    // single event (may gain recurrence). The patch is EventRow-shaped, so it
+    // doubles as the optimistic row patch that updates the grid at once.
+    const patch = {
+      categoryId: form.categoryId === "none" ? null : form.categoryId,
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      location: form.location.trim() || null,
+      isPrivate,
+      isShared,
+      color: form.color,
+      allDay: isContext ? false : form.allDay,
+      inactive: form.inactive,
+      status: form.status,
+      start,
+      end,
+      rrule: buildRRule(form.recurrence),
+      recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
+    };
+    close();
+    void mutations.updateSingle(event.id, patch, undefined, patch);
   }
 
-  async function onEditScope(scope: RecurrenceScope) {
+  function onEditScope(scope: RecurrenceScope) {
     if (!event || !occurrence) return;
     const times = validate();
     if (!times) {
@@ -268,7 +277,7 @@ export function EventDialog(props: EventDialogProps) {
       end,
     };
     setScopePrompt(null);
-    setPending(true);
+    close();
 
     // Color is series-level (a master column, no per-occurrence form), like the
     // Context membership carried in `patch.categoryId`. "this"/"future"/"all"
@@ -278,62 +287,62 @@ export function EventDialog(props: EventDialogProps) {
     if (scope === "this") {
       // A per-occurrence edit can't carry series-level fields, so apply any
       // color change to the whole series.
-      if (colorChanged) void mutations.updateSingle(event.id, { color: form.color });
-      finish(await mutations.editThis(event, occurrence.occurrenceDate, patch));
+      if (colorChanged)
+        void mutations.updateSingle(event.id, { color: form.color }, undefined, {
+          color: form.color,
+        });
+      void mutations.editThis(event, occurrence.occurrenceDate, patch);
     } else if (scope === "future") {
-      finish(
-        await mutations.editFuture(
-          event,
-          occurrence.occurrenceDate,
-          patch,
-          colorChanged ? form.color : undefined,
-        ),
+      void mutations.editFuture(
+        event,
+        occurrence.occurrenceDate,
+        patch,
+        colorChanged ? form.color : undefined,
       );
     } else {
       // all: shift the whole series by the same delta + update fields + rrule.
       const delta = start - occurrence.start;
-      finish(
-        await mutations.updateSingle(event.id, {
-          title: patch.title,
-          description: patch.description,
-          location: patch.location,
-          categoryId: patch.categoryId,
-          // The 3-way control governs the whole series on an "all" edit.
-          isPrivate,
-          isShared,
-          color: form.color,
-          allDay: form.allDay,
-          inactive: form.inactive,
-          status: form.status,
-          start: event.start + delta,
-          end: event.end + delta,
-          rrule: buildRRule(form.recurrence),
-          recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
-        }),
-      );
+      const seriesPatch = {
+        title: patch.title,
+        description: patch.description,
+        location: patch.location,
+        categoryId: patch.categoryId,
+        // The 3-way control governs the whole series on an "all" edit.
+        isPrivate,
+        isShared,
+        color: form.color,
+        allDay: form.allDay,
+        inactive: form.inactive,
+        status: form.status,
+        start: event.start + delta,
+        end: event.end + delta,
+        rrule: buildRRule(form.recurrence),
+        recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
+      };
+      void mutations.updateSingle(event.id, seriesPatch, undefined, seriesPatch);
     }
   }
 
-  async function onDelete() {
+  function onDelete() {
     if (!event || !occurrence) return;
     if (isRecurringEdit) {
       setScopePrompt("delete");
       return;
     }
-    setPending(true);
-    finish(await mutations.remove(event.id));
+    close();
+    void mutations.remove(event.id);
   }
 
-  async function onDeleteScope(scope: RecurrenceScope) {
+  function onDeleteScope(scope: RecurrenceScope) {
     if (!event || !occurrence) return;
     setScopePrompt(null);
-    setPending(true);
+    close();
     if (scope === "this") {
-      finish(await mutations.deleteThis(event, occurrence.occurrenceDate));
+      void mutations.deleteThis(event, occurrence.occurrenceDate);
     } else if (scope === "future") {
-      finish(await mutations.deleteFuture(event, occurrence.occurrenceDate));
+      void mutations.deleteFuture(event, occurrence.occurrenceDate);
     } else {
-      finish(await mutations.deleteAll(event.id));
+      void mutations.deleteAll(event.id);
     }
   }
 

@@ -9,6 +9,12 @@ import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
+import {
+  patchWorkspace,
+  patchCategoryById,
+  removeCategoryById,
+  patchMemberById,
+} from "@/lib/hooks/use-workspace-cache";
 
 const HOUR_MS = 3_600_000;
 
@@ -33,13 +39,20 @@ export function useSidebarMutations(workspaceId?: string) {
     if (workspaceId) qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
   };
 
-  async function run<T>(p: Promise<T>, okMsg: string): Promise<boolean> {
+  async function run<T>(
+    p: Promise<T>,
+    okMsg: string,
+    /** Apply an optimistic cache patch now; returns the rollback for the catch. */
+    optimistic?: () => () => void,
+  ): Promise<boolean> {
+    const rollback = optimistic?.();
     try {
       await p;
       await invalidateWorkspace();
       notify.success(okMsg);
       return true;
     } catch (e) {
+      rollback?.(); // restore the pre-patch snapshot on failure
       toast.error(e instanceof Error ? e.message : "Something went wrong");
       return false;
     }
@@ -47,9 +60,13 @@ export function useSidebarMutations(workspaceId?: string) {
 
   return {
     renameCategory: (id: string, name: string) =>
-      run(m.updateCategory(sb, id, { name }), "Context renamed"),
+      run(m.updateCategory(sb, id, { name }), "Context renamed", () =>
+        patchWorkspace(qc, patchCategoryById(id, { name })),
+      ),
     recolorCategory: (id: string, color: string) =>
-      run(m.updateCategory(sb, id, { color }), "Context color updated"),
+      run(m.updateCategory(sb, id, { color }), "Context color updated", () =>
+        patchWorkspace(qc, patchCategoryById(id, { color })),
+      ),
     /**
      * Convert a Context between Shared (`ownerId = null`; events in it become
      * joint) and Personal (`ownerId = a member`). Also invalidates events so the
@@ -59,12 +76,14 @@ export function useSidebarMutations(workspaceId?: string) {
       const ok = await run(
         m.setCategoryOwner(sb, id, ownerId),
         ownerId === null ? "Context shared" : "Context made personal",
+        () => patchWorkspace(qc, patchCategoryById(id, { ownerId })),
       );
       if (ok) invalidateEvents();
       return ok;
     },
     /** Delete a Context, its calendar time-blocks, and unlink its items (undoable). */
     deleteCategory: async (id: string): Promise<boolean> => {
+      const rollback = patchWorkspace(qc, removeCategoryById(id));
       try {
         const snap = await m.deleteCategory(sb, id);
         invalidateWorkspace();
@@ -87,6 +106,7 @@ export function useSidebarMutations(workspaceId?: string) {
         notify.success("Context deleted");
         return true;
       } catch (e) {
+        rollback(); // restore the removed context on failure
         toast.error(e instanceof Error ? e.message : "Something went wrong");
         return false;
       }
@@ -120,8 +140,12 @@ export function useSidebarMutations(workspaceId?: string) {
     },
 
     renameMember: (id: string, name: string) =>
-      run(m.updateMember(sb, id, { name }), "Calendar renamed"),
+      run(m.updateMember(sb, id, { name }), "Calendar renamed", () =>
+        patchWorkspace(qc, patchMemberById(id, { name })),
+      ),
     recolorMember: (id: string, color: string) =>
-      run(m.updateMember(sb, id, { color }), "Calendar color updated"),
+      run(m.updateMember(sb, id, { color }), "Calendar color updated", () =>
+        patchWorkspace(qc, patchMemberById(id, { color })),
+      ),
   };
 }

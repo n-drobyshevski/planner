@@ -7,6 +7,11 @@ import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
+import {
+  patchWorkspace,
+  patchBoardById,
+  removeBoardById,
+} from "@/lib/hooks/use-workspace-cache";
 
 /** A reversible action: a label for the toast + the inverse to run. */
 type UndoSpec = { label: string; undo: () => Promise<boolean> };
@@ -45,8 +50,13 @@ export function useBoardMutations() {
   async function run<T>(
     p: Promise<T>,
     okMsg: string,
-    opts?: { undo?: (result: T) => UndoSpec | null },
+    opts?: {
+      undo?: (result: T) => UndoSpec | null;
+      /** Apply an optimistic cache patch now; returns the rollback for the catch. */
+      optimistic?: () => () => void;
+    },
   ): Promise<boolean> {
+    const rollback = opts?.optimistic?.();
     try {
       const result = await p;
       invalidate();
@@ -55,6 +65,7 @@ export function useBoardMutations() {
       notify.success(okMsg);
       return true;
     } catch (e) {
+      rollback?.(); // restore the pre-patch snapshot on failure
       toast.error(e instanceof Error ? e.message : "Something went wrong");
       return false;
     }
@@ -82,15 +93,22 @@ export function useBoardMutations() {
     },
 
     update: (id: string, patch: { name?: string; color?: string; sortOrder?: number }) =>
-      run(m.updateBoard(sb, id, patch), "Board updated"),
+      run(m.updateBoard(sb, id, patch), "Board updated", {
+        optimistic: () => patchWorkspace(qc, patchBoardById(id, patch)),
+      }),
 
     setShared: (id: string, ownerId: string | null) =>
-      run(m.setBoardOwner(sb, id, ownerId), ownerId === null ? "Board shared" : "Board made personal"),
+      run(
+        m.setBoardOwner(sb, id, ownerId),
+        ownerId === null ? "Board shared" : "Board made personal",
+        { optimistic: () => patchWorkspace(qc, patchBoardById(id, { ownerId })) },
+      ),
 
     /** Delete a board (blocked if it still holds tasks). Returns success. */
     remove: (id: string) =>
       run(m.deleteBoard(sb, id), "Board deleted", {
         undo: (board) => inverse("delete", () => m.restoreBoard(sb, board)),
+        optimistic: () => patchWorkspace(qc, removeBoardById(id)),
       }),
   };
 }

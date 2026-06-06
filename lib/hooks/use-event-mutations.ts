@@ -8,8 +8,9 @@ import * as m from "@/lib/supabase/mutations";
 import type { DeletedSnapshot } from "@/lib/supabase/mutations";
 import type { WindowData } from "@/lib/supabase/queries";
 import type { EventInput } from "@/lib/supabase/mappers";
-import type { EventRow } from "@/lib/types";
+import type { EventRow, OverrideRow, OverrideType } from "@/lib/types";
 import type { OccurrencePatch } from "@/lib/recurrence/edit-semantics";
+import { editAll as computeEditAll } from "@/lib/recurrence/edit-semantics";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
 
@@ -71,6 +72,80 @@ export function useEventMutations(workspaceId: string | undefined) {
     );
     return () => prev.forEach(([key, data]) => qc.setQueryData(key, data));
   };
+
+  // Upsert a provisional override into every cached window, keyed (like the
+  // server's event_id,occurrence_date unique constraint) on eventId +
+  // occurrenceDate, so a single-occurrence edit/cancel shows before the round
+  // trip. `build` receives any existing override for that key so a "modify"
+  // merges onto it (mirroring the server's column-wise upsert).
+  const upsertOverrideInWindows = (
+    eventId: string,
+    occurrenceDate: number,
+    build: (existing: OverrideRow | undefined) => OverrideRow,
+  ) => {
+    if (!workspaceId) return () => {};
+    const prev = qc.getQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) });
+    qc.setQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) }, (old) => {
+      if (!old) return old;
+      const idx = old.overrides.findIndex(
+        (o) => o.eventId === eventId && o.occurrenceDate === occurrenceDate,
+      );
+      const built = build(idx >= 0 ? old.overrides[idx] : undefined);
+      const overrides =
+        idx >= 0
+          ? old.overrides.map((o, i) => (i === idx ? built : o))
+          : [...old.overrides, built];
+      return { ...old, overrides };
+    });
+    return () => prev.forEach(([key, data]) => qc.setQueryData(key, data));
+  };
+
+  /** Build a provisional override row, merging a modify patch onto any existing one. */
+  const provisionalOverride = (
+    existing: OverrideRow | undefined,
+    eventId: string,
+    occurrenceDate: number,
+    type: OverrideType,
+    patch?: OccurrencePatch,
+  ): OverrideRow => {
+    const base: OverrideRow = existing ?? {
+      id: `optimistic:${eventId}:${occurrenceDate}`,
+      workspaceId: workspaceId!,
+      eventId,
+      occurrenceDate,
+      type,
+      title: null,
+      description: null,
+      location: null,
+      categoryId: null,
+      start: null,
+      end: null,
+      allDay: null,
+    };
+    if (type === "cancel") return { ...base, type: "cancel" };
+    // modify: only the override-backed columns (inactive/status are series-level
+    // and the server's applyOverride leaves them alone, so we do too).
+    const p = patch ?? {};
+    return {
+      ...base,
+      type: "modify",
+      ...(p.title !== undefined ? { title: p.title } : {}),
+      ...(p.description !== undefined ? { description: p.description } : {}),
+      ...(p.location !== undefined ? { location: p.location } : {}),
+      ...(p.categoryId !== undefined ? { categoryId: p.categoryId } : {}),
+      ...(p.start !== undefined ? { start: p.start } : {}),
+      ...(p.end !== undefined ? { end: p.end } : {}),
+      ...(p.allDay !== undefined ? { allDay: p.allDay } : {}),
+    };
+  };
+
+  /** Master-row patch for a move/resize op (start/end/allDay are identically typed
+   *  on EventInput and EventRow, so this stays type-safe). */
+  const rowMovePatch = (p: Partial<EventInput>): Partial<EventRow> => ({
+    ...(p.start !== undefined ? { start: p.start } : {}),
+    ...(p.end !== undefined ? { end: p.end } : {}),
+    ...(p.allDay !== undefined ? { allDay: p.allDay } : {}),
+  });
 
   /** Wrap a raw inverse op: invalidate on success, toast + false on failure. */
   const inverse = (label: string, op: () => Promise<unknown>): UndoSpec => ({
@@ -182,6 +257,18 @@ export function useEventMutations(workspaceId: string | undefined) {
                 Promise.all(undoable.map((o) => m.updateEvent(sb, o.id, o.prev))),
               );
         },
+        () => {
+          // Patch master rows (moves/resizes) and inject per-occurrence modify
+          // overrides (single recurring instances) so a group drag shows at once.
+          const rollbacks = ops.map((o) =>
+            o.kind === "update"
+              ? patchEventWindows(o.id, (e) => ({ ...e, ...rowMovePatch(o.patch) }))
+              : upsertOverrideInWindows(o.event.id, o.occurrenceDate, (ex) =>
+                  provisionalOverride(ex, o.event.id, o.occurrenceDate, "modify", o.patch),
+                ),
+          );
+          return () => rollbacks.forEach((r) => r());
+        },
       ),
     remove: (id: string) =>
       run(
@@ -248,6 +335,10 @@ export function useEventMutations(workspaceId: string | undefined) {
         "This event updated",
         ({ prior }) =>
           inverse("edit", () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
+        () =>
+          upsertOverrideInWindows(event.id, occurrenceMs, (ex) =>
+            provisionalOverride(ex, event.id, occurrenceMs, "modify", patch),
+          ),
       ),
     editFuture: (
       event: EventRow,
@@ -269,7 +360,13 @@ export function useEventMutations(workspaceId: string | undefined) {
           }),
       ),
     editAll: (event: EventRow, patch: OccurrencePatch) =>
-      run(m.updateAll(sb, event, patch), "All events updated"),
+      run(
+        m.updateAll(sb, event, patch),
+        "All events updated",
+        undefined,
+        () =>
+          patchEventWindows(event.id, (e) => ({ ...e, ...computeEditAll(event, patch) })),
+      ),
 
     deleteThis: (event: EventRow, occurrenceMs: number) =>
       run(
@@ -281,6 +378,10 @@ export function useEventMutations(workspaceId: string | undefined) {
         "Event deleted",
         ({ prior }) =>
           inverse("delete", () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
+        () =>
+          upsertOverrideInWindows(event.id, occurrenceMs, (ex) =>
+            provisionalOverride(ex, event.id, occurrenceMs, "cancel"),
+          ),
       ),
     deleteFuture: (event: EventRow, occurrenceMs: number) =>
       run(m.deleteThisAndFuture(sb, event, occurrenceMs), "This and future deleted", () =>

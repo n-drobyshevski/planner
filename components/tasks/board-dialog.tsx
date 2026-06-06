@@ -70,35 +70,38 @@ export function BoardDialog({
 
   async function save() {
     if (!name.trim() || pending) return;
-    setPending(true);
-    try {
-      if (mode === "create") {
-        const id = await mutations.create({
-          workspaceId,
-          ownerId: shared ? null : currentMemberId,
-          name: name.trim(),
-          color,
-          sortOrder: Date.now(),
-        });
-        if (id) {
-          onCreated?.(id);
-          onOpenChange(false);
-        }
-        return;
-      }
+
+    if (mode === "edit") {
       if (!board) return;
-      // Edit: apply name/color and, if the share state changed, owner too.
-      const tasks: Promise<unknown>[] = [];
-      if (name.trim() !== board.name || color !== board.color) {
-        tasks.push(mutations.update(board.id, { name: name.trim(), color }));
-      }
+      // Edit: apply name/color and, if the share state changed, owner too. Both
+      // mutations patch the cache optimistically, so close now and let them
+      // reconcile in the background (failures surface via toast + undo).
       const wantShared = shared;
       const isShared = board.ownerId === null;
-      if (wantShared !== isShared) {
-        tasks.push(mutations.setShared(board.id, wantShared ? null : currentMemberId));
-      }
-      await Promise.all(tasks);
       onOpenChange(false);
+      if (name.trim() !== board.name || color !== board.color) {
+        void mutations.update(board.id, { name: name.trim(), color });
+      }
+      if (wantShared !== isShared) {
+        void mutations.setShared(board.id, wantShared ? null : currentMemberId);
+      }
+      return;
+    }
+
+    // create: await the new id so we can switch the board view to it.
+    setPending(true);
+    try {
+      const id = await mutations.create({
+        workspaceId,
+        ownerId: shared ? null : currentMemberId,
+        name: name.trim(),
+        color,
+        sortOrder: Date.now(),
+      });
+      if (id) {
+        onCreated?.(id);
+        onOpenChange(false);
+      }
     } finally {
       setPending(false);
     }

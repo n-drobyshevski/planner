@@ -1,6 +1,8 @@
 "use client";
 
 import { forwardRef, useMemo } from "react";
+import { m, AnimatePresence } from "motion/react";
+import { tween, tweenFast } from "@/lib/motion";
 import { format, isSameDay } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
@@ -65,30 +67,42 @@ export function AgendaView({
   const timeZone = useViewerTimeZone();
   const groups = useMemo(() => groupByDay(occurrences, timeZone), [occurrences, timeZone]);
 
-  if (loading && groups.length === 0) return <AgendaSkeleton />;
-
-  if (groups.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center p-8">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CalendarDays />
-            </EmptyMedia>
-            <EmptyTitle>Nothing scheduled</EmptyTitle>
-            <EmptyDescription>
-              Add an event with the New button, or jump to another date.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </div>
-    );
-  }
+  // Crossfade the loading / empty / content states instead of a hard pop-in.
+  // `initial={false}` paints the first state instantly (no blank-on-mount), so
+  // only the transition between states animates; reduced motion shortens it via
+  // the global rule + MotionConfig.
+  const state =
+    loading && groups.length === 0 ? "loading" : groups.length === 0 ? "empty" : "content";
 
   return (
-    <div className="h-full overflow-y-auto overscroll-contain">
-      <ol className="mx-auto max-w-2xl divide-y">
-        {groups.map((g) => {
+    <AnimatePresence mode="wait" initial={false}>
+      <m.div
+        key={state}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: tween }}
+        exit={{ opacity: 0, transition: tweenFast }}
+        className="h-full"
+      >
+        {state === "loading" ? (
+          <AgendaSkeleton />
+        ) : state === "empty" ? (
+          <div className="flex h-full items-center justify-center p-8">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <CalendarDays />
+                </EmptyMedia>
+                <EmptyTitle>Nothing scheduled</EmptyTitle>
+                <EmptyDescription>
+                  Add an event with the New button, or jump to another date.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </div>
+        ) : (
+          <div className="h-full overflow-y-auto overscroll-contain">
+            <ol className="mx-auto max-w-2xl divide-y">
+              {groups.map((g) => {
           const isToday = isSameDay(g.dayMs, today, { in: tz(timeZone) });
           return (
             <li key={g.dayMs} className="flex gap-3 px-3 py-3 sm:px-4">
@@ -155,9 +169,12 @@ export function AgendaView({
               </ul>
             </li>
           );
-        })}
-      </ol>
-    </div>
+              })}
+            </ol>
+          </div>
+        )}
+      </m.div>
+    </AnimatePresence>
   );
 }
 
