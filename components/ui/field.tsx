@@ -216,7 +216,13 @@ function FieldError({
     <div
       role="alert"
       data-slot="field-error"
-      className={cn("text-sm font-normal text-destructive", className)}
+      // Validation errors fade + slide in when they appear, so the message reads
+      // as a response to the field rather than a layout jump. Reduced-motion
+      // collapses it via the global rule.
+      className={cn(
+        "text-sm font-normal text-destructive animate-in fade-in slide-in-from-top-1 duration-150",
+        className,
+      )}
       {...props}
     >
       {content}

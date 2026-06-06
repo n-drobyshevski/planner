@@ -139,10 +139,15 @@ export function useWindowEvents(
       query.data
         ? expandEvents(query.data.events, query.data.overrides, win, sharedCategoryIds)
         : [],
-    // win identity changes each render; depend on its primitive bounds. The
-    // shared-id set is memoized by the caller, so it is a stable dependency.
+    // Depend on the events/overrides arrays separately, not the whole WindowData
+    // object: React Query's structural sharing keeps their references stable when
+    // a refetch leaves them unchanged, so a realtime refetch that touched only
+    // one (or a category-bundle change) doesn't force a full re-expansion of every
+    // series. An optimistic patch rebuilds `events`, so it still re-expands (as it
+    // must, to reflect the change). win identity changes each render → depend on
+    // its primitive bounds; the shared-id set is memoized by the caller.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [query.data, win.start, win.end, sharedCategoryIds],
+    [query.data?.events, query.data?.overrides, win.start, win.end, sharedCategoryIds],
   );
 
   return {

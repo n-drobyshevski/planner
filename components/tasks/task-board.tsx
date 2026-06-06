@@ -21,7 +21,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { m } from "motion/react";
 import { Plus, ListChecks } from "lucide-react";
+import { tweenFast } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { TaskContextMenu } from "./task-context-menu";
 import {
@@ -251,18 +253,23 @@ export function TaskBoard({
 
       <DragOverlay>
         {activeTask ? (
-          <TaskCard
-            task={activeTask}
-            color={colorOf(activeTask)}
-            assignee={
-              activeTask.assigneeId ? members.get(activeTask.assigneeId) ?? null : null
-            }
-            progress={progressOf?.(activeTask) ?? null}
-            onOpen={() => {}}
-            onToggleDone={() => {}}
-            showHandle
-            className="cursor-grabbing shadow-soft-lg"
-          />
+          // The grabbed card lifts (subtle scale) above the board while dragging;
+          // shadow-soft-lg reinforces the depth. reducedMotion="user" (provider)
+          // drops the scale for users who ask for it.
+          <m.div initial={{ scale: 1 }} animate={{ scale: 1.03 }} transition={tweenFast}>
+            <TaskCard
+              task={activeTask}
+              color={colorOf(activeTask)}
+              assignee={
+                activeTask.assigneeId ? members.get(activeTask.assigneeId) ?? null : null
+              }
+              progress={progressOf?.(activeTask) ?? null}
+              onOpen={() => {}}
+              onToggleDone={() => {}}
+              showHandle
+              className="cursor-grabbing shadow-soft-lg"
+            />
+          </m.div>
         ) : null}
       </DragOverlay>
     </DndContext>

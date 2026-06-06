@@ -677,7 +677,7 @@ export function CalendarShell({
       const occ = visible.find((o) => o.key === key);
       if (!occ || !canEditOcc(occ)) continue;
       const ev = events.find((e) => e.id === occ.eventId);
-      if (ev) void mutations.updateSingle(ev.id, { color }, { color: ev.color });
+      if (ev) void mutations.updateSingle(ev.id, { color }, { color: ev.color }, { color });
     }
   }
 
@@ -935,7 +935,7 @@ export function CalendarShell({
             members={memberMap}
             onSchedule={(t) => setScheduling(t)}
             onToggleDone={(t) => void taskMutations.toggleDone(t)}
-            onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c }, { color: t.color })}
+            onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c }, { color: t.color }, { color: c })}
             onDelete={(t) => setDeletingTask(t)}
             analytics={{
               occurrences: visible,
@@ -1084,7 +1084,7 @@ export function CalendarShell({
             setBacklogOpen(false);
           }}
           onToggleDone={(t) => void taskMutations.toggleDone(t)}
-          onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c }, { color: t.color })}
+          onChangeColor={(t, c) => void taskMutations.update(t.id, { color: c }, { color: t.color }, { color: c })}
           onDelete={(t) => setDeletingTask(t)}
         />
       )}

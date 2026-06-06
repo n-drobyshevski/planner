@@ -59,8 +59,10 @@ export const EventBlock = forwardRef<
       className={cn(
         // z-index comes from --evt-z (the cascade order set by day-column);
         // hovering or selecting an event raises it above the stack so a covered
-        // block is revealed in full — a pure z change, no layout shift.
-        "absolute z-[var(--evt-z,10)] flex touch-none flex-col overflow-hidden rounded-md border-[1.5px] px-1.5 text-left text-xs shadow-soft select-none hover:z-30",
+        // block is revealed in full — a pure z change, no layout shift. The
+        // selection ring + hover shadow are both box-shadow, so transition-shadow
+        // eases them in/out (≈150ms) instead of snapping — conveys state calmly.
+        "absolute z-[var(--evt-z,10)] flex touch-none flex-col overflow-hidden rounded-md border-[1.5px] px-1.5 text-left text-xs shadow-soft transition-shadow duration-150 ease-out-quint select-none hover:z-30 hover:shadow-soft-lg",
         compact ? "py-0.5" : "py-1",
         editable ? "cursor-grab" : "cursor-pointer",
         selected && "z-30 ring-2 ring-foreground",
@@ -102,10 +104,12 @@ export const EventBlock = forwardRef<
                 e.stopPropagation();
                 onToggleTaskDone?.();
               }}
-              className="mt-px shrink-0 cursor-pointer text-current opacity-90 hover:opacity-100"
+              className="mt-px shrink-0 cursor-pointer text-current opacity-90 transition-transform duration-150 ease-out-quint hover:opacity-100 active:scale-90"
             >
               {taskDone ? (
-                <CheckCircle2 className="size-3.5" />
+                // The check pops in (scale) when the task is marked done — a small
+                // bit of feedback. Reduced-motion collapses it via the global rule.
+                <CheckCircle2 className="size-3.5 animate-in zoom-in-50 duration-150" />
               ) : (
                 <Circle className="size-3.5" />
               )}

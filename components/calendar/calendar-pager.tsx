@@ -184,7 +184,7 @@ export const CalendarPager = React.forwardRef<CalendarPagerHandle, Props>(
       >
         <div
           ref={trackRef}
-          className={cn("flex h-full will-change-transform", transitioning && "ease-out")}
+          className={cn("flex h-full will-change-transform", transitioning && "ease-out-quint")}
           style={{
             transform,
             transitionProperty: transitioning ? "transform" : "none",

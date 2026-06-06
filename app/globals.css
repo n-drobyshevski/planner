@@ -67,6 +67,29 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ---------------------------------------------------------------------------
+   Motion system — the single source of truth for easing + duration. A regular
+   @theme block (not `inline`) so Tailwind BOTH generates the utilities
+   (`ease-out-quint`, …) AND emits the `--ease-*` / `--dur-*` custom properties
+   to :root, so inline styles, plain CSS, and the JS motion config (lib/motion.ts)
+   all read the same values. Easing is the ease-out family only (no bounce /
+   elastic — impeccable product register); durations stay in the 120–300ms band
+   so motion conveys state without making anyone wait. Keep lib/motion.ts in sync
+   (it mirrors these as seconds for the `motion` library).
+--------------------------------------------------------------------------- */
+/* `static` so ALL motion vars emit to :root even when a given easing isn't yet
+   used by a utility (Tailwind v4 tree-shakes unused @theme vars by default) —
+   keeps var(--ease-*) reliably available for inline styles and future use. */
+@theme static {
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1); /* smooth */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1); /* slightly snappier — default */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); /* confident, decisive */
+
+  --dur-fast: 150ms; /* press, toggle, color, focus ring (== duration-150) */
+  --dur-base: 200ms; /* menus, hover, selection, most state changes (== duration-200) */
+  --dur-slow: 300ms; /* drawer, sheet, accordion, layout settle (== duration-300) */
+}
+
 :root {
   --radius: 0.75rem; /* rounded + soft */
 

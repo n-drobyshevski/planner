@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import type { DeletedSnapshot } from "@/lib/supabase/mutations";
+import type { WindowData } from "@/lib/supabase/queries";
 import type { EventInput } from "@/lib/supabase/mappers";
 import type { EventRow } from "@/lib/types";
 import type { OccurrencePatch } from "@/lib/recurrence/edit-semantics";
@@ -47,6 +48,30 @@ export function useEventMutations(workspaceId: string | undefined) {
     if (workspaceId) qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
   };
 
+  // --- Optimistic cache patches -------------------------------------------
+  // Patch every cached window (the prev/current/next swipe panes + prefetched
+  // neighbours all share the ["events", workspaceId, …] prefix) so the change
+  // shows instantly, before the server round-trip. Each returns a rollback that
+  // restores the pre-patch snapshots; `run` calls it if the write throws. The
+  // success path's invalidate() — plus realtime — reconciles with server truth.
+  // Generalizes calendar-shell's single-window `optimisticMove` to all windows.
+  const patchEventWindows = (eventId: string, patch: (e: EventRow) => EventRow) => {
+    if (!workspaceId) return () => {};
+    const prev = qc.getQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) });
+    qc.setQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) }, (old) =>
+      old ? { ...old, events: old.events.map((e) => (e.id === eventId ? patch(e) : e)) } : old,
+    );
+    return () => prev.forEach(([key, data]) => qc.setQueryData(key, data));
+  };
+  const removeEventFromWindows = (eventId: string) => {
+    if (!workspaceId) return () => {};
+    const prev = qc.getQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) });
+    qc.setQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) }, (old) =>
+      old ? { ...old, events: old.events.filter((e) => e.id !== eventId) } : old,
+    );
+    return () => prev.forEach(([key, data]) => qc.setQueryData(key, data));
+  };
+
   /** Wrap a raw inverse op: invalidate on success, toast + false on failure. */
   const inverse = (label: string, op: () => Promise<unknown>): UndoSpec => ({
     label,
@@ -66,7 +91,10 @@ export function useEventMutations(workspaceId: string | undefined) {
     p: Promise<T>,
     okMsg: string,
     undo?: (result: T) => UndoSpec | null,
+    /** Apply an optimistic cache patch now; returns the rollback for the catch. */
+    optimistic?: () => () => void,
   ): Promise<boolean> {
+    const rollback = optimistic?.();
     try {
       const result = await p;
       invalidate();
@@ -80,6 +108,7 @@ export function useEventMutations(workspaceId: string | undefined) {
       );
       return true;
     } catch (e) {
+      rollback?.(); // restore the pre-patch snapshot on failure
       toast.error(e instanceof Error ? e.message : "Something went wrong");
       return false;
     }
@@ -102,11 +131,23 @@ export function useEventMutations(workspaceId: string | undefined) {
                 Promise.all(rows.map((r) => m.deleteEvent(sb, r.id))),
               ),
       ),
-    updateSingle: (id: string, patch: Partial<EventInput>, prev?: Partial<EventInput>) =>
-      run(m.updateEvent(sb, id, patch), "Event updated", (row) =>
-        prev
-          ? inverse("edit", () => m.updateEvent(sb, id, prev, row.updatedAt))
-          : null,
+    updateSingle: (
+      id: string,
+      patch: Partial<EventInput>,
+      prev?: Partial<EventInput>,
+      /** Row fields to apply optimistically (e.g. { color } from a recolor). Pass
+       *  only when the caller doesn't already patch the cache itself — moves use
+       *  calendar-shell's optimisticMove, so they leave this undefined. */
+      optimisticRowPatch?: Partial<EventRow>,
+    ) =>
+      run(
+        m.updateEvent(sb, id, patch),
+        "Event updated",
+        (row) =>
+          prev ? inverse("edit", () => m.updateEvent(sb, id, prev, row.updatedAt)) : null,
+        optimisticRowPatch
+          ? () => patchEventWindows(id, (e) => ({ ...e, ...optimisticRowPatch }))
+          : undefined,
       ),
     /**
      * Move/resize several items at once — one invalidate + one toast. Mixes
@@ -143,8 +184,11 @@ export function useEventMutations(workspaceId: string | undefined) {
         },
       ),
     remove: (id: string) =>
-      run(m.deleteEventDeep(sb, id), "Event deleted", (snap) =>
-        inverse("delete", () => m.restoreDeleted(sb, snap)),
+      run(
+        m.deleteEventDeep(sb, id),
+        "Event deleted",
+        (snap) => inverse("delete", () => m.restoreDeleted(sb, snap)),
+        () => removeEventFromWindows(id),
       ),
     /** Delete several items — whole rows and/or single-occurrence cancels. */
     removeMany: (ops: DeleteOp[]) =>
@@ -190,6 +234,7 @@ export function useEventMutations(workspaceId: string | undefined) {
                 m.updateEvent(sb, eventId, { categoryId: prevCategoryId }, row.updatedAt),
               )
             : null,
+        () => patchEventWindows(eventId, (e) => ({ ...e, categoryId })),
       ),
 
     editThis: (event: EventRow, occurrenceMs: number, patch: OccurrencePatch) =>

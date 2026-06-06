@@ -32,6 +32,31 @@ export function useTaskMutations(workspaceId: string | undefined) {
     if (alsoEvents) qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
   };
 
+  // --- Optimistic cache patches -------------------------------------------
+  // The tasks query is a single flat list (not windowed), so patches are simple
+  // map/filter over ["tasks", workspaceId]. Each returns a rollback that restores
+  // the snapshot; `run` calls it if the write throws. invalidate() + realtime
+  // reconcile on success.
+  const patchTaskCache = (taskId: string, patch: (t: TaskRow) => TaskRow) => {
+    if (!workspaceId) return () => {};
+    const key = qk.tasks(workspaceId);
+    const prev = qc.getQueryData<TaskRow[]>(key);
+    qc.setQueryData<TaskRow[]>(key, (old) =>
+      old?.map((t) => (t.id === taskId ? patch(t) : t)),
+    );
+    return () => qc.setQueryData(key, prev);
+  };
+  const removeTaskFromCache = (taskId: string) => {
+    if (!workspaceId) return () => {};
+    const key = qk.tasks(workspaceId);
+    const prev = qc.getQueryData<TaskRow[]>(key);
+    // Drop the task and its direct subtasks (deleteTaskDeep cascades server-side).
+    qc.setQueryData<TaskRow[]>(key, (old) =>
+      old?.filter((t) => t.id !== taskId && t.parentId !== taskId),
+    );
+    return () => qc.setQueryData(key, prev);
+  };
+
   /** Wrap a raw inverse op: invalidate on success, toast + false on failure. */
   const inverse = (
     label: string,
@@ -54,8 +79,14 @@ export function useTaskMutations(workspaceId: string | undefined) {
   async function run<T>(
     p: Promise<T>,
     okMsg: string,
-    opts?: { alsoEvents?: boolean; undo?: (result: T) => UndoSpec | null },
+    opts?: {
+      alsoEvents?: boolean;
+      undo?: (result: T) => UndoSpec | null;
+      /** Apply an optimistic cache patch now; returns the rollback for the catch. */
+      optimistic?: () => () => void;
+    },
   ): Promise<boolean> {
+    const rollback = opts?.optimistic?.();
     try {
       const result = await p;
       invalidate(opts?.alsoEvents);
@@ -69,6 +100,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
       );
       return true;
     } catch (e) {
+      rollback?.(); // restore the pre-patch snapshot on failure
       toast.error(e instanceof Error ? e.message : "Something went wrong");
       return false;
     }
@@ -79,17 +111,27 @@ export function useTaskMutations(workspaceId: string | undefined) {
       run(m.createTask(sb, input), "Task created", {
         undo: (row) => inverse("create", () => m.deleteTask(sb, row.id)),
       }),
-    update: (id: string, patch: Partial<TaskInput>, prev?: Partial<TaskInput>) =>
+    update: (
+      id: string,
+      patch: Partial<TaskInput>,
+      prev?: Partial<TaskInput>,
+      /** Row fields to apply optimistically (e.g. { color } from a recolor). */
+      optimisticRowPatch?: Partial<TaskRow>,
+    ) =>
       run(m.updateTask(sb, id, patch), "Task updated", {
         undo: (row) =>
           prev
             ? inverse("edit", () => m.updateTask(sb, id, prev, row.updatedAt))
             : null,
+        optimistic: optimisticRowPatch
+          ? () => patchTaskCache(id, (t) => ({ ...t, ...optimisticRowPatch }))
+          : undefined,
       }),
     remove: (id: string) =>
       run(m.deleteTaskDeep(sb, id), "Task deleted", {
         alsoEvents: true,
         undo: (snap) => inverse("delete", () => m.restoreDeleted(sb, snap), true),
+        optimistic: () => removeTaskFromCache(id),
       }),
 
     /** Move to a status column at a new position; manages completed_at on transition. */
@@ -107,27 +149,33 @@ export function useTaskMutations(workspaceId: string | undefined) {
       return run(m.updateTask(sb, task.id, patch), "Task moved", {
         undo: (row) =>
           inverse("move", () => m.updateTask(sb, task.id, prev, row.updatedAt)),
+        optimistic: () => patchTaskCache(task.id, (t) => ({ ...t, ...patch })),
       });
     },
 
     /** Toggle the done state (e.g. a checkbox). */
     toggleDone: (task: TaskRow) => {
       const done = task.status === "done";
+      const nextStatus: TaskRow["status"] = done ? "todo" : "done";
+      const nextCompletedAt = done ? null : Date.now();
       const prev: Partial<TaskInput> = {
         status: task.status,
         completedAt: task.completedAt,
       };
       return run(
-        m.updateTask(sb, task.id, {
-          status: done ? "todo" : "done",
-          completedAt: done ? null : Date.now(),
-        }),
+        m.updateTask(sb, task.id, { status: nextStatus, completedAt: nextCompletedAt }),
         done ? "Task reopened" : "Task completed",
         {
           undo: (row) =>
             inverse(done ? "reopen" : "complete", () =>
               m.updateTask(sb, task.id, prev, row.updatedAt),
             ),
+          optimistic: () =>
+            patchTaskCache(task.id, (t) => ({
+              ...t,
+              status: nextStatus,
+              completedAt: nextCompletedAt,
+            })),
         },
       );
     },
