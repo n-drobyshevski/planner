@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   Minimize2,
+  Keyboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +58,7 @@ export function CalendarToolbar({
   onToggleSidebar,
   onToggleBacklog,
   onOpenFilters,
+  onOpenShortcuts,
   backlogOpen,
   workspace,
 }: {
@@ -70,6 +72,7 @@ export function CalendarToolbar({
   onToggleSidebar: () => void;
   onToggleBacklog: () => void;
   onOpenFilters: () => void;
+  onOpenShortcuts: () => void;
   backlogOpen: boolean;
   workspace: WorkspaceData | null;
 }) {
@@ -89,6 +92,7 @@ export function CalendarToolbar({
           variant="ghost"
           size="icon"
           aria-label="Toggle sidebar"
+          title="Toggle sidebar (Ctrl+Alt+←)"
           onClick={onToggleSidebar}
         >
           <PanelLeft />
@@ -139,11 +143,21 @@ export function CalendarToolbar({
             variant="ghost"
             size="icon"
             aria-label="Toggle tasks panel"
+            title="Toggle tasks panel (Ctrl+Alt+→)"
             aria-pressed={backlogOpen}
             onClick={onToggleBacklog}
             className={cn(backlogOpen && "bg-accent text-accent-foreground")}
           >
             <PanelRight />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            onClick={onOpenShortcuts}
+          >
+            <Keyboard />
           </Button>
           <ToolbarUserMenu current={current} />
         </div>
@@ -232,7 +246,9 @@ function CalendarMobileMenu({
           value={view}
           onValueChange={(v) => onViewChange(v as CalendarView)}
         >
-          {VIEW_OPTIONS.map((o) => (
+          {/* Week needs 7 columns it can't get on a phone — the shell coerces it
+              to 3-day there, so it isn't offered in the mobile menu. */}
+          {VIEW_OPTIONS.filter((o) => o.value !== "week").map((o) => (
             <DropdownMenuRadioItem key={o.value} value={o.value}>
               {o.label}
             </DropdownMenuRadioItem>

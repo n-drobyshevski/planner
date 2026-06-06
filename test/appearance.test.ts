@@ -6,11 +6,22 @@ describe("eventFillStyle", () => {
   // so it re-tints with Catppuccin flavors.
   const TEAL = "#0f766e";
 
-  it("filled (my / shared events): solid swatch, matching ink, no border", () => {
+  it("filled (my / shared events): chroma-trimmed swatch, matching ink, no border", () => {
     expect(eventFillStyle(TEAL, false)).toEqual({
-      backgroundColor: "var(--swatch-teal)",
+      // Chroma trimmed ~15% (lightness held) to calm saturation without changing
+      // the ink contrast; still re-tints with Catppuccin via the swatch var.
+      backgroundColor: "oklch(from var(--swatch-teal) l calc(c * 0.85) h)",
       borderColor: "transparent",
       color: "var(--swatch-ink-teal, var(--swatch-ink))",
+    });
+  });
+
+  it("inactive (sleep / blocked hours): faint wash, hairline tint border, ink text, flat", () => {
+    expect(eventFillStyle(TEAL, false, true)).toEqual({
+      backgroundColor: "color-mix(in oklab, var(--swatch-teal) 18%, var(--card))",
+      borderColor: "color-mix(in oklab, var(--swatch-teal) 36%, var(--border))",
+      color: "var(--foreground)",
+      boxShadow: "none",
     });
   });
 
@@ -29,7 +40,7 @@ describe("eventFillStyle", () => {
   it("passes unknown/custom hexes through unchanged (still background-filled when outlined)", () => {
     const CUSTOM = "#123456";
     expect(eventFillStyle(CUSTOM, false)).toMatchObject({
-      backgroundColor: "#123456",
+      backgroundColor: "oklch(from #123456 l calc(c * 0.85) h)",
       borderColor: "transparent",
       color: "var(--swatch-ink)",
     });

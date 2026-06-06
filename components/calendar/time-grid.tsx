@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
@@ -194,6 +194,122 @@ export function TimeGrid({
   const timeZone = useViewerTimeZone();
   const secondaryTimeZone = useSecondaryTimeZone();
 
+  // --- Roving keyboard navigation -----------------------------------------
+  // The columns container is the grid's one Tab stop; from it the arrow keys
+  // move focus block-to-block. We read the live DOM (not a recomputed list) so
+  // the order always matches what's rendered. `[role="button"]` selects only
+  // EventBlocks — ContextBackdrops carry data-occ-key but no role, so the
+  // backdrops are skipped. The last-focused block is remembered so re-entering
+  // the grid returns to it. `pointerActive` suppresses the entry-delegation on a
+  // mouse click (clicking empty space must not yank focus onto an event).
+  const lastFocusedKey = useRef<string | null>(null);
+  const pointerActive = useRef(false);
+
+  const focusableBlocks = (): HTMLElement[] =>
+    Array.from(
+      colsRef.current?.querySelectorAll<HTMLElement>(
+        '[data-occ-key][role="button"]',
+      ) ?? [],
+    );
+
+  const focusBlock = (el: HTMLElement | null | undefined) => {
+    if (!el) return;
+    lastFocusedKey.current = el.dataset.occKey ?? null;
+    el.focus(); // scrolls into view via the ScrollArea viewport
+  };
+
+  /** The block to land on when Tab/arrow first enters the grid. */
+  const entryBlock = (blocks: HTMLElement[]): HTMLElement | undefined => {
+    const remembered = lastFocusedKey.current
+      ? blocks.find((b) => b.dataset.occKey === lastFocusedKey.current)
+      : undefined;
+    return remembered ?? blocks[0];
+  };
+
+  /** Nearest block (by vertical position) in the next/prev day column that has
+   *  one. Day columns are the first `days.length` children of colsRef (the move
+   *  previews render after), so we never step into a ghost. */
+  const adjacentColumnBlock = (
+    block: HTMLElement,
+    dir: -1 | 1,
+  ): HTMLElement | null => {
+    const root = colsRef.current;
+    if (!root) return null;
+    let col: HTMLElement | null = block;
+    while (col && col.parentElement !== root) col = col.parentElement;
+    if (!col) return null;
+    const cols = Array.from(root.children);
+    const start = cols.indexOf(col);
+    const top = block.getBoundingClientRect().top;
+    for (let j = start + dir; j >= 0 && j < days.length; j += dir) {
+      const candidates = Array.from(
+        (cols[j] as HTMLElement).querySelectorAll<HTMLElement>(
+          '[data-occ-key][role="button"]',
+        ),
+      );
+      if (candidates.length === 0) continue;
+      let best = candidates[0];
+      let bestD = Infinity;
+      for (const c of candidates) {
+        const d = Math.abs(c.getBoundingClientRect().top - top);
+        if (d < bestD) {
+          bestD = d;
+          best = c;
+        }
+      }
+      return best;
+    }
+    return null;
+  };
+
+  // Focus entering the columns container: delegate to a block on keyboard entry
+  // (Tab), but stay put on a mouse click (pointerActive) so an empty-space click
+  // keeps its create/clear behaviour. A child block bubbling its own focus here
+  // just updates the remembered key. `relatedTarget` inside the grid means
+  // Shift+Tab is leaving the first block backward — don't re-grab it (that would
+  // trap the back-tab); a second Shift+Tab then exits cleanly.
+  const onGridFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) {
+      const k = (e.target as HTMLElement).dataset?.occKey;
+      if (k) lastFocusedKey.current = k;
+      return;
+    }
+    if (pointerActive.current) return;
+    if (e.relatedTarget && colsRef.current?.contains(e.relatedTarget as Node)) return;
+    focusBlock(entryBlock(focusableBlocks()));
+  };
+
+  const onGridKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (
+      e.key !== "ArrowDown" &&
+      e.key !== "ArrowUp" &&
+      e.key !== "ArrowLeft" &&
+      e.key !== "ArrowRight"
+    )
+      return;
+    const root = colsRef.current;
+    if (!root) return;
+    const blocks = focusableBlocks();
+    if (blocks.length === 0) return;
+    const active = document.activeElement as HTMLElement | null;
+    const onBlock =
+      !!active &&
+      active.dataset.occKey != null &&
+      active.getAttribute("role") === "button" &&
+      root.contains(active);
+    e.preventDefault(); // stop the arrow from also scrolling the viewport
+    if (!onBlock) {
+      // Container focused (a click landed here, or an empty grid) — the first
+      // arrow press steps into the blocks.
+      focusBlock(entryBlock(blocks));
+      return;
+    }
+    const i = blocks.indexOf(active!);
+    if (e.key === "ArrowDown") focusBlock(blocks[Math.min(i + 1, blocks.length - 1)]);
+    else if (e.key === "ArrowUp") focusBlock(blocks[Math.max(i - 1, 0)]);
+    else focusBlock(adjacentColumnBlock(active!, e.key === "ArrowRight" ? 1 : -1) ?? active!);
+  };
+
   // Cancel any in-progress single-touch grid gesture so a two-finger pinch
   // (zoom) never also creates or moves an event.
   const cancelGesture = () => {
@@ -208,6 +324,22 @@ export function TimeGrid({
   };
   // Ctrl+wheel / trackpad + touch pinch stretch the grid vertically (via hourPx).
   useTimelineZoom({ viewportRef, onGestureStart: cancelGesture });
+
+  // Open the timed grid at a useful hour instead of 00:00: the current time when
+  // today is in the window (so the now-line is visible on load), else the start
+  // of the work day. Once per window — the ref guard means zooming (hourPx) keeps
+  // the user's scroll position instead of yanking back to now.
+  const scrolledFor = useRef<number | null>(null);
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const windowKey = days[0] ?? 0;
+    if (scrolledFor.current === windowKey) return;
+    scrolledFor.current = windowKey;
+    const minutes = days.includes(today) ? (Date.now() - today) / 60000 : 7 * 60;
+    const y = minutesToY(clampMin(minutes), hourPx);
+    vp.scrollTop = Math.max(0, y - vp.clientHeight * 0.3);
+  }, [days, today, hourPx]);
 
   // Contexts are timed backdrops in the grid body; never show them all-day
   // (all-day contexts are deferred — they'd otherwise render as a flat chip).
@@ -320,6 +452,9 @@ export function TimeGrid({
     // Edit/Delete (and every other menu action) inert.
     const cols = colsRef.current;
     if (cols && !cols.contains(e.target as Node)) return;
+    // A pointer interaction owns focus now; suppress the keyboard entry-delegation
+    // so clicking empty space (create / clear) never jumps focus onto an event.
+    pointerActive.current = true;
     const el = e.target as HTMLElement;
     const handle = el.closest<HTMLElement>("[data-resize]");
     const blockEl = el.closest<HTMLElement>("[data-occ-key]");
@@ -531,6 +666,7 @@ export function TimeGrid({
   }
 
   function onPointerUp(e: React.PointerEvent) {
+    pointerActive.current = false;
     const lp = longPressRef.current;
     if (lp && lp.pointerId === e.pointerId) {
       clearTimeout(lp.timer);
@@ -682,7 +818,15 @@ export function TimeGrid({
         )}
         {days.map((d) => (
           <div key={d} className="flex-1 border-l py-2 text-center">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div
+              className={cn(
+                "text-xs uppercase tracking-wide",
+                // Today's weekday label takes the brand colour (matches the
+                // agenda + the date pill below), tying the today column to the
+                // brand on the otherwise-neutral grid.
+                d === today ? "text-primary" : "text-muted-foreground",
+              )}
+            >
               {format(d, "EEE", { in: tz(timeZone) })}
             </div>
             <div
@@ -798,11 +942,22 @@ export function TimeGrid({
 
           <div
             ref={colsRef}
-            className={cn("relative flex flex-1", armed ? "touch-none" : "touch-pan-y")}
+            // The grid's one Tab stop: focus delegates to an event block, then
+            // the arrow keys rove between blocks (see onGridFocus/onGridKeyDown).
+            // outline-none because focus visibly lands on a block, not here.
+            tabIndex={0}
+            aria-label="Events. Use the arrow keys to move between events, Enter to open."
+            className={cn(
+              "relative flex flex-1 outline-none",
+              armed ? "touch-none" : "touch-pan-y",
+            )}
+            onFocus={onGridFocus}
+            onKeyDown={onGridKeyDown}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={() => {
+              pointerActive.current = false;
               if (longPressRef.current) {
                 clearTimeout(longPressRef.current.timer);
                 longPressRef.current = null;

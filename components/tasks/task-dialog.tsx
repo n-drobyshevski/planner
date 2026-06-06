@@ -340,14 +340,14 @@ export function TaskDialog(props: TaskDialogProps) {
             <AlertDialogTitle>Delete this task?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the task, its subtasks, and any blocks it placed on the
-              calendar. This can&apos;t be undone.
+              calendar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={onDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
             </AlertDialogAction>

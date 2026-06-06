@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { startOfDay, getTime } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { getWindow, getVisibleDays, navigate, defaultCreateDay } from "@/lib/datetime/window";
@@ -30,6 +31,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTimelineZoomPersistence } from "@/hooks/use-timeline-zoom";
 import { CalendarToolbar } from "./calendar-toolbar";
+import { KeyboardShortcutsDialog } from "./keyboard-shortcuts-dialog";
 import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
@@ -117,6 +119,7 @@ export function CalendarShell({
   const autoMobileApplied = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const workspace = useWorkspace();
   const wsId = workspace.data?.workspaceId;
@@ -684,13 +687,21 @@ export function CalendarShell({
   keyHandlerRef.current = (e: KeyboardEvent) => {
     // Don't hijack keys while a dialog/sheet is open or while typing — applies
     // to every shortcut below (incl. Shift+M, so typing "M" never toggles).
-    if (editor || details || pendingReschedule || pendingDelete || scheduling) return;
+    if (editor || details || pendingReschedule || pendingDelete || scheduling || shortcutsOpen)
+      return;
     const ae = document.activeElement;
     if (
       ae instanceof HTMLElement &&
       (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)
     )
       return;
+    // "?" (Shift+/) opens the keyboard-shortcut reference. Guarded above so it
+    // never fires while typing or with another dialog open.
+    if (e.key === "?") {
+      e.preventDefault();
+      setShortcutsOpen(true);
+      return;
+    }
     // Shift+M blurs/un-blurs all titles — works in every view, no selection needed.
     if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "m") {
       e.preventDefault();
@@ -726,6 +737,36 @@ export function CalendarShell({
   }, []);
 
   useEffect(() => setMounted(true), []);
+
+  // First time a second event joins the selection, surface the group-op modifiers
+  // contextually (they're otherwise only in the ? sheet). One toast, ever — the
+  // session ref stops repeats this mount, localStorage stops them across visits.
+  const multiSelectHintShown = useRef(false);
+  useEffect(() => {
+    if (selectedKeys.size < 2 || multiSelectHintShown.current) return;
+    multiSelectHintShown.current = true;
+    try {
+      if (localStorage.getItem("planner.hint.multiselect") === "seen") return;
+      localStorage.setItem("planner.hint.multiselect", "seen");
+    } catch {
+      /* private mode / no storage — just show it this once */
+    }
+    toast.info("Multiple events selected", {
+      description:
+        "Drag any one to move them together. Hold Alt for the whole series, Ctrl to duplicate. Press ? for all shortcuts.",
+      duration: 8000,
+    });
+  }, [selectedKeys.size]);
+
+  // The technical hint (a fresh DB needs its schema applied + seeded) goes to the
+  // console only; users get the human LoadError with a Retry instead.
+  const dataError = workspace.isError || eventsError;
+  useEffect(() => {
+    if (dataError)
+      console.warn(
+        "[planner] Calendar data failed to load. If this is a fresh environment, make sure the Supabase schema is applied and seeded.",
+      );
+  }, [dataError]);
 
   const days = useMemo(
     () => getVisibleDays(view, focusedDate, { timeZone: viewerTimeZone }),
@@ -767,6 +808,15 @@ export function CalendarShell({
     autoMobileApplied.current = true;
     setView("agenda");
   }
+  // Week needs 7 columns a phone can't give it; 3-day is the legible stand-in.
+  // This also catches a deep-linked `?view=week` opened on a phone (the
+  // auto-Agenda above is skipped when the URL pins a view) and a desktop window
+  // resized down to phone width. Same convergent render-time setState pattern:
+  // week -> 3day, after which this condition is false. The URL self-heals on the
+  // next navigation (pushUrl writes the current view).
+  if (mounted && isMobile && view === "week") {
+    setView("3day");
+  }
 
   return (
     <TimezoneProvider>
@@ -782,6 +832,7 @@ export function CalendarShell({
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onToggleBacklog={() => setBacklogOpen(!backlogOpen)}
         onOpenFilters={() => setFiltersOpen(true)}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
         backlogOpen={backlogOpen}
         workspace={workspace.data ?? null}
       />
@@ -869,6 +920,7 @@ export function CalendarShell({
                 twoCalendars={twoCalendars}
                 loading={workspace.isLoading || eventsLoading}
                 error={workspace.isError || eventsError}
+                onRetry={() => void qc.invalidateQueries()}
               />
             </CalendarPager>
           ) : (
@@ -1018,6 +1070,8 @@ export function CalendarShell({
         />
       )}
 
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
       {workspace.data && (
         <TaskBacklogSheet
           open={isMobile && backlogOpen}
@@ -1054,7 +1108,7 @@ export function CalendarShell({
                 if (deletingContext) void mutations.remove(deletingContext.id);
                 setDeletingContext(null);
               }}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
             </AlertDialogAction>
@@ -1071,7 +1125,7 @@ export function CalendarShell({
             <AlertDialogTitle>Delete this task?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the task, its subtasks, and any blocks it placed on the
-              calendar. This can&apos;t be undone.
+              calendar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1081,7 +1135,7 @@ export function CalendarShell({
                 if (deletingTask) void taskMutations.remove(deletingTask.id);
                 setDeletingTask(null);
               }}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
             </AlertDialogAction>

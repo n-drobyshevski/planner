@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
@@ -14,6 +15,7 @@ import { TaskBoard } from "./task-board";
 import { TaskList } from "./task-list";
 import { TaskDialog } from "./task-dialog";
 import { ScheduleTaskDialog } from "./schedule-task-dialog";
+import { LoadError } from "@/components/shared/load-error";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -133,6 +135,14 @@ export function TasksShell({
 
   const loading = workspace.isLoading || isLoading;
   const error = workspace.isError || isError;
+  const qc = useQueryClient();
+  // Technical hint to the console only; users get the human LoadError + Retry.
+  useEffect(() => {
+    if (error)
+      console.warn(
+        "[planner] Task data failed to load. If this is a fresh environment, make sure the Supabase schema is applied and seeded.",
+      );
+  }, [error]);
 
   return (
     <div className="flex h-dvh flex-col bg-background">
@@ -150,10 +160,7 @@ export function TasksShell({
         {!mounted ? (
           <div className="h-full" />
         ) : error ? (
-          <Centered>
-            Couldn&apos;t load your tasks. Make sure the database schema is applied
-            and seeded.
-          </Centered>
+          <LoadError subject="tasks" onRetry={() => void qc.invalidateQueries()} />
         ) : loading ? (
           <Centered>
             <Loader2 className="size-5 animate-spin" />
@@ -235,7 +242,7 @@ export function TasksShell({
             <AlertDialogTitle>Delete this task?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the task, its subtasks, and any blocks it placed on the
-              calendar. This can&apos;t be undone.
+              calendar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -245,7 +252,7 @@ export function TasksShell({
                 if (deleting) void mutations.remove(deleting.id);
                 setDeleting(null);
               }}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
             </AlertDialogAction>

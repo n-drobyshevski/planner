@@ -2,6 +2,7 @@
 
 import { useMemo, type CSSProperties } from "react";
 import { FolderPlus, FolderMinus, Pencil, Trash2, Eye } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { packDay } from "@/lib/layout/pack-day";
 import { enclosingContext } from "@/lib/calendar/contexts";
 import { msToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
@@ -142,7 +143,12 @@ export function DayColumn({
   }
 
   return (
-    <div className="relative flex-1 border-l">
+    // Today's column carries a faint brand wash (4-8% of --primary) so the
+    // current day reads as "today" the full height of the grid, not just via the
+    // header pill — a calm, functional way to let the brand undertone reach the
+    // dominant Week surface. Theme-aware: warm in the default palette, the
+    // theme's accent (e.g. blue under Frappé) otherwise.
+    <div className={cn("relative flex-1 border-l", isToday && "bg-primary/5 dark:bg-primary/10")}>
       {HOURS.map((h) => (
         <div
           key={h}
@@ -253,6 +259,7 @@ export function DayColumn({
               color={colorOf(seg.occ)}
               selected={selectedKeys.has(seg.occ.key)}
               editable={editable}
+              onActivate={() => onSelect(seg.occ)}
               taskDone={taskId ? taskDoneById?.get(taskId) ?? false : undefined}
               onToggleTaskDone={
                 taskId && onToggleTaskDone

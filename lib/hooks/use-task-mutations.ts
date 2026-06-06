@@ -23,6 +23,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
+  const runUndo = useHistoryStore((s) => s.runUndo);
   const notify = useNotify();
 
   const invalidate = (alsoEvents = false) => {
@@ -60,7 +61,12 @@ export function useTaskMutations(workspaceId: string | undefined) {
       invalidate(opts?.alsoEvents);
       const spec = opts?.undo?.(result) ?? null;
       if (spec) pushUndo(spec);
-      notify.success(okMsg);
+      // Undoable actions get a visible Undo on the toast (works on mobile, where
+      // there's no Ctrl+Z); it pops the same history entry Ctrl+Z would.
+      notify.success(
+        okMsg,
+        spec ? { action: { label: "Undo", onClick: () => void runUndo() } } : undefined,
+      );
       return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");
