@@ -40,6 +40,7 @@ export function useEventMutations(workspaceId: string | undefined) {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
+  const runUndo = useHistoryStore((s) => s.runUndo);
   const notify = useNotify();
 
   const invalidate = () => {
@@ -71,7 +72,12 @@ export function useEventMutations(workspaceId: string | undefined) {
       invalidate();
       const spec = undo?.(result) ?? null;
       if (spec) pushUndo(spec);
-      notify.success(okMsg);
+      // Undoable actions get a visible Undo on the toast (works on mobile, where
+      // there's no Ctrl+Z); it pops the same history entry Ctrl+Z would.
+      notify.success(
+        okMsg,
+        spec ? { action: { label: "Undo", onClick: () => void runUndo() } } : undefined,
+      );
       return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");
@@ -195,6 +201,8 @@ export function useEventMutations(workspaceId: string | undefined) {
           patch,
         }),
         "This event updated",
+        ({ prior }) =>
+          inverse("edit", () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
       ),
     editFuture: (
       event: EventRow,
@@ -205,6 +213,15 @@ export function useEventMutations(workspaceId: string | undefined) {
       run(
         m.splitSeries(sb, event, occurrenceMs, patch, color),
         "This and future updated",
+        (newSeries) =>
+          // Undo the split: drop the new future series, restore the original rrule.
+          inverse("edit", async () => {
+            await m.deleteEvent(sb, newSeries.id);
+            await m.updateEvent(sb, event.id, {
+              rrule: event.rrule,
+              recurrenceEndsAt: event.recurrenceEndsAt,
+            });
+          }),
       ),
     editAll: (event: EventRow, patch: OccurrencePatch) =>
       run(m.updateAll(sb, event, patch), "All events updated"),
@@ -217,9 +234,18 @@ export function useEventMutations(workspaceId: string | undefined) {
           type: "cancel",
         }),
         "Event deleted",
+        ({ prior }) =>
+          inverse("delete", () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
       ),
     deleteFuture: (event: EventRow, occurrenceMs: number) =>
-      run(m.deleteThisAndFuture(sb, event, occurrenceMs), "This and future deleted"),
+      run(m.deleteThisAndFuture(sb, event, occurrenceMs), "This and future deleted", () =>
+        inverse("delete", () =>
+          m.updateEvent(sb, event.id, {
+            rrule: event.rrule,
+            recurrenceEndsAt: event.recurrenceEndsAt,
+          }),
+        ),
+      ),
     deleteAll: (id: string) =>
       run(m.deleteEventDeep(sb, id), "Series deleted", (snap) =>
         inverse("delete series", () => m.restoreDeleted(sb, snap)),

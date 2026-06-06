@@ -14,7 +14,7 @@ const items = [
 export function AppNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex items-center gap-1 rounded-lg bg-muted p-0.5">
+    <nav data-app-nav className="flex items-center gap-1 rounded-lg bg-muted p-0.5">
       {items.map(({ href, label, icon: Icon }) => {
         const active = pathname.startsWith(href);
         return (

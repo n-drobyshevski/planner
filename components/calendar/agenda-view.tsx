@@ -5,7 +5,7 @@ import { format, isSameDay } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
-import { CalendarDays, Pencil, Trash2, Eye } from "lucide-react";
+import { CalendarDays, Lock, Pencil, Trash2, Eye, Users } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
 import { cn } from "@/lib/utils";
 import { toPaletteColor } from "@/lib/theme/appearance";
@@ -217,6 +217,13 @@ const AgendaRow = forwardRef<
           >
             {occ.title}
           </span>
+          {/* Privacy / sharing as glyphs, not colour alone (matches the grid). */}
+          {occ.isPrivate && (
+            <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label="Private" />
+          )}
+          {occ.isShared && (
+            <Users className="size-3.5 shrink-0 text-muted-foreground" aria-label="Shared" />
+          )}
           {occ.kind === "context" && (
             <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Context

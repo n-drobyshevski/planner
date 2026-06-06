@@ -3,7 +3,7 @@
 import { forwardRef } from "react";
 import { isBefore, startOfDay } from "date-fns";
 import { formatDayMonth } from "@/lib/datetime/format";
-import { CalendarClock, Flag, GripVertical, Lock } from "lucide-react";
+import { CalendarClock, CalendarX2, Flag, GripVertical, Lock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -123,13 +123,21 @@ export const TaskCard = forwardRef<
             )}
             {task.dueAt != null && (
               <span
+                title={overdue ? "Overdue" : undefined}
                 className={cn(
                   "inline-flex items-center gap-1 tabular-nums",
                   overdue && "font-medium text-destructive",
                 )}
               >
-                <CalendarClock className="size-3.5" />
+                {/* Overdue is signalled by glyph + weight + colour (not colour
+                    alone): a struck calendar icon and screen-reader text. */}
+                {overdue ? (
+                  <CalendarX2 className="size-3.5" />
+                ) : (
+                  <CalendarClock className="size-3.5" />
+                )}
                 {formatDayMonth(task.dueAt)}
+                {overdue && <span className="sr-only"> (overdue)</span>}
               </span>
             )}
             {prio && (

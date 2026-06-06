@@ -321,7 +321,7 @@ function PinForm({
         <Button
           onClick={submit}
           disabled={!canSubmit}
-          className={mode === "remove" ? "bg-destructive text-white hover:bg-destructive/90" : undefined}
+          className={mode === "remove" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
         >
           {pending ? "Saving…" : PIN_COPY[mode].submit}
         </Button>

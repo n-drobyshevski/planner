@@ -162,9 +162,32 @@ export interface EventFill {
   backgroundColor: string | undefined;
   borderColor: string;
   color: string;
+  /** Set to "none" for inactive events so they sit flat (no lifted-card shadow);
+   *  omitted otherwise so the block's default `shadow-soft` class applies. */
+  boxShadow?: string;
 }
-export function eventFillStyle(color: string, outlined: boolean): EventFill {
+export function eventFillStyle(
+  color: string,
+  outlined: boolean,
+  inactive = false,
+): EventFill {
   const tint = toPaletteColor(color);
+  // Inactive events (sleep, blocked hours) recede into the grid instead of
+  // reading as solid slabs: a faint wash of their own colour over the surface,
+  // a hairline tint border, and full ink text (so they stay legible — AAA on the
+  // card — while the block itself quiets down) with the shadow dropped flat.
+  if (inactive) {
+    return {
+      backgroundColor: tint
+        ? `color-mix(in oklab, ${tint} 18%, var(--card))`
+        : "var(--card)",
+      borderColor: tint
+        ? `color-mix(in oklab, ${tint} 36%, var(--border))`
+        : "var(--border)",
+      color: "var(--foreground)",
+      boxShadow: "none",
+    };
+  }
   return outlined
     ? {
         backgroundColor: tint ? "var(--background)" : undefined,
@@ -172,7 +195,12 @@ export function eventFillStyle(color: string, outlined: boolean): EventFill {
         color: "var(--foreground)",
       }
     : {
-        backgroundColor: tint,
+        // Trim chroma ~15% (holding lightness, so the ink contrast is unchanged)
+        // to calm the saturation of the colour-coded fills — the category colour
+        // still reads, it just stops competing with the schedule.
+        backgroundColor: tint
+          ? `oklch(from ${tint} l calc(c * 0.85) h)`
+          : undefined,
         borderColor: "transparent",
         color: toPaletteInk(color),
       };

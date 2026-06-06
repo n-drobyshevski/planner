@@ -7,6 +7,7 @@ import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TimeGrid } from "./time-grid";
 import { MonthGrid } from "./month-grid";
 import { AgendaView } from "./agenda-view";
+import { LoadError } from "@/components/shared/load-error";
 import type { CalendarView, ContextLabel, Occurrence } from "@/lib/types";
 import type { ItemAction } from "@/components/shared/item-context-menu";
 
@@ -66,6 +67,8 @@ export interface CanvasProps {
   twoCalendars?: boolean;
   loading: boolean;
   error: boolean;
+  /** Refetch the calendar data after a load failure (omitted on display-only panes). */
+  onRetry?: () => void;
 }
 
 const ALWAYS_EDITABLE = () => true;
@@ -99,6 +102,7 @@ export function CalendarCanvas(props: CanvasProps) {
     contextLabel = "bar",
     twoCalendars = false,
     error,
+    onRetry,
   } = props;
   const timeZone = useViewerTimeZone();
   // "Today" is the viewer-zone day, so the highlight + now-line land on the
@@ -121,12 +125,7 @@ export function CalendarCanvas(props: CanvasProps) {
   );
 
   if (error) {
-    return (
-      <Centered>
-        Couldn&apos;t load your calendar. Make sure the database schema is applied
-        and seeded.
-      </Centered>
-    );
+    return <LoadError subject="calendar" onRetry={onRetry} />;
   }
 
   if (view === "agenda") {
@@ -200,10 +199,3 @@ export function CalendarCanvas(props: CanvasProps) {
   );
 }
 
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
-      <p className="max-w-xs">{children}</p>
-    </div>
-  );
-}

@@ -28,6 +28,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -81,10 +82,11 @@
   --secondary: #f2ede7; /* warm stone-100 */
   --secondary-foreground: #44403c; /* stone-700 */
   --muted: #f2ede7;
-  --muted-foreground: #78716c; /* stone-500 */
+  --muted-foreground: #57514b; /* warm stone, 7.4:1 on bg — WCAG AAA body text */
   --accent: #f1ebe4;
   --accent-foreground: #292524;
-  --destructive: #dc2626;
+  --destructive: #a11414; /* deep red — 7.5:1 as text, 8:1 white-on-fill (AAA) */
+  --destructive-foreground: #ffffff;
 
   --border: #e7e0d7; /* warm stone-200 */
   --input: #e7e0d7;
@@ -144,10 +146,11 @@
   --secondary: #3a3531;
   --secondary-foreground: #faf8f5;
   --muted: #3a3531;
-  --muted-foreground: #b3aaa1; /* stone-400-ish, >=3:1 on dark */
+  --muted-foreground: #bcb3aa; /* lighter warm stone, 7.3:1 on cards — WCAG AAA */
   --accent: #3a3531;
   --accent-foreground: #faf8f5;
-  --destructive: #f87171;
+  --destructive: #fca5a5; /* light red — AAA as text on dark; dark ink on fills */
+  --destructive-foreground: #1c1917;
 
   --border: #3a3531;
   --input: #423c37;
@@ -311,7 +314,7 @@
   --card: #ffffff; --card-foreground: #27272a;
   --popover: #ffffff; --popover-foreground: #27272a;
   --secondary: #f4f4f5; --secondary-foreground: #3f3f46;
-  --muted: #f4f4f5; --muted-foreground: #71717a;
+  --muted: #f4f4f5; --muted-foreground: #52525b; /* zinc-600, AAA 7.4:1 */
   --accent: #f4f4f5; --accent-foreground: #27272a;
   --border: #e4e4e7; --input: #e4e4e7;
   --sidebar: #fafafa; --sidebar-foreground: #27272a;
@@ -322,7 +325,7 @@
   --card: #27272a; --card-foreground: #fafafa;
   --popover: #27272a; --popover-foreground: #fafafa;
   --secondary: #27272a; --secondary-foreground: #fafafa;
-  --muted: #27272a; --muted-foreground: #a1a1aa;
+  --muted: #27272a; --muted-foreground: #b4b4bc; /* zinc, AAA 7.2:1 on cards */
   --accent: #27272a; --accent-foreground: #fafafa;
   --border: #27272a; --input: #3f3f46;
   --sidebar: #18181b; --sidebar-foreground: #fafafa;
@@ -334,7 +337,7 @@
   --card: #ffffff; --card-foreground: #1e293b;
   --popover: #ffffff; --popover-foreground: #1e293b;
   --secondary: #f1f5f9; --secondary-foreground: #334155;
-  --muted: #f1f5f9; --muted-foreground: #64748b;
+  --muted: #f1f5f9; --muted-foreground: #4b5563; /* slate-600, AAA 7.2:1 */
   --accent: #f1f5f9; --accent-foreground: #1e293b;
   --border: #e2e8f0; --input: #e2e8f0;
   --sidebar: #f8fafc; --sidebar-foreground: #1e293b;
@@ -345,7 +348,7 @@
   --card: #1e293b; --card-foreground: #f8fafc;
   --popover: #1e293b; --popover-foreground: #f8fafc;
   --secondary: #1e293b; --secondary-foreground: #f8fafc;
-  --muted: #1e293b; --muted-foreground: #94a3b8;
+  --muted: #1e293b; --muted-foreground: #aab6c6; /* slate, AAA 7.1:1 on cards */
   --accent: #1e293b; --accent-foreground: #f8fafc;
   --border: #1e293b; --input: #334155;
   --sidebar: #0f172a; --sidebar-foreground: #f8fafc;
@@ -634,7 +637,35 @@
   [data-slot="select-trigger"] {
     font-size: 16px;
   }
-  /* Comfortable touch targets for form controls on phones. */
+}
+
+/* ---- Touch targets: 44px minimum on coarse pointers (WCAG 2.5.5, AAA) ----
+   Scoped to the shadcn Button component's standard sizes (default / sm / lg /
+   icon). The compact `xs` / `icon-xs` / `icon-sm` variants and the raw inline
+   <button>s used in dense content (event check-circle, card / event ⋮ menus,
+   all-day chips, subtask rows) are left small on purpose — WCAG's inline-target
+   exception — so the dense calendar and cards don't inflate and reflow. */
+@media (pointer: coarse) {
+  /* Match by `data-size` (emitted only by the Button + ToggleGroup controls) on
+     an interactive element — this catches plain Buttons AND the asChild menu /
+     popover triggers, which Radix re-slots as `data-slot="…-trigger"` but still
+     render as <button>/<a> carrying data-size. Compact xs / icon-sm variants and
+     the raw inline <button>s in dense content carry no data-size, so they're
+     untouched. */
+  :is(a, button):is([data-size="default"], [data-size="sm"], [data-size="lg"]) {
+    min-height: 2.75rem;
+  }
+  :is(a, button):is([data-size="icon"], [data-size="icon-lg"]) {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  /* The Calendar/Tasks nav switch is raw links (no data-size); give its options
+     the same 44px tap height on touch. */
+  [data-app-nav] a {
+    min-height: 2.75rem;
+  }
+  /* Form controls, alongside the buttons above — by pointer, so touch tablets
+     get the 44px target too (the old max-width rule missed them). */
   input:not([type="checkbox"]):not([type="radio"]),
   [data-slot="select-trigger"] {
     min-height: 2.75rem;

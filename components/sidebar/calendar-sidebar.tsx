@@ -312,7 +312,7 @@ export function CalendarFiltersContent({
                 if (deleting) void mutations.deleteCategory(deleting.id);
                 setDeleting(null);
               }}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
             </AlertDialogAction>

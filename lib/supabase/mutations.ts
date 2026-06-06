@@ -214,12 +214,23 @@ export async function restoreDeleted(
 
 // --- Recurring edits -------------------------------------------------------
 
-/** Apply a cancel/modify override for a single occurrence (this-occurrence edit). */
+/**
+ * Apply a cancel/modify override for a single occurrence (this-occurrence edit).
+ * Returns any pre-existing override row for this occurrence (or null) so the
+ * change can be undone via `revertOverride`. The prior-read is best-effort: a
+ * failed read never blocks the edit, it just yields a delete-style inverse.
+ */
 export async function applyOverride(
   sb: SupabaseClient,
   workspaceId: string,
   input: OverrideInput,
-): Promise<void> {
+): Promise<{ prior: Record<string, unknown> | null }> {
+  const { data: prior } = await sb
+    .from("event_overrides")
+    .select("*")
+    .eq("event_id", input.eventId)
+    .eq("occurrence_date", toIso(input.occurrenceDate))
+    .maybeSingle();
   const row: Record<string, unknown> = {
     workspace_id: workspaceId,
     event_id: input.eventId,
@@ -240,6 +251,32 @@ export async function applyOverride(
     .from("event_overrides")
     .upsert(row, { onConflict: "event_id,occurrence_date" });
   if (error) throw error;
+  return { prior: prior ?? null };
+}
+
+/**
+ * Undo an `applyOverride`: restore the prior override row if there was one,
+ * otherwise remove the override entirely (back to the plain occurrence).
+ */
+export async function revertOverride(
+  sb: SupabaseClient,
+  eventId: string,
+  occurrenceDateMs: number,
+  prior: Record<string, unknown> | null,
+): Promise<void> {
+  if (prior) {
+    const { error } = await sb
+      .from("event_overrides")
+      .upsert(prior, { onConflict: "event_id,occurrence_date" });
+    if (error) throw error;
+  } else {
+    const { error } = await sb
+      .from("event_overrides")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("occurrence_date", toIso(occurrenceDateMs));
+    if (error) throw error;
+  }
 }
 
 /** "All events": edit the master row. */
