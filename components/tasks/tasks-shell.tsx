@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
+import { useIdlePreload } from "@/lib/lazy";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { m, AnimatePresence } from "motion/react";
+import { fade } from "@/lib/motion";
 import { Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useTasks } from "@/lib/hooks/use-tasks";
@@ -13,8 +17,6 @@ import { groupByParent, progressOf } from "@/lib/tasks/tree";
 import { TasksToolbar, type TasksView } from "./tasks-toolbar";
 import { TaskBoard } from "./task-board";
 import { TaskList } from "./task-list";
-import { TaskDialog } from "./task-dialog";
-import { ScheduleTaskDialog } from "./schedule-task-dialog";
 import { LoadError } from "@/components/shared/load-error";
 import {
   AlertDialog,
@@ -27,6 +29,22 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { TaskRow, TaskStatus } from "@/lib/types";
+
+// Defer the task/schedule dialogs out of the initial /tasks JS (both portaled →
+// null fallback, no layout cost). Warmed on idle via useIdlePreload so the
+// common "open a task" stays instant. ScheduleTaskDialog shares its chunk with
+// the calendar surface.
+const loadTaskDialog = () => import("./task-dialog").then((m) => m.TaskDialog);
+const TaskDialog = dynamic(loadTaskDialog, { ssr: false, loading: () => null });
+const loadScheduleTaskDialog = () =>
+  import("./schedule-task-dialog").then((m) => m.ScheduleTaskDialog);
+const ScheduleTaskDialog = dynamic(loadScheduleTaskDialog, {
+  ssr: false,
+  loading: () => null,
+});
+
+/** Overlays warmed during idle so their first open is instant. */
+const OVERLAY_PRELOADS = [loadTaskDialog, loadScheduleTaskDialog];
 
 type EditorState =
   | { mode: "create"; status?: TaskStatus }
@@ -52,6 +70,8 @@ export function TasksShell({
   const autoApplied = useRef(false);
 
   useEffect(() => setMounted(true), []);
+  // Warm the task/schedule dialog chunks during idle so first open is instant.
+  useIdlePreload(OVERLAY_PRELOADS);
 
   // Phones default to the List view (the board's 3 columns don't fit) unless
   // the URL pinned a view. Run in an effect (not render-phase) so the
@@ -170,30 +190,47 @@ export function TasksShell({
             You don&apos;t have any boards yet. Use the “New board” button up top to
             create your first one.
           </Centered>
-        ) : view === "board" ? (
-          <TaskBoard
-            tasks={topLevel}
-            colorOf={colorOf}
-            members={memberMap}
-            progressOf={progressFor}
-            onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
-            onToggleDone={(t) => void mutations.toggleDone(t)}
-            onMove={(t, status, position) => void mutations.move(t, status, position)}
-            onNew={(status) => setEditor({ mode: "create", status })}
-            onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
-            onDelete={(t) => setDeleting(t)}
-          />
         ) : (
-          <TaskList
-            tasks={topLevel}
-            colorOf={colorOf}
-            members={memberMap}
-            progressOf={progressFor}
-            onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
-            onToggleDone={(t) => void mutations.toggleDone(t)}
-            onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
-            onDelete={(t) => setDeleting(t)}
-          />
+          // Crossfade the board/list swap instead of an instant cut. `initial=
+          // {false}` paints the first view at once; only the manual switch
+          // animates. The swap is a deliberate user action, so the brief
+          // mode="wait" exit→enter never interrupts work.
+          <AnimatePresence mode="wait" initial={false}>
+            <m.div
+              key={view}
+              variants={fade}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="h-full"
+            >
+              {view === "board" ? (
+                <TaskBoard
+                  tasks={topLevel}
+                  colorOf={colorOf}
+                  members={memberMap}
+                  progressOf={progressFor}
+                  onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
+                  onToggleDone={(t) => void mutations.toggleDone(t)}
+                  onMove={(t, status, position) => void mutations.move(t, status, position)}
+                  onNew={(status) => setEditor({ mode: "create", status })}
+                  onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
+                  onDelete={(t) => setDeleting(t)}
+                />
+              ) : (
+                <TaskList
+                  tasks={topLevel}
+                  colorOf={colorOf}
+                  members={memberMap}
+                  progressOf={progressFor}
+                  onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
+                  onToggleDone={(t) => void mutations.toggleDone(t)}
+                  onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
+                  onDelete={(t) => setDeleting(t)}
+                />
+              )}
+            </m.div>
+          </AnimatePresence>
         )}
       </main>
 

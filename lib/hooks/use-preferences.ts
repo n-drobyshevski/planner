@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useTheme } from "next-themes";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ import {
   paletteMode,
 } from "@/lib/theme/appearance";
 import { writeAppearanceCookie } from "@/lib/theme/appearance-cookie";
+import { withAppearanceTransition } from "@/lib/theme/appearance-transition";
 import { localTimeZone } from "@/lib/datetime/local";
 import type {
   AccentId,
@@ -124,7 +126,9 @@ export function usePreferences() {
 
   const setAccent = useCallback(
     (next: Member["accent"]) => {
-      applyAppearance(next, tone, palette); // DOM + cookie
+      // Crossfade the re-tint via the View Transitions API (instant fallback
+      // under reduced-motion / unsupported browsers — see withAppearanceTransition).
+      withAppearanceTransition(() => applyAppearance(next, tone, palette)); // DOM + cookie
       void persist({ accent: next });
     },
     [persist, tone, palette],
@@ -132,7 +136,7 @@ export function usePreferences() {
 
   const setTone = useCallback(
     (next: Member["surfaceTone"]) => {
-      applyAppearance(accent, next, palette); // DOM + cookie
+      withAppearanceTransition(() => applyAppearance(accent, next, palette)); // DOM + cookie
       void persist({ surfaceTone: next });
     },
     [persist, accent, palette],
@@ -140,7 +144,9 @@ export function usePreferences() {
 
   const setThemePref = useCallback(
     (next: ThemePreference) => {
-      setTheme(next);
+      // flushSync so next-themes' class update lands inside the transition's
+      // "after" snapshot (it's otherwise an async React state update).
+      withAppearanceTransition(() => flushSync(() => setTheme(next)));
       void persist({ themePreference: next });
     },
     [persist, setTheme],
@@ -193,14 +199,16 @@ export function usePreferences() {
 
   const setPalette = useCallback(
     (next: Palette) => {
-      // applyAppearance handles the data-tone rule (default honors tone, a
-      // Catppuccin flavor forces 'warm') and mirrors all three to the cookie.
-      applyAppearance(accent, tone, next);
-      if (next === "default") {
-        setTheme(themePreference); // their own light / dark / system
-      } else {
-        setTheme(paletteMode(next) ?? "dark"); // the flavor owns light/dark
-      }
+      // Crossfade the whole flavor swap (surfaces + light/dark + accent) as one
+      // View Transition. applyAppearance handles the data-tone rule (default
+      // honors tone, a Catppuccin flavor forces 'warm') and mirrors all three to
+      // the cookie; flushSync lands the next-themes class in the after-snapshot.
+      withAppearanceTransition(() => {
+        applyAppearance(accent, tone, next);
+        flushSync(() =>
+          setTheme(next === "default" ? themePreference : paletteMode(next) ?? "dark"),
+        );
+      });
       void persist({ palette: next });
     },
     [persist, setTheme, accent, tone, themePreference],

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
+import { useIdlePreload } from "@/lib/lazy";
 import { toast } from "sonner";
 import { startOfDay, getTime } from "date-fns";
 import { tz } from "@date-fns/tz";
@@ -31,17 +33,13 @@ import { useUiStore } from "@/stores/ui-store";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTimelineZoomPersistence } from "@/hooks/use-timeline-zoom";
 import { CalendarToolbar } from "./calendar-toolbar";
-import { KeyboardShortcutsDialog } from "./keyboard-shortcuts-dialog";
 import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
-import { CalendarFiltersSheet } from "@/components/sidebar/calendar-filters-sheet";
 import { Users, User, CopyPlus } from "lucide-react";
-import { EventDialog } from "@/components/event/event-dialog";
 import { EventDetails } from "@/components/event/event-details";
 import type { ItemAction } from "@/components/shared/item-context-menu";
 import { TaskBacklogRail, TaskBacklogSheet } from "@/components/tasks/task-backlog-rail";
-import { ScheduleTaskDialog } from "@/components/tasks/schedule-task-dialog";
 import {
   RecurrenceScopePrompt,
   type RecurrenceScope,
@@ -57,6 +55,35 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { CalendarView, EventRow, Occurrence, TaskRow } from "@/lib/types";
+
+// Defer heavy/rare overlays out of the initial /calendar JS. All are portaled,
+// so a `null` fallback costs no layout. The core EventDialog (which pulls in the
+// recurrence editor + date/time fields — the biggest single chunk) and the
+// schedule dialog are warmed on idle via useIdlePreload, so the common open
+// stays instant; the filters sheet and shortcuts dialog load purely on demand.
+const loadEventDialog = () =>
+  import("@/components/event/event-dialog").then((m) => m.EventDialog);
+const EventDialog = dynamic(loadEventDialog, { ssr: false, loading: () => null });
+const loadScheduleTaskDialog = () =>
+  import("@/components/tasks/schedule-task-dialog").then((m) => m.ScheduleTaskDialog);
+const ScheduleTaskDialog = dynamic(loadScheduleTaskDialog, {
+  ssr: false,
+  loading: () => null,
+});
+const CalendarFiltersSheet = dynamic(
+  () =>
+    import("@/components/sidebar/calendar-filters-sheet").then(
+      (m) => m.CalendarFiltersSheet,
+    ),
+  { ssr: false, loading: () => null },
+);
+const KeyboardShortcutsDialog = dynamic(
+  () => import("./keyboard-shortcuts-dialog").then((m) => m.KeyboardShortcutsDialog),
+  { ssr: false, loading: () => null },
+);
+
+/** Overlays warmed during idle so their first open is instant. */
+const OVERLAY_PRELOADS = [loadEventDialog, loadScheduleTaskDialog];
 
 type EditorState =
   | {
@@ -120,6 +147,8 @@ export function CalendarShell({
   const [mounted, setMounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Warm the event/schedule dialog chunks during idle so first open is instant.
+  useIdlePreload(OVERLAY_PRELOADS);
 
   const workspace = useWorkspace();
   const wsId = workspace.data?.workspaceId;

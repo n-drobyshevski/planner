@@ -23,7 +23,7 @@ export function AppNav() {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150 ease-out-quint",
               active
                 ? "bg-background text-foreground shadow-soft"
                 : "text-muted-foreground hover:text-foreground",

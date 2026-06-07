@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { startOfDay, getTime } from "date-fns";
 import { tz } from "@date-fns/tz";
+import { m, AnimatePresence } from "motion/react";
+import { fade } from "@/lib/motion";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TimeGrid } from "./time-grid";
 import { MonthGrid } from "./month-grid";
@@ -128,8 +130,9 @@ export function CalendarCanvas(props: CanvasProps) {
     return <LoadError subject="calendar" onRetry={onRetry} />;
   }
 
+  let content: React.ReactNode;
   if (view === "agenda") {
-    return (
+    content = (
       <AgendaView
         occurrences={occurrences}
         today={today}
@@ -144,10 +147,8 @@ export function CalendarCanvas(props: CanvasProps) {
         loading={props.loading}
       />
     );
-  }
-
-  if (view === "month") {
-    return (
+  } else if (view === "month") {
+    content = (
       <MonthGrid
         days={days}
         occurrences={monthOccurrences}
@@ -165,37 +166,59 @@ export function CalendarCanvas(props: CanvasProps) {
         canEdit={canEdit}
       />
     );
+  } else {
+    content = (
+      <TimeGrid
+        days={days}
+        occurrences={occurrences}
+        today={today}
+        colorOf={colorOf}
+        selectedKeys={props.selectedKeys ?? EMPTY_SET}
+        onSelect={onSelect}
+        onToggleSelect={props.onToggleSelect ?? NOOP}
+        onClearSelection={props.onClearSelection ?? NOOP}
+        onCreateRange={onCreateRange}
+        onReschedule={onReschedule}
+        onRescheduleMany={props.onRescheduleMany ?? NOOP}
+        onDuplicate={props.onDuplicate ?? NOOP}
+        onDuplicateMany={props.onDuplicateMany ?? NOOP}
+        onChangeColor={onChangeColor}
+        onColorSelected={props.onColorSelected ?? NOOP}
+        onDeleteEvent={onDeleteEvent}
+        onAssignCategory={onAssignCategory}
+        categoryChoices={categoryChoices}
+        eventShareAction={eventShareAction}
+        eventCopyAction={eventCopyAction}
+        canEdit={canEdit}
+        taskDoneById={taskDoneById}
+        onToggleTaskDone={onToggleTaskDone}
+        onScheduleTask={onScheduleTask}
+        labelStyle={contextLabel}
+        twoCalendars={twoCalendars}
+      />
+    );
   }
 
+  // Crossfade the big view-type changes (grid ↔ month ↔ agenda). Key on the
+  // *kind*, not the exact view, so switching within the time-grid family
+  // (week ↔ day ↔ 3day) stays instant and — critically — never remounts
+  // TimeGrid (a remount would re-fire its scroll-to-now and lose scroll pos).
+  // `initial={false}` keeps the first paint instant, so the pager's date paging
+  // (neighbour panes mount with the same view) and hydration never animate.
+  const viewKind = view === "agenda" ? "agenda" : view === "month" ? "month" : "grid";
   return (
-    <TimeGrid
-      days={days}
-      occurrences={occurrences}
-      today={today}
-      colorOf={colorOf}
-      selectedKeys={props.selectedKeys ?? EMPTY_SET}
-      onSelect={onSelect}
-      onToggleSelect={props.onToggleSelect ?? NOOP}
-      onClearSelection={props.onClearSelection ?? NOOP}
-      onCreateRange={onCreateRange}
-      onReschedule={onReschedule}
-      onRescheduleMany={props.onRescheduleMany ?? NOOP}
-      onDuplicate={props.onDuplicate ?? NOOP}
-      onDuplicateMany={props.onDuplicateMany ?? NOOP}
-      onChangeColor={onChangeColor}
-      onColorSelected={props.onColorSelected ?? NOOP}
-      onDeleteEvent={onDeleteEvent}
-      onAssignCategory={onAssignCategory}
-      categoryChoices={categoryChoices}
-      eventShareAction={eventShareAction}
-      eventCopyAction={eventCopyAction}
-      canEdit={canEdit}
-      taskDoneById={taskDoneById}
-      onToggleTaskDone={onToggleTaskDone}
-      onScheduleTask={onScheduleTask}
-      labelStyle={contextLabel}
-      twoCalendars={twoCalendars}
-    />
+    <AnimatePresence mode="wait" initial={false}>
+      <m.div
+        key={viewKind}
+        variants={fade}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="h-full"
+      >
+        {content}
+      </m.div>
+    </AnimatePresence>
   );
 }
 

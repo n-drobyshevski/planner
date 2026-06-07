@@ -14,11 +14,13 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   experimental: {
     // Tree-shake barrel imports for heavy packages. lucide-react and date-fns are
-    // already optimized by Next's defaults; only the calendar's timezone helper
-    // needs adding here. recharts is NOT in Next's default list (and that flag
-    // wouldn't lazy-load it anyway) — it's code-split via next/dynamic instead,
-    // in components/tasks/task-backlog-rail.tsx (the right rail's "Insights" tab).
-    optimizePackageImports: ["@date-fns/tz"],
+    // already optimized by Next's defaults; the calendar's timezone helper and the
+    // `radix-ui` umbrella package (every components/ui/* primitive imports from it,
+    // and it's NOT in Next's default list) are added here. recharts is NOT in the
+    // default list (and that flag wouldn't lazy-load it anyway) — it's code-split
+    // via next/dynamic instead, in components/tasks/task-backlog-rail.tsx (the
+    // right rail's "Insights" tab).
+    optimizePackageImports: ["@date-fns/tz", "radix-ui"],
     // Dev-only DevTools panel to inspect what renders instantly vs streams.
     instantNavigationDevToolsToggle: true,
   },

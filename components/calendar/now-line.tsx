@@ -19,7 +19,7 @@ export function NowLine({ dayStart, hourPx = HOUR_PX }: { dayStart: number; hour
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 z-30"
+      className="pointer-events-none absolute inset-x-0 z-30 animate-in fade-in duration-150"
       style={{ top: msToY(now, dayStart, hourPx) }}
       aria-hidden
     >

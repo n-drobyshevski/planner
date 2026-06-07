@@ -706,3 +706,17 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---- View Transitions: theme / accent / palette crossfade ----
+   The appearance setters (lib/hooks/use-preferences.ts) wrap the <html> re-tint
+   in document.startViewTransition (lib/theme/appearance-transition.ts), so the
+   browser crossfades the whole document between the old and new colors instead
+   of hard-cutting. Tune the default root fade to the motion system's slow/quint
+   curve. The JS skips the transition entirely under prefers-reduced-motion (and
+   the `*` rule above doesn't reach these overlay pseudo-elements anyway), so no
+   extra guard is needed here. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease-out-quint);
+}
