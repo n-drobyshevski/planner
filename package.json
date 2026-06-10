@@ -49,6 +49,20 @@
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
+  "pnpm": {
+    "packageExtensions": {
+      "@hookform/resolvers": {
+        "peerDependencies": {
+          "zod": "^4"
+        },
+        "peerDependenciesMeta": {
+          "zod": {
+            "optional": true
+          }
+        }
+      }
+    }
+  },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",

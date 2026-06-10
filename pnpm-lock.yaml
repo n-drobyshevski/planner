@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: 83b7a6086a102ecfe77d08c20ef2c4d7
+
 dependencies:
   '@date-fns/tz':
     specifier: ^1.5.0
@@ -22,7 +24,7 @@ dependencies:
     version: 3.2.2(react@19.2.4)
   '@hookform/resolvers':
     specifier: ^5.4.0
-    version: 5.4.0(react-hook-form@7.77.0)
+    version: 5.4.0(react-hook-form@7.77.0)(zod@4.4.3)
   '@supabase/ssr':
     specifier: ^0.10.3
     version: 0.10.3(@supabase/supabase-js@2.106.2)
@@ -1002,13 +1004,18 @@ packages:
       hono: 4.12.23
     dev: false
 
-  /@hookform/resolvers@5.4.0(react-hook-form@7.77.0):
+  /@hookform/resolvers@5.4.0(react-hook-form@7.77.0)(zod@4.4.3):
     resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
     peerDependencies:
       react-hook-form: ^7.55.0
+      zod: ^4
+    peerDependenciesMeta:
+      zod:
+        optional: true
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.77.0(react@19.2.4)
+      zod: 4.4.3
     dev: false
 
   /@humanfs/core@0.19.2:
