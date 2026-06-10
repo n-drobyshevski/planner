@@ -1,8 +1,12 @@
 "use client";
 
+// The list is the read-oriented surface (phones default to it); reordering
+// stays board-only on purpose — a second drag surface would duplicate the dnd
+// machinery for little gain when the board already owns ordering.
 import { useMemo } from "react";
 import { TaskCard } from "./task-card";
 import { TaskContextMenu } from "./task-context-menu";
+import type { TaskActions } from "./task-actions";
 import type { Member, TaskRow, TaskStatus } from "@/lib/types";
 
 const SECTIONS: { status: TaskStatus; title: string }[] = [
@@ -16,22 +20,10 @@ export interface TaskListProps {
   colorOf: (t: TaskRow) => string;
   members: Map<string, Member>;
   progressOf?: (t: TaskRow) => { done: number; total: number } | null;
-  onOpen: (t: TaskRow) => void;
-  onToggleDone: (t: TaskRow) => void;
-  onChangeColor: (t: TaskRow, color: string | null) => void;
-  onDelete: (t: TaskRow) => void;
+  actions: TaskActions;
 }
 
-export function TaskList({
-  tasks,
-  colorOf,
-  members,
-  progressOf,
-  onOpen,
-  onToggleDone,
-  onChangeColor,
-  onDelete,
-}: TaskListProps) {
+export function TaskList({ tasks, colorOf, members, progressOf, actions }: TaskListProps) {
   const groups = useMemo(
     () =>
       SECTIONS.map((s) => ({
@@ -46,8 +38,11 @@ export function TaskList({
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4">
       {groups.map((g) => (
-        <section key={g.status} className="flex flex-col gap-2">
-          <h3 className="flex items-center gap-2 px-1 text-sm font-semibold">
+        <section key={g.status} aria-labelledby={`list-col-${g.status}`} className="flex flex-col gap-2">
+          <h3
+            id={`list-col-${g.status}`}
+            className="flex items-center gap-2 px-1 text-sm font-semibold"
+          >
             {g.title}
             <span className="rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
               {g.items.length}
@@ -56,27 +51,28 @@ export function TaskList({
           {g.items.length === 0 ? (
             <p className="px-1 text-sm text-muted-foreground">Nothing here.</p>
           ) : (
-            <div className="flex flex-col gap-2">
+            <ul className="flex list-none flex-col gap-2">
               {g.items.map((t) => (
-                <TaskContextMenu
-                  key={t.id}
-                  task={t}
-                  onOpen={() => onOpen(t)}
-                  onToggleDone={() => onToggleDone(t)}
-                  onDelete={() => onDelete(t)}
-                  onChangeColor={(c) => onChangeColor(t, c)}
-                >
-                  <TaskCard
+                <li key={t.id}>
+                  <TaskContextMenu
                     task={t}
-                    color={colorOf(t)}
-                    assignee={t.assigneeId ? members.get(t.assigneeId) ?? null : null}
-                    progress={progressOf?.(t) ?? null}
-                    onOpen={() => onOpen(t)}
-                    onToggleDone={() => onToggleDone(t)}
-                  />
-                </TaskContextMenu>
+                    onOpen={() => actions.open(t)}
+                    onToggleDone={() => actions.toggleDone(t)}
+                    onDelete={() => actions.remove(t)}
+                    onChangeColor={(c) => actions.changeColor(t, c)}
+                  >
+                    <TaskCard
+                      task={t}
+                      color={colorOf(t)}
+                      assignee={t.assigneeId ? members.get(t.assigneeId) ?? null : null}
+                      progress={progressOf?.(t) ?? null}
+                      onOpen={() => actions.open(t)}
+                      onToggleDone={() => actions.toggleDone(t)}
+                    />
+                  </TaskContextMenu>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </section>
       ))}

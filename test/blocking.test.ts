@@ -17,7 +17,7 @@ function mk(id: string, status: TaskStatus): TaskRow {
     color: null,
     status,
     priority: null,
-    dueAt: null,
+    dueDate: null,
     position: 0,
     sequential: false,
     completedAt: null,

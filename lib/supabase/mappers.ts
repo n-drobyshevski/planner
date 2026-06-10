@@ -111,7 +111,7 @@ export function mapTask(r: Row): TaskRow {
     color: (r.color as string | null) ?? null,
     status: r.status as TaskRow["status"],
     priority: (r.priority as number | null) ?? null,
-    dueAt: toMsOrNull(r.due_at),
+    dueDate: (r.due_date as string | null) ?? null,
     position: (r.position as number) ?? 0,
     sequential: Boolean(r.sequential),
     completedAt: toMsOrNull(r.completed_at),
@@ -224,7 +224,8 @@ export interface TaskInput {
   color?: string | null;
   status?: TaskRow["status"];
   priority?: number | null;
-  dueAt?: number | null;
+  /** zone-free calendar date ("yyyy-MM-dd") */
+  dueDate?: string | null;
   position?: number;
   sequential?: boolean;
   completedAt?: number | null;
@@ -244,7 +245,7 @@ export function taskInputToRow(input: TaskInput): Row {
     color: input.color ?? null,
     status: input.status ?? "todo",
     priority: input.priority ?? null,
-    due_at: toIsoOrNull(input.dueAt ?? null),
+    due_date: input.dueDate ?? null,
     position: input.position ?? 0,
     sequential: input.sequential ?? false,
     completed_at: toIsoOrNull(input.completedAt ?? null),
@@ -264,7 +265,7 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("color" in patch) row.color = patch.color ?? null;
   if ("status" in patch) row.status = patch.status;
   if ("priority" in patch) row.priority = patch.priority ?? null;
-  if ("dueAt" in patch) row.due_at = toIsoOrNull(patch.dueAt ?? null);
+  if ("dueDate" in patch) row.due_date = patch.dueDate ?? null;
   if ("position" in patch) row.position = patch.position;
   if ("sequential" in patch) row.sequential = patch.sequential;
   if ("completedAt" in patch) row.completed_at = toIsoOrNull(patch.completedAt ?? null);

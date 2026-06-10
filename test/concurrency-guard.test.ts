@@ -46,7 +46,7 @@ const taskRow = {
   color: null,
   status: "todo",
   priority: null,
-  due_at: null,
+  due_date: null,
   position: 0,
   sequential: false,
   completed_at: null,

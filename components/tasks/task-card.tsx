@@ -1,8 +1,9 @@
 "use client";
 
 import { forwardRef } from "react";
-import { isBefore, startOfDay } from "date-fns";
-import { formatDayMonth } from "@/lib/datetime/format";
+import { formatDayMonthToken } from "@/lib/datetime/format";
+import { isDateTokenPast } from "@/lib/datetime/local";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { CalendarClock, CalendarX2, Flag, GripVertical, Lock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -61,8 +62,9 @@ export const TaskCard = forwardRef<
 ) {
   const done = task.status === "done";
   const maskTitles = useUiStore((s) => s.maskTitles);
+  const timeZone = useViewerTimeZone();
   const overdue =
-    task.dueAt != null && !done && isBefore(task.dueAt, startOfDay(new Date()));
+    task.dueDate != null && !done && isDateTokenPast(task.dueDate, timeZone);
   const prio = task.priority ? PRIORITY[task.priority] : undefined;
 
   return (
@@ -109,7 +111,7 @@ export const TaskCard = forwardRef<
           {task.title}
         </span>
 
-        {(task.dueAt != null || prio || progress?.total || blocked || task.isPrivate) && (
+        {(task.dueDate != null || prio || progress?.total || blocked || task.isPrivate) && (
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             {blocked && (
               <Badge variant="outline" className="gap-1 text-muted-foreground">
@@ -121,7 +123,7 @@ export const TaskCard = forwardRef<
                 <Lock /> Private
               </Badge>
             )}
-            {task.dueAt != null && (
+            {task.dueDate != null && (
               <span
                 title={overdue ? "Overdue" : undefined}
                 className={cn(
@@ -136,7 +138,7 @@ export const TaskCard = forwardRef<
                 ) : (
                   <CalendarClock className="size-3.5" />
                 )}
-                {formatDayMonth(task.dueAt)}
+                {formatDayMonthToken(task.dueDate)}
                 {overdue && <span className="sr-only"> (overdue)</span>}
               </span>
             )}

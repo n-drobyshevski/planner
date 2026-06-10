@@ -72,7 +72,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     color: null,
     status: "todo",
     priority: null,
-    dueAt: null,
+    dueDate: null,
     position: 0,
     sequential: false,
     completedAt: null,

@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
+import { useOptimisticOrder } from "@/lib/hooks/use-optimistic-order";
 import { sortByPosition, progressOf } from "@/lib/tasks/tree";
 import { blockedIds } from "@/lib/tasks/blocking";
 import { positionBetween } from "@/lib/tasks/ordering";
@@ -45,15 +46,16 @@ export function SubtaskEditor({
   const ordered = useMemo(() => sortByPosition(subtasks), [subtasks]);
   const byId = useMemo(() => new Map(ordered.map((t) => [t.id, t])), [ordered]);
 
-  // Optimistic local order (render-time sync from props, like the board).
+  // Optimistic local order, resynced from props unless a drag is live.
   const sourceIds = useMemo(() => ordered.map((t) => t.id), [ordered]);
-  const [orderIds, setOrderIds] = useState<string[]>(sourceIds);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [syncedIds, setSyncedIds] = useState(sourceIds);
-  if (sourceIds.join() !== syncedIds.join() && !activeId) {
-    setSyncedIds(sourceIds);
-    setOrderIds(sourceIds);
-  }
+  const [orderIds, setOrderIds] = useOptimisticOrder(
+    sourceIds,
+    activeId !== null,
+    // sourceIds is recomputed per subtasks identity; compare content, not
+    // reference, so an unrelated parent re-render can't reset a pending drag.
+    (a, b) => a.join() === b.join(),
+  );
 
   const blocked = useMemo(
     () => blockedIds(ordered, parent.sequential),

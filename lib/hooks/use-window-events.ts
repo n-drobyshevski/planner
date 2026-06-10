@@ -92,18 +92,34 @@ export function useWorkspaceRealtime(workspaceId: string | undefined) {
 
   useEffect(() => {
     if (!workspaceId) return;
-    return subscribeWorkspace(sb, workspaceId, (change) => {
-      if (change.table === "categories") {
-        // A category's owner/name/color drives derived jointness + the sidebar;
-        // refetch the bundle so both calendars stay in sync.
-        qc.invalidateQueries({ queryKey: qk.workspace });
-        return;
-      }
-      if (change.table !== "events" && change.table !== "event_overrides") {
-        return; // not an event-window concern
-      }
-      invalidateAffectedWindows(qc, workspaceId, change);
-    });
+    return subscribeWorkspace(
+      sb,
+      workspaceId,
+      (change) => {
+        if (change.table === "categories") {
+          // A category's owner/name/color drives derived jointness + the sidebar;
+          // refetch the bundle so both calendars stay in sync.
+          qc.invalidateQueries({ queryKey: qk.workspace });
+          return;
+        }
+        if (change.table !== "events" && change.table !== "event_overrides") {
+          return; // not an event-window concern
+        }
+        invalidateAffectedWindows(qc, workspaceId, change);
+      },
+      "main",
+      {
+        onStatus: (status, wasReconnect) => {
+          // Changes may have been missed while the channel was down; refetch
+          // the windows once on rejoin to reconcile.
+          if (status === "subscribed" && wasReconnect) {
+            void qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
+          } else if (status === "error") {
+            console.warn("[planner] Events realtime channel error; live updates may lag until it reconnects.");
+          }
+        },
+      },
+    );
   }, [workspaceId, qc, sb]);
 }
 

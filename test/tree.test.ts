@@ -21,7 +21,7 @@ function mk(p: Partial<TaskRow> & { id: string }): TaskRow {
     color: null,
     status: "todo" as TaskStatus,
     priority: null,
-    dueAt: null,
+    dueDate: null,
     position: 0,
     sequential: false,
     completedAt: null,

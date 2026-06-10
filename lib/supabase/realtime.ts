@@ -14,16 +14,27 @@ export type WorkspaceChange = RealtimePostgresChangesPayload<
 >;
 
 /**
+ * Channel lifecycle, simplified to what subscribers act on. "subscribed" with
+ * `wasReconnect` means payloads may have been missed while the channel was
+ * down — refetch to reconcile. "error" covers CHANNEL_ERROR and TIMED_OUT.
+ */
+export type ChannelStatus = "subscribed" | "error" | "closed";
+
+/**
  * Subscribe to all event/override/category/task changes for a workspace.
  * RLS is enforced for realtime, so a private event/task of the other member is
  * never delivered here. The handler receives the row-change payload so callers
  * can filter by table and narrow invalidation. Returns an unsubscribe function.
+ *
+ * `onStatus` surfaces channel health: the realtime client auto-reconnects, and
+ * without it a dead channel would just mean silently stale data.
  */
 export function subscribeWorkspace(
   sb: SupabaseClient,
   workspaceId: string,
   onChange: (change: WorkspaceChange) => void,
   channelKey = "main",
+  opts?: { onStatus?: (status: ChannelStatus, wasReconnect: boolean) => void },
 ): () => void {
   const filter = `workspace_id=eq.${workspaceId}`;
   const channel = sb
@@ -52,8 +63,21 @@ export function subscribeWorkspace(
       "postgres_changes",
       { event: "*", schema: "public", table: "tasks", filter },
       onChange,
-    )
-    .subscribe();
+    );
+
+  // Track whether this channel has been live before, so a re-SUBSCRIBED after
+  // a drop is distinguishable from the initial join.
+  let hadSession = false;
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED") {
+      opts?.onStatus?.("subscribed", hadSession);
+      hadSession = true;
+    } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      opts?.onStatus?.("error", hadSession);
+    } else if (status === "CLOSED") {
+      opts?.onStatus?.("closed", hadSession);
+    }
+  });
 
   return () => {
     void sb.removeChannel(channel);

@@ -2,7 +2,7 @@ import { format, isSameDay } from "date-fns";
 import { tz } from "@date-fns/tz";
 import type { CalendarView } from "@/lib/types";
 import { getVisibleDays } from "@/lib/datetime/window";
-import { localTimeZone } from "@/lib/datetime/local";
+import { localTimeZone, dateInputToUtcMs } from "@/lib/datetime/local";
 
 /** 24-hour time, e.g. "09:00". */
 export function formatTime(ms: number, timeZone: string = localTimeZone()): string {
@@ -12,6 +12,11 @@ export function formatTime(ms: number, timeZone: string = localTimeZone()): stri
 /** Day then month, e.g. "1 Jun". */
 export function formatDayMonth(ms: number, timeZone: string = localTimeZone()): string {
   return format(ms, "d MMM", { in: tz(timeZone) });
+}
+
+/** Day then month for a zone-free "yyyy-MM-dd" token (e.g. task due dates). */
+export function formatDayMonthToken(dateStr: string): string {
+  return format(dateInputToUtcMs(dateStr), "d MMM", { in: tz("UTC") });
 }
 
 /** Weekday, day, month, e.g. "Mon, 1 Jun". */

@@ -24,6 +24,13 @@ import {
   type OccurrencePatch,
   type OverrideInput,
 } from "@/lib/recurrence/edit-semantics";
+import {
+  taskInputSchema,
+  taskPatchSchema,
+  boardInputSchema,
+  boardPatchSchema,
+  parseInput,
+} from "@/lib/tasks/schemas";
 import { buildRRule, parseRRule } from "@/lib/recurrence/rrule-build";
 
 export class StaleWriteError extends Error {
@@ -532,14 +539,15 @@ export async function createBoard(
   sb: SupabaseClient,
   input: { workspaceId: string; ownerId: string | null; name: string; color: string; sortOrder?: number },
 ): Promise<string> {
+  const parsed = parseInput(boardInputSchema, input);
   const { data, error } = await sb
     .from("boards")
     .insert({
-      workspace_id: input.workspaceId,
-      owner_id: input.ownerId,
-      name: input.name,
-      color: input.color,
-      sort_order: input.sortOrder ?? 0,
+      workspace_id: parsed.workspaceId,
+      owner_id: parsed.ownerId,
+      name: parsed.name,
+      color: parsed.color,
+      sort_order: parsed.sortOrder ?? 0,
     })
     .select("id")
     .single();
@@ -552,10 +560,11 @@ export async function updateBoard(
   id: string,
   patch: { name?: string; color?: string; sortOrder?: number },
 ): Promise<void> {
+  const parsed = parseInput(boardPatchSchema, patch);
   const row: Record<string, unknown> = {};
-  if (patch.name != null) row.name = patch.name;
-  if (patch.color != null) row.color = patch.color;
-  if (patch.sortOrder != null) row.sort_order = patch.sortOrder;
+  if (parsed.name != null) row.name = parsed.name;
+  if (parsed.color != null) row.color = parsed.color;
+  if (parsed.sortOrder != null) row.sort_order = parsed.sortOrder;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("boards").update(row).eq("id", id);
   if (error) throw error;
@@ -694,7 +703,7 @@ export async function createTask(
 ): Promise<TaskRow> {
   const { data, error } = await sb
     .from("tasks")
-    .insert(taskInputToRow(input))
+    .insert(taskInputToRow(parseInput(taskInputSchema, input)))
     .select()
     .single();
   if (error) throw error;
@@ -711,7 +720,10 @@ export async function updateTask(
   patch: Partial<TaskInput>,
   expectedUpdatedAt?: number,
 ): Promise<TaskRow> {
-  let q = sb.from("tasks").update(taskPatchToRow(patch)).eq("id", id);
+  let q = sb
+    .from("tasks")
+    .update(taskPatchToRow(parseInput(taskPatchSchema, patch)))
+    .eq("id", id);
   if (expectedUpdatedAt != null) q = guardUpdatedAt(q, expectedUpdatedAt);
   const { data, error } = await q.select();
   if (error) throw error;

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -19,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,21 +39,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Trash2, Loader2, CalendarPlus } from "lucide-react";
 import { SubtaskEditor } from "./subtask-editor";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
-import { msToDateInput, dateInputToMs } from "@/lib/datetime/local";
-import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
+import { taskFormSchema, type TaskFormValues } from "@/lib/tasks/schemas";
 import type { Category, Member, TaskRow, TaskStatus } from "@/lib/types";
 import type { TaskInput } from "@/lib/supabase/mappers";
-
-interface FormState {
-  title: string;
-  description: string;
-  assigneeId: string; // "none" | memberId
-  categoryId: string; // "none" | id
-  isPrivate: boolean;
-  priority: string; // "none" | "1" | "2" | "3"
-  dueDate: string; // "" | yyyy-MM-dd
-  status: TaskStatus;
-}
 
 export interface TaskDialogProps {
   open: boolean;
@@ -76,63 +66,51 @@ export function TaskDialog(props: TaskDialogProps) {
   const { open, onOpenChange, mode, workspaceId, currentMemberId, members, categories, task } =
     props;
   const mutations = useTaskMutations(workspaceId);
-  const timeZone = useViewerTimeZone();
-
-  const [form, setForm] = useState<FormState>(() => buildInitial(props, timeZone));
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      setForm(buildInitial(props, timeZone));
-      setError(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, task?.id, mode]);
-
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  // The dialog is conditionally mounted by its opener (it remounts fresh per
+  // open), so the defaults are computed exactly once — no re-seed effect.
+  const form = useForm<TaskFormValues>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: buildInitial(props),
+  });
+  const { errors, isSubmitting } = form.formState;
 
   const usableCategories = categories.filter(
     (c) => c.ownerId === null || c.ownerId === currentMemberId,
   );
 
-  function buildPayload() {
+  function buildPayload(values: TaskFormValues) {
     return {
-      assigneeId: form.assigneeId === "none" ? null : form.assigneeId,
-      categoryId: form.categoryId === "none" ? null : form.categoryId,
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      isPrivate: form.isPrivate,
-      priority: form.priority === "none" ? null : Number(form.priority),
-      dueAt: form.dueDate ? dateInputToMs(form.dueDate, timeZone) : null,
-      status: form.status,
+      assigneeId: values.assigneeId === "none" ? null : values.assigneeId,
+      categoryId: values.categoryId === "none" ? null : values.categoryId,
+      title: values.title.trim(),
+      description: values.description.trim() || null,
+      isPrivate: values.isPrivate,
+      priority: values.priority === "none" ? null : Number(values.priority),
+      dueDate: values.dueDate || null,
+      status: values.status,
     };
-  }
-
-  async function finish(ok: boolean) {
-    setPending(false);
-    if (ok) onOpenChange(false);
   }
 
   // Edit/delete close immediately: the mutation patches the cache optimistically
   // and failures surface via toast + undo, so there's no spinner wait. Create
-  // keeps the await path (finish/pending) so a failed insert doesn't discard the
+  // keeps the await path (isSubmitting) so a failed insert doesn't discard the
   // unsaved form.
   function close() {
     onOpenChange(false);
   }
 
-  async function onSave() {
-    if (!form.title.trim()) {
-      setError("Please add a title.");
-      return;
-    }
-    const payload = buildPayload();
+  // handleSubmit is invoked at event time (not render) so the React Compiler
+  // doesn't treat the submit body — Date.now() included — as render-scoped.
+  function onSave(e?: React.BaseSyntheticEvent) {
+    return form.handleSubmit(onValid)(e);
+  }
+
+  async function onValid(values: TaskFormValues) {
+    const payload = buildPayload(values);
 
     if (mode === "create") {
-      setPending(true);
       const input: TaskInput = {
         workspaceId,
         ownerId: currentMemberId,
@@ -141,7 +119,7 @@ export function TaskDialog(props: TaskDialogProps) {
         ...payload,
         completedAt: payload.status === "done" ? Date.now() : null,
       };
-      finish(await mutations.create(input));
+      if (await mutations.create(input)) onOpenChange(false);
       return;
     }
     if (!task) return;
@@ -174,23 +152,26 @@ export function TaskDialog(props: TaskDialogProps) {
 
           <ResponsiveDialogBody>
           <FieldGroup>
-            <Field>
+            <Field data-invalid={errors.title ? true : undefined}>
               <FieldLabel htmlFor="task-title">Title</FieldLabel>
               <Input
                 id="task-title"
-                value={form.title}
-                onChange={(e) => set("title", e.target.value)}
+                {...form.register("title")}
                 placeholder="What needs doing?"
                 autoFocus
+                aria-invalid={errors.title ? true : undefined}
+                aria-describedby={errors.title ? "task-title-error" : undefined}
               />
+              {errors.title && (
+                <FieldError id="task-title-error" errors={[errors.title]} />
+              )}
             </Field>
 
             <Field>
               <FieldLabel htmlFor="task-notes">Notes</FieldLabel>
               <Textarea
                 id="task-notes"
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
+                {...form.register("description")}
                 rows={2}
                 placeholder="Add details"
               />
@@ -199,69 +180,93 @@ export function TaskDialog(props: TaskDialogProps) {
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel>Assignee</FieldLabel>
-                <Select value={form.assigneeId} onValueChange={(v) => set("assigneeId", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="none">Unassigned</SelectItem>
-                      {members.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="assigneeId"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="none">Unassigned</SelectItem>
+                          {members.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </Field>
 
               <Field>
                 <FieldLabel>Context</FieldLabel>
-                <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="No context" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="none">No context</SelectItem>
-                      {usableCategories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="No context" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="none">No context</SelectItem>
+                          {usableCategories.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel>Priority</FieldLabel>
-                <Select value={form.priority} onValueChange={(v) => set("priority", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="1">Low</SelectItem>
-                      <SelectItem value="2">Medium</SelectItem>
-                      <SelectItem value="3">High</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="1">Low</SelectItem>
+                          <SelectItem value="2">Medium</SelectItem>
+                          <SelectItem value="3">High</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </Field>
 
               <Field>
                 <FieldLabel htmlFor="task-due">Due date</FieldLabel>
-                <DatePicker
-                  id="task-due"
-                  value={form.dueDate}
-                  onChange={(v) => set("dueDate", v)}
-                  clearable
-                  aria-label="Due date"
+                <Controller
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <DatePicker
+                      id="task-due"
+                      value={field.value}
+                      onChange={field.onChange}
+                      clearable
+                      aria-label="Due date"
+                    />
+                  )}
                 />
               </Field>
             </div>
@@ -269,30 +274,40 @@ export function TaskDialog(props: TaskDialogProps) {
             {mode === "edit" && (
               <Field>
                 <FieldLabel>Status</FieldLabel>
-                <ToggleGroup
-                  type="single"
-                  variant="outline"
-                  value={form.status}
-                  onValueChange={(v) => v && set("status", v as TaskStatus)}
-                  className="justify-start"
-                >
-                  <ToggleGroupItem value="todo">To Do</ToggleGroupItem>
-                  <ToggleGroupItem value="in_progress">In Progress</ToggleGroupItem>
-                  <ToggleGroupItem value="done">Done</ToggleGroupItem>
-                </ToggleGroup>
+                <Controller
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      value={field.value}
+                      onValueChange={(v) => v && field.onChange(v as TaskStatus)}
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="todo">To Do</ToggleGroupItem>
+                      <ToggleGroupItem value="in_progress">In Progress</ToggleGroupItem>
+                      <ToggleGroupItem value="done">Done</ToggleGroupItem>
+                    </ToggleGroup>
+                  )}
+                />
               </Field>
             )}
 
             <Field orientation="horizontal">
-              <Switch
-                id="task-private"
-                checked={form.isPrivate}
-                onCheckedChange={(v) => set("isPrivate", v)}
+              <Controller
+                control={form.control}
+                name="isPrivate"
+                render={({ field }) => (
+                  <Switch
+                    id="task-private"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
               />
               <FieldLabel htmlFor="task-private">Private (only you can see this)</FieldLabel>
             </Field>
-
-            {error && <p className="text-sm text-destructive">{error}</p>}
           </FieldGroup>
 
           {mode === "edit" && task && (
@@ -312,7 +327,7 @@ export function TaskDialog(props: TaskDialogProps) {
                 <Button
                   variant="ghost"
                   onClick={() => setConfirmDelete(true)}
-                  disabled={pending}
+                  disabled={isSubmitting}
                   className="text-destructive"
                 >
                   <Trash2 data-icon="inline-start" />
@@ -322,7 +337,7 @@ export function TaskDialog(props: TaskDialogProps) {
                   <Button
                     variant="ghost"
                     onClick={() => props.onSchedule?.()}
-                    disabled={pending}
+                    disabled={isSubmitting}
                   >
                     <CalendarPlus data-icon="inline-start" />
                     <span className="hidden sm:inline">Add to calendar</span>
@@ -333,11 +348,11 @@ export function TaskDialog(props: TaskDialogProps) {
               <span />
             )}
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button onClick={onSave} disabled={pending}>
-                {pending && <Loader2 data-icon="inline-start" className="animate-spin" />}
+              <Button onClick={onSave} disabled={isSubmitting}>
+                {isSubmitting && <Loader2 data-icon="inline-start" className="animate-spin" />}
                 {mode === "create" ? "Create" : "Save"}
               </Button>
             </div>
@@ -369,7 +384,7 @@ export function TaskDialog(props: TaskDialogProps) {
   );
 }
 
-function buildInitial(props: TaskDialogProps, timeZone: string): FormState {
+function buildInitial(props: TaskDialogProps): TaskFormValues {
   const { mode, task, defaultStatus } = props;
   if (mode === "edit" && task) {
     return {
@@ -378,8 +393,8 @@ function buildInitial(props: TaskDialogProps, timeZone: string): FormState {
       assigneeId: task.assigneeId ?? "none",
       categoryId: task.categoryId ?? "none",
       isPrivate: task.isPrivate,
-      priority: task.priority ? String(task.priority) : "none",
-      dueDate: task.dueAt != null ? msToDateInput(task.dueAt, timeZone) : "",
+      priority: task.priority ? (String(task.priority) as TaskFormValues["priority"]) : "none",
+      dueDate: task.dueDate ?? "",
       status: task.status,
     };
   }

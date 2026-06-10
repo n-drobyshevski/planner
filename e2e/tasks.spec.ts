@@ -53,6 +53,39 @@ test("subtasks: a sequential subtask is blocked", async ({ page }) => {
   await expect(page.getByText("Blocked").first()).toBeVisible();
 });
 
+test("realtime: a shared task created by one member appears for the other", async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+  const title = `RT-${testInfo.testId}`;
+
+  try {
+    await signInToTasks(a, "Alex");
+    await signInToTasks(b, "Sam");
+
+    await a.getByRole("button", { name: "New task" }).click();
+    await a.getByPlaceholder("What needs doing?").fill(title);
+    await a.getByRole("button", { name: "Create" }).click();
+    await expect(a.getByText(title).first()).toBeVisible({ timeout: 15_000 });
+
+    // B receives it live (shared board, not private) without reloading.
+    await expect(b.getByText(title).first()).toBeVisible({ timeout: 20_000 });
+
+    // cleanup
+    await a.getByText(title).first().click();
+    await a.getByText("Edit task").waitFor();
+    await deleteOpenTask(a);
+    await expect(a.getByText(title)).toHaveCount(0, { timeout: 15_000 });
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
 test("schedule a task onto the calendar", async ({ page }, testInfo) => {
   await signInToTasks(page, "Alex");
   const title = `Sched-${testInfo.testId}`;

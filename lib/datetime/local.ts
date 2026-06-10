@@ -59,6 +59,11 @@ export function dateKeyInZone(ms: number, timeZone: string = localTimeZone()): s
   return format(ms, "yyyy-MM-dd", { in: tz(timeZone) });
 }
 
+/** Whether a zone-free "yyyy-MM-dd" token is before today, judged in `timeZone`. */
+export function isDateTokenPast(dateStr: string, timeZone: string = localTimeZone()): boolean {
+  return dateStr < dateKeyInZone(Date.now(), timeZone);
+}
+
 export const DAY_IN_MS = DAY_MS;
 
 /** Round a timestamp up to the next `stepMin` boundary (for sensible defaults). */

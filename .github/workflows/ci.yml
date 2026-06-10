@@ -1,0 +1,78 @@
+# Checks run on every push/PR: typecheck + lint + unit tests (no Supabase
+# needed — unit tests are pure).
+#
+# The e2e job is opt-in (manual dispatch + nightly): it runs the Playwright
+# suite against a dedicated hosted Supabase project supplied via repo secrets
+# (the repo is linked to hosted Supabase; there is no committed local stack
+# config). The seeded workspace is shared mutable state, so the job is
+# serialized with a concurrency group. If a hermetic setup is wanted later,
+# commit a `supabase/config.toml` (supabase init) and swap the env steps for
+# supabase/setup-cli + `supabase start` + `supabase db reset`.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+jobs:
+  checks:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  e2e:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    # One run at a time — the tests mutate one shared seeded workspace.
+    concurrency:
+      group: e2e-workspace
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # `pnpm seed` and the dev server both read .env.local; assemble it from
+      # the e2e project's secrets.
+      - name: Write .env.local from secrets
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.E2E_SUPABASE_URL }}"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.E2E_SUPABASE_ANON_KEY }}"
+            echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}"
+          } > .env.local
+      - name: Reset workspace data
+        run: pnpm seed
+      - name: Run Playwright
+        run: pnpm e2e
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
