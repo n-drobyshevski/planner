@@ -8,6 +8,15 @@ export const taskStatusSchema = z.enum(["todo", "in_progress", "done"]);
 
 const nullableUuid = z.uuid().nullable();
 
+// Shared between the write schemas below and the dialog form schema, so the
+// user-facing messages live in one place.
+const titleSchema = z
+  .string()
+  .trim()
+  .min(1, "Please add a title.")
+  .max(500, "Keep the title under 500 characters.");
+const descriptionSchema = z.string().max(10_000, "Keep the description under 10,000 characters.");
+
 const taskInputBase = z.object({
   workspaceId: z.uuid(),
   ownerId: z.uuid(),
@@ -15,8 +24,8 @@ const taskInputBase = z.object({
   parentId: nullableUuid.optional(),
   boardId: nullableUuid.optional(),
   categoryId: nullableUuid.optional(),
-  title: z.string().trim().min(1, "Please add a title.").max(500, "Keep the title under 500 characters."),
-  description: z.string().max(10_000, "Keep the description under 10,000 characters.").nullable().optional(),
+  title: titleSchema,
+  description: descriptionSchema.nullable().optional(),
   isPrivate: z.boolean().optional(),
   color: z.string().min(1).nullable().optional(),
   status: taskStatusSchema.optional(),
@@ -61,6 +70,23 @@ export const taskPatchSchema = taskInputBase
       });
     }
   });
+
+/**
+ * The task dialog's field shape: selects use "none" sentinels and the date
+ * field uses "" for unset, so this schema speaks string. The submit handler
+ * maps it onto TaskInput (which `taskInputSchema` then re-checks).
+ */
+export const taskFormSchema = z.object({
+  title: titleSchema,
+  description: descriptionSchema,
+  assigneeId: z.string(), // "none" | member id
+  categoryId: z.string(), // "none" | category id
+  isPrivate: z.boolean(),
+  priority: z.enum(["none", "1", "2", "3"]),
+  dueDate: z.literal("").or(z.iso.date()),
+  status: taskStatusSchema,
+});
+export type TaskFormValues = z.infer<typeof taskFormSchema>;
 
 export const boardInputSchema = z.object({
   workspaceId: z.uuid(),

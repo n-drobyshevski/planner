@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -67,30 +67,19 @@ export function ScheduleTaskDialog({
   const timeZone = useViewerTimeZone();
   const hasSubtasks = subtasks.length > 0;
 
-  // Seed from defaultStartMs when given; otherwise the open-effect fills a
-  // sensible default (keeps Date.now() out of render).
-  const [date, setDate] = useState(
-    defaultStartMs != null ? msToDateInput(defaultStartMs, timeZone) : "",
+  // The dialog is conditionally mounted by its openers (it remounts fresh per
+  // open), so the seed is computed once in lazy initializers — fields render
+  // filled on the first paint instead of flashing empty until an effect ran.
+  const [seed] = useState(
+    () => defaultStartMs ?? ceilToStep(Date.now() + 3_600_000, 30),
   );
-  const [time, setTime] = useState(
-    defaultStartMs != null ? msToTimeInput(defaultStartMs, timeZone) : "",
-  );
+  const [date, setDate] = useState(() => msToDateInput(seed, timeZone));
+  const [time, setTime] = useState(() => msToTimeInput(seed, timeZone));
   const [mode, setMode] = useState<Mode>("single");
   const [duration, setDuration] = useState("60"); // single & per-subtask minutes
   const [totalDuration, setTotalDuration] = useState("120"); // split total minutes
   const [count, setCount] = useState("2");
   const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      const s = defaultStartMs ?? ceilToStep(Date.now() + 3_600_000, 30);
-      setDate(msToDateInput(s, timeZone));
-      setTime(msToTimeInput(s, timeZone));
-      setMode("single");
-      setPending(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, task.id]);
 
   const ordered = sortByPosition(subtasks);
 

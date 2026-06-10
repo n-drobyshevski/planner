@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
+import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent, progressOf } from "@/lib/tasks/tree";
 import { combineDateTime } from "@/lib/datetime/local";
@@ -30,7 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { TaskRow, TaskStatus } from "@/lib/types";
+import type { TaskActions } from "./task-actions";
+import type { TaskRow } from "@/lib/types";
 
 // Defer the task/schedule dialogs out of the initial /tasks JS (both portaled →
 // null fallback, no layout cost). Warmed on idle via useIdlePreload so the
@@ -48,10 +50,6 @@ const ScheduleTaskDialog = dynamic(loadScheduleTaskDialog, {
 /** Overlays warmed during idle so their first open is instant. */
 const OVERLAY_PRELOADS = [loadTaskDialog, loadScheduleTaskDialog];
 
-type EditorState =
-  | { mode: "create"; status?: TaskStatus }
-  | { mode: "edit"; taskId: string };
-
 export function TasksShell({
   initialView,
   viewFromUrl,
@@ -64,9 +62,7 @@ export function TasksShell({
   const router = useRouter();
   const [view, setView] = useState<TasksView>(initialView);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(initialBoardId);
-  const [editor, setEditor] = useState<EditorState | null>(null);
-  const [scheduling, setScheduling] = useState<TaskRow | null>(null);
-  const [deleting, setDeleting] = useState<TaskRow | null>(null);
+  const dialogs = useTaskDialogs();
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
   const autoApplied = useRef(false);
@@ -131,13 +127,24 @@ export function TasksShell({
     const c = childrenByParent.get(t.id) ?? [];
     return c.length ? progressOf(c) : null;
   };
+  const editorState = dialogs.editor;
   const editingTask =
-    editor?.mode === "edit"
-      ? tasks.find((t) => t.id === editor.taskId) ?? null
+    editorState?.mode === "edit"
+      ? tasks.find((t) => t.id === editorState.taskId) ?? null
       : null;
   const editingSubtasks = editingTask
     ? childrenByParent.get(editingTask.id) ?? []
     : [];
+
+  // One grouped prop for the views instead of a six-way handler drill.
+  const actions: TaskActions = {
+    open: (t) => dialogs.openEdit(t.id),
+    toggleDone: (t) => void mutations.toggleDone(t),
+    move: (t, status, position) => void mutations.move(t, status, position),
+    create: (status) => dialogs.openCreate(status),
+    changeColor: (t, color) => void mutations.update(t.id, { color }, { color: t.color }),
+    remove: (t) => dialogs.openDelete(t),
+  };
 
   function syncUrl(v: TasksView, boardId: string | null) {
     const params = new URLSearchParams();
@@ -172,7 +179,7 @@ export function TasksShell({
       <TasksToolbar
         view={view}
         onViewChange={changeView}
-        onNewTask={() => setEditor({ mode: "create" })}
+        onNewTask={() => dialogs.openCreate()}
         currentMember={workspace.data?.currentMember ?? null}
         activeBoardId={activeBoard?.id ?? null}
         onBoardChange={changeBoard}
@@ -213,12 +220,7 @@ export function TasksShell({
                   colorOf={colorOf}
                   members={memberMap}
                   progressOf={progressFor}
-                  onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
-                  onToggleDone={(t) => void mutations.toggleDone(t)}
-                  onMove={(t, status, position) => void mutations.move(t, status, position)}
-                  onNew={(status) => setEditor({ mode: "create", status })}
-                  onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
-                  onDelete={(t) => setDeleting(t)}
+                  actions={actions}
                 />
               ) : (
                 <TaskList
@@ -226,10 +228,7 @@ export function TasksShell({
                   colorOf={colorOf}
                   members={memberMap}
                   progressOf={progressFor}
-                  onOpen={(t) => setEditor({ mode: "edit", taskId: t.id })}
-                  onToggleDone={(t) => void mutations.toggleDone(t)}
-                  onChangeColor={(t, color) => void mutations.update(t.id, { color }, { color: t.color })}
-                  onDelete={(t) => setDeleting(t)}
+                  actions={actions}
                 />
               )}
             </m.div>
@@ -237,15 +236,15 @@ export function TasksShell({
         )}
       </main>
 
-      {editor &&
+      {dialogs.editor &&
         workspace.data?.currentMember &&
-        (editor.mode === "create" || editingTask) && (
+        (dialogs.editor.mode === "create" || editingTask) && (
           <TaskDialog
             open
             onOpenChange={(o) => {
-              if (!o) setEditor(null);
+              if (!o) dialogs.closeEditor();
             }}
-            mode={editor.mode}
+            mode={dialogs.editor.mode}
             workspaceId={workspace.data.workspaceId}
             currentMemberId={workspace.data.currentMember.id}
             boardId={activeBoard?.id ?? null}
@@ -253,36 +252,33 @@ export function TasksShell({
             categories={categories}
             task={editingTask}
             subtasks={editingSubtasks}
-            defaultStatus={editor.mode === "create" ? editor.status : undefined}
+            defaultStatus={dialogs.editor.mode === "create" ? dialogs.editor.status : undefined}
             onSchedule={
               editingTask
-                ? () => {
-                    setScheduling(editingTask);
-                    setEditor(null);
-                  }
+                ? () => dialogs.scheduleFromEditor(editingTask)
                 : undefined
             }
           />
         )}
 
-      {scheduling && workspace.data && (
+      {dialogs.scheduling && workspace.data && (
         <ScheduleTaskDialog
           open
-          onOpenChange={(o) => !o && setScheduling(null)}
-          task={scheduling}
-          subtasks={childrenByParent.get(scheduling.id) ?? []}
+          onOpenChange={(o) => !o && dialogs.closeSchedule()}
+          task={dialogs.scheduling}
+          subtasks={childrenByParent.get(dialogs.scheduling.id) ?? []}
           workspaceId={workspace.data.workspaceId}
           // A due date is a zone-free token; seed the dialog at 09:00 of that
           // day in the viewer's zone.
           defaultStartMs={
-            scheduling.dueDate
-              ? combineDateTime(scheduling.dueDate, "09:00", timeZone)
+            dialogs.scheduling.dueDate
+              ? combineDateTime(dialogs.scheduling.dueDate, "09:00", timeZone)
               : undefined
           }
         />
       )}
 
-      <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+      <AlertDialog open={dialogs.deleting !== null} onOpenChange={(o) => !o && dialogs.closeDelete()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this task?</AlertDialogTitle>
@@ -295,8 +291,8 @@ export function TasksShell({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (deleting) void mutations.remove(deleting.id);
-                setDeleting(null);
+                if (dialogs.deleting) void mutations.remove(dialogs.deleting.id);
+                dialogs.closeDelete();
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
