@@ -52,6 +52,11 @@ describe("isTracked", () => {
     expect(isTracked(occ({ inactive: true }))).toBe(false);
     expect(isTracked(occ({ kind: "context" }))).toBe(false);
   });
+  it("keeps inactive blocks when includeInactive is set, but never all-day/context", () => {
+    expect(isTracked(occ({ inactive: true }), true)).toBe(true);
+    expect(isTracked(occ({ allDay: true }), true)).toBe(false);
+    expect(isTracked(occ({ kind: "context" }), true)).toBe(false);
+  });
 });
 
 describe("computeUsage", () => {
@@ -149,6 +154,19 @@ describe("computeUsage", () => {
     expect(u.summary.totalMs).toBe(3 * HOUR);
     // Σ perDay still equals the total.
     expect(u.perDay.reduce((s, d) => s + d.ms, 0)).toBe(u.summary.totalMs);
+  });
+
+  it("counts inactive blocks only when includeInactive is set", () => {
+    const occs = [
+      occ({ key: "a", start: D(9), end: D(10) }),
+      occ({ key: "sleep", inactive: true, start: D(0), end: D(8) }),
+    ];
+    const without = computeUsage(occs, days3, win3);
+    expect(without.summary.totalMs).toBe(1 * HOUR);
+    const withInactive = computeUsage(occs, days3, win3, { includeInactive: true });
+    expect(withInactive.summary.totalMs).toBe(9 * HOUR);
+    expect(withInactive.summary.eventCount).toBe(2);
+    expect(withInactive.perDay[0].ms).toBe(9 * HOUR);
   });
 
   it("picks the busiest day across several days", () => {

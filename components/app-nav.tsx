@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ListChecks } from "lucide-react";
+import { CalendarDays, ListChecks, ChartColumnBig } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/tasks", label: "Tasks", icon: ListChecks },
+  { href: "/insights", label: "Insights", icon: ChartColumnBig },
 ];
 
-/** Top-level switch between the Calendar and Tasks surfaces. */
+/** Top-level switch between the Calendar, Tasks, and Insights surfaces. */
 export function AppNav() {
   const pathname = usePathname();
   return (

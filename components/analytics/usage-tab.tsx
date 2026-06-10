@@ -24,6 +24,7 @@ import {
   formatWeekdayDayMonth,
 } from "@/lib/datetime/format";
 import { computeUsage } from "@/lib/analytics/usage";
+import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { cn } from "@/lib/utils";
 import { toPaletteColor } from "@/lib/theme/appearance";
@@ -53,21 +54,6 @@ export interface UsageTabProps {
   members: Map<string, Member>;
   /** true when another member's calendar is overlaid (enables the By-member split) */
   overlayActive: boolean;
-}
-
-/** prefers-reduced-motion as a lint-safe, SSR-safe external store read. */
-function subscribeReducedMotion(cb: () => void) {
-  if (typeof window === "undefined") return () => {};
-  const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-  mql.addEventListener("change", cb);
-  return () => mql.removeEventListener("change", cb);
-}
-function usePrefersReducedMotion() {
-  return React.useSyncExternalStore(
-    subscribeReducedMotion,
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    () => false,
-  );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

@@ -48,9 +48,13 @@ export interface Usage {
   byMember: MemberUsage[];
 }
 
-/** Tracked = a normal timed event the user actually does (see module note). */
-export function isTracked(o: Occurrence): boolean {
-  return o.kind === "event" && !o.allDay && !o.inactive;
+/**
+ * Tracked = a normal timed event the user actually does (see module note).
+ * `includeInactive` opts grayed-out blocks (e.g. sleep) back in — the Insights
+ * views expose this as a toggle; all-day and context stay excluded regardless.
+ */
+export function isTracked(o: Occurrence, includeInactive = false): boolean {
+  return o.kind === "event" && !o.allDay && (includeInactive || !o.inactive);
 }
 
 /** Overlap (ms, ≥ 0) of half-open [aStart, aEnd) with [bStart, bEnd). */
@@ -74,8 +78,10 @@ export function computeUsage(
   occurrences: Occurrence[],
   days: number[],
   window: TimeWindow,
+  opts?: { includeInactive?: boolean },
 ): Usage {
-  const tracked = occurrences.filter(isTracked);
+  const includeInactive = opts?.includeInactive ?? false;
+  const tracked = occurrences.filter((o) => isTracked(o, includeInactive));
 
   const perDay: DayUsage[] = days.map((dayMs, i) => {
     const dayEnd = i + 1 < days.length ? days[i + 1] : window.end;

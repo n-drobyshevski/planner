@@ -137,6 +137,8 @@ export function useWindowEvents(
   occurrences: Occurrence[];
   events: EventRow[];
   isLoading: boolean;
+  /** true while (re)fetching — with keepPreviousData, stale results showing */
+  isFetching: boolean;
   isError: boolean;
 } {
   const sb = createClient();
@@ -170,6 +172,7 @@ export function useWindowEvents(
     occurrences,
     events: query.data?.events ?? [],
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     isError: query.isError,
   };
 }
