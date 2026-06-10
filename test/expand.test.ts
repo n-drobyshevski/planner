@@ -36,6 +36,7 @@ function makeEvent(p: Partial<EventRow> = {}): EventRow {
     rrule: null,
     recurrenceEndsAt: null,
     taskId: null,
+    attributes: {},
     createdAt: 0,
     updatedAt: 0,
     ...p,
@@ -75,6 +76,34 @@ describe("expandEvent — inactive flag", () => {
 
   it("defaults to active (inactive=false) occurrences", () => {
     expect(expandEvent(makeEvent(), [], win)[0].inactive).toBe(false);
+  });
+});
+
+describe("expandEvent — attributes", () => {
+  const win: TimeWindow = { start: berlin(2026, 2, 27, 0), end: berlin(2026, 3, 1, 0) };
+
+  it("inherits the master's attributes on every occurrence", () => {
+    const occ = expandEvent(
+      makeEvent({ rrule: "FREQ=DAILY", attributes: { energy: 2, mood: "calm" } }),
+      [],
+      win,
+    );
+    expect(occ.length).toBeGreaterThan(1);
+    expect(occ.every((o) => o.attributes.energy === 2)).toBe(true);
+    expect(occ.every((o) => o.attributes.mood === "calm")).toBe(true);
+  });
+
+  it("a modify override leaves attributes untouched (series-level)", () => {
+    const e = makeEvent({ rrule: "FREQ=DAILY", attributes: { focus: "deep" } });
+    const first = expandEvent(e, [], win)[0];
+    const occ = expandEvent(
+      e,
+      [ov({ occurrenceDate: first.occurrenceDate, type: "modify", title: "Renamed" })],
+      win,
+    );
+    const exception = occ.find((o) => o.isException);
+    expect(exception?.title).toBe("Renamed");
+    expect(exception?.attributes).toEqual({ focus: "deep" });
   });
 });
 

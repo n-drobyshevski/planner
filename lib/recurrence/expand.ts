@@ -103,6 +103,9 @@ function baseOccurrence(
       (event.isShared ||
         (event.categoryId != null && sharedCategoryIds.has(event.categoryId))),
     taskId: event.taskId,
+    // Series-level, like color: every occurrence inherits the master's
+    // attributes; applyOverride leaves them alone (no override column).
+    attributes: event.attributes,
     isRecurring: opts.isRecurring,
     isException: opts.isException,
   };

@@ -35,7 +35,14 @@ import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { RecurrenceScopePrompt, type RecurrenceScope } from "./recurrence-scope-prompt";
 import { ColorField } from "@/components/shared/color-field";
+import { AttributeFields } from "@/components/shared/attribute-fields";
 import { CreateContextDialog } from "@/components/shared/create-context-dialog";
+import {
+  attributesEqual,
+  hasAnyAttribute,
+  parseAttributes,
+  type ItemAttributes,
+} from "@/lib/attributes/schema";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
 import { buildRRule, parseRRule, type RecurrenceForm } from "@/lib/recurrence/rrule-build";
 import {
@@ -79,6 +86,8 @@ interface FormState {
   /** own color override (hex); null = derive from category/owner */
   color: string | null;
   recurrence: RecurrenceForm | null;
+  /** optimization attributes (series-level; full parsed bag so unknown keys survive saves) */
+  attributes: ItemAttributes;
 }
 
 export interface EventDialogProps {
@@ -119,6 +128,9 @@ export function EventDialog(props: EventDialogProps) {
 
   const [form, setForm] = useState<FormState>(() => buildInitial(props, timeZone));
   const [showMore, setShowMore] = useState(() => hasAdvanced(form));
+  const [showOptimization, setShowOptimization] = useState(() =>
+    hasAnyAttribute(form.attributes),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [scopePrompt, setScopePrompt] = useState<null | "edit" | "delete">(null);
@@ -130,6 +142,7 @@ export function EventDialog(props: EventDialogProps) {
       const next = buildInitial(props, timeZone);
       setForm(next);
       setShowMore(hasAdvanced(next));
+      setShowOptimization(hasAnyAttribute(next.attributes));
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,6 +237,7 @@ export function EventDialog(props: EventDialogProps) {
         timeZone,
         rrule: buildRRule(form.recurrence),
         recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
+        attributes: form.attributes,
       };
       finish(await mutations.create(input));
       return;
@@ -252,6 +266,7 @@ export function EventDialog(props: EventDialogProps) {
       end,
       rrule: buildRRule(form.recurrence),
       recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
+      attributes: form.attributes,
     };
     close();
     void mutations.updateSingle(event.id, patch, undefined, patch);
@@ -279,18 +294,26 @@ export function EventDialog(props: EventDialogProps) {
     setScopePrompt(null);
     close();
 
-    // Color is series-level (a master column, no per-occurrence form), like the
-    // Context membership carried in `patch.categoryId`. "this"/"future"/"all"
-    // govern time/content; the color change is applied to the relevant series.
+    // Color and attributes are series-level (master columns, no per-occurrence
+    // form), like the Context membership carried in `patch.categoryId`.
+    // "this"/"future"/"all" govern time/content; series-level changes are
+    // applied to the relevant series.
     const colorChanged = form.color !== (event.color ?? null);
+    const attrsChanged = !attributesEqual(
+      form.attributes,
+      parseAttributes(event.attributes),
+    );
 
     if (scope === "this") {
       // A per-occurrence edit can't carry series-level fields, so apply any
-      // color change to the whole series.
-      if (colorChanged)
-        void mutations.updateSingle(event.id, { color: form.color }, undefined, {
-          color: form.color,
-        });
+      // color/attribute change to the whole series in one side patch.
+      if (colorChanged || attrsChanged) {
+        const sidePatch: Partial<EventInput> = {
+          ...(colorChanged ? { color: form.color } : {}),
+          ...(attrsChanged ? { attributes: form.attributes } : {}),
+        };
+        void mutations.updateSingle(event.id, sidePatch, undefined, sidePatch);
+      }
       void mutations.editThis(event, occurrence.occurrenceDate, patch);
     } else if (scope === "future") {
       void mutations.editFuture(
@@ -298,6 +321,7 @@ export function EventDialog(props: EventDialogProps) {
         occurrence.occurrenceDate,
         patch,
         colorChanged ? form.color : undefined,
+        attrsChanged ? form.attributes : undefined,
       );
     } else {
       // all: shift the whole series by the same delta + update fields + rrule.
@@ -318,6 +342,7 @@ export function EventDialog(props: EventDialogProps) {
         end: event.end + delta,
         rrule: buildRRule(form.recurrence),
         recurrenceEndsAt: recurrenceEndsAt(form.recurrence),
+        attributes: form.attributes,
       };
       void mutations.updateSingle(event.id, seriesPatch, undefined, seriesPatch);
     }
@@ -611,6 +636,38 @@ export function EventDialog(props: EventDialogProps) {
               </CollapsibleContent>
             </Collapsible>
 
+            {/* Optimization details — optional attributes feeding /insights.
+                Hidden for contexts: backdrops never count as tracked time. */}
+            {!isContext && (
+              <Collapsible
+                open={readOnly ? true : showOptimization}
+                onOpenChange={setShowOptimization}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  >
+                    Optimization details
+                    <ChevronDown
+                      className={`size-4 transition-transform ${
+                        readOnly || showOptimization ? "rotate-180" : ""
+                      }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <AttributeFields
+                    value={form.attributes}
+                    onChange={(v) => set("attributes", v)}
+                    idPrefix="ev"
+                  />
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
             {error && <p className="text-sm text-destructive">{error}</p>}
           </FieldGroup>
           </fieldset>
@@ -706,6 +763,9 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
       visibility: event.isPrivate ? "private" : event.isShared ? "shared" : "visible",
       color: event.color ?? null,
       recurrence: parseRRule(event.rrule),
+      // From the MASTER event, not the occurrence patch — attributes are
+      // series-level (no override column).
+      attributes: parseAttributes(event.attributes),
     };
   }
   const start = defaultStart ?? ceilToStep(Date.now(), 30);
@@ -726,5 +786,6 @@ function buildInitial(props: EventDialogProps, timeZone: string): FormState {
     visibility: "visible",
     color: null,
     recurrence: null,
+    attributes: {},
   };
 }

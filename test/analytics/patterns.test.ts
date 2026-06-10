@@ -31,6 +31,7 @@ function occ(over: Partial<Occurrence>): Occurrence {
     isPrivate: false,
     isShared: false,
     taskId: null,
+    attributes: {},
     isRecurring: false,
     isException: false,
     ...over,

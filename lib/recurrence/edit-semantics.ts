@@ -173,6 +173,7 @@ export function splitThisAndFuture(
     // New series is open-ended (prior UNTIL/COUNT dropped).
     recurrenceEndsAt: null,
     taskId: event.taskId,
+    attributes: event.attributes,
   };
 
   return { original, newSeries };

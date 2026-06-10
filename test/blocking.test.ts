@@ -21,6 +21,7 @@ function mk(id: string, status: TaskStatus): TaskRow {
     position: 0,
     sequential: false,
     completedAt: null,
+    attributes: {},
     createdAt: 0,
     updatedAt: 0,
   };

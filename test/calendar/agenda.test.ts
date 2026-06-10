@@ -30,6 +30,7 @@ function occ(start: number, title: string, opts: Partial<Occurrence> = {}): Occu
     isPrivate: false,
     isShared: false,
     taskId: null,
+    attributes: {},
     isRecurring: false,
     isException: false,
     ...opts,

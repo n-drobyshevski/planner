@@ -54,6 +54,20 @@ describe("taskInputSchema", () => {
     expect(taskInputSchema.safeParse({ ...base, workspaceId: "nope" }).success).toBe(false);
   });
 
+  it("accepts omitted, valid, and unknown-key attributes; rejects invalid known values", () => {
+    expect(taskInputSchema.safeParse(base).success).toBe(true);
+    expect(
+      taskInputSchema.safeParse({ ...base, attributes: { energy: 2, mood: "calm" } }).success,
+    ).toBe(true);
+    expect(taskInputSchema.safeParse({ ...base, attributes: { energy: 0 } }).success).toBe(false);
+    expect(
+      taskPatchSchema.safeParse({ attributes: { satisfaction: 5 } }).success,
+    ).toBe(true);
+    expect(
+      taskPatchSchema.safeParse({ attributes: { flexibility: "rigid" } }).success,
+    ).toBe(false);
+  });
+
   it("rejects priority outside 0..3", () => {
     expect(taskInputSchema.safeParse({ ...base, priority: 4 }).success).toBe(false);
     expect(taskInputSchema.safeParse({ ...base, priority: -1 }).success).toBe(false);

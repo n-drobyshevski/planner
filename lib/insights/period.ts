@@ -28,15 +28,22 @@ export type PeriodPreset =
 
 export type Granularity = "day" | "week" | "month";
 
-export type InsightsTab = "overview" | "trends" | "patterns" | "balance" | "tasks";
+export type InsightsTab =
+  | "overview"
+  | "trends"
+  | "patterns"
+  | "balance"
+  | "tasks"
+  | "optimize";
 
-/** All tabs in display order. Phases 2/3 append "optimize" / "sleep" here. */
+/** All tabs in display order. Phase 3 appends "sleep" here. */
 export const INSIGHTS_TABS: InsightsTab[] = [
   "overview",
   "trends",
   "patterns",
   "balance",
   "tasks",
+  "optimize",
 ];
 
 export interface PeriodState {

@@ -35,6 +35,7 @@ const TAB_LABELS: Record<InsightsTab, string> = {
   patterns: "Patterns",
   balance: "Balance",
   tasks: "Tasks",
+  optimize: "Optimize",
 };
 
 // Each tab is its own lazy chunk (recharts stays out of the route JS); warmed
@@ -45,13 +46,22 @@ const loadTrends = () => import("./trends-tab").then((m) => m.TrendsTab);
 const loadPatterns = () => import("./patterns-tab").then((m) => m.PatternsTab);
 const loadBalance = () => import("./balance-tab").then((m) => m.BalanceTab);
 const loadTasksTab = () => import("./tasks-tab").then((m) => m.TasksTab);
+const loadOptimize = () => import("./optimize-tab").then((m) => m.OptimizeTab);
 const OverviewTab = dynamic(loadOverview, { ssr: false, loading: tabLoading });
 const TrendsTab = dynamic(loadTrends, { ssr: false, loading: tabLoading });
 const PatternsTab = dynamic(loadPatterns, { ssr: false, loading: tabLoading });
 const BalanceTab = dynamic(loadBalance, { ssr: false, loading: tabLoading });
 const TasksTab = dynamic(loadTasksTab, { ssr: false, loading: tabLoading });
+const OptimizeTab = dynamic(loadOptimize, { ssr: false, loading: tabLoading });
 
-const TAB_PRELOADS = [loadOverview, loadTrends, loadPatterns, loadBalance, loadTasksTab];
+const TAB_PRELOADS = [
+  loadOverview,
+  loadTrends,
+  loadPatterns,
+  loadBalance,
+  loadTasksTab,
+  loadOptimize,
+];
 
 /** Everything a tab needs, computed once in the shell. */
 export interface InsightsTabData {
@@ -276,6 +286,7 @@ function InsightsShellInner({
             {tab === "patterns" && <PatternsTab data={data} />}
             {tab === "balance" && <BalanceTab data={data} />}
             {tab === "tasks" && <TasksTab data={data} />}
+            {tab === "optimize" && <OptimizeTab data={data} />}
           </div>
         )}
       </main>

@@ -36,10 +36,17 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Trash2, Loader2, CalendarPlus } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
+import { Trash2, Loader2, CalendarPlus, ChevronDown } from "lucide-react";
 import { SubtaskEditor } from "./subtask-editor";
+import { AttributeFields } from "@/components/shared/attribute-fields";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { taskFormSchema, type TaskFormValues } from "@/lib/tasks/schemas";
+import { parseAttributes, hasAnyAttribute } from "@/lib/attributes/schema";
 import type { Category, Member, TaskRow, TaskStatus } from "@/lib/types";
 import type { TaskInput } from "@/lib/supabase/mappers";
 
@@ -70,11 +77,15 @@ export function TaskDialog(props: TaskDialogProps) {
 
   // The dialog is conditionally mounted by its opener (it remounts fresh per
   // open), so the defaults are computed exactly once — no re-seed effect.
+  const [defaults] = useState(() => buildInitial(props));
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
-    defaultValues: buildInitial(props),
+    defaultValues: defaults,
   });
   const { errors, isSubmitting } = form.formState;
+  const [showOptimization, setShowOptimization] = useState(() =>
+    hasAnyAttribute(defaults.attributes),
+  );
 
   const usableCategories = categories.filter(
     (c) => c.ownerId === null || c.ownerId === currentMemberId,
@@ -90,6 +101,7 @@ export function TaskDialog(props: TaskDialogProps) {
       priority: values.priority === "none" ? null : Number(values.priority),
       dueDate: values.dueDate || null,
       status: values.status,
+      attributes: values.attributes,
     };
   }
 
@@ -308,6 +320,37 @@ export function TaskDialog(props: TaskDialogProps) {
               />
               <FieldLabel htmlFor="task-private">Private (only you can see this)</FieldLabel>
             </Field>
+
+            {/* Optimization details — optional attributes feeding /insights.
+                Scheduled blocks inherit them (scheduleTaskBlocks). */}
+            <Collapsible open={showOptimization} onOpenChange={setShowOptimization}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                >
+                  Optimization details
+                  <ChevronDown
+                    className={`size-4 transition-transform ${showOptimization ? "rotate-180" : ""}`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <Controller
+                  control={form.control}
+                  name="attributes"
+                  render={({ field }) => (
+                    <AttributeFields
+                      value={field.value}
+                      onChange={field.onChange}
+                      idPrefix="task"
+                    />
+                  )}
+                />
+              </CollapsibleContent>
+            </Collapsible>
           </FieldGroup>
 
           {mode === "edit" && task && (
@@ -396,6 +439,7 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
       priority: task.priority ? (String(task.priority) as TaskFormValues["priority"]) : "none",
       dueDate: task.dueDate ?? "",
       status: task.status,
+      attributes: parseAttributes(task.attributes),
     };
   }
   return {
@@ -407,5 +451,6 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
     priority: "none",
     dueDate: "",
     status: defaultStatus ?? "todo",
+    attributes: {},
   };
 }

@@ -10,6 +10,7 @@ import type { WindowData } from "@/lib/supabase/queries";
 import type { EventInput } from "@/lib/supabase/mappers";
 import type { EventRow, OverrideRow, OverrideType } from "@/lib/types";
 import type { OccurrencePatch } from "@/lib/recurrence/edit-semantics";
+import type { ItemAttributes } from "@/lib/attributes/schema";
 import { editAll as computeEditAll } from "@/lib/recurrence/edit-semantics";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
@@ -345,9 +346,10 @@ export function useEventMutations(workspaceId: string | undefined) {
       occurrenceMs: number,
       patch: OccurrencePatch,
       color?: string | null,
+      attributes?: ItemAttributes,
     ) =>
       run(
-        m.splitSeries(sb, event, occurrenceMs, patch, color),
+        m.splitSeries(sb, event, occurrenceMs, patch, color, attributes),
         "This and future updated",
         (newSeries) =>
           // Undo the split: drop the new future series, restore the original rrule.

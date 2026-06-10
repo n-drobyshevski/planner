@@ -1,6 +1,7 @@
 // Map Postgres rows (snake_case, timestamptz strings) <-> app domain
 // (camelCase, epoch ms). Keep all conversion in one place.
 
+import { parseAttributes, type ItemAttributes } from "@/lib/attributes/schema";
 import type {
   EventRow,
   EventStatus,
@@ -91,6 +92,7 @@ export function mapEvent(r: Row): EventRow {
     rrule: (r.rrule as string | null) ?? null,
     recurrenceEndsAt: toMsOrNull(r.recurrence_ends_at),
     taskId: (r.task_id as string | null) ?? null,
+    attributes: parseAttributes(r.attributes),
     createdAt: toMs(r.created_at),
     updatedAt: toMs(r.updated_at),
   };
@@ -115,6 +117,7 @@ export function mapTask(r: Row): TaskRow {
     position: (r.position as number) ?? 0,
     sequential: Boolean(r.sequential),
     completedAt: toMsOrNull(r.completed_at),
+    attributes: parseAttributes(r.attributes),
     createdAt: toMs(r.created_at),
     updatedAt: toMs(r.updated_at),
   };
@@ -158,6 +161,8 @@ export interface EventInput {
   rrule?: string | null;
   recurrenceEndsAt?: number | null;
   taskId?: string | null;
+  /** whole-object write; callers start from the parsed full bag so unknown keys survive */
+  attributes?: ItemAttributes;
 }
 
 export function eventInputToRow(input: EventInput): Row {
@@ -181,6 +186,7 @@ export function eventInputToRow(input: EventInput): Row {
     rrule: input.rrule ?? null,
     recurrence_ends_at: toIsoOrNull(input.recurrenceEndsAt ?? null),
     task_id: input.taskId ?? null,
+    attributes: input.attributes ?? {},
   };
 }
 
@@ -205,6 +211,7 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("recurrenceEndsAt" in patch)
     row.recurrence_ends_at = toIsoOrNull(patch.recurrenceEndsAt ?? null);
   if ("taskId" in patch) row.task_id = patch.taskId ?? null;
+  if ("attributes" in patch) row.attributes = patch.attributes ?? {};
   return row;
 }
 
@@ -229,6 +236,8 @@ export interface TaskInput {
   position?: number;
   sequential?: boolean;
   completedAt?: number | null;
+  /** whole-object write; callers start from the parsed full bag so unknown keys survive */
+  attributes?: ItemAttributes;
 }
 
 export function taskInputToRow(input: TaskInput): Row {
@@ -249,6 +258,7 @@ export function taskInputToRow(input: TaskInput): Row {
     position: input.position ?? 0,
     sequential: input.sequential ?? false,
     completed_at: toIsoOrNull(input.completedAt ?? null),
+    attributes: input.attributes ?? {},
   };
 }
 
@@ -269,5 +279,6 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("position" in patch) row.position = patch.position;
   if ("sequential" in patch) row.sequential = patch.sequential;
   if ("completedAt" in patch) row.completed_at = toIsoOrNull(patch.completedAt ?? null);
+  if ("attributes" in patch) row.attributes = patch.attributes ?? {};
   return row;
 }

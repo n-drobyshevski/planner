@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   mapEvent,
+  mapTask,
   eventInputToRow,
   eventPatchToRow,
+  taskInputToRow,
+  taskPatchToRow,
   type EventInput,
+  type TaskInput,
 } from "@/lib/supabase/mappers";
 
 const baseRow = {
@@ -98,5 +102,78 @@ describe("eventPatchToRow — kind/category", () => {
     expect(eventPatchToRow({ categoryId: "cat-1" })).toEqual({ category_id: "cat-1" });
     expect(eventPatchToRow({ categoryId: null })).toEqual({ category_id: null });
     expect(eventPatchToRow({ kind: "context" })).toEqual({ kind: "context" });
+  });
+});
+
+const baseTaskRow = {
+  id: "t1",
+  workspace_id: "w1",
+  owner_id: "m1",
+  assignee_id: null,
+  parent_id: null,
+  board_id: null,
+  category_id: null,
+  title: "Task",
+  description: null,
+  is_private: false,
+  color: null,
+  status: "todo",
+  priority: null,
+  due_date: null,
+  position: 0,
+  sequential: false,
+  completed_at: null,
+  created_at: "2026-06-01T00:00:00.000Z",
+  updated_at: "2026-06-01T00:00:00.000Z",
+};
+
+describe("attributes round-trip", () => {
+  it("mapEvent/mapTask read attributes leniently ({} when missing or junk)", () => {
+    expect(mapEvent(baseRow).attributes).toEqual({});
+    expect(mapEvent({ ...baseRow, attributes: "junk" }).attributes).toEqual({});
+    expect(
+      mapEvent({ ...baseRow, attributes: { energy: 2, mood: "calm" } }).attributes,
+    ).toEqual({ energy: 2, mood: "calm" });
+    // invalid known key drops, unknown sibling survives
+    expect(
+      mapEvent({ ...baseRow, attributes: { energy: 9, mood: "calm" } }).attributes,
+    ).toEqual({ mood: "calm" });
+
+    expect(mapTask(baseTaskRow).attributes).toEqual({});
+    expect(
+      mapTask({ ...baseTaskRow, attributes: { focus: "deep" } }).attributes,
+    ).toEqual({ focus: "deep" });
+  });
+
+  it("input mappers default attributes to {} and pass them through", () => {
+    const eventInput: EventInput = {
+      workspaceId: "w1",
+      ownerId: "m1",
+      title: "Work",
+      start: 0,
+      end: 1,
+      timeZone: "UTC",
+    };
+    expect(eventInputToRow(eventInput).attributes).toEqual({});
+    expect(
+      eventInputToRow({ ...eventInput, attributes: { energy: 1 } }).attributes,
+    ).toEqual({ energy: 1 });
+
+    const taskInput: TaskInput = { workspaceId: "w1", ownerId: "m1", title: "Task" };
+    expect(taskInputToRow(taskInput).attributes).toEqual({});
+    expect(
+      taskInputToRow({ ...taskInput, attributes: { focus: "shallow" } }).attributes,
+    ).toEqual({ focus: "shallow" });
+  });
+
+  it("patch mappers write attributes only when present in the patch", () => {
+    expect(eventPatchToRow({ title: "x" })).not.toHaveProperty("attributes");
+    expect(eventPatchToRow({ attributes: { energy: 3 } })).toEqual({
+      attributes: { energy: 3 },
+    });
+    expect(taskPatchToRow({ title: "x" })).not.toHaveProperty("attributes");
+    expect(taskPatchToRow({ attributes: { satisfaction: 5 } })).toEqual({
+      attributes: { satisfaction: 5 },
+    });
   });
 });

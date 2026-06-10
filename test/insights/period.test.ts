@@ -229,6 +229,7 @@ describe("URL codec", () => {
     expect(parseGranularityParam("week")).toBe("week");
     expect(parseGranularityParam("bogus")).toBeNull();
     expect(parseTabParam("patterns")).toBe("patterns");
+    expect(parseTabParam("optimize")).toBe("optimize");
     expect(parseTabParam(undefined)).toBe("overview");
     expect(parseTabParam("bogus")).toBe("overview");
   });

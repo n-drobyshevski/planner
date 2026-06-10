@@ -4,6 +4,8 @@
 // validation messages live in one place.
 import { z } from "zod";
 
+import { itemAttributesSchema } from "@/lib/attributes/schema";
+
 export const taskStatusSchema = z.enum(["todo", "in_progress", "done"]);
 
 const nullableUuid = z.uuid().nullable();
@@ -35,6 +37,7 @@ const taskInputBase = z.object({
   position: z.number().finite().optional(),
   sequential: z.boolean().optional(),
   completedAt: z.number().int().nullable().optional(),
+  attributes: itemAttributesSchema.optional(),
 });
 
 /** Full create payload. Enforces the done <-> completedAt coupling the DB CHECKs. */
@@ -85,6 +88,7 @@ export const taskFormSchema = z.object({
   priority: z.enum(["none", "1", "2", "3"]),
   dueDate: z.literal("").or(z.iso.date()),
   status: taskStatusSchema,
+  attributes: itemAttributesSchema,
 });
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
 

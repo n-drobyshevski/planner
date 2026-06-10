@@ -31,6 +31,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     position: 0,
     sequential: false,
     completedAt: null,
+    attributes: {},
     createdAt: T0 - 30 * DAY,
     updatedAt: T0,
     ...over,

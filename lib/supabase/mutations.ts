@@ -32,6 +32,7 @@ import {
   parseInput,
 } from "@/lib/tasks/schemas";
 import { buildRRule, parseRRule } from "@/lib/recurrence/rrule-build";
+import type { ItemAttributes } from "@/lib/attributes/schema";
 
 export class StaleWriteError extends Error {
   constructor(
@@ -307,6 +308,7 @@ export async function splitSeries(
   fromOccurrenceMs: number,
   patch: OccurrencePatch,
   newColor?: string | null,
+  newAttributes?: ItemAttributes,
 ): Promise<EventRow> {
   const { original, newSeries } = splitThisAndFuture(event, fromOccurrenceMs, patch);
   const { error } = await sb
@@ -339,6 +341,7 @@ export async function splitSeries(
     rrule: newSeries.rrule,
     recurrenceEndsAt: newSeries.recurrenceEndsAt,
     taskId: newSeries.taskId,
+    attributes: newAttributes !== undefined ? newAttributes : newSeries.attributes,
   };
   return createEvent(sb, input);
 }
@@ -764,6 +767,9 @@ export async function scheduleTaskBlocks(
       end: seg.end,
       timeZone,
       taskId: task.id,
+      // Blocks inherit the task's optimization attributes, so energy/focus
+      // set on a task flows onto its scheduled time.
+      attributes: task.attributes,
     }),
   );
   const { data, error } = await sb.from("events").insert(rows).select();
@@ -795,6 +801,7 @@ export async function scheduleBlocks(
       end: it.end,
       timeZone,
       taskId: it.task.id,
+      attributes: it.task.attributes,
     }),
   );
   const { data, error } = await sb.from("events").insert(rows).select();

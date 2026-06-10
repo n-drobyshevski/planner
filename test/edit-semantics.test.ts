@@ -35,6 +35,7 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     rrule: "FREQ=WEEKLY;BYDAY=MO,WE",
     recurrenceEndsAt: null,
     taskId: null,
+    attributes: {},
     createdAt: Date.UTC(2025, 11, 1),
     updatedAt: Date.UTC(2025, 11, 1),
     ...overrides,
@@ -157,6 +158,12 @@ describe("editAll", () => {
 describe("splitThisAndFuture", () => {
   // Pick an occurrence start in the middle of the series: 2026-02-02 10:00 UTC.
   const fromOccurrenceMs = Date.UTC(2026, 1, 2, 10, 0, 0);
+
+  it("the new series inherits the master's attributes", () => {
+    const event = makeEvent({ attributes: { energy: 3, mood: "calm" } });
+    const { newSeries } = splitThisAndFuture(event, fromOccurrenceMs, {});
+    expect(newSeries.attributes).toEqual({ energy: 3, mood: "calm" });
+  });
 
   it("sets the original UNTIL to just before the split point", () => {
     const event = makeEvent();

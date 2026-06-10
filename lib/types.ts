@@ -1,6 +1,8 @@
 // Shared domain types. Times are epoch milliseconds (UTC) inside the app;
 // the data layer converts to/from Postgres `timestamptz` at the boundary.
 
+import type { ItemAttributes } from "@/lib/attributes/schema";
+
 export type OverrideType = "cancel" | "modify";
 export type TaskStatus = "todo" | "in_progress" | "done";
 /** An event's lifecycle state, driving how it renders on the calendar:
@@ -134,6 +136,8 @@ export interface EventRow {
   recurrenceEndsAt: number | null;
   /** when set, this event is a scheduled block of a task ("part" of it) */
   taskId: string | null;
+  /** optimization attributes (energy/flexibility/...); series-level jsonb bag, see lib/attributes/schema.ts */
+  attributes: ItemAttributes;
   createdAt: number;
   updatedAt: number;
 }
@@ -163,6 +167,8 @@ export interface TaskRow {
   sequential: boolean;
   /** set when status -> done, epoch ms */
   completedAt: number | null;
+  /** optimization attributes (energy/flexibility/...); jsonb bag, see lib/attributes/schema.ts */
+  attributes: ItemAttributes;
   createdAt: number;
   updatedAt: number;
 }
@@ -216,6 +222,8 @@ export interface Occurrence {
   isShared: boolean;
   /** when set, this occurrence is a scheduled block of a task */
   taskId: string | null;
+  /** optimization attributes, inherited from the master event (series-level, not overridable) */
+  attributes: ItemAttributes;
   isRecurring: boolean;
   /** true when a `modify` override was applied to this instance */
   isException: boolean;

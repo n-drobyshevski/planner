@@ -22,6 +22,7 @@ function mk(id: string, over: Partial<TaskRow> = {}): TaskRow {
     position: 0,
     sequential: false,
     completedAt: null,
+    attributes: {},
     createdAt: 0,
     updatedAt: 0,
     ...over,
