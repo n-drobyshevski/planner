@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { TimezoneSettings } from "@/components/settings/timezone-settings";
+import { SleepSettings } from "@/components/settings/sleep-settings";
 
 export const metadata: Metadata = {
   title: "Settings · Planner",
@@ -25,6 +26,7 @@ export default function SettingsPage() {
         <ProfileSettings />
         <AppearanceSettings />
         <TimezoneSettings />
+        <SleepSettings />
       </main>
     </div>
   );

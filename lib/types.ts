@@ -76,6 +76,31 @@ export interface Member {
   showSuccessToasts: boolean;
   // How context time-blocks are labelled in the week/day grid. Defaults to "bar".
   contextLabel: ContextLabel;
+  // Sleep planning preferences (per member): one full sleep cycle in minutes,
+  // time to fall asleep after getting into bed, and the nightly cycle target.
+  // Non-null — DB defaults (90 / 15 / 5) apply on insert.
+  sleepCycleLengthMin: number;
+  sleepOnsetLatencyMin: number;
+  targetSleepCycles: number;
+}
+
+/**
+ * A member's sleep log for one night, keyed by the WAKE date (`date` is a
+ * zone-free yyyy-MM-dd token). Member-private under RLS: the partner can
+ * never read these rows. `bedtimeAt`/`wokeAt` are optional real instants;
+ * `quality` is 1..5, `fatigue` is a simplified 1..9 Karolinska scale.
+ */
+export interface SleepLog {
+  id: string;
+  workspaceId: string;
+  memberId: string;
+  date: string;
+  bedtimeAt: number | null;
+  wokeAt: number | null;
+  quality: number | null;
+  fatigue: number | null;
+  note: string | null;
+  createdAt: number;
 }
 
 export interface Category {

@@ -89,6 +89,10 @@ export function usePreferences() {
   const showSuccessToasts = member?.showSuccessToasts ?? true;
   // Week/day display: how context time-blocks are labelled (top bar vs side).
   const contextLabel = member?.contextLabel ?? DEFAULT_CONTEXT_LABEL;
+  // Sleep planning: cycle length / onset latency / nightly cycle target.
+  const sleepCycleLengthMin = member?.sleepCycleLengthMin ?? 90;
+  const sleepOnsetLatencyMin = member?.sleepOnsetLatencyMin ?? 15;
+  const targetSleepCycles = member?.targetSleepCycles ?? 5;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
   // its own (Latte light, the rest dark); `default` defers to themePreference.
@@ -197,6 +201,29 @@ export function usePreferences() {
     [persist],
   );
 
+  // No DOM side-effect: the Sleep tab re-reads these from the workspace cache
+  // that `persist` patches, so the calculator re-ranks immediately.
+  const setSleepCycleLength = useCallback(
+    (next: number) => {
+      void persist({ sleepCycleLengthMin: next });
+    },
+    [persist],
+  );
+
+  const setSleepOnsetLatency = useCallback(
+    (next: number) => {
+      void persist({ sleepOnsetLatencyMin: next });
+    },
+    [persist],
+  );
+
+  const setTargetSleepCycles = useCallback(
+    (next: number) => {
+      void persist({ targetSleepCycles: next });
+    },
+    [persist],
+  );
+
   const setPalette = useCallback(
     (next: Palette) => {
       // Crossfade the whole flavor swap (surfaces + light/dark + accent) as one
@@ -231,6 +258,12 @@ export function usePreferences() {
     showSuccessToasts,
     /** How context time-blocks are labelled in the week/day grid. */
     contextLabel,
+    /** One full sleep cycle in minutes (70..110, default 90). */
+    sleepCycleLengthMin,
+    /** Minutes to fall asleep after getting into bed (0..60, default 15). */
+    sleepOnsetLatencyMin,
+    /** Nightly sleep-cycle target (3..7, default 5). */
+    targetSleepCycles,
     setThemePref,
     setAccent,
     setTone,
@@ -240,6 +273,9 @@ export function usePreferences() {
     setShowInactiveInMonth,
     setShowSuccessToasts,
     setContextLabel,
+    setSleepCycleLength,
+    setSleepOnsetLatency,
+    setTargetSleepCycles,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,
   };

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   EventRow,
+  SleepLog,
   TaskRow,
   ThemePreference,
   AccentId,
@@ -10,12 +11,15 @@ import type {
 } from "@/lib/types";
 import {
   mapEvent,
+  mapSleepLog,
   mapTask,
   eventInputToRow,
   eventPatchToRow,
+  sleepLogInputToRow,
   taskInputToRow,
   taskPatchToRow,
   type EventInput,
+  type SleepLogInput,
   type TaskInput,
 } from "./mappers";
 import {
@@ -642,6 +646,12 @@ export interface MemberPreferencesPatch {
   showSuccessToasts?: boolean;
   /** How context time-blocks are labelled in the week/day grid. */
   contextLabel?: ContextLabel;
+  /** One full sleep cycle, minutes (DB check 70..110). */
+  sleepCycleLengthMin?: number;
+  /** Time to fall asleep after getting into bed, minutes (DB check 0..60). */
+  sleepOnsetLatencyMin?: number;
+  /** Nightly cycle target (DB check 3..7). */
+  targetSleepCycles?: number;
 }
 
 /**
@@ -693,9 +703,32 @@ export async function updateMemberPreferences(
   if (patch.showInactiveInMonth != null) row.show_inactive_in_month = patch.showInactiveInMonth;
   if (patch.showSuccessToasts != null) row.show_success_toasts = patch.showSuccessToasts;
   if (patch.contextLabel != null) row.context_label = patch.contextLabel;
+  if (patch.sleepCycleLengthMin != null) row.sleep_cycle_length_min = patch.sleepCycleLengthMin;
+  if (patch.sleepOnsetLatencyMin != null) row.sleep_onset_latency_min = patch.sleepOnsetLatencyMin;
+  if (patch.targetSleepCycles != null) row.target_sleep_cycles = patch.targetSleepCycles;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;
+}
+
+// --- Sleep logs --------------------------------------------------------------
+
+/**
+ * Insert or replace the viewer's log for one night (unique member_id,date —
+ * the morning check-in and a backfill edit of the same date both land here).
+ * RLS keeps it member-private.
+ */
+export async function upsertSleepLog(
+  sb: SupabaseClient,
+  input: SleepLogInput,
+): Promise<SleepLog> {
+  const { data, error } = await sb
+    .from("sleep_logs")
+    .upsert(sleepLogInputToRow(input), { onConflict: "member_id,date" })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapSleepLog(data);
 }
 
 // --- Tasks -----------------------------------------------------------------

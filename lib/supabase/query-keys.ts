@@ -13,4 +13,7 @@ export const qk = {
   eventsAll: (workspaceId: string) => ["events", workspaceId] as const,
   /** All tasks (+ subtasks) in the workspace; not windowed. */
   tasks: (workspaceId: string) => ["tasks", workspaceId] as const,
+  /** The viewer's sleep logs (member-private under RLS); not windowed. */
+  sleepLogs: (workspaceId: string, memberId: string) =>
+    ["sleep-logs", workspaceId, memberId] as const,
 };

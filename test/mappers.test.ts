@@ -1,12 +1,16 @@
 import { describe, it, expect } from "vitest";
 import {
   mapEvent,
+  mapMember,
+  mapSleepLog,
   mapTask,
   eventInputToRow,
   eventPatchToRow,
+  sleepLogInputToRow,
   taskInputToRow,
   taskPatchToRow,
   type EventInput,
+  type SleepLogInput,
   type TaskInput,
 } from "@/lib/supabase/mappers";
 
@@ -175,5 +179,111 @@ describe("attributes round-trip", () => {
     expect(taskPatchToRow({ attributes: { satisfaction: 5 } })).toEqual({
       attributes: { satisfaction: 5 },
     });
+  });
+});
+
+const baseSleepRow = {
+  id: "s1",
+  workspace_id: "w1",
+  member_id: "m1",
+  date: "2026-06-10",
+  bedtime_at: "2026-06-09T21:00:00.000Z",
+  woke_at: "2026-06-10T05:30:00.000Z",
+  quality: 4,
+  fatigue: 3,
+  note: "fine",
+  created_at: "2026-06-10T06:00:00.000Z",
+};
+
+describe("sleep log mappers", () => {
+  it("mapSleepLog converts timestamps to ms and keeps the date token verbatim", () => {
+    const log = mapSleepLog(baseSleepRow);
+    expect(log.date).toBe("2026-06-10");
+    expect(log.bedtimeAt).toBe(Date.UTC(2026, 5, 9, 21));
+    expect(log.wokeAt).toBe(Date.UTC(2026, 5, 10, 5, 30));
+    expect(log.quality).toBe(4);
+    expect(log.fatigue).toBe(3);
+    expect(log.note).toBe("fine");
+  });
+
+  it("mapSleepLog tolerates the all-optional fields being null", () => {
+    const log = mapSleepLog({
+      ...baseSleepRow,
+      bedtime_at: null,
+      woke_at: null,
+      quality: null,
+      fatigue: null,
+      note: null,
+    });
+    expect(log.bedtimeAt).toBeNull();
+    expect(log.wokeAt).toBeNull();
+    expect(log.quality).toBeNull();
+    expect(log.fatigue).toBeNull();
+    expect(log.note).toBeNull();
+  });
+
+  it("sleepLogInputToRow writes snake_case with nulls for absent optionals", () => {
+    const input: SleepLogInput = {
+      workspaceId: "w1",
+      memberId: "m1",
+      date: "2026-06-10",
+      quality: 5,
+    };
+    const row = sleepLogInputToRow(input);
+    expect(row.workspace_id).toBe("w1");
+    expect(row.member_id).toBe("m1");
+    expect(row.date).toBe("2026-06-10");
+    expect(row.quality).toBe(5);
+    expect(row.fatigue).toBeNull();
+    expect(row.bedtime_at).toBeNull();
+    expect(row.woke_at).toBeNull();
+    expect(row.note).toBeNull();
+  });
+
+  it("sleepLogInputToRow encodes instants as ISO strings", () => {
+    const row = sleepLogInputToRow({
+      workspaceId: "w1",
+      memberId: "m1",
+      date: "2026-06-10",
+      bedtimeAt: Date.UTC(2026, 5, 9, 21),
+      wokeAt: Date.UTC(2026, 5, 10, 5, 30),
+    });
+    expect(typeof row.bedtime_at).toBe("string");
+    expect(toMsBack(row.bedtime_at as string)).toBe(Date.UTC(2026, 5, 9, 21));
+    expect(toMsBack(row.woke_at as string)).toBe(Date.UTC(2026, 5, 10, 5, 30));
+  });
+});
+
+function toMsBack(iso: string): number {
+  return new Date(iso).getTime();
+}
+
+describe("mapMember — sleep preferences", () => {
+  const memberRow = {
+    id: "m1",
+    workspace_id: "w1",
+    auth_user_id: null,
+    name: "Nick",
+    color: "#aabbcc",
+    pin_hash: null,
+  };
+
+  it("defaults to 90 / 15 / 5 when the columns are absent", () => {
+    const m = mapMember(memberRow);
+    expect(m.sleepCycleLengthMin).toBe(90);
+    expect(m.sleepOnsetLatencyMin).toBe(15);
+    expect(m.targetSleepCycles).toBe(5);
+  });
+
+  it("passes stored values through", () => {
+    const m = mapMember({
+      ...memberRow,
+      sleep_cycle_length_min: 100,
+      sleep_onset_latency_min: 10,
+      target_sleep_cycles: 6,
+    });
+    expect(m.sleepCycleLengthMin).toBe(100);
+    expect(m.sleepOnsetLatencyMin).toBe(10);
+    expect(m.targetSleepCycles).toBe(6);
   });
 });

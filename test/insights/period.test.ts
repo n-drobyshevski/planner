@@ -230,6 +230,7 @@ describe("URL codec", () => {
     expect(parseGranularityParam("bogus")).toBeNull();
     expect(parseTabParam("patterns")).toBe("patterns");
     expect(parseTabParam("optimize")).toBe("optimize");
+    expect(parseTabParam("sleep")).toBe("sleep");
     expect(parseTabParam(undefined)).toBe("overview");
     expect(parseTabParam("bogus")).toBe("overview");
   });

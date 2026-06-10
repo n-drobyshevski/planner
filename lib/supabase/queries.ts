@@ -5,6 +5,7 @@ import type {
   Member,
   Category,
   Board,
+  SleepLog,
   TaskRow,
   TimeWindow,
 } from "@/lib/types";
@@ -14,6 +15,7 @@ import {
   mapMember,
   mapCategory,
   mapBoard,
+  mapSleepLog,
   mapTask,
 } from "./mappers";
 
@@ -110,4 +112,26 @@ export async function fetchTasks(
     .order("created_at");
   if (error) throw error;
   return (data ?? []).map(mapTask);
+}
+
+/**
+ * All of the viewer's sleep logs, oldest first. Not windowed: one tiny row
+ * per night means the whole history stays a single shared cache entry for the
+ * check-in card, Tonight card, history chart, and backfill dialog. RLS is
+ * member-private — the partner's rows are never returned; the eq filters are
+ * belt-and-braces like fetchTasks.
+ */
+export async function fetchSleepLogs(
+  sb: SupabaseClient,
+  workspaceId: string,
+  memberId: string,
+): Promise<SleepLog[]> {
+  const { data, error } = await sb
+    .from("sleep_logs")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("member_id", memberId)
+    .order("date");
+  if (error) throw error;
+  return (data ?? []).map(mapSleepLog);
 }

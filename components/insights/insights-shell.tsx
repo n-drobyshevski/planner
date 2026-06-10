@@ -36,6 +36,7 @@ const TAB_LABELS: Record<InsightsTab, string> = {
   balance: "Balance",
   tasks: "Tasks",
   optimize: "Optimize",
+  sleep: "Sleep",
 };
 
 // Each tab is its own lazy chunk (recharts stays out of the route JS); warmed
@@ -47,12 +48,14 @@ const loadPatterns = () => import("./patterns-tab").then((m) => m.PatternsTab);
 const loadBalance = () => import("./balance-tab").then((m) => m.BalanceTab);
 const loadTasksTab = () => import("./tasks-tab").then((m) => m.TasksTab);
 const loadOptimize = () => import("./optimize-tab").then((m) => m.OptimizeTab);
+const loadSleep = () => import("./sleep-tab").then((m) => m.SleepTab);
 const OverviewTab = dynamic(loadOverview, { ssr: false, loading: tabLoading });
 const TrendsTab = dynamic(loadTrends, { ssr: false, loading: tabLoading });
 const PatternsTab = dynamic(loadPatterns, { ssr: false, loading: tabLoading });
 const BalanceTab = dynamic(loadBalance, { ssr: false, loading: tabLoading });
 const TasksTab = dynamic(loadTasksTab, { ssr: false, loading: tabLoading });
 const OptimizeTab = dynamic(loadOptimize, { ssr: false, loading: tabLoading });
+const SleepTab = dynamic(loadSleep, { ssr: false, loading: tabLoading });
 
 const TAB_PRELOADS = [
   loadOverview,
@@ -61,6 +64,7 @@ const TAB_PRELOADS = [
   loadBalance,
   loadTasksTab,
   loadOptimize,
+  loadSleep,
 ];
 
 /** Everything a tab needs, computed once in the shell. */
@@ -70,6 +74,12 @@ export interface InsightsTabData {
   occurrences: Occurrence[];
   /** same filter over the comparison window */
   prevOccurrences: Occurrence[];
+  /**
+   * RAW (unfiltered) occurrences of the focused window — same array the
+   * filter ran over. The Sleep tab derives nights from inactive spans, which
+   * the insights filter drops; everything else should use `occurrences`.
+   */
+  rawOccurrences: Occurrence[];
   tasks: TaskRow[];
   categories: Map<string, Category>;
   members: Map<string, Member>;
@@ -180,6 +190,7 @@ function InsightsShellInner({
     period,
     occurrences,
     prevOccurrences,
+    rawOccurrences: cur.occurrences,
     tasks,
     categories: categoryMap,
     members: memberMap,
@@ -287,6 +298,7 @@ function InsightsShellInner({
             {tab === "balance" && <BalanceTab data={data} />}
             {tab === "tasks" && <TasksTab data={data} />}
             {tab === "optimize" && <OptimizeTab data={data} />}
+            {tab === "sleep" && <SleepTab data={data} />}
           </div>
         )}
       </main>

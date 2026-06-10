@@ -9,6 +9,7 @@ import type {
   Member,
   Category,
   Board,
+  SleepLog,
   TaskRow,
   ThemePreference,
   AccentId,
@@ -45,6 +46,50 @@ export function mapMember(r: Row): Member {
     showSuccessToasts:
       r.show_success_toasts == null ? true : Boolean(r.show_success_toasts),
     contextLabel: (r.context_label as ContextLabel | null) ?? "bar",
+    sleepCycleLengthMin: (r.sleep_cycle_length_min as number | null) ?? 90,
+    sleepOnsetLatencyMin: (r.sleep_onset_latency_min as number | null) ?? 15,
+    targetSleepCycles: (r.target_sleep_cycles as number | null) ?? 5,
+  };
+}
+
+export function mapSleepLog(r: Row): SleepLog {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    memberId: r.member_id as string,
+    date: r.date as string, // zone-free yyyy-mm-dd wake-date token, verbatim
+    bedtimeAt: toMsOrNull(r.bedtime_at),
+    wokeAt: toMsOrNull(r.woke_at),
+    quality: (r.quality as number | null) ?? null,
+    fatigue: (r.fatigue as number | null) ?? null,
+    note: (r.note as string | null) ?? null,
+    createdAt: toMs(r.created_at),
+  };
+}
+
+/** Upsert payload for one night (conflict key member_id,date). */
+export interface SleepLogInput {
+  workspaceId: string;
+  memberId: string;
+  /** WAKE date "yyyy-MM-dd" in the viewer's zone */
+  date: string;
+  bedtimeAt?: number | null;
+  wokeAt?: number | null;
+  quality?: number | null;
+  fatigue?: number | null;
+  note?: string | null;
+}
+
+export function sleepLogInputToRow(input: SleepLogInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    member_id: input.memberId,
+    date: input.date,
+    bedtime_at: toIsoOrNull(input.bedtimeAt ?? null),
+    woke_at: toIsoOrNull(input.wokeAt ?? null),
+    quality: input.quality ?? null,
+    fatigue: input.fatigue ?? null,
+    note: input.note ?? null,
   };
 }
 

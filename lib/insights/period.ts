@@ -34,9 +34,10 @@ export type InsightsTab =
   | "patterns"
   | "balance"
   | "tasks"
-  | "optimize";
+  | "optimize"
+  | "sleep";
 
-/** All tabs in display order. Phase 3 appends "sleep" here. */
+/** All tabs in display order. */
 export const INSIGHTS_TABS: InsightsTab[] = [
   "overview",
   "trends",
@@ -44,6 +45,7 @@ export const INSIGHTS_TABS: InsightsTab[] = [
   "balance",
   "tasks",
   "optimize",
+  "sleep",
 ];
 
 export interface PeriodState {

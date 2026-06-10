@@ -29,6 +29,9 @@ const member = (id: string, color: string): Member => ({
   showInactiveInMonth: true,
   showSuccessToasts: true,
   contextLabel: "bar",
+  sleepCycleLengthMin: 90,
+  sleepOnsetLatencyMin: 15,
+  targetSleepCycles: 5,
 });
 
 function occ(over: Partial<Occurrence>): Occurrence {
