@@ -33,7 +33,7 @@ describe("taskInputSchema", () => {
       color: "peach",
       status: "done",
       priority: 2,
-      dueAt: Date.now(),
+      dueDate: "2026-06-13",
       position: 1.5,
       sequential: false,
       completedAt: Date.now(),

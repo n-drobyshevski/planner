@@ -14,6 +14,8 @@ import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent, progressOf } from "@/lib/tasks/tree";
+import { combineDateTime } from "@/lib/datetime/local";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TasksToolbar, type TasksView } from "./tasks-toolbar";
 import { TaskBoard } from "./task-board";
 import { TaskList } from "./task-list";
@@ -89,6 +91,7 @@ export function TasksShell({
 
   const workspace = useWorkspace();
   const workspaceId = workspace.data?.workspaceId;
+  const timeZone = useViewerTimeZone();
   const { tasks, isLoading, isError } = useTasks(workspaceId);
   const mutations = useTaskMutations(workspaceId);
 
@@ -269,7 +272,13 @@ export function TasksShell({
           task={scheduling}
           subtasks={childrenByParent.get(scheduling.id) ?? []}
           workspaceId={workspace.data.workspaceId}
-          defaultStartMs={scheduling.dueAt ?? undefined}
+          // A due date is a zone-free token; seed the dialog at 09:00 of that
+          // day in the viewer's zone.
+          defaultStartMs={
+            scheduling.dueDate
+              ? combineDateTime(scheduling.dueDate, "09:00", timeZone)
+              : undefined
+          }
         />
       )}
 

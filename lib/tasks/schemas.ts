@@ -22,7 +22,7 @@ const taskInputBase = z.object({
   status: taskStatusSchema.optional(),
   // The form offers 1..3; 0 stays legal for legacy rows (DB CHECK is 0..3).
   priority: z.number().int().min(0).max(3).nullable().optional(),
-  dueAt: z.number().int().nullable().optional(),
+  dueDate: z.iso.date().nullable().optional(),
   position: z.number().finite().optional(),
   sequential: z.boolean().optional(),
   completedAt: z.number().int().nullable().optional(),

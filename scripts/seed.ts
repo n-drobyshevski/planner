@@ -137,6 +137,12 @@ async function main() {
   };
   const plus = (iso: string, mins: number) =>
     new Date(new Date(iso).getTime() + mins * 60_000).toISOString();
+  // Zone-free "yyyy-MM-dd" token for task due dates.
+  const dateAt = (dayOffset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + dayOffset);
+    return d.toISOString().slice(0, 10);
+  };
 
   const s1 = at(0, 9);
   const s2 = at(0, 9, 30); // overlaps s1 -> exercises packing
@@ -193,7 +199,7 @@ async function main() {
       {
         workspace_id: ws.id, owner_id: memA.id, category_id: home.id, board_id: boardErrands.id,
         title: "Pay rent",
-        status: "todo", position: 3, priority: 3, due_at: at(3, 0), sequential: false,
+        status: "todo", position: 3, priority: 3, due_date: dateAt(3), sequential: false,
       },
       {
         workspace_id: ws.id, owner_id: memA.id, assignee_id: memA.id, board_id: boardMain.id,

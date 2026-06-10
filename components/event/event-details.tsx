@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ColorSwatchPicker } from "@/components/shared/color-swatch-picker";
-import { formatOccurrenceWhen, formatDayMonth } from "@/lib/datetime/format";
+import { formatOccurrenceWhen, formatDayMonthToken } from "@/lib/datetime/format";
 import {
   useViewerTimeZone,
   useSecondaryTimeZone,
@@ -183,9 +183,9 @@ export function EventDetails({
               <Row icon={taskDone ? CheckCircle2 : Circle}>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span>Task · {TASK_STATUS_LABEL[task.status]}</span>
-                  {task.dueAt != null && (
+                  {task.dueDate != null && (
                     <span className="text-muted-foreground tabular-nums">
-                      Due {formatDayMonth(task.dueAt, timeZone)}
+                      Due {formatDayMonthToken(task.dueDate)}
                     </span>
                   )}
                   {isOwn && onToggleTaskDone && (

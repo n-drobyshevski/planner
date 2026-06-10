@@ -155,8 +155,8 @@ export interface TaskRow {
   status: TaskStatus;
   /** 0..3 priority; null = none */
   priority: number | null;
-  /** optional deadline, epoch ms */
-  dueAt: number | null;
+  /** optional deadline as a zone-free calendar date ("yyyy-MM-dd"); overdue is judged in the viewer's zone */
+  dueDate: string | null;
   /** order within its status column / among siblings */
   position: number;
   /** parent only: subtasks must be completed in order */
