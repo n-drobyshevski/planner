@@ -6,12 +6,18 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchTasks } from "@/lib/supabase/queries";
 import { subscribeWorkspace } from "@/lib/supabase/realtime";
 import { qk } from "@/lib/supabase/query-keys";
+import { applyTaskChange } from "@/lib/tasks/cache";
 import type { TaskRow } from "@/lib/types";
 
 /**
- * Fetch all tasks (+ subtasks) for the workspace and live-invalidate on any
- * realtime change. Mirrors use-window-events but is not windowed — the board
- * and list need the full set.
+ * Fetch all tasks (+ subtasks) for the workspace and apply realtime changes
+ * directly to the cache (the payload carries the row, so no refetch is
+ * needed). Mirrors use-window-events but is not windowed — the board and list
+ * need the full set.
+ *
+ * Known gap (unchanged from the invalidate days): when a task flips to
+ * private, RLS stops delivering its events to the partner — no payload, so
+ * the stale row lingers until the next refetch (window refocus or reconnect).
  */
 export function useTasks(workspaceId: string | undefined): {
   tasks: TaskRow[];
@@ -37,9 +43,23 @@ export function useTasks(workspaceId: string | undefined): {
         // Only react to task changes otherwise; event/override/category changes
         // on this shared channel are not this list's concern.
         if (change.table !== "tasks") return;
-        qc.invalidateQueries({ queryKey: qk.tasks(workspaceId) });
+        qc.setQueryData<TaskRow[]>(qk.tasks(workspaceId), (old) =>
+          old ? applyTaskChange(old, change) : old,
+        );
       },
       "tasks",
+      {
+        onStatus: (status, wasReconnect) => {
+          // Payloads may have been missed while the channel was down; refetch
+          // once on rejoin to reconcile. Errors are logged, not surfaced — the
+          // client auto-reconnects and the app stays calm.
+          if (status === "subscribed" && wasReconnect) {
+            void qc.invalidateQueries({ queryKey: qk.tasks(workspaceId) });
+          } else if (status === "error") {
+            console.warn("[planner] Tasks realtime channel error; live updates may lag until it reconnects.");
+          }
+        },
+      },
     );
   }, [workspaceId, qc, sb]);
 

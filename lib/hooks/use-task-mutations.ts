@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
+import { upsertTask, removeTasks } from "@/lib/tasks/cache";
 import type { TaskInput } from "@/lib/supabase/mappers";
 import type { TaskRow } from "@/lib/types";
 import { useHistoryStore } from "@/stores/history-store";
@@ -14,10 +15,12 @@ import { useNotify } from "@/lib/hooks/use-notify";
 type UndoSpec = { label: string; undo: () => Promise<boolean> };
 
 /**
- * Task write operations wrapped with cache invalidation + toasts. Realtime
- * also invalidates, so the other member sees changes live. Scheduling touches
- * the events table too, so those calls invalidate both task and event queries.
- * Successful writes push an inverse onto the history store so Ctrl+Z can undo.
+ * Task write operations wrapped with targeted cache reconciliation + toasts.
+ * Successful writes apply the returned server row to the cache (so trigger-
+ * normalized fields land too) instead of refetching the whole set; realtime
+ * applies the same rows for the other member. Scheduling touches the events
+ * table, so those calls still invalidate the event windows. Successful writes
+ * push an inverse onto the history store so Ctrl+Z can undo.
  */
 export function useTaskMutations(workspaceId: string | undefined) {
   const qc = useQueryClient();
@@ -30,6 +33,16 @@ export function useTaskMutations(workspaceId: string | undefined) {
     if (!workspaceId) return;
     qc.invalidateQueries({ queryKey: qk.tasks(workspaceId) });
     if (alsoEvents) qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
+  };
+  const invalidateEvents = () => {
+    if (!workspaceId) return;
+    qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
+  };
+  const setTasks = (updater: (old: TaskRow[]) => TaskRow[]) => {
+    if (!workspaceId) return;
+    qc.setQueryData<TaskRow[]>(qk.tasks(workspaceId), (old) =>
+      old ? updater(old) : old,
+    );
   };
 
   // --- Optimistic cache patches -------------------------------------------
@@ -84,12 +97,23 @@ export function useTaskMutations(workspaceId: string | undefined) {
       undo?: (result: T) => UndoSpec | null;
       /** Apply an optimistic cache patch now; returns the rollback for the catch. */
       optimistic?: () => () => void;
+      /**
+       * Reconcile the cache from the server result instead of refetching the
+       * task set (events still refetch when `alsoEvents`). Without it, success
+       * falls back to a full invalidate.
+       */
+      apply?: (result: T) => void;
     },
   ): Promise<boolean> {
     const rollback = opts?.optimistic?.();
     try {
       const result = await p;
-      invalidate(opts?.alsoEvents);
+      if (opts?.apply) {
+        opts.apply(result);
+        if (opts.alsoEvents) invalidateEvents();
+      } else {
+        invalidate(opts?.alsoEvents);
+      }
       const spec = opts?.undo?.(result) ?? null;
       if (spec) pushUndo(spec);
       // Undoable actions get a visible Undo on the toast (works on mobile, where
@@ -110,6 +134,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
     create: (input: TaskInput) =>
       run(m.createTask(sb, input), "Task created", {
         undo: (row) => inverse("create", () => m.deleteTask(sb, row.id)),
+        apply: (row) => setTasks((old) => upsertTask(old, row)),
       }),
     update: (
       id: string,
@@ -126,12 +151,17 @@ export function useTaskMutations(workspaceId: string | undefined) {
         optimistic: optimisticRowPatch
           ? () => patchTaskCache(id, (t) => ({ ...t, ...optimisticRowPatch }))
           : undefined,
+        apply: (row) => setTasks((old) => upsertTask(old, row)),
       }),
     remove: (id: string) =>
       run(m.deleteTaskDeep(sb, id), "Task deleted", {
         alsoEvents: true,
         undo: (snap) => inverse("delete", () => m.restoreDeleted(sb, snap), true),
         optimistic: () => removeTaskFromCache(id),
+        // The snapshot lists every cascaded row, so deeper-than-one subtrees
+        // (which the optimistic patch doesn't cover) are dropped too.
+        apply: (snap) =>
+          setTasks((old) => removeTasks(old, snap.tasks.map((r) => r.id as string))),
       }),
 
     /** Move to a status column at a new position; manages completed_at on transition. */
@@ -150,6 +180,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
         undo: (row) =>
           inverse("move", () => m.updateTask(sb, task.id, prev, row.updatedAt)),
         optimistic: () => patchTaskCache(task.id, (t) => ({ ...t, ...patch })),
+        apply: (row) => setTasks((old) => upsertTask(old, row)),
       });
     },
 
@@ -176,6 +207,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
               status: nextStatus,
               completedAt: nextCompletedAt,
             })),
+          apply: (row) => setTasks((old) => upsertTask(old, row)),
         },
       );
     },
@@ -188,6 +220,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
     ) =>
       run(m.scheduleTaskBlocks(sb, task, segments, timeZone), "Added to calendar", {
         alsoEvents: true,
+        apply: () => {}, // only events change; the task set is untouched
         undo: (rows) =>
           rows.length === 0
             ? null
@@ -205,6 +238,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
     ) =>
       run(m.scheduleBlocks(sb, items, timeZone), "Added to calendar", {
         alsoEvents: true,
+        apply: () => {}, // only events change; the task set is untouched
         undo: (rows) =>
           rows.length === 0
             ? null
