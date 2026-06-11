@@ -21,6 +21,7 @@ import { tz } from "@date-fns/tz";
 import { computeUsage } from "@/lib/analytics/usage";
 import { fragmentation } from "@/lib/analytics/patterns";
 import { categoryShares } from "@/lib/analytics/balance";
+import { median } from "@/lib/analytics/stats";
 import { dateInputToMs, dateKeyInZone } from "@/lib/datetime/local";
 import { formatDuration } from "@/lib/datetime/format";
 import { hasAnyAttribute } from "@/lib/attributes/schema";
@@ -91,13 +92,6 @@ const KIND_PRIORITY: Record<SuggestionKind, number> = {
   fragmentation: 4,
   "category-drift": 5,
 };
-
-function median(sortedAsc: number[]): number {
-  const n = sortedAsc.length;
-  if (n === 0) return 0;
-  const mid = Math.floor(n / 2);
-  return n % 2 === 1 ? sortedAsc[mid] : (sortedAsc[mid - 1] + sortedAsc[mid]) / 2;
-}
 
 export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
   const { window, prevWindow, days, prevDays, timeZone, now, categoryName } = input;
