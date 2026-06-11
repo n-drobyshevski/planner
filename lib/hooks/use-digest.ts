@@ -40,57 +40,69 @@ async function postDigest(
 }
 
 /**
- * The Optimize tab's digest state. On mount (and whenever the payload's hash
- * changes — new period, new filters, new data) it probes with cachedOnly:
- * a cache hit renders instantly, "nothing cached" leaves the idle button, and
- * "unavailable" (no server API key) hides the card. Only the explicit
- * `generate()` click ever spends a model call.
+ * The Optimize tab's digest state. On every payload-hash change (new period,
+ * new filters, new data) it probes with cachedOnly: a cache hit renders
+ * instantly, "nothing cached" leaves the idle button, and "unavailable"
+ * (no server API key) hides the card. Only the explicit `generate()` click
+ * ever spends a model call.
+ *
+ * State is keyed by hash instead of being reset in the effect: a digest
+ * fetched for hash A simply stops matching when the data moves to hash B —
+ * no synchronous setState on data change, no flash of stale narrative.
  */
 export function useDigest(payload: DigestPayload): DigestState {
-  const [available, setAvailable] = useState<boolean | null>(null);
-  const [digest, setDigest] = useState<Digest | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const hash = digestPayloadHash(payload);
-  // The payload identity churns every render; the hash is the real identity.
-  const payloadRef = useRef(payload);
-  payloadRef.current = payload;
+  const payloadRef = useRef<DigestPayload | null>(null);
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [fetched, setFetched] = useState<{ hash: string; digest: Digest } | null>(
+    null,
+  );
+  const [generatingHash, setGeneratingHash] = useState<string | null>(null);
 
   useEffect(() => {
+    payloadRef.current = payload;
     let cancelled = false;
-    setDigest(null);
-    postDigest(payloadRef.current, true)
+    postDigest(payload, true)
       .then((res) => {
         if (cancelled) return;
         setAvailable(res.available ?? false);
         const parsed = digestSchema.safeParse(res.digest);
-        if (parsed.success) setDigest(parsed.data);
+        if (parsed.success) setFetched({ hash, digest: parsed.data });
       })
       .catch(() => {
-        // Probe failures (offline, 401 mid-signout) just leave the idle state.
-        if (!cancelled) setAvailable((prev) => prev ?? null);
+        /* probe failures (offline, 401 mid-signout) just leave the idle state */
       });
     return () => {
       cancelled = true;
     };
+    // The payload's object identity churns every render; `hash` fingerprints
+    // its full contents, so it is the real dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash]);
 
   const generate = useCallback(() => {
-    setIsGenerating(true);
-    postDigest(payloadRef.current, false)
+    const p = payloadRef.current;
+    if (p === null) return;
+    const h = digestPayloadHash(p);
+    setGeneratingHash(h);
+    postDigest(p, false)
       .then((res) => {
         setAvailable(res.available ?? false);
         const parsed = digestSchema.safeParse(res.digest);
-        if (parsed.success) setDigest(parsed.data);
+        if (parsed.success) setFetched({ hash: h, digest: parsed.data });
         else if (res.available !== false)
           toast.error("The digest came back malformed — try again.");
       })
       .catch((e: unknown) => {
-        toast.error(
-          e instanceof Error ? e.message : "The digest request failed.",
-        );
+        toast.error(e instanceof Error ? e.message : "The digest request failed.");
       })
-      .finally(() => setIsGenerating(false));
+      .finally(() => setGeneratingHash((curr) => (curr === h ? null : curr)));
   }, []);
 
-  return { available, digest, isGenerating, generate };
+  return {
+    available,
+    digest: fetched?.hash === hash ? fetched.digest : null,
+    isGenerating: generatingHash === hash,
+    generate,
+  };
 }
