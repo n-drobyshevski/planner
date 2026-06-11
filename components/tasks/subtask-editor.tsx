@@ -65,27 +65,31 @@ export function SubtaskEditor({
   const { done, total } = progressOf(ordered);
 
   // The add-row is a tiny form of its own; the inline renames stay uncontrolled
-  // blur-commit inputs (SubtaskRow) where a form adds nothing.
+  // blur-commit inputs (SubtaskRow) where a form adds nothing. The body lives in
+  // a function declaration invoked at submit time (not render) so the React
+  // Compiler doesn't treat it — Date.now() included — as render-scoped.
   const addForm = useForm({
     defaultValues: { title: "" },
-    onSubmit: ({ value }) => {
-      const title = value.title.trim();
-      if (!title) return;
-      const input: TaskInput = {
-        workspaceId,
-        ownerId: parent.ownerId,
-        parentId: parent.id,
-        boardId: parent.boardId,
-        assigneeId: parent.assigneeId,
-        categoryId: parent.categoryId,
-        title,
-        isPrivate: parent.isPrivate,
-        position: Date.now(),
-      };
-      addForm.reset();
-      void mutations.create(input);
-    },
+    onSubmit: ({ value }) => addSubtask(value.title),
   });
+
+  async function addSubtask(rawTitle: string) {
+    const title = rawTitle.trim();
+    if (!title) return;
+    const input: TaskInput = {
+      workspaceId,
+      ownerId: parent.ownerId,
+      parentId: parent.id,
+      boardId: parent.boardId,
+      assigneeId: parent.assigneeId,
+      categoryId: parent.categoryId,
+      title,
+      isPrivate: parent.isPrivate,
+      position: Date.now(),
+    };
+    addForm.reset();
+    void mutations.create(input);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
