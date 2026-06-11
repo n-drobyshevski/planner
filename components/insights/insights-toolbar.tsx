@@ -15,6 +15,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { AppNav } from "@/components/app-nav";
+import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
 import { signOutAction } from "@/app/login/actions";
 import { PeriodSelector } from "./period-selector";
@@ -52,9 +53,13 @@ export function InsightsToolbar({
   filtersSlot?: React.ReactNode;
 }) {
   const choices = granularityChoices(period.window);
+  const surfaceSwipe = useSurfaceSwipe();
 
   return (
-    <header className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-3 pt-safe pb-2 sm:px-4">
+    <header
+      {...surfaceSwipe}
+      className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-3 pt-safe pb-2 sm:px-4"
+    >
       <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
         <ChartColumnBig className="size-4" />
       </span>

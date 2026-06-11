@@ -17,12 +17,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { SURFACE_PATHS } from "@/lib/surfaces";
 
-const items = [
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/tasks", label: "Tasks", icon: ListChecks },
-  { href: "/insights", label: "Insights", icon: ChartColumnBig },
-];
+const SURFACE_META = {
+  "/calendar": { label: "Calendar", icon: CalendarDays },
+  "/tasks": { label: "Tasks", icon: ListChecks },
+  "/insights": { label: "Insights", icon: ChartColumnBig },
+} as const;
+
+const items = SURFACE_PATHS.map((href) => ({ href, ...SURFACE_META[href] }));
 
 /** Top-level switch between the Calendar, Tasks, and Insights surfaces. */
 export function AppNav() {

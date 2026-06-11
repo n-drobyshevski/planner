@@ -33,6 +33,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { DEFAULT_HOUR_PX } from "@/lib/datetime/zoom-math";
 import { ViewSwitcher } from "./view-switcher";
 import { AppNav } from "@/components/app-nav";
+import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
 import { signOutAction } from "@/app/login/actions";
 import type { CalendarView } from "@/lib/types";
@@ -83,9 +84,13 @@ export function CalendarToolbar({
   // The reset affordance only makes sense in the timed grid, and only once the
   // user has actually zoomed away from the default scale.
   const zoomed = timeGridView && hourPx !== DEFAULT_HOUR_PX;
+  const surfaceSwipe = useSurfaceSwipe();
 
   return (
-    <header className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4">
+    <header
+      {...surfaceSwipe}
+      className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4"
+    >
       {/* ---- Desktop toolbar (>= md) ---- */}
       <div className="hidden flex-1 items-center gap-2 md:flex">
         <Button

@@ -15,6 +15,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { AppNav } from "@/components/app-nav";
+import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
 import { signOutAction } from "@/app/login/actions";
 import { BoardSwitcher } from "./board-switcher";
@@ -44,8 +45,12 @@ export function TasksToolbar({
   // profile/settings/sign-out menu collapse into the `⋯` menu so the row never
   // overflows a phone (mirrors the calendar toolbar). The quick theme toggle is
   // desktop-only here too — it lives in Settings on mobile.
+  const surfaceSwipe = useSurfaceSwipe();
   return (
-    <header className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4">
+    <header
+      {...surfaceSwipe}
+      className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4"
+    >
       <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
         <ListChecks className="size-4" />
       </span>
