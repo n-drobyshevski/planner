@@ -123,8 +123,6 @@ export function UsageTab({
       })),
     [usage.perDay, timeZone],
   );
-  // Thin out x-axis labels on dense windows (month=42, agenda=30) to ~7 ticks.
-  const tickInterval = days.length <= 14 ? 0 : Math.ceil(days.length / 7) - 1;
 
   const categoryData = React.useMemo(() => {
     const rows = usage.byCategory.map((c) => ({
@@ -209,8 +207,8 @@ export function UsageTab({
               tickLine={false}
               axisLine={false}
               tickMargin={6}
-              minTickGap={8}
-              interval={tickInterval}
+              minTickGap={24}
+              interval="preserveStartEnd"
               tickFormatter={(value: string) => format(Number(value), "d", { in: tz(timeZone) })}
             />
             <YAxis hide domain={[0, "dataMax"]} />

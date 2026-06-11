@@ -123,7 +123,6 @@ export function HistorySection({
     quality: { label: "Quality (1–5)", color: "var(--chart-2)" },
     fatigue: { label: "Sleepiness (1–9)", color: "var(--chart-4)" },
   };
-  const tickInterval = rows.length <= 14 ? 0 : Math.ceil(rows.length / 7) - 1;
 
   /** Format minutes-since-noon back to a wall clock "HH:mm". */
   const fromNoon = (min: number) => {
@@ -190,8 +189,8 @@ export function HistorySection({
                 tickLine={false}
                 axisLine={false}
                 tickMargin={6}
-                minTickGap={8}
-                interval={tickInterval}
+                minTickGap={24}
+                interval="preserveStartEnd"
                 tickFormatter={(v: string) => bucketTick(Number(v), "day", timeZone)}
               />
               <YAxis hide domain={[0, "dataMax"]} />
@@ -262,8 +261,8 @@ export function HistorySection({
                 tickLine={false}
                 axisLine={false}
                 tickMargin={6}
-                minTickGap={8}
-                interval={tickInterval}
+                minTickGap={24}
+                interval="preserveStartEnd"
                 tickFormatter={(v: string) => bucketTick(Number(v), "day", timeZone)}
               />
               <YAxis hide domain={[0, 9]} />

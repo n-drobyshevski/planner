@@ -97,8 +97,6 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
     created: { label: "Created", color: "var(--chart-4)" },
     completed: { label: "Completed", color: "var(--chart-2)" },
   };
-  const tickInterval =
-    period.buckets.length <= 14 ? 0 : Math.ceil(period.buckets.length / 7) - 1;
   const boardName = (id: string | null) =>
     id === null ? "No board" : (data.boards.find((b) => b.id === id)?.name ?? "Unknown");
 
@@ -173,8 +171,8 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
               tickLine={false}
               axisLine={false}
               tickMargin={6}
-              minTickGap={8}
-              interval={tickInterval}
+              minTickGap={24}
+              interval="preserveStartEnd"
               tickFormatter={(v: string) => bucketTick(Number(v), granularity, timeZone)}
             />
             <YAxis hide domain={[0, "dataMax"]} allowDecimals={false} />

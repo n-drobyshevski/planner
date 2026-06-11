@@ -81,8 +81,6 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
     }),
   );
 
-  const tickInterval =
-    period.buckets.length <= 14 ? 0 : Math.ceil(period.buckets.length / 7) - 1;
   const topShare = shares[0];
 
   const tooltipContent = (config: ChartConfig) => (
@@ -128,8 +126,8 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
               tickLine={false}
               axisLine={false}
               tickMargin={6}
-              minTickGap={8}
-              interval={tickInterval}
+              minTickGap={24}
+              interval="preserveStartEnd"
               tickFormatter={(v: string) => bucketTick(Number(v), granularity, timeZone)}
             />
             <YAxis hide domain={[0, "dataMax"]} />
@@ -237,8 +235,8 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
                 tickLine={false}
                 axisLine={false}
                 tickMargin={6}
-                minTickGap={8}
-                interval={tickInterval}
+                minTickGap={24}
+                interval="preserveStartEnd"
                 tickFormatter={(v: string) =>
                   bucketTick(Number(v), granularity, timeZone)
                 }
