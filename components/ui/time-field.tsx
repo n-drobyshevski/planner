@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +28,13 @@ export function normalizeTime(raw: string): string | null {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** Controlled 24-hour time field; value/onChange use "HH:mm". */
+/**
+ * Controlled 24-hour time field built on the platform `<input type="time">`.
+ * value/onChange use "HH:mm" ("" = empty). The native control gives us the real
+ * OS picker on mobile (iOS wheel, Android clock) and a segmented keyboard-
+ * friendly field on desktop; the stored value is always 24-hour regardless of
+ * the locale-driven display format.
+ */
 export function TimeField({
   value,
   onChange,
@@ -45,34 +50,14 @@ export function TimeField({
   "aria-label"?: string;
   className?: string;
 }) {
-  // While editing, hold the raw draft; otherwise display the controlled value.
-  const [draft, setDraft] = useState<string | null>(null);
-  const display = draft ?? value;
-
-  function commit() {
-    const norm = normalizeTime(draft ?? value);
-    if (norm && norm !== value) onChange(norm);
-    setDraft(null);
-  }
-
   return (
     <Input
       id={id}
-      type="text"
-      inputMode="numeric"
-      placeholder="hh:mm"
+      type="time"
       disabled={disabled}
       aria-label={ariaLabel}
-      value={display}
-      onFocus={() => setDraft(value)}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
       className={cn("tabular-nums", className)}
     />
   );
