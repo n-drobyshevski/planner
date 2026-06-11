@@ -686,11 +686,6 @@
     min-height: 2.75rem;
     min-width: 2.75rem;
   }
-  /* The Calendar/Tasks nav switch is raw links (no data-size); give its options
-     the same 44px tap height on touch. */
-  [data-app-nav] a {
-    min-height: 2.75rem;
-  }
   /* Form controls, alongside the buttons above — by pointer, so touch tablets
      get the 44px target too (the old max-width rule missed them). */
   input:not([type="checkbox"]):not([type="radio"]),
