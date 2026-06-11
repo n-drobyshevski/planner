@@ -394,7 +394,7 @@ describe("rule: stranded-flexible", () => {
 });
 
 describe("ordering and caps", () => {
-  it("orders attention before info, then by kind priority; caps the total at 6", () => {
+  it("orders attention before info, then by kind priority; caps the total at 8", () => {
     const input = makeInput();
     input.prevOccurrences = [
       ...prevBaseline4h(input),
@@ -416,7 +416,7 @@ describe("ordering and caps", () => {
     input.tasks = [task({ id: "t-due", dueDate: "2026-06-04" })]; // attention
     const out = computeSuggestions(input);
 
-    expect(out.length).toBeLessThanOrEqual(6);
+    expect(out.length).toBeLessThanOrEqual(8);
     // attention block first
     const severities = out.map((s) => s.severity);
     const firstInfo = severities.indexOf("info");
@@ -456,5 +456,326 @@ describe("attributeCoverage", () => {
 
   it("returns a null share when empty", () => {
     expect(attributeCoverage([]).share).toBeNull();
+  });
+});
+
+// --- Advice v2: evidence, actions, and the new optional-input rules ---------
+
+import { goalProgress } from "@/lib/insights/goals";
+import type { CategoryGoal } from "@/lib/types";
+import type { Forecast } from "@/lib/analytics/forecast";
+import type { SleepDayPair } from "@/lib/analytics/sleep-cross";
+
+function goalRow(over: Partial<CategoryGoal> = {}): CategoryGoal {
+  return {
+    id: "g1",
+    workspaceId: "w1",
+    categoryId: "catA",
+    weeklyTargetMs: 7 * HOUR,
+    direction: "at-least",
+    createdBy: "m1",
+    createdAt: T0,
+    ...over,
+  };
+}
+
+function forecastOf(over: Partial<Forecast> = {}): Forecast {
+  return {
+    perDay: [{ dayMs: T0 + 7 * DAY, committedMs: 6 * HOUR }],
+    busiestDay: { dayMs: T0 + 7 * DAY, ms: 6 * HOUR },
+    typicalDayMs: 4 * HOUR,
+    capacityRatio: 1.2,
+    dueUnscheduled: [],
+    ...over,
+  };
+}
+
+function night(wakeDayMs: number, durationMs: number | null): SleepDayPair {
+  return {
+    wakeDayMs,
+    durationMs,
+    quality: null,
+    nextDay: { trackedMs: 0, fragmentation: null, meanSatisfaction: null },
+  };
+}
+
+describe("evidence and actions", () => {
+  it("every emitted suggestion carries populated evidence", () => {
+    const input = makeInput();
+    input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = [dayLoad(input.days[1], 8)];
+    input.tasks = [task({ id: "t-e", dueDate: "2026-06-05" })];
+    input.goals = [
+      goalProgress(
+        goalRow({ direction: "at-most", weeklyTargetMs: HOUR }),
+        2 * HOUR,
+        input.days,
+        input.window,
+        input.now,
+      ),
+    ];
+    const out = computeSuggestions(input);
+    expect(out.length).toBeGreaterThanOrEqual(3);
+    for (const s of out) {
+      expect(s.evidence.summary.length).toBeGreaterThan(0);
+      expect(s.evidence.threshold.length).toBeGreaterThan(0);
+      expect(s.evidence.windowLabel.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("windowLabel prefers periodLabel and falls back to the date range", () => {
+    const input = makeInput({ periodLabel: "This week" });
+    input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = [dayLoad(input.days[1], 8)];
+    expect(computeSuggestions(input)[0].evidence.windowLabel).toBe("This week");
+
+    const fallback = makeInput();
+    fallback.prevOccurrences = prevBaseline4h(fallback);
+    fallback.occurrences = [dayLoad(fallback.days[1], 8)];
+    expect(computeSuggestions(fallback)[0].evidence.windowLabel).toBe("1 Jun – 7 Jun");
+  });
+
+  it("deep links are well-formed calendar/tasks/insights hrefs", () => {
+    const input = makeInput();
+    input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = [dayLoad(input.days[1], 8)];
+    input.tasks = [task({ id: "t-a", dueDate: "2026-06-05" })];
+    input.forecast = forecastOf();
+    const out = computeSuggestions(input);
+    const byKind = new Map(out.map((s) => [s.kind, s]));
+    expect(byKind.get("overloaded-day")?.action?.href).toBe(
+      "/calendar?date=2026-06-02&view=day",
+    );
+    expect(byKind.get("unscheduled-task")?.action?.href).toBe("/tasks");
+    expect(byKind.get("forecast-overload")?.action?.href).toBe(
+      "/calendar?date=2026-06-08&view=day",
+    );
+  });
+});
+
+describe("goal rules", () => {
+  it("flags a blown at-most budget, escalating ≥1.25× to attention", () => {
+    const input = makeInput();
+    const mild = goalProgress(
+      goalRow({ id: "g-m", categoryId: "catA", direction: "at-most", weeklyTargetMs: 7 * HOUR }),
+      7.5 * HOUR,
+      input.days,
+      input.window,
+      input.now,
+    );
+    const blown = goalProgress(
+      goalRow({ id: "g-b", categoryId: "catB", direction: "at-most", weeklyTargetMs: 7 * HOUR }),
+      10 * HOUR,
+      input.days,
+      input.window,
+      input.now,
+    );
+    input.goals = [mild, blown];
+    const out = computeSuggestions(input).filter((s) => s.kind === "goal-over-budget");
+    expect(out.map((s) => s.id).sort()).toEqual([
+      "goal-over-budget:catA",
+      "goal-over-budget:catB",
+    ]);
+    expect(out.find((s) => s.id.endsWith("catB"))?.severity).toBe("attention");
+    expect(out.find((s) => s.id.endsWith("catA"))?.severity).toBe("info");
+  });
+
+  it("flags behind-pace at-least targets mid-window only", () => {
+    const input = makeInput(); // now = day 3+1h → expected ≈ 43%
+    const behind = goalProgress(
+      goalRow(),
+      0,
+      input.days,
+      input.window,
+      input.now,
+    );
+    input.goals = [behind];
+    expect(
+      computeSuggestions(input).some((s) => s.kind === "goal-under-budget"),
+    ).toBe(true);
+
+    // Fully-past window: expected is null → silent (the bullets tell it).
+    const past = makeInput({ now: T0 + 30 * DAY });
+    past.goals = [goalProgress(goalRow(), 0, past.days, past.window, past.now)];
+    expect(
+      computeSuggestions(past).some((s) => s.kind === "goal-under-budget"),
+    ).toBe(false);
+  });
+
+  it("stays silent for on-track and met goals", () => {
+    const input = makeInput();
+    input.goals = [
+      goalProgress(goalRow(), 7 * HOUR, input.days, input.window, input.now), // met
+      goalProgress(
+        goalRow({ id: "g2", categoryId: "catB", direction: "at-most" }),
+        HOUR,
+        input.days,
+        input.window,
+        input.now,
+      ), // under cap
+    ];
+    const kinds = computeSuggestions(input).map((s) => s.kind);
+    expect(kinds).not.toContain("goal-over-budget");
+    expect(kinds).not.toContain("goal-under-budget");
+  });
+});
+
+describe("forecast-overload rule", () => {
+  it("fires above 110% of typical pace and escalates above 130%", () => {
+    const input = makeInput({ forecast: forecastOf({ capacityRatio: 1.2 }) });
+    const mild = computeSuggestions(input).find((s) => s.kind === "forecast-overload");
+    expect(mild?.severity).toBe("info");
+
+    const heavy = makeInput({ forecast: forecastOf({ capacityRatio: 1.4 }) });
+    expect(
+      computeSuggestions(heavy).find((s) => s.kind === "forecast-overload")?.severity,
+    ).toBe("attention");
+  });
+
+  it("stays silent under the threshold, without a baseline, and for past periods", () => {
+    const under = makeInput({ forecast: forecastOf({ capacityRatio: 1.05 }) });
+    expect(
+      computeSuggestions(under).some((s) => s.kind === "forecast-overload"),
+    ).toBe(false);
+
+    const noBaseline = makeInput({ forecast: forecastOf({ capacityRatio: null }) });
+    expect(
+      computeSuggestions(noBaseline).some((s) => s.kind === "forecast-overload"),
+    ).toBe(false);
+
+    const past = makeInput({
+      now: T0 + 30 * DAY,
+      forecast: forecastOf({ capacityRatio: 2 }),
+    });
+    expect(
+      computeSuggestions(past).some((s) => s.kind === "forecast-overload"),
+    ).toBe(false);
+  });
+});
+
+describe("anomaly rule", () => {
+  it("surfaces anomalies but never re-flags an overloaded day, capping at 2", () => {
+    const input = makeInput();
+    input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = [dayLoad(input.days[1], 8)]; // overloaded day 2
+    input.anomalies = [
+      { dayMs: input.days[1], ms: 8 * HOUR, z: 4, direction: "high" }, // duplicate of overload
+      { dayMs: input.days[2], ms: 30 * 60_000, z: -3.5, direction: "low" },
+      { dayMs: input.days[3], ms: 9 * HOUR, z: 3.2, direction: "high" },
+      { dayMs: input.days[4], ms: 9 * HOUR, z: 3.1, direction: "high" },
+    ];
+    const out = computeSuggestions(input).filter((s) => s.kind === "anomaly");
+    expect(out).toHaveLength(2);
+    expect(out.map((s) => s.id)).toEqual([
+      "anomaly:2026-06-03",
+      "anomaly:2026-06-04",
+    ]);
+  });
+});
+
+describe("streak-broken rule", () => {
+  it("fires when a 5+ day streak ended, silent otherwise", () => {
+    const fired = makeInput({ streak: { current: 0, longest: 6 } });
+    expect(computeSuggestions(fired).some((s) => s.kind === "streak-broken")).toBe(true);
+
+    const short = makeInput({ streak: { current: 0, longest: 4 } });
+    expect(computeSuggestions(short).some((s) => s.kind === "streak-broken")).toBe(false);
+
+    const alive = makeInput({ streak: { current: 6, longest: 6 } });
+    expect(computeSuggestions(alive).some((s) => s.kind === "streak-broken")).toBe(false);
+  });
+});
+
+describe("sleep-debt rule (viewer-only)", () => {
+  it("fires when 3 of the last 7 logged nights are under 7h", () => {
+    const input = makeInput({
+      sleepPairs: [
+        night(T0, 8 * HOUR),
+        night(T0 + DAY, 6 * HOUR),
+        night(T0 + 2 * DAY, 6.5 * HOUR),
+        night(T0 + 3 * DAY, 5 * HOUR),
+        night(T0 + 4 * DAY, null), // unlogged duration — excluded
+      ],
+    });
+    const s = computeSuggestions(input).find((x) => x.kind === "sleep-debt");
+    expect(s).toBeDefined();
+    expect(s?.action?.href).toBe("/insights?tab=sleep");
+  });
+
+  it("is silent with fewer short nights or when sleepPairs is null", () => {
+    const two = makeInput({
+      sleepPairs: [
+        night(T0, 6 * HOUR),
+        night(T0 + DAY, 6 * HOUR),
+        night(T0 + 2 * DAY, 8 * HOUR),
+      ],
+    });
+    expect(computeSuggestions(two).some((s) => s.kind === "sleep-debt")).toBe(false);
+
+    const none = makeInput({ sleepPairs: null });
+    expect(computeSuggestions(none).some((s) => s.kind === "sleep-debt")).toBe(false);
+  });
+});
+
+describe("correlation-insight rule", () => {
+  it("flags the lowest-rated context at ≤2.5 mean over 5+ rated items", () => {
+    const input = makeInput();
+    input.occurrences = Array.from({ length: 5 }, (_, i) =>
+      occ({
+        start: T0 + i * DAY + 9 * HOUR,
+        end: T0 + i * DAY + 10 * HOUR,
+        categoryId: "catA",
+        attributes: { satisfaction: 2 },
+      }),
+    );
+    const s = computeSuggestions(input).find((x) => x.kind === "correlation-insight");
+    expect(s?.id).toBe("correlation-insight:satisfaction:catA");
+    expect(s?.evidence.n).toBe(5);
+  });
+
+  it("is silent for well-rated contexts and under the n gate", () => {
+    const happy = makeInput();
+    happy.occurrences = Array.from({ length: 5 }, (_, i) =>
+      occ({
+        start: T0 + i * DAY + 9 * HOUR,
+        end: T0 + i * DAY + 10 * HOUR,
+        categoryId: "catA",
+        attributes: { satisfaction: 4 },
+      }),
+    );
+    expect(
+      computeSuggestions(happy).some((s) => s.kind === "correlation-insight"),
+    ).toBe(false);
+
+    const sparse = makeInput();
+    sparse.occurrences = Array.from({ length: 4 }, (_, i) =>
+      occ({
+        start: T0 + i * DAY + 9 * HOUR,
+        end: T0 + i * DAY + 10 * HOUR,
+        categoryId: "catA",
+        attributes: { satisfaction: 1 },
+      }),
+    );
+    expect(
+      computeSuggestions(sparse).some((s) => s.kind === "correlation-insight"),
+    ).toBe(false);
+  });
+});
+
+describe("suppression", () => {
+  it("filters muted kinds and leaves the rest", () => {
+    const input = makeInput();
+    input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = [dayLoad(input.days[1], 8)];
+    input.tasks = [task({ id: "t-s", dueDate: "2026-06-05" })];
+
+    const all = computeSuggestions(input).map((s) => s.kind);
+    expect(all).toContain("overloaded-day");
+    expect(all).toContain("unscheduled-task");
+
+    input.suppressedKinds = new Set(["overloaded-day"]);
+    const muted = computeSuggestions(input).map((s) => s.kind);
+    expect(muted).not.toContain("overloaded-day");
+    expect(muted).toContain("unscheduled-task");
   });
 });

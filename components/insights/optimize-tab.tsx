@@ -1,22 +1,39 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import {
+  Activity,
   AlarmClock,
   ArrowRightLeft,
+  BedDouble,
+  CalendarClock,
+  ChevronDown,
   CircleAlert,
+  Flame,
   Gauge,
   Info,
+  Meh,
   MoonStar,
   Puzzle,
   Scale,
   Sparkles,
+  Target,
+  ThumbsDown,
+  ThumbsUp,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Empty,
   EmptyDescription,
@@ -26,13 +43,22 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { computeForecast, type Forecast } from "@/lib/analytics/forecast";
+import { activeStreak, dayAnomalies } from "@/lib/analytics/momentum";
+import { buildSleepDayPairs } from "@/lib/analytics/sleep-cross";
 import { computeUsage } from "@/lib/analytics/usage";
+import { goalProgress } from "@/lib/insights/goals";
 import {
   attributeCoverage,
   computeSuggestions,
   type Suggestion,
   type SuggestionKind,
 } from "@/lib/insights/suggestions";
+import { useCategoryGoals } from "@/lib/hooks/use-category-goals";
+import {
+  useInsightsPrefs,
+  useUpdateInsightsPrefs,
+} from "@/lib/hooks/use-insights-prefs";
+import { useSleepLogs } from "@/lib/hooks/use-sleep-logs";
 import { formatDuration } from "@/lib/datetime/format";
 import { dateInputToMs } from "@/lib/datetime/local";
 import { InsightsEmpty } from "./insights-empty";
@@ -44,6 +70,8 @@ import type { InsightsTabData } from "./insights-shell";
 // period key → dismissed suggestion ids, pruned to the most recent periods.
 // Suggestion ids are stable for the same data, so a dismissal survives
 // re-renders and filter tweaks but resets when the period changes.
+// (Muting a whole KIND is the cross-device layer — that lives in
+// insights_prefs.suppressed_kinds, written through the prefs hook.)
 const STORAGE_PREFIX = "planner:insights:dismissed:v1:";
 const MAX_PERIOD_ENTRIES = 12;
 
@@ -82,6 +110,30 @@ const KIND_ICONS: Record<SuggestionKind, LucideIcon> = {
   "stranded-flexible": ArrowRightLeft,
   fragmentation: Puzzle,
   "category-drift": Scale,
+  "goal-over-budget": Wallet,
+  "goal-under-budget": Target,
+  "streak-broken": Flame,
+  anomaly: Activity,
+  "forecast-overload": CalendarClock,
+  "sleep-debt": BedDouble,
+  "correlation-insight": Meh,
+};
+
+/** Human names for the mute list ("Muted: heavy-day tips"). */
+const KIND_LABELS: Record<SuggestionKind, string> = {
+  "unscheduled-task": "due-task tips",
+  "overloaded-day": "heavy-day tips",
+  "late-night": "short-night tips",
+  "stranded-flexible": "movable-item tips",
+  fragmentation: "fragmentation tips",
+  "category-drift": "share-shift tips",
+  "goal-over-budget": "over-budget tips",
+  "goal-under-budget": "behind-pace tips",
+  "streak-broken": "streak tips",
+  anomaly: "out-of-pattern tips",
+  "forecast-overload": "outlook tips",
+  "sleep-debt": "sleep tips",
+  "correlation-insight": "satisfaction tips",
 };
 
 export function OptimizeTab({ data }: { data: InsightsTabData }) {
@@ -94,51 +146,120 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     timeZone,
     now,
     viewerId,
+    workspaceId,
+    memberFilter,
   } = data;
 
-  const suggestions = useMemo(
-    () =>
-      computeSuggestions({
-        occurrences,
-        prevOccurrences,
-        tasks,
-        window: period.window,
-        prevWindow: period.prevWindow,
-        days: period.days,
-        prevDays: period.prevDays,
-        timeZone,
-        now,
-        categoryName: (id) =>
-          id === null ? "Uncategorized" : (categories.get(id)?.name ?? "a context"),
-      }),
-    [occurrences, prevOccurrences, tasks, period, timeZone, now, categories],
+  const { goals } = useCategoryGoals(workspaceId || undefined);
+  const { logs: sleepLogs } = useSleepLogs(
+    workspaceId || undefined,
+    viewerId || undefined,
   );
-  const coverage = useMemo(() => attributeCoverage(occurrences), [occurrences]);
+  const { prefs } = useInsightsPrefs(workspaceId || undefined, viewerId || undefined);
+  const updatePrefs = useUpdateInsightsPrefs(
+    workspaceId || undefined,
+    viewerId || undefined,
+  );
+  const suppressedKinds = useMemo(
+    () => prefs?.suppressedKinds ?? [],
+    [prefs?.suppressedKinds],
+  );
+
+  // Active (non-sleep) usage of both windows — shared baseline for the
+  // forecast, anomalies, streak and goal judgments (same rule as the engine:
+  // sleep blocks never read as workload).
+  const usage = useMemo(() => {
+    const active = (occs: typeof occurrences) => occs.filter((o) => !o.inactive);
+    return {
+      cur: computeUsage(active(occurrences), period.days, period.window, {
+        includeInactive: true,
+      }),
+      prev: computeUsage(active(prevOccurrences), period.prevDays, period.prevWindow, {
+        includeInactive: true,
+      }),
+    };
+  }, [occurrences, prevOccurrences, period]);
 
   // Capacity forecast over the NEXT window: committed time from already-
   // scheduled (incl. recurring) items vs the typical day of the trailing
   // current+previous windows.
-  const forecast = useMemo(() => {
-    const activeHistory = (occs: typeof occurrences) => occs.filter((o) => !o.inactive);
-    const curUsage = computeUsage(activeHistory(occurrences), period.days, period.window, {
-      includeInactive: true,
-    });
-    const prevUsage = computeUsage(
-      activeHistory(prevOccurrences),
-      period.prevDays,
-      period.prevWindow,
-      { includeInactive: true },
+  const forecast = useMemo(
+    () =>
+      computeForecast({
+        futureOccurrences: data.futureOccurrences,
+        futureDays: data.futureDays,
+        futureWindow: data.futureWindow,
+        historyPerDay: [...usage.cur.perDay, ...usage.prev.perDay],
+        tasks,
+        timeZone,
+        now,
+      }),
+    [usage, data.futureOccurrences, data.futureDays, data.futureWindow, tasks, timeZone, now],
+  );
+
+  const suggestions = useMemo(() => {
+    const actualByCategory = new Map(
+      usage.cur.byCategory.map((c) => [c.categoryId, c.ms]),
     );
-    return computeForecast({
-      futureOccurrences: data.futureOccurrences,
-      futureDays: data.futureDays,
-      futureWindow: data.futureWindow,
-      historyPerDay: [...curUsage.perDay, ...prevUsage.perDay],
+    // Streak over days that have started — future days always read as 0 and
+    // would fake a "broken streak" mid-period.
+    const elapsedPerDay = usage.cur.perDay.filter((d) => d.dayMs <= now);
+    return computeSuggestions({
+      occurrences,
+      prevOccurrences,
       tasks,
+      window: period.window,
+      prevWindow: period.prevWindow,
+      days: period.days,
+      prevDays: period.prevDays,
       timeZone,
       now,
+      categoryName: (id) =>
+        id === null ? "Uncategorized" : (categories.get(id)?.name ?? "a context"),
+      goals: goals
+        .filter((g) => categories.has(g.categoryId))
+        .map((g) =>
+          goalProgress(
+            g,
+            actualByCategory.get(g.categoryId) ?? 0,
+            period.days,
+            period.window,
+            now,
+          ),
+        ),
+      forecast: period.window.end > now ? forecast : null,
+      anomalies: dayAnomalies(usage.cur.perDay),
+      streak: elapsedPerDay.length > 0 ? activeStreak(elapsedPerDay) : null,
+      // The sleep-debt rule only ever sees the VIEWER's own nights, and only
+      // when the lens is strictly "me" (occurrences are theirs alone then).
+      sleepPairs:
+        memberFilter === "me"
+          ? buildSleepDayPairs(sleepLogs, occurrences, period.days, period.window, timeZone)
+          : null,
+      suppressedKinds: new Set(suppressedKinds),
+      periodLabel: period.label,
     });
-  }, [occurrences, prevOccurrences, period, data.futureOccurrences, data.futureDays, data.futureWindow, tasks, timeZone, now]);
+  }, [occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goals, forecast, usage, memberFilter, sleepLogs, suppressedKinds]);
+
+  const coverage = useMemo(() => attributeCoverage(occurrences), [occurrences]);
+
+  function muteKind(kind: SuggestionKind) {
+    if (suppressedKinds.includes(kind)) return;
+    const restored = suppressedKinds;
+    void updatePrefs({ suppressedKinds: [...suppressedKinds, kind] }).catch(() => {});
+    toast(`Muted ${KIND_LABELS[kind]}`, {
+      description: "You won't see this kind of tip again, on any device.",
+      action: {
+        label: "Undo",
+        onClick: () => void updatePrefs({ suppressedKinds: restored }).catch(() => {}),
+      },
+    });
+  }
+  function unmuteKind(kind: string) {
+    void updatePrefs({
+      suppressedKinds: suppressedKinds.filter((k) => k !== kind),
+    }).catch(() => {});
+  }
 
   if (occurrences.length === 0) return <InsightsEmpty />;
 
@@ -166,7 +287,26 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
         storageKey={`${STORAGE_PREFIX}${viewerId}`}
         periodKey={periodKey}
         suggestions={suggestions}
+        onMute={muteKind}
       />
+      {suppressedKinds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
+          <span>Muted:</span>
+          {suppressedKinds.map((kind) => (
+            <Button
+              key={kind}
+              variant="ghost"
+              size="sm"
+              className="min-h-11 px-1.5 text-xs sm:min-h-7"
+              onClick={() => unmuteKind(kind)}
+              aria-label={`Unmute ${KIND_LABELS[kind as SuggestionKind] ?? kind}`}
+            >
+              {KIND_LABELS[kind as SuggestionKind] ?? kind}
+              <X data-icon="inline-end" />
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -288,10 +428,12 @@ function SuggestionList({
   storageKey,
   periodKey,
   suggestions,
+  onMute,
 }: {
   storageKey: string;
   periodKey: string;
   suggestions: Suggestion[];
+  onMute: (kind: SuggestionKind) => void;
 }) {
   // Component is inside an ssr:false chunk, so reading localStorage in the
   // lazy initializer is hydration-safe.
@@ -332,6 +474,7 @@ function SuggestionList({
               key={s.id}
               suggestion={s}
               onDismiss={() => persist([...dismissed, s.id])}
+              onMute={() => onMute(s.kind)}
             />
           ))}
         </ul>
@@ -362,12 +505,17 @@ function SuggestionList({
 function SuggestionCard({
   suggestion,
   onDismiss,
+  onMute,
 }: {
   suggestion: Suggestion;
   onDismiss: () => void;
+  onMute: () => void;
 }) {
   const KindIcon = KIND_ICONS[suggestion.kind];
   const SeverityIcon = suggestion.severity === "attention" ? CircleAlert : Info;
+  // "Useful" is a thank-you, not a database row — it acknowledges and stops.
+  const [thanked, setThanked] = useState(false);
+
   return (
     <li className="flex items-start gap-3 rounded-lg border bg-card p-3 shadow-soft">
       <KindIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
@@ -385,6 +533,77 @@ function SuggestionCard({
             {suggestion.meta.join(" · ")}
           </p>
         )}
+
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="group -ml-1.5 mt-1 min-h-11 px-1.5 text-xs text-muted-foreground sm:min-h-7"
+            >
+              Why am I seeing this?
+              <ChevronDown
+                data-icon="inline-end"
+                className="transition-transform group-data-[state=open]:rotate-180"
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <dl className="mt-1 space-y-1 rounded-md bg-muted/50 p-2.5 text-xs text-muted-foreground">
+              <div>
+                <dt className="sr-only">The data behind this</dt>
+                <dd>{suggestion.evidence.summary}</dd>
+              </div>
+              <div>
+                <dt className="sr-only">When this fires</dt>
+                <dd>{suggestion.evidence.threshold}</dd>
+              </div>
+              <div className="tabular-nums">
+                <dt className="sr-only">Data window</dt>
+                <dd>
+                  Window: {suggestion.evidence.windowLabel}
+                  {suggestion.evidence.n !== undefined
+                    ? ` · n ${suggestion.evidence.n}`
+                    : ""}
+                </dd>
+              </div>
+            </dl>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          {suggestion.action && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11 text-xs sm:min-h-7"
+              asChild
+            >
+              <Link href={suggestion.action.href}>{suggestion.action.label}</Link>
+            </Button>
+          )}
+          <span className="flex-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11 text-muted-foreground sm:size-7"
+            aria-label={thanked ? "Marked useful" : "Useful"}
+            aria-pressed={thanked}
+            disabled={thanked}
+            onClick={() => setThanked(true)}
+          >
+            <ThumbsUp className={thanked ? "text-foreground" : undefined} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11 text-muted-foreground sm:size-7"
+            aria-label="Not useful — mute this kind of tip"
+            onClick={onMute}
+          >
+            <ThumbsDown />
+          </Button>
+        </div>
       </div>
       <Button
         variant="ghost"
