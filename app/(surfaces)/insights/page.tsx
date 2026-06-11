@@ -1,7 +1,13 @@
 import { Suspense } from "react";
+import { cacheLife } from "next/cache";
 import { InsightsShell } from "@/components/insights/insights-shell";
 import { InsightsSkeleton } from "@/components/shared/surface-skeletons";
-import { parsePeriodSearch, parseTabParam } from "@/lib/insights/period";
+import {
+  parsePeriodSearch,
+  parseTabParam,
+  type InsightsTab,
+  type PeriodState,
+} from "@/lib/insights/period";
 
 interface InsightsSearch {
   range?: string;
@@ -32,7 +38,29 @@ async function InsightsRoute({
   searchParams: Promise<InsightsSearch>;
 }) {
   const sp = await searchParams;
+  // Params are parsed OUT here, in the dynamic scope; the plain PeriodState +
+  // tab become the cache key below. Presets like "this-week" stay symbolic in
+  // PeriodState (resolved client-side by resolvePeriod), so the parse is
+  // deterministic and the cached payload never embeds a server-side "now".
   return (
-    <InsightsShell initialState={parsePeriodSearch(sp)} initialTab={parseTabParam(sp.tab)} />
+    <CachedInsights state={parsePeriodSearch(sp)} tab={parseTabParam(sp.tab)} />
   );
+}
+
+/**
+ * The RSC payload for a given (period, tab) is pure code-derived UI — all data
+ * is client-fetched — so it's cached: repeat visits skip the server render,
+ * and within the profile's client `stale` window the router serves surface
+ * back-navigation from browser memory with no roundtrip at all.
+ */
+async function CachedInsights({
+  state,
+  tab,
+}: {
+  state: PeriodState;
+  tab: InsightsTab;
+}) {
+  "use cache";
+  cacheLife("hours");
+  return <InsightsShell initialState={state} initialTab={tab} />;
 }
