@@ -674,8 +674,12 @@
      popover triggers, which Radix re-slots as `data-slot="…-trigger"` but still
      render as <button>/<a> carrying data-size. Compact xs / icon-sm variants and
      the raw inline <button>s in dense content carry no data-size, so they're
-     untouched. */
-  :is(a, button):is([data-size="default"], [data-size="sm"], [data-size="lg"]) {
+     untouched. The Switch also emits data-size but is excluded — min-height
+     would stretch its short pill into a tall sliver; it carries its own
+     after:-inset touch hit-area instead. */
+  :is(a, button):is([data-size="default"], [data-size="sm"], [data-size="lg"]):not(
+      [data-slot="switch"]
+    ) {
     min-height: 2.75rem;
   }
   :is(a, button):is([data-size="icon"], [data-size="icon-lg"]) {
