@@ -62,7 +62,9 @@ export function wakesForBedtime(
  * Tonight's bedtime options for tomorrow's first commitment. Wake is
  * GET_READY_MS before the event; the recommended option is the member's
  * target cycle count clamped into the offered range. `tooLate` is true once
- * `now` is strictly past the recommended bedtime.
+ * `now` is strictly past the recommended bedtime; `bestFeasible` is the
+ * highest-cycle option whose bedtime hasn't passed (null when they all have),
+ * and `cyclesFromNow` is how many full cycles still fit going to bed at `now`.
  */
 export function recommendTonight(input: {
   tomorrowFirstEventStart: number;
@@ -73,17 +75,31 @@ export function recommendTonight(input: {
   options: CycleOption[];
   recommended: CycleOption;
   tooLate: boolean;
+  bestFeasible: CycleOption | null;
+  cyclesFromNow: number;
 } {
   const wakeMs = input.tomorrowFirstEventStart - GET_READY_MS;
   const options = bedtimesForWake(wakeMs, input.prefs);
   const lo = Math.min(...CYCLE_RANGE);
   const hi = Math.max(...CYCLE_RANGE);
   const target = Math.min(hi, Math.max(lo, input.prefs.targetCycles));
-  const recommended = options.find((o) => o.cycles === target) as CycleOption;
+  const recommended = options.find((o) => o.cycles === target) ?? options[0];
+  // Options are earliest-bedtime (most cycles) first, so the first one that
+  // hasn't passed is the best the night can still hold.
+  const bestFeasible = options.find((o) => o.bedtimeMs >= input.now) ?? null;
+  const cyclesFromNow = Math.max(
+    0,
+    Math.floor(
+      (wakeMs - input.now - input.prefs.onsetLatencyMin * MIN_MS) /
+        (input.prefs.cycleLengthMin * MIN_MS),
+    ),
+  );
   return {
     wakeMs,
     options,
     recommended,
     tooLate: recommended.bedtimeMs < input.now,
+    bestFeasible,
+    cyclesFromNow,
   };
 }

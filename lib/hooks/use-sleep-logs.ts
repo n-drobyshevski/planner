@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
 import { fetchSleepLogs } from "@/lib/supabase/queries";
-import { upsertSleepLog } from "@/lib/supabase/mutations";
+import { deleteSleepLog, upsertSleepLog } from "@/lib/supabase/mutations";
 import type { SleepLogInput } from "@/lib/supabase/mappers";
 import { subscribeWorkspace } from "@/lib/supabase/realtime";
 import { qk } from "@/lib/supabase/query-keys";
@@ -26,6 +26,7 @@ export function useSleepLogs(
   logs: SleepLog[];
   isLoading: boolean;
   isError: boolean;
+  refetch: () => void;
 } {
   const qc = useQueryClient();
   const sb = createClient();
@@ -71,6 +72,7 @@ export function useSleepLogs(
     logs: query.data ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
+    refetch: query.refetch,
   };
 }
 
@@ -80,6 +82,9 @@ export function useSleepLogs(
  * kept date-sorted), the server row replaces it on success, and the previous
  * cache is restored + a toast shown on failure (use-preferences pattern).
  */
+/** Distinguishes overlapping optimistic rows when saves race (same date). */
+let optimisticSeq = 0;
+
 export function useUpsertSleepLog(
   workspaceId: string | undefined,
   memberId: string | undefined,
@@ -93,7 +98,7 @@ export function useUpsertSleepLog(
       const prev = qc.getQueryData<SleepLog[]>(key);
       const full: SleepLogInput = { ...input, workspaceId, memberId };
       const provisional: SleepLog = {
-        id: `optimistic:${input.date}`,
+        id: `optimistic:${input.date}:${++optimisticSeq}`,
         workspaceId,
         memberId,
         date: input.date,
@@ -116,6 +121,38 @@ export function useUpsertSleepLog(
         if (prev) qc.setQueryData(key, prev);
         toast.error(
           e instanceof Error ? e.message : "Couldn't save your sleep log",
+        );
+        throw e;
+      }
+    },
+    [workspaceId, memberId, qc],
+  );
+}
+
+/**
+ * Delete one night's log (same optimistic shape as the upsert: remove from
+ * cache immediately, restore + toast on failure).
+ */
+export function useDeleteSleepLog(
+  workspaceId: string | undefined,
+  memberId: string | undefined,
+): (date: string) => Promise<void> {
+  const qc = useQueryClient();
+
+  return useCallback(
+    async (date) => {
+      if (!workspaceId || !memberId) return;
+      const key = qk.sleepLogs(workspaceId, memberId);
+      const prev = qc.getQueryData<SleepLog[]>(key);
+      qc.setQueryData<SleepLog[]>(key, (old) =>
+        (old ?? []).filter((l) => l.date !== date),
+      );
+      try {
+        await deleteSleepLog(createClient(), memberId, date);
+      } catch (e) {
+        if (prev) qc.setQueryData(key, prev);
+        toast.error(
+          e instanceof Error ? e.message : "Couldn't delete the sleep log",
         );
         throw e;
       }

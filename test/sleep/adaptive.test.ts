@@ -156,8 +156,10 @@ describe("computeSleepHints", () => {
   it("flags cycle alignment when aligned nights score better", () => {
     // All ≥ target so the duration rule can't split; same bedtime so no
     // regularity. Aligned: 555min in bed (540 asleep = 6×90, dist 0).
-    // Misaligned: 510min (495 asleep, dist 45).
+    // Misaligned: 510min (495 asleep, dist 45). Three per group (the
+    // compareGroups minimum).
     const logs = [
+      loggedNight(22, 0, 7, 15, 5),
       loggedNight(22, 0, 7, 15, 5),
       loggedNight(22, 0, 7, 15, 5),
       loggedNight(22, 0, 6, 30, 2),
@@ -167,6 +169,40 @@ describe("computeSleepHints", () => {
     const out = computeSleepHints(input({ logs }));
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe("cycle-alignment");
+  });
+
+  it("stays silent when a comparison group has fewer than three nights", () => {
+    // Two aligned vs three misaligned — below the n≥3 per-group floor.
+    const logs = [
+      loggedNight(22, 0, 7, 15, 5),
+      loggedNight(22, 0, 7, 15, 5),
+      loggedNight(22, 0, 6, 30, 2),
+      loggedNight(22, 0, 6, 30, 2),
+      loggedNight(22, 0, 6, 30, 2),
+    ];
+    expect(computeSleepHints(input({ logs }))).toEqual([]);
+  });
+
+  it("does not subtract onset latency from derived durations (cycle alignment)", () => {
+    // Derived block-sums are asleep-ish time already. 615min → dist 15
+    // (aligned, boundary); subtracting latency would give 600 → dist 30,
+    // emptying the aligned group and silencing the hint. 495min → dist 45
+    // (misaligned) either way.
+    const logs = [
+      ...Array.from({ length: 3 }, () => log({ quality: 5 })),
+      ...Array.from({ length: 3 }, () => log({ quality: 2 })),
+    ];
+    const nights: DerivedNight[] = logs.map((l, i) => ({
+      dateKey: l.date,
+      dayStartMs: Date.UTC(2026, 5, i + 1),
+      start: null,
+      end: null,
+      durationMs: (i < 3 ? 615 : 495) * MIN,
+    }));
+    const out = computeSleepHints(input({ logs, nights }));
+    const alignment = out.find((h) => h.kind === "cycle-alignment");
+    expect(alignment).toBeDefined();
+    expect(alignment?.title).toBe("Whole cycles agree with you");
   });
 
   it("falls back to derived nights for duration when times are not logged", () => {

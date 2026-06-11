@@ -64,6 +64,16 @@ export function isDateTokenPast(dateStr: string, timeZone: string = localTimeZon
   return dateStr < dateKeyInZone(Date.now(), timeZone);
 }
 
+/**
+ * Local day-start `offset` days after the day containing `ms` (negative =
+ * before). TZDate normalizes out-of-range days, and a DST-transition day
+ * keeps its wall-clock midnight.
+ */
+export function dayStartOffset(ms: number, offset: number, timeZone: string): number {
+  const [y, mo, d] = dateKeyInZone(ms, timeZone).split("-").map(Number);
+  return new TZDate(y, mo - 1, d + offset, 0, 0, 0, timeZone).getTime();
+}
+
 export const DAY_IN_MS = DAY_MS;
 
 /** Round a timestamp up to the next `stepMin` boundary (for sensible defaults). */

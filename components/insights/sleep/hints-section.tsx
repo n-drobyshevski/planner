@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   BedDouble,
   CircleAlert,
@@ -9,7 +10,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { HINTS_MIN_LOGGED, type SleepHint } from "@/lib/sleep/adaptive";
+import {
+  HINTS_MIN_LOGGED,
+  HINTS_WINDOW_DAYS,
+  type SleepHint,
+} from "@/lib/sleep/adaptive";
 import { SectionLabel } from "../tab-bits";
 
 const KIND_ICONS: Record<SleepHint["kind"], LucideIcon> = {
@@ -19,32 +24,40 @@ const KIND_ICONS: Record<SleepHint["kind"], LucideIcon> = {
 };
 
 /**
- * Adaptive hints from logged check-ins. The engine stays silent below
- * HINTS_MIN_LOGGED scored mornings — surface that honestly instead of
- * implying the data says nothing.
+ * Adaptive hints from logged check-ins over a fixed trailing window
+ * (period-independent, so switching to a short period can't silence them).
+ * The engine stays silent below HINTS_MIN_LOGGED scored mornings — surface
+ * that honestly instead of implying the data says nothing.
  */
 export function HintsSection({
   hints,
   scoredCount,
 }: {
   hints: SleepHint[];
-  /** check-ins with a quality or sleepiness score in this period */
+  /** check-ins with a quality or sleepiness score in the trailing window */
   scoredCount: number;
 }) {
   return (
     <section className="space-y-2">
-      <SectionLabel>Hints</SectionLabel>
+      <SectionLabel>Hints · last {HINTS_WINDOW_DAYS} days</SectionLabel>
       {scoredCount < HINTS_MIN_LOGGED ? (
         <p className="text-xs text-muted-foreground">
           Log {HINTS_MIN_LOGGED - scoredCount} more morning
-          {HINTS_MIN_LOGGED - scoredCount === 1 ? "" : "s"} in this period to
-          unlock sleep hints — they compare how you score after different kinds
-          of nights.
+          {HINTS_MIN_LOGGED - scoredCount === 1 ? "" : "s"} to unlock sleep
+          hints — they compare how you score after different kinds of nights,
+          against your{" "}
+          <Link
+            href="/settings#sleep"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            sleep settings
+          </Link>
+          .
         </p>
       ) : hints.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           No patterns stand out yet — your scores don&apos;t differ much across
-          night lengths or bedtimes in this period.
+          night lengths or bedtimes in the last {HINTS_WINDOW_DAYS} days.
         </p>
       ) : (
         <ul role="list" className="flex flex-col gap-2">

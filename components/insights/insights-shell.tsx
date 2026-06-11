@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ import { filterForInsights, type MemberFilter } from "@/lib/insights/filters";
 import { useInsightsFilters } from "@/lib/hooks/use-insights-filters";
 import { useInsightsCustomizationRealtime } from "@/lib/hooks/use-insights-prefs";
 import type { SavedViewConfig } from "@/lib/insights/views";
+import { dateKeyInZone } from "@/lib/datetime/local";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadError } from "@/components/shared/load-error";
 import { InsightsToolbar } from "./insights-toolbar";
@@ -154,6 +155,25 @@ function InsightsShellInner({
     () => resolvePeriod(state, { timeZone, now }),
     [state, timeZone, now],
   );
+
+  // Roll "now" forward when the local date changes (tab left open overnight),
+  // so "today" — the Sleep check-in, relative presets — stays honest. The
+  // callbacks only set state on an actual rollover, so queries don't churn.
+  useEffect(() => {
+    const check = () =>
+      setNow((prev) => {
+        const t = Date.now();
+        return dateKeyInZone(t, timeZone) === dateKeyInZone(prev, timeZone)
+          ? prev
+          : t;
+      });
+    const id = setInterval(check, 60_000);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [timeZone]);
 
   // Ids of Shared contexts (categories with no owner) — drives the derived
   // `isShared` on every occurrence, exactly like the calendar shell.

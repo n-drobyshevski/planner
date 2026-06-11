@@ -122,4 +122,46 @@ describe("recommendTonight", () => {
       }).tooLate,
     ).toBe(true);
   });
+
+  it("offers the best still-feasible option once the recommended one passed", () => {
+    const base = recommendTonight({
+      tomorrowFirstEventStart: eventStart,
+      prefs: PREFS,
+      now: T0 - 3 * HOUR,
+    });
+    // Just past the 5-cycle bedtime → 4 cycles is the best that still fits.
+    const out = recommendTonight({
+      tomorrowFirstEventStart: eventStart,
+      prefs: PREFS,
+      now: base.recommended.bedtimeMs + MIN,
+    });
+    expect(out.tooLate).toBe(true);
+    expect(out.bestFeasible?.cycles).toBe(4);
+  });
+
+  it("reports cycles-from-now when every option has passed", () => {
+    const base = recommendTonight({
+      tomorrowFirstEventStart: eventStart,
+      prefs: PREFS,
+      now: T0 - 3 * HOUR,
+    });
+    const lastBedtime = base.options[base.options.length - 1].bedtimeMs; // 4 cycles
+    // 1 minute past the latest option: 4×90 no longer fits, 3 full ones do.
+    const out = recommendTonight({
+      tomorrowFirstEventStart: eventStart,
+      prefs: PREFS,
+      now: lastBedtime + MIN,
+    });
+    expect(out.tooLate).toBe(true);
+    expect(out.bestFeasible).toBeNull();
+    expect(out.cyclesFromNow).toBe(3);
+
+    // So close to wake that not even one cycle fits.
+    const veryLate = recommendTonight({
+      tomorrowFirstEventStart: eventStart,
+      prefs: PREFS,
+      now: base.wakeMs - 30 * MIN,
+    });
+    expect(veryLate.cyclesFromNow).toBe(0);
+  });
 });

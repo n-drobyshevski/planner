@@ -1,8 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { NotebookPen } from "lucide-react";
+import { NotebookPen, Trash2 } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -15,6 +25,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
+import { useNotify } from "@/lib/hooks/use-notify";
 import { msToTimeInput } from "@/lib/datetime/local";
 import type { SleepLogInput } from "@/lib/supabase/mappers";
 import type { DerivedNight } from "@/lib/sleep/derive";
@@ -38,6 +49,7 @@ export function LogNightDialog({
   nights,
   logs,
   onSave,
+  onDelete,
 }: {
   todayKey: string;
   timeZone: string;
@@ -45,11 +57,16 @@ export function LogNightDialog({
   nights: DerivedNight[];
   logs: SleepLog[];
   onSave: (input: Omit<SleepLogInput, "workspaceId" | "memberId">) => Promise<void>;
+  /** delete the log for a wake date (only offered when one exists) */
+  onDelete: (date: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayKey);
   const [draft, setDraft] = useState<SleepLogDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const notify = useNotify();
 
   const nightByKey = useMemo(
     () => new Map(nights.map((n) => [n.dateKey, n])),
@@ -101,6 +118,7 @@ export function LogNightDialog({
         fatigue: draft.fatigue,
         note: draft.note.trim() === "" ? null : draft.note.trim(),
       });
+      notify.success("Night saved");
       setOpen(false);
     } catch {
       /* the mutation hook already toasted; keep the dialog open to retry */
@@ -108,6 +126,23 @@ export function LogNightDialog({
       setSaving(false);
     }
   }
+
+  async function confirmDelete() {
+    setDeleting(true);
+    try {
+      await onDelete(date);
+      notify.success("Night deleted");
+      setConfirmingDelete(false);
+      setOpen(false);
+    } catch {
+      /* the mutation hook already toasted; keep the dialog open */
+      setConfirmingDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const hasExistingLog = logByKey.has(date);
 
   return (
     <>
@@ -131,6 +166,7 @@ export function LogNightDialog({
                 id="backfill-date"
                 value={date}
                 onChange={pickDate}
+                maxDate={todayKey}
                 aria-label="Wake date"
               />
               <FieldDescription>
@@ -140,6 +176,21 @@ export function LogNightDialog({
             <SleepLogFields draft={draft} onChange={setDraft} idPrefix="backfill" />
           </ResponsiveDialogBody>
           <ResponsiveDialogFooter>
+            {/* The button text swaps aren't announced; this region is. */}
+            <span aria-live="polite" className="sr-only">
+              {saving ? "Saving the night" : deleting ? "Deleting the night" : ""}
+            </span>
+            {hasExistingLog && (
+              <Button
+                variant="ghost"
+                className="text-destructive hover:text-destructive sm:mr-auto"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={deleting}
+              >
+                <Trash2 data-icon="inline-start" />
+                Delete this night
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
@@ -152,6 +203,26 @@ export function LogNightDialog({
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
       </ResponsiveDialog>
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this night’s log?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes your check-in for {date} — quality, fatigue, times
+              and note. Nights derived from your calendar are not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void confirmDelete()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete log"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

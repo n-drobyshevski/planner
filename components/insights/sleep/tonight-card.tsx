@@ -1,23 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { TZDate } from "@date-fns/tz";
 import { BadgeCheck, MoonStar } from "lucide-react";
 
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
-import { dateKeyInZone } from "@/lib/datetime/local";
+import { dayStartOffset } from "@/lib/datetime/local";
 import { formatDuration, formatTime } from "@/lib/datetime/format";
 import {
   recommendTonight,
   type CycleOption,
   type SleepPrefs,
 } from "@/lib/sleep/cycles";
-
-/** Local day-start `offset` days after the day containing `ms`. */
-function dayStartAfter(ms: number, offset: number, timeZone: string): number {
-  const [y, mo, d] = dateKeyInZone(ms, timeZone).split("-").map(Number);
-  return new TZDate(y, mo - 1, d + offset, 0, 0, 0, timeZone).getTime();
-}
 
 /**
  * Bedtime options for tonight, anchored to tomorrow's first commitment.
@@ -42,8 +35,8 @@ export function TonightCard({
 }) {
   const win = useMemo(
     () => ({
-      start: dayStartAfter(now, 1, timeZone),
-      end: dayStartAfter(now, 2, timeZone),
+      start: dayStartOffset(now, 1, timeZone),
+      end: dayStartOffset(now, 2, timeZone),
     }),
     [now, timeZone],
   );
@@ -95,10 +88,23 @@ export function TonightCard({
               />
             ))}
           </ul>
-          {rec.tooLate && (
+          {rec.tooLate && rec.bestFeasible && (
             <p className="mt-2 text-xs text-muted-foreground">
-              The recommended bedtime has already passed — the next option still
-              fits {rec.recommended.cycles - 1} cycles.
+              The recommended bedtime has already passed —{" "}
+              <span className="tabular-nums">
+                {formatTime(rec.bestFeasible.bedtimeMs, timeZone)}
+              </span>{" "}
+              still fits {rec.bestFeasible.cycles} cycles.
+            </p>
+          )}
+          {rec.tooLate && !rec.bestFeasible && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              All cycle bedtimes have passed —{" "}
+              {rec.cyclesFromNow >= 1
+                ? `going to bed now still fits ${rec.cyclesFromNow} full ${
+                    rec.cyclesFromNow === 1 ? "cycle" : "cycles"
+                  }.`
+                : "less than one full cycle fits before your wake time."}
             </p>
           )}
         </>

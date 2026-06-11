@@ -662,6 +662,12 @@ export interface MemberPreferencesPatch {
   sleepOnsetLatencyMin?: number;
   /** Nightly cycle target (DB check 3..7). */
   targetSleepCycles?: number;
+  /** Dedicated sleep category id, or null for the inactive≡sleep heuristic. */
+  sleepCategoryId?: string | null;
+  /** Night window start on the evening before, wall hour (DB check 12..23). */
+  nightWindowStartHour?: number;
+  /** Night window end on the wake day, wall hour (DB check 4..16). */
+  nightWindowEndHour?: number;
 }
 
 /**
@@ -716,6 +722,10 @@ export async function updateMemberPreferences(
   if (patch.sleepCycleLengthMin != null) row.sleep_cycle_length_min = patch.sleepCycleLengthMin;
   if (patch.sleepOnsetLatencyMin != null) row.sleep_onset_latency_min = patch.sleepOnsetLatencyMin;
   if (patch.targetSleepCycles != null) row.target_sleep_cycles = patch.targetSleepCycles;
+  // Nullable like `timezone`: explicit null = back to the inactive heuristic.
+  if ("sleepCategoryId" in patch) row.sleep_category_id = patch.sleepCategoryId ?? null;
+  if (patch.nightWindowStartHour != null) row.night_window_start_hour = patch.nightWindowStartHour;
+  if (patch.nightWindowEndHour != null) row.night_window_end_hour = patch.nightWindowEndHour;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;
@@ -739,6 +749,20 @@ export async function upsertSleepLog(
     .single();
   if (error) throw error;
   return mapSleepLog(data);
+}
+
+/** Remove the viewer's log for one night. RLS limits it to their own rows. */
+export async function deleteSleepLog(
+  sb: SupabaseClient,
+  memberId: string,
+  date: string,
+): Promise<void> {
+  const { error } = await sb
+    .from("sleep_logs")
+    .delete()
+    .eq("member_id", memberId)
+    .eq("date", date);
+  if (error) throw error;
 }
 
 // --- Insights customization --------------------------------------------------

@@ -82,6 +82,12 @@ export interface Member {
   sleepCycleLengthMin: number;
   sleepOnsetLatencyMin: number;
   targetSleepCycles: number;
+  // Sleep derivation (per member): the dedicated sleep category (null = the
+  // inactive≡sleep heuristic) and the night collection window — start hour on
+  // the evening before (12..23), end hour on the wake day (4..16).
+  sleepCategoryId: string | null;
+  nightWindowStartHour: number;
+  nightWindowEndHour: number;
 }
 
 /**

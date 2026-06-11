@@ -40,11 +40,14 @@ export function HistorySection({
   logs,
   prefs,
   timeZone,
+  action,
 }: {
   nights: DerivedNight[];
   logs: SleepLog[];
   prefs: SleepPrefs;
   timeZone: string;
+  /** header-right slot — the backfill entry point lives with the data */
+  action?: React.ReactNode;
 }) {
   const reduced = usePrefersReducedMotion();
   const logByKey = useMemo(() => new Map(logs.map((l) => [l.date, l])), [logs]);
@@ -94,10 +97,12 @@ export function HistorySection({
     bedtimes.length > 0
       ? bedtimes.reduce((a, b) => a + b, 0) / bedtimes.length
       : null;
+  // Sample σ (n−1), matching the regularity hint in lib/sleep/adaptive.ts.
   const spread =
     avgBedtime !== null && bedtimes.length > 1
       ? Math.sqrt(
-          bedtimes.reduce((s, b) => s + (b - avgBedtime) ** 2, 0) / bedtimes.length,
+          bedtimes.reduce((s, b) => s + (b - avgBedtime) ** 2, 0) /
+            (bedtimes.length - 1),
         )
       : null;
   const debtMs = withData.reduce((s, r) => s + Math.max(0, targetMs - r.ms), 0);
@@ -115,6 +120,26 @@ export function HistorySection({
     [nights, logByKey],
   );
   const hasScores = scoreRows.some((r) => r.quality !== null || r.fatigue !== null);
+  // Screen-reader summary for the scores chart (the bars/lines are visual-only).
+  const qualityScores = scoreRows.filter((r) => r.quality !== null);
+  const fatigueScores = scoreRows.filter((r) => r.fatigue !== null);
+  const mornings = (n: number) => `${n} morning${n === 1 ? "" : "s"}`;
+  const scoresSummary = [
+    qualityScores.length > 0
+      ? `Average sleep quality ${(
+          qualityScores.reduce((s, r) => s + (r.quality as number), 0) /
+          qualityScores.length
+        ).toFixed(1)} of 5 across ${mornings(qualityScores.length)}`
+      : null,
+    fatigueScores.length > 0
+      ? `average sleepiness ${(
+          fatigueScores.reduce((s, r) => s + (r.fatigue as number), 0) /
+          fatigueScores.length
+        ).toFixed(1)} of 9 across ${mornings(fatigueScores.length)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
 
   const durationConfig: ChartConfig = {
     hours: { label: "In bed", color: "var(--chart-1)" },
@@ -133,7 +158,10 @@ export function HistorySection({
 
   return (
     <section className="space-y-3">
-      <SectionLabel>Sleep history</SectionLabel>
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <SectionLabel>Sleep history</SectionLabel>
+        {action}
+      </div>
       <StatGrid>
         <StatCard
           label="Avg per night"
@@ -171,7 +199,11 @@ export function HistorySection({
             className={`aspect-auto ${CHART_H.compact} w-full`}
             aria-label="Time in bed per night"
           >
-            <BarChart data={rows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+            <BarChart
+              data={rows}
+              accessibilityLayer
+              margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
+            >
               <defs>
                 {/* hatched fill marks calendar-derived nights (shape, not color) */}
                 <pattern
@@ -237,7 +269,7 @@ export function HistorySection({
               </Bar>
             </BarChart>
           </ChartContainer>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Solid bars: logged check-ins · hatched: derived from inactive calendar
             events · dashed line: your target
           </p>
@@ -247,6 +279,7 @@ export function HistorySection({
       {hasScores && (
         <div className="space-y-1.5">
           <SectionLabel>Morning check-ins</SectionLabel>
+          <p className="sr-only">{scoresSummary}.</p>
           <ChartContainer
             config={scoreConfig}
             className="aspect-auto h-[140px] w-full"
@@ -254,6 +287,7 @@ export function HistorySection({
           >
             <LineChart
               data={scoreRows}
+              accessibilityLayer
               margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
             >
               <XAxis
@@ -296,7 +330,7 @@ export function HistorySection({
               />
             </LineChart>
           </ChartContainer>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Solid line: quality (higher is better) · dashed: sleepiness (lower is
             better)
           </p>

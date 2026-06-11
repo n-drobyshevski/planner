@@ -1,21 +1,22 @@
 // Derive nightly sleep sessions from inactive calendar events.
 //
-// Candidates are timed inactive event occurrences (`inactive && !allDay &&
-// kind === "event"`) — at couples scale, inactive ≡ sleep today; a 21:00
-// inactive "focus block" would be miscounted (documented trade-off). The lib
-// is viewer-agnostic: callers pre-filter to one member's occurrences.
+// Candidates are timed event occurrences. By default only inactive ones count
+// (`inactive && !allDay && kind === "event"`) — at couples scale, inactive ≡
+// sleep; a 21:00 inactive "focus block" would be miscounted. Callers with a
+// dedicated sleep category pass `preFiltered: true` and own the criterion.
+// The lib is viewer-agnostic: callers pre-filter to one member's occurrences.
 //
 // Each requested day gets one DerivedNight, attributed to its WAKE date: the
-// night window is [previous day 20:00, wake day 12:00) wall-clock in
-// `timeZone`, built via TZDate so DST nights (Berlin fall-back 25h /
-// spring-forward 23h) keep their wall boundaries. Spans are clipped to the
+// night window is [previous day `startHour`, wake day `endHour`) wall-clock
+// in `timeZone` (defaults 20:00 → 12:00), built via TZDate so DST nights
+// (Berlin fall-back 25h / spring-forward 23h) keep their wall boundaries. Spans are clipped to the
 // window, sorted and merged with a touching rule, then grouped into clusters
 // whose internal gaps are ≤ NIGHT_GAP_TOLERANCE — the night is the cluster
 // with the most sleep. So a split night with brief wake-ups counts fully
 // (gaps stay awake time), while a disconnected inactive block — a morning
 // commute, an evening wind-down — never reads as sleep.
 //
-// Known limitations: sleep past 12:00 is clipped; the first night of a
+// Known limitations: sleep past `endHour` is clipped; the first night of a
 // window can lose a pre-midnight chunk that ended before the window start
 // (such rows are never fetched — see fetchWindow's lower bound).
 
@@ -42,13 +43,31 @@ const NIGHT_END_HOUR = 12; // wake day, local
 /** A gap this short between blocks reads as a brief wake-up, not a day break. */
 const NIGHT_GAP_TOLERANCE_MS = 45 * 60_000;
 
+export interface DeriveOptions {
+  /** Night window start on the evening before, wall hour (default 20). */
+  startHour?: number;
+  /** Night window end on the wake day, wall hour (default 12). */
+  endHour?: number;
+  /**
+   * When true the caller already chose what counts as sleep (e.g. a dedicated
+   * sleep category) and every timed event passed in qualifies; otherwise only
+   * inactive ones do (the historical inactive≡sleep heuristic).
+   */
+  preFiltered?: boolean;
+}
+
 export function deriveNights(
   occurrences: Occurrence[],
   days: number[],
   timeZone: string,
+  opts: DeriveOptions = {},
 ): DerivedNight[] {
+  const startHour = opts.startHour ?? NIGHT_START_HOUR;
+  const endHour = opts.endHour ?? NIGHT_END_HOUR;
   const candidates = occurrences
-    .filter((o) => o.inactive && !o.allDay && o.kind === "event")
+    .filter(
+      (o) => (opts.preFiltered || o.inactive) && !o.allDay && o.kind === "event",
+    )
     .sort((a, b) => a.start - b.start);
 
   return days.map((dayStartMs) => {
@@ -56,8 +75,8 @@ export function deriveNights(
     const [y, mo, d] = dateKey.split("-").map(Number);
     // TZDate normalizes out-of-range days (d − 1 may roll into the previous
     // month), and wall-clock 20:00/12:00 stay put across DST transitions.
-    const winStart = new TZDate(y, mo - 1, d - 1, NIGHT_START_HOUR, 0, 0, timeZone).getTime();
-    const winEnd = new TZDate(y, mo - 1, d, NIGHT_END_HOUR, 0, 0, timeZone).getTime();
+    const winStart = new TZDate(y, mo - 1, d - 1, startHour, 0, 0, timeZone).getTime();
+    const winEnd = new TZDate(y, mo - 1, d, endHour, 0, 0, timeZone).getTime();
 
     // Clip to the window and merge overlapping/touching spans into blocks.
     const blocks: { start: number; end: number }[] = [];

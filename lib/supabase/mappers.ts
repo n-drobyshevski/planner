@@ -52,6 +52,9 @@ export function mapMember(r: Row): Member {
     sleepCycleLengthMin: (r.sleep_cycle_length_min as number | null) ?? 90,
     sleepOnsetLatencyMin: (r.sleep_onset_latency_min as number | null) ?? 15,
     targetSleepCycles: (r.target_sleep_cycles as number | null) ?? 5,
+    sleepCategoryId: (r.sleep_category_id as string | null) ?? null,
+    nightWindowStartHour: (r.night_window_start_hour as number | null) ?? 20,
+    nightWindowEndHour: (r.night_window_end_hour as number | null) ?? 12,
   };
 }
 

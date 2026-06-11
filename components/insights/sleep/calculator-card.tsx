@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Calculator } from "lucide-react";
 
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -66,10 +67,10 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
               if (v === "wake" || v === "bed") setMode(v);
             }}
           >
-            <ToggleGroupItem value="wake" className="min-h-11 px-3 sm:min-h-9">
+            <ToggleGroupItem value="wake" className="min-h-11 px-3 pointer-fine:min-h-9">
               Wake time
             </ToggleGroupItem>
-            <ToggleGroupItem value="bed" className="min-h-11 px-3 sm:min-h-9">
+            <ToggleGroupItem value="bed" className="min-h-11 px-3 pointer-fine:min-h-9">
               Bedtime
             </ToggleGroupItem>
           </ToggleGroup>
@@ -104,8 +105,15 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
         ))}
       </ul>
       <FieldDescription className="mt-2">
-        Uses your {prefs.cycleLengthMin}-minute cycles and {prefs.onsetLatencyMin}{" "}
-        minutes to fall asleep — adjust in Settings.
+        A cycle is one light–deep–REM pass. Uses your {prefs.cycleLengthMin}
+        -minute cycles and {prefs.onsetLatencyMin} minutes to fall asleep —{" "}
+        <Link
+          href="/settings#sleep"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          adjust in Settings
+        </Link>
+        .
       </FieldDescription>
     </section>
   );

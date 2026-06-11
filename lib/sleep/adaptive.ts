@@ -33,6 +33,8 @@ export interface SleepHintsInput {
 /** Minimum scored (quality or fatigue) check-ins before any hint is emitted. */
 export const HINTS_MIN_LOGGED = 5;
 export const HINTS_CAP = 3;
+/** Hints read a fixed trailing window (days), independent of the period picker. */
+export const HINTS_WINDOW_DAYS = 30;
 
 const MIN_MS = 60_000;
 /** smallest group-mean differences that count as a real effect */
@@ -51,7 +53,13 @@ const MISALIGNED_MIN_MIN = 30;
 const KIND_ORDER: SleepHint["kind"][] = ["duration", "regularity", "cycle-alignment"];
 
 interface ScoredNight {
-  durationMin: number | null; // effective in-bed time
+  /**
+   * Effective night length. Semantics differ by `source`: "logged" is in-bed
+   * time (bed→wake, includes onset latency and mid-night wakes); "derived" is
+   * the sum of merged calendar blocks (gaps excluded — closer to asleep time).
+   */
+  durationMin: number | null;
+  durationSource: "logged" | "derived" | null;
   bedtimeAt: number | null;
   quality: number | null;
   fatigue: number | null;
@@ -77,7 +85,8 @@ function compareGroups(
   a: ScoredNight[],
   b: ScoredNight[],
 ): { betterIsA: boolean; qualityDiff: number; fatigueDiff: number } | null {
-  if (a.length < 2 || b.length < 2) return null;
+  // Group means on n<3 are coin flips; stay silent rather than overclaim.
+  if (a.length < 3 || b.length < 3) return null;
   const qa = a.filter((n) => n.quality !== null).map((n) => n.quality as number);
   const qb = b.filter((n) => n.quality !== null).map((n) => n.quality as number);
   const fa = a.filter((n) => n.fatigue !== null).map((n) => n.fatigue as number);
@@ -125,6 +134,10 @@ export function computeSleepHints(input: SleepHintsInput): SleepHint[] {
       derived && derived.durationMs > 0 ? derived.durationMs / MIN_MS : null;
     return {
       durationMin: loggedMin ?? derivedMin,
+      durationSource:
+        loggedMin !== null ? ("logged" as const)
+        : derivedMin !== null ? ("derived" as const)
+        : null,
       bedtimeAt: l.bedtimeAt ?? derived?.start ?? null,
       quality: l.quality,
       fatigue: l.fatigue,
@@ -160,7 +173,10 @@ export function computeSleepHints(input: SleepHintsInput): SleepHint[] {
     .map((n) => minutesSinceNoon(n.bedtimeAt as number, timeZone));
   if (bedtimes.length >= HINTS_MIN_LOGGED) {
     const mu = mean(bedtimes);
-    const spread = Math.sqrt(mean(bedtimes.map((b) => (b - mu) ** 2)));
+    // Sample σ (n−1): at n≈5–20 the population formula understates the spread.
+    const spread = Math.sqrt(
+      bedtimes.reduce((s, b) => s + (b - mu) ** 2, 0) / (bedtimes.length - 1),
+    );
     if (spread >= SPREAD_INFO_MIN) {
       hints.push({
         id: "regularity",
@@ -173,9 +189,13 @@ export function computeSleepHints(input: SleepHintsInput): SleepHint[] {
     }
   }
 
-  // (c) cycle alignment
+  // (c) cycle alignment — onset latency is only inside LOGGED durations
+  // (in-bed time); derived block-sums already approximate asleep time.
   const withAlignment = withDuration.map((n) => {
-    const asleep = Math.max(0, (n.durationMin as number) - prefs.onsetLatencyMin);
+    const asleep =
+      n.durationSource === "logged"
+        ? Math.max(0, (n.durationMin as number) - prefs.onsetLatencyMin)
+        : (n.durationMin as number);
     const rem = asleep % prefs.cycleLengthMin;
     return { night: n, distance: Math.min(rem, prefs.cycleLengthMin - rem) };
   });

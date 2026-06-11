@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sunrise, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useNotify } from "@/lib/hooks/use-notify";
 import type { SleepLogInput } from "@/lib/supabase/mappers";
 import type { DerivedNight } from "@/lib/sleep/derive";
 import { msToTimeInput } from "@/lib/datetime/local";
@@ -59,6 +60,7 @@ export function CheckinCard({
     wake: derivedToday?.end != null ? msToTimeInput(derivedToday.end, timeZone) : "",
   }));
   const [saving, setSaving] = useState(false);
+  const notify = useNotify();
 
   if (dismissed) return null;
 
@@ -83,6 +85,9 @@ export function CheckinCard({
         fatigue: draft.fatigue,
         note: draft.note.trim() === "" ? null : draft.note.trim(),
       });
+      // The card unmounts on success; the toast carries the confirmation
+      // (sonner announces it politely to screen readers too).
+      notify.success("Check-in saved");
     } catch {
       /* the mutation hook already toasted; keep the card open to retry */
     } finally {
@@ -107,7 +112,7 @@ export function CheckinCard({
         <Button
           variant="ghost"
           size="icon"
-          className="-mt-1 -mr-1 size-11 shrink-0 text-muted-foreground sm:size-8"
+          className="-mt-1 -mr-1 size-11 shrink-0 text-muted-foreground pointer-fine:size-8"
           onClick={dismiss}
           aria-label="Dismiss the morning check-in for today"
         >
@@ -118,6 +123,10 @@ export function CheckinCard({
         <SleepLogFields draft={draft} onChange={setDraft} idPrefix="checkin" />
       </div>
       <div className="mt-3 flex justify-end">
+        {/* The button text swap isn't announced; this region is. */}
+        <span aria-live="polite" className="sr-only">
+          {saving ? "Saving your check-in" : ""}
+        </span>
         <Button
           size="sm"
           onClick={() => void save()}

@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -26,6 +28,13 @@ export const KSS_LABELS: Record<number, string> = {
   8: "Sleepy, staying awake takes effort",
   9: "Very sleepy, fighting sleep",
 };
+
+/** The nine KSS options chunked into three scan-friendly bands. */
+const KSS_BANDS: { label: string; values: number[] }[] = [
+  { label: "Alert", values: [1, 2, 3] },
+  { label: "In between", values: [4, 5, 6] },
+  { label: "Sleepy", values: [7, 8, 9] },
+];
 
 /** One night's form values; empty string / null = not provided. */
 export interface SleepLogDraft {
@@ -128,7 +137,7 @@ export function SleepLogFields({
             <ToggleGroupItem
               key={n}
               value={String(n)}
-              className="min-h-11 px-3 tabular-nums sm:min-h-9"
+              className="min-h-11 px-3 tabular-nums pointer-fine:min-h-9"
               aria-label={`Quality ${n} of 5`}
             >
               {n}
@@ -147,11 +156,18 @@ export function SleepLogFields({
           <SelectTrigger id={`${idPrefix}-fatigue`} className="w-full">
             <SelectValue placeholder="Optional" />
           </SelectTrigger>
-          <SelectContent>
-            {Object.entries(KSS_LABELS).map(([n, label]) => (
-              <SelectItem key={n} value={n}>
-                <span className="tabular-nums">{n}</span> — {label}
-              </SelectItem>
+          {/* popper: nine tall items must drop below the trigger, not blanket
+              the form they belong to (one-handed mobile check-in) */}
+          <SelectContent position="popper">
+            {KSS_BANDS.map((band) => (
+              <SelectGroup key={band.label}>
+                <SelectLabel>{band.label}</SelectLabel>
+                {band.values.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    <span className="tabular-nums">{n}</span> — {KSS_LABELS[n]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             ))}
           </SelectContent>
         </Select>

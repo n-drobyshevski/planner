@@ -93,6 +93,10 @@ export function usePreferences() {
   const sleepCycleLengthMin = member?.sleepCycleLengthMin ?? 90;
   const sleepOnsetLatencyMin = member?.sleepOnsetLatencyMin ?? 15;
   const targetSleepCycles = member?.targetSleepCycles ?? 5;
+  // Sleep derivation: dedicated category (null = inactive heuristic) + window.
+  const sleepCategoryId = member?.sleepCategoryId ?? null;
+  const nightWindowStartHour = member?.nightWindowStartHour ?? 20;
+  const nightWindowEndHour = member?.nightWindowEndHour ?? 12;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
   // its own (Latte light, the rest dark); `default` defers to themePreference.
@@ -224,6 +228,27 @@ export function usePreferences() {
     [persist],
   );
 
+  const setSleepCategory = useCallback(
+    (next: string | null) => {
+      void persist({ sleepCategoryId: next });
+    },
+    [persist],
+  );
+
+  const setNightWindowStart = useCallback(
+    (next: number) => {
+      void persist({ nightWindowStartHour: next });
+    },
+    [persist],
+  );
+
+  const setNightWindowEnd = useCallback(
+    (next: number) => {
+      void persist({ nightWindowEndHour: next });
+    },
+    [persist],
+  );
+
   const setPalette = useCallback(
     (next: Palette) => {
       // Crossfade the whole flavor swap (surfaces + light/dark + accent) as one
@@ -264,6 +289,12 @@ export function usePreferences() {
     sleepOnsetLatencyMin,
     /** Nightly sleep-cycle target (3..7, default 5). */
     targetSleepCycles,
+    /** Dedicated sleep category id, or null = the inactive≡sleep heuristic. */
+    sleepCategoryId,
+    /** Night window start hour on the evening before (12..23, default 20). */
+    nightWindowStartHour,
+    /** Night window end hour on the wake day (4..16, default 12). */
+    nightWindowEndHour,
     setThemePref,
     setAccent,
     setTone,
@@ -276,6 +307,9 @@ export function usePreferences() {
     setSleepCycleLength,
     setSleepOnsetLatency,
     setTargetSleepCycles,
+    setSleepCategory,
+    setNightWindowStart,
+    setNightWindowEnd,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,
   };

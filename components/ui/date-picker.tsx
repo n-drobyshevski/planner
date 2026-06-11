@@ -22,6 +22,7 @@ export function DatePicker({
   disabled,
   clearable = false,
   placeholder = "dd/mm/yyyy",
+  maxDate,
   "aria-label": ariaLabel,
   className,
 }: {
@@ -31,11 +32,14 @@ export function DatePicker({
   disabled?: boolean;
   clearable?: boolean;
   placeholder?: string;
+  /** latest selectable day, ISO "yyyy-MM-dd"; later days render disabled */
+  maxDate?: string;
   "aria-label"?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = parseIso(value);
+  const maxSelectable = maxDate ? parseIso(maxDate) : undefined;
   const label =
     ariaLabel && selected
       ? `${ariaLabel}, ${format(selected, "dd/MM/yyyy")}`
@@ -66,6 +70,7 @@ export function DatePicker({
           selected={selected}
           defaultMonth={selected}
           weekStartsOn={1}
+          disabled={maxSelectable ? { after: maxSelectable } : undefined}
           autoFocus
           onSelect={(d) => {
             if (d) {
