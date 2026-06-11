@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "@tanstack/react-form";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -78,11 +77,11 @@ export function TaskDialog(props: TaskDialogProps) {
   // The dialog is conditionally mounted by its opener (it remounts fresh per
   // open), so the defaults are computed exactly once — no re-seed effect.
   const [defaults] = useState(() => buildInitial(props));
-  const form = useForm<TaskFormValues>({
-    resolver: zodResolver(taskFormSchema),
+  const form = useForm({
     defaultValues: defaults,
+    validators: { onSubmit: taskFormSchema },
+    onSubmit: ({ value }) => onValid(value),
   });
-  const { errors, isSubmitting } = form.formState;
   const [showOptimization, setShowOptimization] = useState(() =>
     hasAnyAttribute(defaults.attributes),
   );
@@ -111,12 +110,6 @@ export function TaskDialog(props: TaskDialogProps) {
   // unsaved form.
   function close() {
     onOpenChange(false);
-  }
-
-  // handleSubmit is invoked at event time (not render) so the React Compiler
-  // doesn't treat the submit body — Date.now() included — as render-scoped.
-  function onSave(e?: React.BaseSyntheticEvent) {
-    return form.handleSubmit(onValid)(e);
   }
 
   async function onValid(values: TaskFormValues) {
@@ -164,39 +157,55 @@ export function TaskDialog(props: TaskDialogProps) {
 
           <ResponsiveDialogBody>
           <FieldGroup>
-            <Field data-invalid={errors.title ? true : undefined}>
-              <FieldLabel htmlFor="task-title">Title</FieldLabel>
-              <Input
-                id="task-title"
-                {...form.register("title")}
-                placeholder="What needs doing?"
-                autoFocus
-                aria-invalid={errors.title ? true : undefined}
-                aria-describedby={errors.title ? "task-title-error" : undefined}
-              />
-              {errors.title && (
-                <FieldError id="task-title-error" errors={[errors.title]} />
-              )}
-            </Field>
+            <form.Field name="title">
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
+                return (
+                  <Field data-invalid={isInvalid || undefined}>
+                    <FieldLabel htmlFor="task-title">Title</FieldLabel>
+                    <Input
+                      id="task-title"
+                      name={field.name}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      placeholder="What needs doing?"
+                      autoFocus
+                      aria-invalid={isInvalid || undefined}
+                      aria-describedby={isInvalid ? "task-title-error" : undefined}
+                    />
+                    {isInvalid && (
+                      <FieldError id="task-title-error" errors={field.state.meta.errors} />
+                    )}
+                  </Field>
+                );
+              }}
+            </form.Field>
 
-            <Field>
-              <FieldLabel htmlFor="task-notes">Notes</FieldLabel>
-              <Textarea
-                id="task-notes"
-                {...form.register("description")}
-                rows={2}
-                placeholder="Add details"
-              />
-            </Field>
+            <form.Field name="description">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="task-notes">Notes</FieldLabel>
+                  <Textarea
+                    id="task-notes"
+                    name={field.name}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    rows={2}
+                    placeholder="Add details"
+                  />
+                </Field>
+              )}
+            </form.Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Assignee</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="assigneeId"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+              <form.Field name="assigneeId">
+                {(field) => (
+                  <Field>
+                    <FieldLabel>Assignee</FieldLabel>
+                    <Select value={field.state.value} onValueChange={field.handleChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
@@ -211,17 +220,15 @@ export function TaskDialog(props: TaskDialogProps) {
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                  )}
-                />
-              </Field>
+                  </Field>
+                )}
+              </form.Field>
 
-              <Field>
-                <FieldLabel>Context</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="categoryId"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+              <form.Field name="categoryId">
+                {(field) => (
+                  <Field>
+                    <FieldLabel>Context</FieldLabel>
+                    <Select value={field.state.value} onValueChange={field.handleChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="No context" />
                       </SelectTrigger>
@@ -236,19 +243,22 @@ export function TaskDialog(props: TaskDialogProps) {
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                  )}
-                />
-              </Field>
+                  </Field>
+                )}
+              </form.Field>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field>
-                <FieldLabel>Priority</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+              <form.Field name="priority">
+                {(field) => (
+                  <Field>
+                    <FieldLabel>Priority</FieldLabel>
+                    <Select
+                      value={field.state.value}
+                      onValueChange={(v) =>
+                        field.handleChange(v as TaskFormValues["priority"])
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
@@ -261,65 +271,59 @@ export function TaskDialog(props: TaskDialogProps) {
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                  )}
-                />
-              </Field>
+                  </Field>
+                )}
+              </form.Field>
 
-              <Field>
-                <FieldLabel htmlFor="task-due">Due date</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
+              <form.Field name="dueDate">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="task-due">Due date</FieldLabel>
                     <DatePicker
                       id="task-due"
-                      value={field.value}
-                      onChange={field.onChange}
+                      value={field.state.value}
+                      onChange={field.handleChange}
                       clearable
                       aria-label="Due date"
                     />
-                  )}
-                />
-              </Field>
+                  </Field>
+                )}
+              </form.Field>
             </div>
 
             {mode === "edit" && (
-              <Field>
-                <FieldLabel>Status</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
+              <form.Field name="status">
+                {(field) => (
+                  <Field>
+                    <FieldLabel>Status</FieldLabel>
                     <ToggleGroup
                       type="single"
                       variant="outline"
-                      value={field.value}
-                      onValueChange={(v) => v && field.onChange(v as TaskStatus)}
+                      value={field.state.value}
+                      onValueChange={(v) => v && field.handleChange(v as TaskStatus)}
                       className="justify-start"
                     >
                       <ToggleGroupItem value="todo">To Do</ToggleGroupItem>
                       <ToggleGroupItem value="in_progress">In Progress</ToggleGroupItem>
                       <ToggleGroupItem value="done">Done</ToggleGroupItem>
                     </ToggleGroup>
-                  )}
-                />
-              </Field>
+                  </Field>
+                )}
+              </form.Field>
             )}
 
-            <Field orientation="horizontal">
-              <Controller
-                control={form.control}
-                name="isPrivate"
-                render={({ field }) => (
+            <form.Field name="isPrivate">
+              {(field) => (
+                <Field orientation="horizontal">
                   <Switch
                     id="task-private"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
+                    checked={field.state.value}
+                    onCheckedChange={field.handleChange}
                   />
-                )}
-              />
-              <FieldLabel htmlFor="task-private">Private (only you can see this)</FieldLabel>
-            </Field>
+                  <FieldLabel htmlFor="task-private">Private (only you can see this)</FieldLabel>
+                </Field>
+              )}
+            </form.Field>
 
             {/* Optimization details — optional attributes feeding /insights.
                 Scheduled blocks inherit them (scheduleTaskBlocks). */}
@@ -338,17 +342,15 @@ export function TaskDialog(props: TaskDialogProps) {
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-4">
-                <Controller
-                  control={form.control}
-                  name="attributes"
-                  render={({ field }) => (
+                <form.Field name="attributes">
+                  {(field) => (
                     <AttributeFields
-                      value={field.value}
-                      onChange={field.onChange}
+                      value={field.state.value}
+                      onChange={field.handleChange}
                       idPrefix="task"
                     />
                   )}
-                />
+                </form.Field>
               </CollapsibleContent>
             </Collapsible>
           </FieldGroup>
@@ -365,40 +367,53 @@ export function TaskDialog(props: TaskDialogProps) {
           </ResponsiveDialogBody>
 
           <ResponsiveDialogFooter className="sm:justify-between">
-            {mode === "edit" && task ? (
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  onClick={() => setConfirmDelete(true)}
-                  disabled={isSubmitting}
-                  className="text-destructive"
-                >
-                  <Trash2 data-icon="inline-start" />
-                  Delete
-                </Button>
-                {props.onSchedule && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => props.onSchedule?.()}
-                    disabled={isSubmitting}
-                  >
-                    <CalendarPlus data-icon="inline-start" />
-                    <span className="hidden sm:inline">Add to calendar</span>
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button onClick={onSave} disabled={isSubmitting}>
-                {isSubmitting && <Loader2 data-icon="inline-start" className="animate-spin" />}
-                {mode === "create" ? "Create" : "Save"}
-              </Button>
-            </div>
+            <form.Subscribe selector={(s) => s.isSubmitting}>
+              {(isSubmitting) => (
+                <>
+                  {mode === "edit" && task ? (
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setConfirmDelete(true)}
+                        disabled={isSubmitting}
+                        className="text-destructive"
+                      >
+                        <Trash2 data-icon="inline-start" />
+                        Delete
+                      </Button>
+                      {props.onSchedule && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => props.onSchedule?.()}
+                          disabled={isSubmitting}
+                        >
+                          <CalendarPlus data-icon="inline-start" />
+                          <span className="hidden sm:inline">Add to calendar</span>
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <span />
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                    {/* handleSubmit is invoked at event time (not render) so the React
+                        Compiler doesn't treat the submit body — Date.now() included —
+                        as render-scoped. */}
+                    <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
+                      {isSubmitting && <Loader2 data-icon="inline-start" className="animate-spin" />}
+                      {mode === "create" ? "Create" : "Save"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </form.Subscribe>
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
       </ResponsiveDialog>
