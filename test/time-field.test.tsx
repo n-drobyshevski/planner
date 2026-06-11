@@ -21,36 +21,28 @@ describe("normalizeTime", () => {
 });
 
 describe("TimeField", () => {
-  it("shows the 24-hour value", () => {
+  it("renders a native time input showing the 24-hour value", () => {
     render(<TimeField value="09:00" onChange={vi.fn()} aria-label="Start time" />);
-    expect(screen.getByLabelText("Start time")).toHaveValue("09:00");
+    const input = screen.getByLabelText("Start time");
+    expect(input).toHaveAttribute("type", "time");
+    expect(input).toHaveValue("09:00");
   });
-  it("normalizes and emits on blur when the value changes", () => {
+  it("emits the picked HH:mm value on change", () => {
     const onChange = vi.fn();
     render(<TimeField value="08:00" onChange={onChange} aria-label="t" />);
     const input = screen.getByLabelText("t");
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "0900" } });
-    fireEvent.blur(input);
-    expect(onChange).toHaveBeenCalledWith("09:00");
+    fireEvent.change(input, { target: { value: "09:30" } });
+    expect(onChange).toHaveBeenCalledWith("09:30");
   });
-  it("does not emit when the normalized value is unchanged", () => {
+  it("emits an empty string when cleared", () => {
     const onChange = vi.fn();
     render(<TimeField value="09:00" onChange={onChange} aria-label="t" />);
     const input = screen.getByLabelText("t");
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "0900" } }); // normalizes to 09:00 == value
-    fireEvent.blur(input);
-    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "" } });
+    expect(onChange).toHaveBeenCalledWith("");
   });
-  it("reverts invalid input on blur without calling onChange", () => {
-    const onChange = vi.fn();
-    render(<TimeField value="09:00" onChange={onChange} aria-label="t" />);
-    const input = screen.getByLabelText("t");
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: "99:99" } });
-    fireEvent.blur(input);
-    expect(onChange).not.toHaveBeenCalled();
-    expect(input).toHaveValue("09:00");
+  it("can be disabled", () => {
+    render(<TimeField value="09:00" onChange={vi.fn()} aria-label="t" disabled />);
+    expect(screen.getByLabelText("t")).toBeDisabled();
   });
 });

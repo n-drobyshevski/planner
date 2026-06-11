@@ -456,10 +456,10 @@ export function EventDialog(props: EventDialogProps) {
                     value={form.startTime}
                     onChange={(v) => set("startTime", v)}
                     aria-label="Start time"
-                    className="w-20"
+                    className="w-28"
                   />
                 ) : (
-                  <span className="w-20" aria-hidden />
+                  <span className="w-28" aria-hidden />
                 )}
               </div>
 
@@ -475,10 +475,10 @@ export function EventDialog(props: EventDialogProps) {
                     value={form.endTime}
                     onChange={(v) => set("endTime", v)}
                     aria-label="End time"
-                    className="w-20"
+                    className="w-28"
                   />
                 ) : (
-                  <span className="w-20" aria-hidden />
+                  <span className="w-28" aria-hidden />
                 )}
               </div>
             </div>
