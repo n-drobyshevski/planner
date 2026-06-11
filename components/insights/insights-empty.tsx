@@ -41,3 +41,29 @@ export function InsightsEmpty({
     </Empty>
   );
 }
+
+/**
+ * In-section placeholder for a card that has nothing to show YET. Always says
+ * what would populate it ("Log 3 more nights to unlock this") instead of
+ * rendering a blank box; optional deep link to the place where that happens.
+ */
+export function SectionEmpty({
+  children,
+  actionLabel,
+  actionHref,
+}: {
+  children: React.ReactNode;
+  actionLabel?: string;
+  actionHref?: string;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-2 rounded-lg border border-dashed p-3">
+      <p className="text-xs text-muted-foreground">{children}</p>
+      {actionLabel && actionHref && (
+        <Button variant="ghost" size="sm" className="min-h-11 px-1.5 text-xs sm:min-h-7" asChild>
+          <Link href={actionHref}>{actionLabel}</Link>
+        </Button>
+      )}
+    </div>
+  );
+}

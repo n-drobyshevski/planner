@@ -417,7 +417,9 @@
      white via the --swatch-ink fallback). Used by buttons, chips, avatars, checks. */
   --swatch-ink-rosewater:#11111b; --swatch-ink-flamingo:#11111b; --swatch-ink-pink:#11111b; --swatch-ink-maroon:#11111b; --swatch-ink-peach:#11111b; --swatch-ink-yellow:#11111b; --swatch-ink-green:#11111b; --swatch-ink-teal:#11111b; --swatch-ink-sky:#11111b; --swatch-ink-sapphire:#11111b; --swatch-ink-lavender:#11111b;
   --member-a:#1e66f5; --member-b:#40a02b; --event-shared:#fe640b;
-  --chart-1:#8839ef; --chart-2:#1e66f5; --chart-3:#40a02b; --chart-4:#fe640b; --chart-5:#179299;
+  /* Latte's bright green/peach accents miss the 3:1 fill floor on the light
+     card; the chart set substitutes teal/red/maroon (test/insights/palette). */
+  --chart-1:#8839ef; --chart-2:#1e66f5; --chart-3:#179299; --chart-4:#d20f39; --chart-5:#e64553;
   --sidebar:#dce0e8; --sidebar-foreground:#4c4f69;
   --sidebar-primary:var(--swatch-peach); --sidebar-primary-foreground:var(--swatch-ink-peach, var(--swatch-ink));
   --sidebar-accent:#ccd0da; --sidebar-accent-foreground:#4c4f69;
