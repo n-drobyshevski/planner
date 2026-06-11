@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "@tanstack/react-form";
 import { Plus, Target, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -151,22 +152,23 @@ function GoalRow({
   onRemove: () => void;
 }) {
   const meta = seriesMeta(goal.categoryId, categories);
-  // Local text state so partial input ("2.") doesn't write through; the value
-  // commits on blur/Enter, clamped to the DB CHECK range.
-  const [hours, setHours] = useState(() => toHoursLabel(goal.weeklyTargetMs));
-
-  function commitHours() {
-    const parsed = Number(hours.replace(",", "."));
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setHours(toHoursLabel(goal.weeklyTargetMs));
-      return;
-    }
-    const clamped = clampHours(parsed);
-    setHours(toHoursLabel(clamped * HOUR));
-    const nextMs = Math.round(clamped * HOUR);
-    if (nextMs !== goal.weeklyTargetMs)
-      onChange({ weeklyTargetMs: nextMs, direction: goal.direction });
-  }
+  // The row is its own tiny form so partial input ("2.") doesn't write through;
+  // the value commits (submits) on blur/Enter, clamped to the DB CHECK range.
+  const form = useForm({
+    defaultValues: { hours: toHoursLabel(goal.weeklyTargetMs) },
+    onSubmit: ({ value }) => {
+      const parsed = Number(value.hours.replace(",", "."));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        form.setFieldValue("hours", toHoursLabel(goal.weeklyTargetMs));
+        return;
+      }
+      const clamped = clampHours(parsed);
+      form.setFieldValue("hours", toHoursLabel(clamped * HOUR));
+      const nextMs = Math.round(clamped * HOUR);
+      if (nextMs !== goal.weeklyTargetMs)
+        onChange({ weeklyTargetMs: nextMs, direction: goal.direction });
+    },
+  });
 
   return (
     <li className="flex items-center gap-2">
@@ -178,18 +180,22 @@ function GoalRow({
       <span className="w-24 min-w-0 flex-1 truncate text-sm sm:w-32 sm:flex-none">
         {meta.name}
       </span>
-      <Input
-        type="text"
-        inputMode="decimal"
-        value={hours}
-        onChange={(e) => setHours(e.target.value)}
-        onBlur={commitHours}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        }}
-        className="h-9 w-16 text-right font-mono tabular-nums"
-        aria-label={`${meta.name}: hours per week`}
-      />
+      <form.Field name="hours">
+        {(field) => (
+          <Input
+            type="text"
+            inputMode="decimal"
+            value={field.state.value}
+            onChange={(e) => field.handleChange(e.target.value)}
+            onBlur={() => void form.handleSubmit()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            className="h-9 w-16 text-right font-mono tabular-nums"
+            aria-label={`${meta.name}: hours per week`}
+          />
+        )}
+      </form.Field>
       <span className="text-xs text-muted-foreground">h/wk</span>
       <Select
         value={goal.direction}
@@ -231,38 +237,49 @@ function AddGoalRow({
   addable: Category[];
   onAdd: (categoryId: string) => void;
 }) {
-  const [categoryId, setCategoryId] = useState<string>("");
+  const form = useForm({
+    defaultValues: { categoryId: "" },
+    onSubmit: ({ value }) => {
+      if (value.categoryId === "") return;
+      onAdd(value.categoryId);
+      form.reset();
+    },
+  });
 
   return (
     <div className="flex items-center gap-2 border-t pt-3">
-      <Select value={categoryId} onValueChange={setCategoryId}>
-        <SelectTrigger className="h-9 flex-1" aria-label="Context to add a goal for">
-          <SelectValue placeholder="Pick a context…" />
-        </SelectTrigger>
-        <SelectContent>
-          {addable
-            .slice()
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={categoryId === ""}
-        onClick={() => {
-          if (categoryId === "") return;
-          onAdd(categoryId);
-          setCategoryId("");
-        }}
-      >
-        <Plus data-icon="inline-start" />
-        Add goal
-      </Button>
+      <form.Field name="categoryId">
+        {(field) => (
+          <Select value={field.state.value} onValueChange={field.handleChange}>
+            <SelectTrigger className="h-9 flex-1" aria-label="Context to add a goal for">
+              <SelectValue placeholder="Pick a context…" />
+            </SelectTrigger>
+            <SelectContent>
+              {addable
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        )}
+      </form.Field>
+      <form.Subscribe selector={(s) => s.values.categoryId}>
+        {(categoryId) => (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={categoryId === ""}
+            onClick={() => void form.handleSubmit()}
+          >
+            <Plus data-icon="inline-start" />
+            Add goal
+          </Button>
+        )}
+      </form.Subscribe>
     </div>
   );
 }
