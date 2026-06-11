@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  CategoryGoal,
   EventRow,
+  InsightsPrefs,
+  InsightsView,
   SleepLog,
   TaskRow,
   ThemePreference,
@@ -10,15 +13,22 @@ import type {
   ContextLabel,
 } from "@/lib/types";
 import {
+  mapCategoryGoal,
   mapEvent,
+  mapInsightsPrefs,
+  mapInsightsView,
   mapSleepLog,
   mapTask,
+  categoryGoalInputToRow,
   eventInputToRow,
   eventPatchToRow,
+  insightsViewInputToRow,
   sleepLogInputToRow,
   taskInputToRow,
   taskPatchToRow,
+  type CategoryGoalInput,
   type EventInput,
+  type InsightsViewInput,
   type SleepLogInput,
   type TaskInput,
 } from "./mappers";
@@ -729,6 +739,80 @@ export async function upsertSleepLog(
     .single();
   if (error) throw error;
   return mapSleepLog(data);
+}
+
+// --- Insights customization --------------------------------------------------
+
+/** Create or replace the workspace's goal for one category. */
+export async function upsertCategoryGoal(
+  sb: SupabaseClient,
+  input: CategoryGoalInput,
+): Promise<CategoryGoal> {
+  const { data, error } = await sb
+    .from("category_goals")
+    .upsert(categoryGoalInputToRow(input), { onConflict: "workspace_id,category_id" })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapCategoryGoal(data);
+}
+
+export async function deleteCategoryGoal(
+  sb: SupabaseClient,
+  goalId: string,
+): Promise<void> {
+  const { error } = await sb.from("category_goals").delete().eq("id", goalId);
+  if (error) throw error;
+}
+
+export async function createInsightsView(
+  sb: SupabaseClient,
+  input: InsightsViewInput,
+): Promise<InsightsView> {
+  const { data, error } = await sb
+    .from("insights_views")
+    .insert(insightsViewInputToRow(input))
+    .select()
+    .single();
+  if (error) throw error;
+  return mapInsightsView(data);
+}
+
+export async function deleteInsightsView(
+  sb: SupabaseClient,
+  viewId: string,
+): Promise<void> {
+  const { error } = await sb.from("insights_views").delete().eq("id", viewId);
+  if (error) throw error;
+}
+
+/**
+ * Merge a partial prefs change into the member's single row (insert-or-update
+ * on the member_id PK). Only the provided fields change; `updated_at` bumps so
+ * other devices' realtime invalidation sees a row change even when the jsonb
+ * is structurally similar.
+ */
+export async function upsertInsightsPrefs(
+  sb: SupabaseClient,
+  workspaceId: string,
+  memberId: string,
+  patch: Partial<Pick<InsightsPrefs, "dashboard" | "suppressedKinds">>,
+): Promise<InsightsPrefs> {
+  const row: Record<string, unknown> = {
+    member_id: memberId,
+    workspace_id: workspaceId,
+    updated_at: new Date().toISOString(),
+  };
+  if (patch.dashboard !== undefined) row.dashboard = patch.dashboard;
+  if (patch.suppressedKinds !== undefined)
+    row.suppressed_kinds = patch.suppressedKinds;
+  const { data, error } = await sb
+    .from("insights_prefs")
+    .upsert(row, { onConflict: "member_id" })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapInsightsPrefs(data);
 }
 
 // --- Tasks -----------------------------------------------------------------

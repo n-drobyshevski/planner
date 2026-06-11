@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { format } from "date-fns";
+import { tz } from "@date-fns/tz";
 import {
   AlarmClock,
   ArrowRightLeft,
@@ -22,13 +24,20 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { computeForecast, type Forecast } from "@/lib/analytics/forecast";
+import { computeUsage } from "@/lib/analytics/usage";
 import {
   attributeCoverage,
   computeSuggestions,
   type Suggestion,
   type SuggestionKind,
 } from "@/lib/insights/suggestions";
+import { formatDuration } from "@/lib/datetime/format";
+import { dateInputToMs } from "@/lib/datetime/local";
 import { InsightsEmpty } from "./insights-empty";
+import { StatCard, StatGrid } from "./stat-card";
+import { SectionLabel } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 // Dismissals live in ONE viewer-scoped localStorage entry: a JSON map of
@@ -106,6 +115,31 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
   );
   const coverage = useMemo(() => attributeCoverage(occurrences), [occurrences]);
 
+  // Capacity forecast over the NEXT window: committed time from already-
+  // scheduled (incl. recurring) items vs the typical day of the trailing
+  // current+previous windows.
+  const forecast = useMemo(() => {
+    const activeHistory = (occs: typeof occurrences) => occs.filter((o) => !o.inactive);
+    const curUsage = computeUsage(activeHistory(occurrences), period.days, period.window, {
+      includeInactive: true,
+    });
+    const prevUsage = computeUsage(
+      activeHistory(prevOccurrences),
+      period.prevDays,
+      period.prevWindow,
+      { includeInactive: true },
+    );
+    return computeForecast({
+      futureOccurrences: data.futureOccurrences,
+      futureDays: data.futureDays,
+      futureWindow: data.futureWindow,
+      historyPerDay: [...curUsage.perDay, ...prevUsage.perDay],
+      tasks,
+      timeZone,
+      now,
+    });
+  }, [occurrences, prevOccurrences, period, data.futureOccurrences, data.futureDays, data.futureWindow, tasks, timeZone, now]);
+
   if (occurrences.length === 0) return <InsightsEmpty />;
 
   const periodKey = `${period.window.start}-${period.window.end}`;
@@ -116,6 +150,14 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
           ? "No suggestions for this period."
           : `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"} for this period.`}
       </p>
+      {period.window.end > now && (
+        <OutlookSection
+          forecast={forecast}
+          futureWindow={data.futureWindow}
+          loading={data.futureLoading}
+          timeZone={timeZone}
+        />
+      )}
       <CoverageCard coverage={coverage} />
       {/* Keyed remount per period + viewer: dismissed state re-reads storage
           in its lazy initializer; no setState-in-effect. */}
@@ -126,6 +168,95 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
         suggestions={suggestions}
       />
     </div>
+  );
+}
+
+/**
+ * Capacity outlook for the window after the focused one: committed time from
+ * already-scheduled items (recurring series expand forward like any calendar
+ * window) judged against the typical day of the trailing two windows, plus
+ * tasks due next window with no time blocked. Hidden for fully-past periods —
+ * an outlook on history helps nobody.
+ */
+function OutlookSection({
+  forecast,
+  futureWindow,
+  loading,
+  timeZone,
+}: {
+  forecast: Forecast;
+  futureWindow: { start: number; end: number };
+  loading: boolean;
+  timeZone: string;
+}) {
+  const ctx = tz(timeZone);
+  const rangeLabel = `${format(futureWindow.start, "d MMM", { in: ctx })} – ${format(
+    futureWindow.end - 1,
+    "d MMM",
+    { in: ctx },
+  )}`;
+
+  if (loading) {
+    return (
+      <section className="space-y-1.5" aria-busy>
+        <SectionLabel>Outlook · {rangeLabel}</SectionLabel>
+        <Skeleton className="h-20 w-full rounded-lg" />
+      </section>
+    );
+  }
+
+  const committedMs = forecast.perDay.reduce((s, d) => s + d.committedMs, 0);
+  const pacePct =
+    forecast.capacityRatio === null ? null : Math.round(forecast.capacityRatio * 100);
+
+  return (
+    <section className="space-y-1.5">
+      <SectionLabel>Outlook · {rangeLabel}</SectionLabel>
+      <StatGrid>
+        <StatCard
+          label="Committed"
+          value={formatDuration(committedMs)}
+          hint="already scheduled"
+        />
+        <StatCard
+          label="Of typical pace"
+          value={pacePct === null ? "—" : `${pacePct}%`}
+          warning={pacePct !== null && pacePct > 110}
+          hint={
+            pacePct === null
+              ? "no baseline yet"
+              : `typical day ${formatDuration(forecast.typicalDayMs)}`
+          }
+        />
+        <StatCard
+          label="Busiest day"
+          value={forecast.busiestDay ? formatDuration(forecast.busiestDay.ms) : "—"}
+          hint={
+            forecast.busiestDay
+              ? format(forecast.busiestDay.dayMs, "EEE d MMM", { in: ctx })
+              : "nothing scheduled"
+          }
+        />
+      </StatGrid>
+      {forecast.dueUnscheduled.length > 0 && (
+        <ul className="space-y-1 pt-1" role="list">
+          {forecast.dueUnscheduled.slice(0, 4).map((t) => (
+            <li
+              key={t.taskId}
+              className="flex items-baseline justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-xs"
+            >
+              <span className="min-w-0 truncate">
+                {t.title}
+                <span className="text-muted-foreground"> — due, no time blocked</span>
+              </span>
+              <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
+                {format(dateInputToMs(t.dueDate, timeZone), "EEE d MMM", { in: ctx })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

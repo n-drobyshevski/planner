@@ -11,10 +11,12 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { categoryShares, categoryByBucket, memberByBucket } from "@/lib/analytics/balance";
+import { MIN_CATEGORY_RATINGS, satisfactionByCategory } from "@/lib/analytics/correlations";
 import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { toPaletteColor } from "@/lib/theme/appearance";
-import { InsightsEmpty } from "./insights-empty";
+import { GoalsSection } from "./goals/goals-section";
+import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { NEUTRAL, bucketLabel, bucketTick, seriesMeta } from "./series";
 import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
@@ -37,9 +39,20 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
     () => memberByBucket(occurrences, period.buckets),
     [occurrences, period.buckets],
   );
+  // Satisfaction lens: duration-weighted mean per category, gated on n in the
+  // analytics layer so a single 5-star outing can't crown a context.
+  const satisfaction = useMemo(
+    () => satisfactionByCategory(occurrences, period.window),
+    [occurrences, period.window],
+  );
 
   const total = useMemo(
     () => shares.reduce((s, r) => s + r.ms, 0),
+    [shares],
+  );
+  // Tracked ms per category over the focused window, for the goals section.
+  const actualByCategory = useMemo(
+    () => new Map<string | null, number>(shares.map((s) => [s.categoryId, s.ms])),
     [shares],
   );
   if (total === 0)
@@ -216,6 +229,53 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
             })}
           </tbody>
         </table>
+      </section>
+
+      {data.workspaceId && data.viewerId && (
+        <GoalsSection data={data} actualByCategory={actualByCategory} />
+      )}
+
+      <section className="space-y-1.5">
+        <SectionLabel>Satisfaction by context</SectionLabel>
+        {satisfaction.length === 0 ? (
+          <SectionEmpty actionLabel="Open the calendar" actionHref="/calendar">
+            Rate satisfaction on at least {MIN_CATEGORY_RATINGS} events in a
+            context to see which parts of your time feel best, looking back.
+          </SectionEmpty>
+        ) : (
+          <ul className="space-y-1.5" role="list">
+            {satisfaction.map(({ categoryId, agg }) => {
+              const meta = seriesMeta(categoryId ?? "__uncategorized__", data.categories);
+              const pct = (agg.mean / 5) * 100;
+              return (
+                <li key={categoryId ?? "uncategorized"} className="flex items-center gap-2 text-xs">
+                  <span
+                    className="size-2.5 shrink-0 rounded-[3px]"
+                    style={{ background: meta.color }}
+                    aria-hidden
+                  />
+                  <span className="w-28 min-w-0 truncate sm:w-36">{meta.name}</span>
+                  <span
+                    className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
+                    role="img"
+                    aria-label={`${meta.name}: mean satisfaction ${agg.mean.toFixed(1)} of 5, from ${agg.n} rated items`}
+                  >
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${pct}%`, background: meta.color }}
+                    />
+                  </span>
+                  <span className="w-12 text-right font-mono tabular-nums">
+                    {agg.mean.toFixed(1)}/5
+                  </span>
+                  <span className="w-10 text-right font-mono tabular-nums text-muted-foreground/70">
+                    n {agg.n}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       {showMembers && memberSplit.memberIds.length > 1 && (

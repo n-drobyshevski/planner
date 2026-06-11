@@ -4,6 +4,9 @@ import type {
   OverrideRow,
   Member,
   Category,
+  CategoryGoal,
+  InsightsPrefs,
+  InsightsView,
   Board,
   SleepLog,
   TaskRow,
@@ -14,6 +17,9 @@ import {
   mapOverride,
   mapMember,
   mapCategory,
+  mapCategoryGoal,
+  mapInsightsPrefs,
+  mapInsightsView,
   mapBoard,
   mapSleepLog,
   mapTask,
@@ -121,6 +127,53 @@ export async function fetchTasks(
  * member-private — the partner's rows are never returned; the eq filters are
  * belt-and-braces like fetchTasks.
  */
+/** All per-category weekly goals of the workspace (workspace-shared). */
+export async function fetchCategoryGoals(
+  sb: SupabaseClient,
+  workspaceId: string,
+): Promise<CategoryGoal[]> {
+  const { data, error } = await sb
+    .from("category_goals")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at");
+  if (error) throw error;
+  return (data ?? []).map(mapCategoryGoal);
+}
+
+/** The viewer's saved Insights views (member-private under RLS). */
+export async function fetchInsightsViews(
+  sb: SupabaseClient,
+  workspaceId: string,
+  memberId: string,
+): Promise<InsightsView[]> {
+  const { data, error } = await sb
+    .from("insights_views")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("member_id", memberId)
+    .order("position")
+    .order("created_at");
+  if (error) throw error;
+  return (data ?? []).map(mapInsightsView);
+}
+
+/** The viewer's Insights prefs row, or null before first customization. */
+export async function fetchInsightsPrefs(
+  sb: SupabaseClient,
+  workspaceId: string,
+  memberId: string,
+): Promise<InsightsPrefs | null> {
+  const { data, error } = await sb
+    .from("insights_prefs")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("member_id", memberId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapInsightsPrefs(data) : null;
+}
+
 export async function fetchSleepLogs(
   sb: SupabaseClient,
   workspaceId: string,

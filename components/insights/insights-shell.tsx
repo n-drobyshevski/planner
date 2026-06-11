@@ -12,6 +12,7 @@ import { TimezoneProvider, useViewerTimeZone } from "@/lib/datetime/timezone-con
 import {
   resolvePeriod,
   periodToSearch,
+  nextWindowOf,
   INSIGHTS_TABS,
   type Granularity,
   type InsightsTab,
@@ -19,14 +20,17 @@ import {
 } from "@/lib/insights/period";
 import { filterForInsights, type MemberFilter } from "@/lib/insights/filters";
 import { useInsightsFilters } from "@/lib/hooks/use-insights-filters";
+import { useInsightsCustomizationRealtime } from "@/lib/hooks/use-insights-prefs";
+import type { SavedViewConfig } from "@/lib/insights/views";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadError } from "@/components/shared/load-error";
 import { InsightsToolbar } from "./insights-toolbar";
 import { InsightsFiltersPopover } from "./insights-filters-popover";
+import { SavedViewsMenu } from "./saved-views-menu";
 import { ChartSkeleton } from "./chart-skeleton";
 import { InsightsTabSkeleton } from "./insights-tab-skeleton";
 import { cn } from "@/lib/utils";
-import type { Category, Member, Occurrence, TaskRow } from "@/lib/types";
+import type { Category, Member, Occurrence, TaskRow, TimeWindow } from "@/lib/types";
 
 const emptySubscribe = () => () => {};
 
@@ -81,10 +85,20 @@ export interface InsightsTabData {
    * the insights filter drops; everything else should use `occurrences`.
    */
   rawOccurrences: Occurrence[];
+  /** insights-filtered occurrences of the window AFTER the focused one —
+   *  recurring series expanded forward; feeds the Optimize tab's Outlook. */
+  futureOccurrences: Occurrence[];
+  futureWindow: TimeWindow;
+  futureDays: number[];
+  /** true while the future window is still fetching (Outlook shows a skeleton
+   *  instead of reading an empty array as "nothing committed") */
+  futureLoading: boolean;
   tasks: TaskRow[];
   categories: Map<string, Category>;
   members: Map<string, Member>;
   boards: { id: string; name: string }[];
+  /** for tabs that read/write customization rows (goals, prefs, views) */
+  workspaceId: string;
   viewerId: string;
   timeZone: string;
   memberFilter: MemberFilter;
@@ -129,6 +143,9 @@ function InsightsShellInner({
   const workspace = useWorkspace();
   const wsId = workspace.data?.workspaceId;
   useWorkspaceRealtime(wsId);
+  // One channel for goals/views/prefs — the customization data hooks are
+  // channel-free on purpose (see use-insights-prefs.ts).
+  useInsightsCustomizationRealtime(wsId, workspace.data?.currentMember?.id);
 
   // "now" anchors the relative presets. Captured at mount and refreshed on
   // every period change (event handlers may be impure; render must stay pure).
@@ -150,8 +167,13 @@ function InsightsShellInner({
     [workspace.data],
   );
 
+  // The window after the focused one, for the Outlook forecast. Same period
+  // length; recurring series expand into it like any calendar window.
+  const future = useMemo(() => nextWindowOf(period, timeZone), [period, timeZone]);
+
   const cur = useWindowEvents(wsId, period.window, sharedCategoryIds);
   const prev = useWindowEvents(wsId, period.prevWindow, sharedCategoryIds);
+  const fut = useWindowEvents(wsId, future.window, sharedCategoryIds);
   const { tasks, isLoading: tasksLoading, isError: tasksError } = useTasks(wsId);
 
   const viewerId = workspace.data?.currentMember?.id ?? "";
@@ -179,6 +201,10 @@ function InsightsShellInner({
     () => filterForInsights(prev.occurrences, filterArgs),
     [prev.occurrences, filterArgs],
   );
+  const futureOccurrences = useMemo(
+    () => filterForInsights(fut.occurrences, filterArgs),
+    [fut.occurrences, filterArgs],
+  );
 
   const members = useMemo(
     () => workspace.data?.members ?? [],
@@ -199,10 +225,15 @@ function InsightsShellInner({
     occurrences,
     prevOccurrences,
     rawOccurrences: cur.occurrences,
+    futureOccurrences,
+    futureWindow: future.window,
+    futureDays: future.days,
+    futureLoading: fut.isLoading,
     tasks,
     categories: categoryMap,
     members: memberMap,
     boards: workspace.data?.boards ?? [],
+    workspaceId: wsId ?? "",
     viewerId,
     timeZone,
     memberFilter,
@@ -231,6 +262,33 @@ function InsightsShellInner({
     pushUrl(state, t);
   }
 
+  // Saved views: the slice on screen as a config, and applying one routed
+  // through the SAME setters the toolbar/filters use — no new state paths.
+  const currentViewConfig: SavedViewConfig = {
+    preset: state.preset,
+    ...(state.preset === "custom" && state.customFrom != null
+      ? { customFrom: state.customFrom }
+      : {}),
+    ...(state.preset === "custom" && state.customTo != null
+      ? { customTo: state.customTo }
+      : {}),
+    granularity: state.granularity,
+    member: memberFilter,
+    hiddenCategoryIds: [...hiddenCategoryIds],
+    includeInactive,
+  };
+  function applyView(config: SavedViewConfig) {
+    setMemberFilter(config.member);
+    setHiddenCategoryIds(new Set(config.hiddenCategoryIds));
+    setIncludeInactive(config.includeInactive);
+    changePeriod({
+      preset: config.preset,
+      granularity: config.granularity,
+      ...(config.customFrom != null ? { customFrom: config.customFrom } : {}),
+      ...(config.customTo != null ? { customTo: config.customTo } : {}),
+    });
+  }
+
   const loading =
     workspace.isLoading || cur.isLoading || prev.isLoading || tasksLoading;
   const error = workspace.isError || cur.isError || prev.isError || tasksError;
@@ -248,6 +306,16 @@ function InsightsShellInner({
         onPeriodChange={changePeriod}
         onGranularityChange={changeGranularity}
         currentMember={workspace.data?.currentMember ?? null}
+        viewsSlot={
+          wsId && viewerId ? (
+            <SavedViewsMenu
+              workspaceId={wsId}
+              memberId={viewerId}
+              current={currentViewConfig}
+              onApply={applyView}
+            />
+          ) : undefined
+        }
         filtersSlot={
           <InsightsFiltersPopover
             members={members}

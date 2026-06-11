@@ -37,6 +37,7 @@ export function InsightsToolbar({
   onPeriodChange,
   onGranularityChange,
   currentMember,
+  viewsSlot,
   filtersSlot,
 }: {
   state: PeriodState;
@@ -45,6 +46,8 @@ export function InsightsToolbar({
   onPeriodChange: (next: PeriodState) => void;
   onGranularityChange: (g: Granularity) => void;
   currentMember: Member | null;
+  /** the saved-views trigger (popover), injected by the shell */
+  viewsSlot?: React.ReactNode;
   /** the filters trigger (popover/sheet), injected by the shell */
   filtersSlot?: React.ReactNode;
 }) {
@@ -81,6 +84,7 @@ export function InsightsToolbar({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+        {viewsSlot}
         {filtersSlot}
         <InsightsMobileMenu
           granularity={period.granularity}

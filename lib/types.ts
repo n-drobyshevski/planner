@@ -261,3 +261,49 @@ export interface TimeWindow {
   start: number;
   end: number;
 }
+
+/**
+ * A weekly time goal for one category (one per workspace × category).
+ * Workspace-shared under RLS, like shared categories: both members see and
+ * edit every goal. `weeklyTargetMs` is scaled to the viewed window by app
+ * code (lib/insights/goals.ts); `direction` says whether it's a target to
+ * reach ("at-least") or a budget cap ("at-most").
+ */
+export interface CategoryGoal {
+  id: string;
+  workspaceId: string;
+  categoryId: string;
+  /** weekly target/budget, ms (DB CHECK: 15 min .. 7 days) */
+  weeklyTargetMs: number;
+  direction: "at-least" | "at-most";
+  createdBy: string;
+  createdAt: number;
+}
+
+/**
+ * A member's saved Insights view (named filter/period config). Member-private
+ * under RLS — the partner never sees it. `config` is the raw jsonb bag;
+ * lib/insights/views.ts validates it leniently on read.
+ */
+export interface InsightsView {
+  id: string;
+  workspaceId: string;
+  memberId: string;
+  name: string;
+  config: unknown;
+  position: number;
+  createdAt: number;
+}
+
+/**
+ * A member's Insights dashboard preferences (one row per member, member-
+ * private under RLS). `dashboard` carries card order/hidden ids;
+ * `suppressedKinds` lists suggestion kinds the member dismissed for good.
+ */
+export interface InsightsPrefs {
+  memberId: string;
+  workspaceId: string;
+  dashboard: { order?: string[]; hidden?: string[] };
+  suppressedKinds: string[];
+  updatedAt: number;
+}

@@ -1,7 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Area, Bar, ComposedChart, Line, LineChart, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  Bar,
+  ComposedChart,
+  Line,
+  LineChart,
+  ReferenceDot,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
@@ -9,13 +18,15 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { bucketUsage, categoryTrends, rollingAverage } from "@/lib/analytics/trends";
-import { formatDuration } from "@/lib/datetime/format";
+import { activeStreak, bucketTrend, consistency, dayAnomalies } from "@/lib/analytics/momentum";
+import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
+import { StatCard, StatGrid } from "./stat-card";
 import { ChartCard } from "./chart-card";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { InsightsEmpty } from "./insights-empty";
 import { bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function TrendsTab({ data }: { data: InsightsTabData }) {
@@ -46,6 +57,21 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
       full: bucketLabel({ start: b.start, end: b.end }, granularity, timeZone),
     }));
   }, [buckets, granularity, timeZone]);
+
+  // Momentum: direction over the bucket series, plus day-level streaks,
+  // consistency, and unusual days (robust z over nonzero days).
+  const trend = useMemo(() => bucketTrend(buckets), [buckets]);
+  // Day-level momentum only at day granularity, where buckets ≡ days.
+  const perDay = useMemo(
+    () =>
+      granularity === "day"
+        ? buckets.map((b) => ({ dayMs: b.start, ms: b.ms }))
+        : null,
+    [buckets, granularity],
+  );
+  const streak = useMemo(() => (perDay ? activeStreak(perDay) : null), [perDay]);
+  const steadiness = useMemo(() => (perDay ? consistency(perDay) : null), [perDay]);
+  const anomalies = useMemo(() => (perDay ? dayAnomalies(perDay) : []), [perDay]);
 
   const catTrend = useMemo(
     () => categoryTrends(occurrences, period.buckets, 5),
@@ -96,6 +122,14 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
   });
 
   const busiest = rows.reduce((a, b) => (b.ms > a.ms ? b : a), rows[0]);
+  const trendClause =
+    trend.direction === "up"
+      ? " Trending up across the period."
+      : trend.direction === "down"
+        ? " Trending down across the period."
+        : trend.direction === "flat"
+          ? " Holding steady across the period."
+          : "";
   const topCat = catSeries.length
     ? catSeries.reduce((a, b) =>
         (catTotals.get(b.key) ?? 0) > (catTotals.get(a.key) ?? 0) ? b : a,
@@ -113,7 +147,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         id="trends-per-bucket"
         viewerId={viewerId}
         title={`Tracked time per ${granularity}`}
-        headline={`Busiest ${granularity}: ${busiest.full} (${formatDuration(busiest.ms)}).`}
+        headline={`Busiest ${granularity}: ${busiest.full} (${formatDuration(busiest.ms)}).${trendClause}`}
         chartTypes={["bar", "line", "area"]}
         footnote={
           granularity === "day"
@@ -209,10 +243,68 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                   isAnimationActive={!reduced}
                 />
               )}
+              {anomalies.map((a) => (
+                <ReferenceDot
+                  key={a.dayMs}
+                  x={String(a.dayMs)}
+                  y={a.ms}
+                  r={4}
+                  fill="var(--card)"
+                  stroke="var(--color-ms)"
+                  strokeWidth={2}
+                />
+              ))}
             </ComposedChart>
           </ChartContainer>
         )}
       </ChartCard>
+
+      {perDay && (streak || steadiness !== null || anomalies.length > 0) && (
+        <section className="space-y-1.5">
+          <SectionLabel>Momentum</SectionLabel>
+          <StatGrid>
+            {streak && (
+              <StatCard
+                label="Current streak"
+                value={`${streak.current} ${streak.current === 1 ? "day" : "days"}`}
+                hint="ending at the period's last day"
+              />
+            )}
+            {streak && (
+              <StatCard
+                label="Longest streak"
+                value={`${streak.longest} ${streak.longest === 1 ? "day" : "days"}`}
+                hint="consecutive days with tracked time"
+              />
+            )}
+            {steadiness !== null && (
+              <StatCard
+                label="Consistency"
+                value={`${Math.round(steadiness * 100)}%`}
+                hint="days near your typical load"
+              />
+            )}
+          </StatGrid>
+          {anomalies.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5">
+              {anomalies.map((a) => (
+                <li
+                  key={a.dayMs}
+                  className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs"
+                >
+                  <span className="text-muted-foreground">
+                    {a.direction === "high" ? "Unusually heavy" : "Unusually light"}:
+                  </span>
+                  <span>{formatWeekdayDayMonth(a.dayMs, timeZone)}</span>
+                  <span className="font-mono tabular-nums text-muted-foreground">
+                    {formatDuration(a.ms)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {catTrend.seriesKeys.length > 0 && (
         <ChartCard

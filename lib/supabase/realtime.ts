@@ -21,9 +21,10 @@ export type WorkspaceChange = RealtimePostgresChangesPayload<
 export type ChannelStatus = "subscribed" | "error" | "closed";
 
 /**
- * Subscribe to all event/override/category/task/sleep-log changes for a
- * workspace. RLS is enforced for realtime, so a private event/task — or any
- * sleep log of the other member — is never delivered here. The handler receives the row-change payload so callers
+ * Subscribe to all event/override/category/task/sleep-log/goal/insights-pref
+ * changes for a workspace. RLS is enforced for realtime, so a private
+ * event/task — or any sleep log, saved view or prefs row of the other member —
+ * is never delivered here. The handler receives the row-change payload so callers
  * can filter by table and narrow invalidation. Returns an unsubscribe function.
  *
  * `onStatus` surfaces channel health: the realtime client auto-reconnects, and
@@ -67,6 +68,21 @@ export function subscribeWorkspace(
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "sleep_logs", filter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "category_goals", filter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "insights_views", filter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "insights_prefs", filter },
       onChange,
     );
 
