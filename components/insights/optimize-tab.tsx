@@ -42,10 +42,13 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { categoryShares } from "@/lib/analytics/balance";
 import { computeForecast, type Forecast } from "@/lib/analytics/forecast";
 import { activeStreak, dayAnomalies } from "@/lib/analytics/momentum";
 import { buildSleepDayPairs } from "@/lib/analytics/sleep-cross";
+import { computeTaskStats } from "@/lib/analytics/task-stats";
 import { computeUsage } from "@/lib/analytics/usage";
+import { buildDigestPayload } from "@/lib/insights/digest-payload";
 import { goalProgress } from "@/lib/insights/goals";
 import {
   attributeCoverage,
@@ -60,7 +63,8 @@ import {
 } from "@/lib/hooks/use-insights-prefs";
 import { useSleepLogs } from "@/lib/hooks/use-sleep-logs";
 import { formatDuration } from "@/lib/datetime/format";
-import { dateInputToMs } from "@/lib/datetime/local";
+import { dateInputToMs, dateKeyInZone } from "@/lib/datetime/local";
+import { DigestCard } from "./digest-card";
 import { InsightsEmpty } from "./insights-empty";
 import { StatCard, StatGrid } from "./stat-card";
 import { SectionLabel } from "./tab-bits";
@@ -197,13 +201,33 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     [usage, data.futureOccurrences, data.futureDays, data.futureWindow, tasks, timeZone, now],
   );
 
-  const suggestions = useMemo(() => {
+  // Lifted out of the suggestions memo: the digest payload reads the same
+  // goal judgments, anomalies and streak the rule engine sees.
+  const goalsProgress = useMemo(() => {
     const actualByCategory = new Map(
       usage.cur.byCategory.map((c) => [c.categoryId, c.ms]),
     );
-    // Streak over days that have started — future days always read as 0 and
-    // would fake a "broken streak" mid-period.
+    return goals
+      .filter((g) => categories.has(g.categoryId))
+      .map((g) =>
+        goalProgress(
+          g,
+          actualByCategory.get(g.categoryId) ?? 0,
+          period.days,
+          period.window,
+          now,
+        ),
+      );
+  }, [goals, categories, usage.cur.byCategory, period, now]);
+  const anomalies = useMemo(() => dayAnomalies(usage.cur.perDay), [usage.cur.perDay]);
+  // Streak over days that have started — future days always read as 0 and
+  // would fake a "broken streak" mid-period.
+  const streak = useMemo(() => {
     const elapsedPerDay = usage.cur.perDay.filter((d) => d.dayMs <= now);
+    return elapsedPerDay.length > 0 ? activeStreak(elapsedPerDay) : null;
+  }, [usage.cur.perDay, now]);
+
+  const suggestions = useMemo(() => {
     return computeSuggestions({
       occurrences,
       prevOccurrences,
@@ -216,20 +240,10 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
       now,
       categoryName: (id) =>
         id === null ? "Uncategorized" : (categories.get(id)?.name ?? "a context"),
-      goals: goals
-        .filter((g) => categories.has(g.categoryId))
-        .map((g) =>
-          goalProgress(
-            g,
-            actualByCategory.get(g.categoryId) ?? 0,
-            period.days,
-            period.window,
-            now,
-          ),
-        ),
+      goals: goalsProgress,
       forecast: period.window.end > now ? forecast : null,
-      anomalies: dayAnomalies(usage.cur.perDay),
-      streak: elapsedPerDay.length > 0 ? activeStreak(elapsedPerDay) : null,
+      anomalies,
+      streak,
       // The sleep-debt rule only ever sees the VIEWER's own nights, and only
       // when the lens is strictly "me" (occurrences are theirs alone then).
       sleepPairs:
@@ -239,9 +253,76 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
       suppressedKinds: new Set(suppressedKinds),
       periodLabel: period.label,
     });
-  }, [occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goals, forecast, usage, memberFilter, sleepLogs, suppressedKinds]);
+  }, [occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goalsProgress, anomalies, streak, forecast, memberFilter, sleepLogs, suppressedKinds]);
 
   const coverage = useMemo(() => attributeCoverage(occurrences), [occurrences]);
+
+  // The digest payload: the same aggregates this tab renders, rounded to
+  // minutes and clamped (see lib/insights/digest-payload.ts for the privacy
+  // boundary — no event titles, no occurrences, no sleep rows).
+  const digestPayload = useMemo(() => {
+    const active = occurrences.filter((o) => !o.inactive);
+    const prevActive = prevOccurrences.filter((o) => !o.inactive);
+    const shares = categoryShares(active, prevActive, period.window, period.prevWindow);
+    const taskStats = computeTaskStats(tasks, period.window, now, timeZone);
+    const name = (id: string | null) =>
+      id === null ? "Uncategorized" : (categories.get(id)?.name ?? "a context");
+    const futureCommittedMs = forecast.perDay.reduce((s, d) => s + d.committedMs, 0);
+    return buildDigestPayload({
+      periodLabel: period.label,
+      dayCount: period.days.length,
+      lens: memberFilter,
+      totalMs: usage.cur.summary.totalMs,
+      prevTotalMs: usage.prev.summary.totalMs,
+      dailyAvgMs: usage.cur.summary.dailyAverageMs,
+      activeDays: usage.cur.summary.activeDays,
+      busiest: usage.cur.summary.busiestDay
+        ? {
+            dateKey: dateKeyInZone(usage.cur.summary.busiestDay.dayMs, timeZone),
+            ms: usage.cur.summary.busiestDay.ms,
+          }
+        : null,
+      contexts: shares.map((s) => ({
+        name: name(s.categoryId),
+        ms: s.ms,
+        share: s.share,
+        prevShare: s.prevShare,
+      })),
+      tasks: {
+        completed: taskStats.completedCount,
+        onTimeRate: taskStats.adherenceRate,
+        overdueOpen: taskStats.overdueOpenCount,
+      },
+      goals: goalsProgress.map((g) => ({
+        name: name(g.goal.categoryId),
+        direction: g.goal.direction,
+        targetMs: g.targetMs,
+        actualMs: g.actualMs,
+        judgment: g.judgment,
+      })),
+      outlook:
+        period.window.end > now
+          ? {
+              committedMs: futureCommittedMs,
+              capacityRatio: forecast.capacityRatio,
+              busiestDateKey: forecast.busiestDay
+                ? dateKeyInZone(forecast.busiestDay.dayMs, timeZone)
+                : null,
+              dueUnscheduled: forecast.dueUnscheduled.length,
+            }
+          : null,
+      anomalies: anomalies.map((a) => ({
+        dateKey: dateKeyInZone(a.dayMs, timeZone),
+        ms: a.ms,
+        direction: a.direction,
+      })),
+      streak,
+      signals: suggestions.map((s) => ({
+        kind: s.kind,
+        text: `${s.title} — ${s.evidence.summary}`,
+      })),
+    });
+  }, [occurrences, prevOccurrences, period, tasks, now, timeZone, categories, memberFilter, usage, forecast, goalsProgress, anomalies, streak, suggestions]);
 
   function muteKind(kind: SuggestionKind) {
     if (suppressedKinds.includes(kind)) return;
@@ -271,6 +352,7 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
           ? "No suggestions for this period."
           : `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"} for this period.`}
       </p>
+      <DigestCard payload={digestPayload} />
       {period.window.end > now && (
         <OutlookSection
           forecast={forecast}
