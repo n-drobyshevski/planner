@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,8 +10,6 @@ import {
   PanelRight,
   SlidersHorizontal,
   MoreVertical,
-  Settings,
-  LogOut,
   Minimize2,
   Keyboard,
 } from "lucide-react";
@@ -32,10 +29,8 @@ import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import { DEFAULT_HOUR_PX } from "@/lib/datetime/zoom-math";
 import { ViewSwitcher } from "./view-switcher";
-import { AppNav } from "@/components/app-nav";
-import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
-import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
-import { signOutAction } from "@/app/login/actions";
+import { ToolbarSlot } from "@/components/toolbar-slots";
+import { MobileAccountSection } from "@/components/mobile-account-section";
 import type { CalendarView } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import type { WorkspaceData } from "@/lib/hooks/use-workspace";
@@ -48,6 +43,13 @@ const VIEW_OPTIONS: { value: CalendarView; label: string }[] = [
   { value: "month", label: "Month" },
 ];
 
+/**
+ * Calendar controls, portaled into the shared surface header (SurfaceChrome
+ * owns the <header>, AppNav, swipe, and the desktop user menu). One responsive
+ * sequence: desktop shows sidebar toggle · brand · period nav · label · view
+ * switcher · actions; below `md` everything but Filters, the label, New and
+ * the `⋯` menu hides, and the collapsed controls live in the `⋯` menu.
+ */
 export function CalendarToolbar({
   view,
   label,
@@ -84,25 +86,21 @@ export function CalendarToolbar({
   // The reset affordance only makes sense in the timed grid, and only once the
   // user has actually zoomed away from the default scale.
   const zoomed = timeGridView && hourPx !== DEFAULT_HOUR_PX;
-  const surfaceSwipe = useSurfaceSwipe();
 
   return (
-    <header
-      {...surfaceSwipe}
-      className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4"
-    >
-      {/* ---- Desktop toolbar (>= md) ---- */}
-      <div className="hidden flex-1 items-center gap-2 md:flex">
+    <>
+      <ToolbarSlot name="leading">
         <Button
           variant="ghost"
           size="icon"
           aria-label="Toggle sidebar"
           title="Toggle sidebar (Ctrl+Alt+←)"
           onClick={onToggleSidebar}
+          className="hidden md:inline-flex"
         >
           <PanelLeft />
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 md:flex">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <CalendarDays className="size-4" />
           </span>
@@ -110,12 +108,27 @@ export function CalendarToolbar({
             {workspace?.workspaceName ?? "Planner"}
           </span>
         </div>
-        <AppNav />
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Filters"
+          onClick={onOpenFilters}
+          className="md:hidden"
+        >
+          <SlidersHorizontal />
+        </Button>
+      </ToolbarSlot>
 
-        <Button variant="outline" size="sm" onClick={onToday}>
+      <ToolbarSlot name="center">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToday}
+          className="hidden md:inline-flex"
+        >
           Today
         </Button>
-        <div className="flex items-center">
+        <div className="hidden items-center md:flex">
           <Button variant="ghost" size="icon" aria-label="Previous" onClick={onPrev}>
             <ChevronLeft />
           </Button>
@@ -123,67 +136,62 @@ export function CalendarToolbar({
             <ChevronRight />
           </Button>
         </div>
-        <h2 className="ml-1 min-w-0 truncate font-heading text-base font-semibold sm:text-lg">
+        <h2 className="ml-1 min-w-0 flex-1 truncate font-heading text-base font-semibold sm:text-lg">
           {label}
         </h2>
+      </ToolbarSlot>
 
-        <div className="ml-auto flex items-center gap-2">
-          {zoomed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Reset zoom"
-              title="Reset zoom (Ctrl+0)"
-              onClick={() => setHourPx(DEFAULT_HOUR_PX)}
-            >
-              <Minimize2 />
-            </Button>
-          )}
+      <ToolbarSlot name="trailing">
+        {zoomed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Reset zoom"
+            title="Reset zoom (Ctrl+0)"
+            onClick={() => setHourPx(DEFAULT_HOUR_PX)}
+            className="hidden md:inline-flex"
+          >
+            <Minimize2 />
+          </Button>
+        )}
+        <div className="hidden md:contents">
           <ViewSwitcher view={view} onViewChange={onViewChange} />
-          <Button size="sm" onClick={onNewEvent}>
-            <Plus data-icon="inline-start" />
-            <span className="hidden sm:inline">New</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Toggle tasks panel"
-            title="Toggle tasks panel (Ctrl+Alt+→)"
-            aria-pressed={backlogOpen}
-            onClick={onToggleBacklog}
-            className={cn(backlogOpen && "bg-accent text-accent-foreground")}
-          >
-            <PanelRight />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Keyboard shortcuts"
-            title="Keyboard shortcuts (?)"
-            onClick={onOpenShortcuts}
-          >
-            <Keyboard />
-          </Button>
-          <ToolbarUserMenu current={current} />
         </div>
-      </div>
-
-      {/* ---- Mobile toolbar (< md) ---- */}
-      <div className="flex flex-1 items-center gap-1 md:hidden">
+        <Button size="sm" onClick={onNewEvent} className="hidden md:inline-flex">
+          <Plus data-icon="inline-start" />
+          New
+        </Button>
+        <Button
+          size="icon"
+          aria-label="New event"
+          onClick={onNewEvent}
+          className="md:hidden"
+        >
+          <Plus />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Filters"
-          onClick={onOpenFilters}
+          aria-label="Toggle tasks panel"
+          title="Toggle tasks panel (Ctrl+Alt+→)"
+          aria-pressed={backlogOpen}
+          onClick={onToggleBacklog}
+          className={cn(
+            "hidden md:inline-flex",
+            backlogOpen && "bg-accent text-accent-foreground",
+          )}
         >
-          <SlidersHorizontal />
+          <PanelRight />
         </Button>
-        <AppNav />
-        <h2 className="ml-1 min-w-0 flex-1 truncate font-heading text-base font-semibold">
-          {label}
-        </h2>
-        <Button size="icon" aria-label="New event" onClick={onNewEvent}>
-          <Plus />
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts (?)"
+          onClick={onOpenShortcuts}
+          className="hidden md:inline-flex"
+        >
+          <Keyboard />
         </Button>
         <CalendarMobileMenu
           view={view}
@@ -195,8 +203,8 @@ export function CalendarToolbar({
           backlogOpen={backlogOpen}
           current={current}
         />
-      </div>
-    </header>
+      </ToolbarSlot>
+    </>
   );
 }
 
@@ -227,7 +235,12 @@ function CalendarMobileMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="More options">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="More options"
+          className="md:hidden"
+        >
           <MoreVertical />
         </Button>
       </DropdownMenuTrigger>
@@ -275,26 +288,7 @@ function CalendarMobileMenu({
           </DropdownMenuItem>
         )}
 
-        <DropdownMenuSeparator />
-        {current && (
-          <DropdownMenuLabel className="font-normal text-muted-foreground">
-            Signed in as {current.name}
-          </DropdownMenuLabel>
-        )}
-        <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <Settings data-icon="inline-start" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => {
-            void signOutAction();
-          }}
-        >
-          <LogOut data-icon="inline-start" />
-          Sign out
-        </DropdownMenuItem>
+        <MobileAccountSection current={current} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { InsightsShell } from "@/components/insights/insights-shell";
+import { InsightsSkeleton } from "@/components/shared/surface-skeletons";
 import { parsePeriodSearch, parseTabParam } from "@/lib/insights/period";
 
 interface InsightsSearch {
@@ -19,7 +20,7 @@ export default function InsightsPage({
   searchParams: Promise<InsightsSearch>;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<InsightsSkeleton />}>
       <InsightsRoute searchParams={searchParams} />
     </Suspense>
   );

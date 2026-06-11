@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { CalendarShell } from "@/components/calendar/calendar-shell";
+import { CalendarSkeleton } from "@/components/shared/surface-skeletons";
 import {
   parseViewParam,
   parseDateParam,
@@ -8,14 +9,15 @@ import {
 
 // Reading searchParams is request-time data. Under Cache Components it must sit
 // behind a Suspense boundary so the rest of the route (the static shell) can be
-// prerendered while the params-dependent shell streams in.
+// prerendered while the params-dependent shell streams in. The skeleton
+// fallback prerenders into the shell too: cold loads paint header + placeholder.
 export default function CalendarPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string; date?: string }>;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<CalendarSkeleton />}>
       <CalendarRoute searchParams={searchParams} />
     </Suspense>
   );

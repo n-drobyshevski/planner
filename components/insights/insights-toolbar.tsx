@@ -1,23 +1,18 @@
 "use client";
 
-import Link from "next/link";
-import { ChartColumnBig, MoreVertical, Settings, LogOut } from "lucide-react";
+import { ChartColumnBig, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { AppNav } from "@/components/app-nav";
-import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
-import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
-import { signOutAction } from "@/app/login/actions";
+import { ToolbarSlot } from "@/components/toolbar-slots";
+import { MobileAccountSection } from "@/components/mobile-account-section";
 import { PeriodSelector } from "./period-selector";
 import { granularityChoices, type Granularity, type PeriodState, type ResolvedPeriod } from "@/lib/insights/period";
 import type { Member } from "@/lib/types";
@@ -29,10 +24,11 @@ const GRANULARITY_LABELS: Record<Granularity, string> = {
 };
 
 /**
- * Top bar of /insights: nav · period selector · bucket granularity · filters ·
- * user menu. Below `md` the granularity toggle and profile actions collapse
- * into the `⋯` menu so the row never overflows a phone (mirrors the tasks
- * toolbar); the period selector stays put — it's the view's main control.
+ * Insights controls, portaled into the shared surface header (SurfaceChrome
+ * owns the <header>, AppNav, swipe, and the desktop user menu): period
+ * selector · bucket granularity · filters. Below `md` the granularity toggle
+ * and profile actions collapse into the `⋯` menu so the row never overflows a
+ * phone; the period selector stays put — it's the view's main control.
  */
 export function InsightsToolbar({
   state,
@@ -53,25 +49,23 @@ export function InsightsToolbar({
   filtersSlot?: React.ReactNode;
 }) {
   const choices = granularityChoices(period.window);
-  const surfaceSwipe = useSurfaceSwipe();
 
   return (
-    <header
-      {...surfaceSwipe}
-      className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-3 pt-safe pb-2 sm:px-4"
-    >
-      <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
-        <ChartColumnBig className="size-4" />
-      </span>
-      <AppNav />
-      <PeriodSelector
-        state={state}
-        period={period}
-        timeZone={timeZone}
-        onChange={onPeriodChange}
-      />
-
-      <div className="ml-auto flex items-center gap-1 sm:gap-2">
+    <>
+      <ToolbarSlot name="leading">
+        <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
+          <ChartColumnBig className="size-4" />
+        </span>
+      </ToolbarSlot>
+      <ToolbarSlot name="center">
+        <PeriodSelector
+          state={state}
+          period={period}
+          timeZone={timeZone}
+          onChange={onPeriodChange}
+        />
+      </ToolbarSlot>
+      <ToolbarSlot name="trailing">
         <ToggleGroup
           type="single"
           value={period.granularity}
@@ -88,17 +82,14 @@ export function InsightsToolbar({
           ))}
         </ToggleGroup>
         {filtersSlot}
-        <div className="hidden items-center gap-2 md:flex">
-          <ToolbarUserMenu current={currentMember} />
-        </div>
         <InsightsMobileMenu
           granularity={period.granularity}
           choices={choices}
           onGranularityChange={onGranularityChange}
           current={currentMember}
         />
-      </div>
-    </header>
+      </ToolbarSlot>
+    </>
   );
 }
 
@@ -138,27 +129,7 @@ function InsightsMobileMenu({
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
-
-        <DropdownMenuSeparator />
-        {current && (
-          <DropdownMenuLabel className="font-normal text-muted-foreground">
-            Signed in as {current.name}
-          </DropdownMenuLabel>
-        )}
-        <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <Settings data-icon="inline-start" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => {
-            void signOutAction();
-          }}
-        >
-          <LogOut data-icon="inline-start" />
-          Sign out
-        </DropdownMenuItem>
+        <MobileAccountSection current={current} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

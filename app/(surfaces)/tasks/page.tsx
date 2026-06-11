@@ -1,15 +1,18 @@
 import { Suspense } from "react";
 import { TasksShell } from "@/components/tasks/tasks-shell";
+import { TasksSkeleton } from "@/components/shared/surface-skeletons";
 
 // searchParams is request-time data; behind Suspense so the static shell can
 // prerender while the params-dependent shell streams in (Cache Components).
+// The skeleton fallback prerenders into the shell too: cold loads paint
+// header + placeholder.
 export default function TasksPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string; board?: string }>;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<TasksSkeleton />}>
       <TasksRoute searchParams={searchParams} />
     </Suspense>
   );

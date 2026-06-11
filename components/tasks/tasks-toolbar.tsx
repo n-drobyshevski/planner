@@ -1,28 +1,29 @@
 "use client";
 
-import Link from "next/link";
-import { Plus, ListChecks, MoreVertical, Settings, LogOut } from "lucide-react";
+import { Plus, ListChecks, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { AppNav } from "@/components/app-nav";
-import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
-import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
-import { signOutAction } from "@/app/login/actions";
+import { ToolbarSlot } from "@/components/toolbar-slots";
+import { MobileAccountSection } from "@/components/mobile-account-section";
 import { BoardSwitcher } from "./board-switcher";
 import type { Member } from "@/lib/types";
 
 export type TasksView = "board" | "list";
 
+/**
+ * Tasks controls, portaled into the shared surface header (SurfaceChrome owns
+ * the <header>, AppNav, swipe, and the desktop user menu). The board switcher
+ * renders once and stays put across breakpoints; below `md` the view toggle
+ * collapses into the `⋯` menu so the row never overflows a phone.
+ */
 export function TasksToolbar({
   view,
   onViewChange,
@@ -40,28 +41,19 @@ export function TasksToolbar({
   onBoardChange: (boardId: string) => void;
   taskCountByBoard: Map<string, number>;
 }) {
-  // The board switcher and app nav render once and stay put across breakpoints;
-  // only the trailing controls swap. Below `md` the view toggle and the
-  // profile/settings/sign-out menu collapse into the `⋯` menu so the row never
-  // overflows a phone (mirrors the calendar toolbar). The quick theme toggle is
-  // desktop-only here too — it lives in Settings on mobile.
-  const surfaceSwipe = useSurfaceSwipe();
   return (
-    <header
-      {...surfaceSwipe}
-      className="flex items-center gap-2 border-b px-3 pt-safe pb-2 sm:px-4"
-    >
-      <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
-        <ListChecks className="size-4" />
-      </span>
-      <BoardSwitcher
-        activeBoardId={activeBoardId}
-        onActiveBoardChange={onBoardChange}
-        taskCountByBoard={taskCountByBoard}
-      />
-      <AppNav />
-
-      <div className="ml-auto flex items-center gap-1 sm:gap-2">
+    <>
+      <ToolbarSlot name="leading">
+        <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
+          <ListChecks className="size-4" />
+        </span>
+        <BoardSwitcher
+          activeBoardId={activeBoardId}
+          onActiveBoardChange={onBoardChange}
+          taskCountByBoard={taskCountByBoard}
+        />
+      </ToolbarSlot>
+      <ToolbarSlot name="trailing">
         <ToggleGroup
           type="single"
           value={view}
@@ -88,16 +80,13 @@ export function TasksToolbar({
         >
           <Plus />
         </Button>
-        <div className="hidden items-center gap-2 md:flex">
-          <ToolbarUserMenu current={currentMember} />
-        </div>
         <TasksMobileMenu
           view={view}
           onViewChange={onViewChange}
           current={currentMember}
         />
-      </div>
-    </header>
+      </ToolbarSlot>
+    </>
   );
 }
 
@@ -132,27 +121,7 @@ function TasksMobileMenu({
           <DropdownMenuRadioItem value="board">Board</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="list">List</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
-
-        <DropdownMenuSeparator />
-        {current && (
-          <DropdownMenuLabel className="font-normal text-muted-foreground">
-            Signed in as {current.name}
-          </DropdownMenuLabel>
-        )}
-        <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <Settings data-icon="inline-start" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => {
-            void signOutAction();
-          }}
-        >
-          <LogOut data-icon="inline-start" />
-          Sign out
-        </DropdownMenuItem>
+        <MobileAccountSection current={current} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

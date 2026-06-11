@@ -574,6 +574,13 @@
   padding-right: env(safe-area-inset-right);
 }
 
+/* Settled height of the shared surface toolbar: pt-safe + the size-8 control
+   row + pb-2. Reserved up front (min-height) so the header doesn't grow when
+   the portaled toolbar controls mount at hydration (no CLS). */
+@utility min-h-toolbar {
+  min-height: calc(max(env(safe-area-inset-top), 0.5rem) + 2.5rem);
+}
+
 /* ---- Event lifecycle status overlays (see lib/theme/appearance.ts) ----
    These ride on top of the inline backgroundColor each event block sets.
    'confirmed' uses no class (plain fill). */

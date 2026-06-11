@@ -18,11 +18,14 @@ import { signOutAction } from "@/app/login/actions";
 import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import type { Member } from "@/lib/types";
 
-/** Theme toggle + profile menu, shared by the calendar and tasks toolbars. */
+/** Theme toggle + profile menu, rendered by the shared surface header. */
 export function ToolbarUserMenu({ current }: { current: Member | null }) {
   return (
     <>
       <ThemeToggle />
+      {/* The avatar's footprint is reserved while the workspace query resolves
+          so the header row doesn't shift when it lands. */}
+      {!current && <span aria-hidden className="size-8" />}
       {current && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
