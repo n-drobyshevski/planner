@@ -292,6 +292,23 @@ export function resolvePeriod(state: PeriodState, opts: PeriodOpts): ResolvedPer
   return { window, days, buckets, granularity, prevWindow, prevDays, label, clamped };
 }
 
+/**
+ * The window immediately following a resolved period: starts at
+ * `period.window.end`, spans the same DAY COUNT, day-aligned in the viewer
+ * zone (DST-correct — days are enumerated like resolvePeriod's, so a window
+ * crossing a transition keeps local-midnight boundaries even though its
+ * absolute length differs by the shifted hour).
+ */
+export function nextWindowOf(
+  period: ResolvedPeriod,
+  timeZone: string,
+): { window: TimeWindow; days: number[] } {
+  const ctx = tz(timeZone);
+  const start = period.window.end;
+  const end = getTime(addDays(start, period.days.length, { in: ctx }));
+  return { window: { start, end }, days: listDays(start, end, ctx) };
+}
+
 // --- URL codec (mirrors the calendar's view/date param helpers) ---
 
 /** URL token ↔ preset. Rolling presets use the short "30d"/"90d" tokens. */

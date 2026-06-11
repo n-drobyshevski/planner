@@ -9,13 +9,29 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { byWeekday, fragmentation } from "@/lib/analytics/patterns";
+import {
+  deepWorkShare,
+  energyLoadPerDay,
+  satisfactionByDaypart,
+  type Daypart,
+} from "@/lib/analytics/correlations";
 import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
-import { InsightsEmpty } from "./insights-empty";
+import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { HourHeatmap } from "./hour-heatmap";
 import { SectionLabel } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
+
+const DAYPART_LABELS: Record<Daypart, string> = {
+  morning: "Morning (5–12)",
+  midday: "Midday (12–17)",
+  evening: "Evening (17–22)",
+  night: "Night (22–5)",
+};
+
+/** Minimum rated occurrences before a daypart verdict is worth showing. */
+const MIN_DAYPART_RATINGS = 5;
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const WEEKDAYS_FULL = [
@@ -43,6 +59,21 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
   const total = useMemo(
     () => weekdays.reduce((s, w) => s + w.totalMs, 0),
     [weekdays],
+  );
+
+  // Attribute lenses: focus mode split, satisfaction by time of day, energy
+  // coverage. All gated on sample size in the analytics layer or below.
+  const focusSplit = useMemo(
+    () => deepWorkShare(occurrences, period.window),
+    [occurrences, period.window],
+  );
+  const dayparts = useMemo(
+    () => satisfactionByDaypart(occurrences, period.window, timeZone),
+    [occurrences, period.window, timeZone],
+  );
+  const energyDays = useMemo(
+    () => energyLoadPerDay(occurrences, period.days, period.window),
+    [occurrences, period.days, period.window],
   );
 
   if (total === 0)
@@ -141,6 +172,12 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
         />
       </section>
 
+      <AttributesSection
+        focusSplit={focusSplit}
+        dayparts={dayparts}
+        energyDays={energyDays}
+      />
+
       <section className="space-y-1.5">
         <SectionLabel>Fragmentation</SectionLabel>
         <StatGrid>
@@ -177,5 +214,87 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
         </StatGrid>
       </section>
     </div>
+  );
+}
+
+function AttributesSection({
+  focusSplit,
+  dayparts,
+  energyDays,
+}: {
+  focusSplit: ReturnType<typeof deepWorkShare>;
+  dayparts: ReturnType<typeof satisfactionByDaypart>;
+  energyDays: ReturnType<typeof energyLoadPerDay>;
+}) {
+  const ratedParts = dayparts.filter((d) => d.agg.n >= MIN_DAYPART_RATINGS);
+  const best = ratedParts.length
+    ? ratedParts.reduce((a, b) => (b.agg.mean > a.agg.mean ? b : a))
+    : null;
+  const worst =
+    ratedParts.length >= 2
+      ? ratedParts.reduce((a, b) => (b.agg.mean < a.agg.mean ? b : a))
+      : null;
+
+  const energyRatedMs = energyDays.reduce((s, d) => s + d.ratedMs, 0);
+  const energyWeightedMs = energyDays.reduce((s, d) => s + d.weightedMs, 0);
+  const energyTotalMs = energyDays.reduce((s, d) => s + d.totalMs, 0);
+  // weighted / rated = duration-weighted mean energy on the 1..3 scale.
+  const meanEnergy = energyRatedMs > 0 ? energyWeightedMs / energyRatedMs : null;
+
+  const hasAnything =
+    focusSplit.share !== null || best !== null || meanEnergy !== null;
+
+  return (
+    <section className="space-y-1.5">
+      <SectionLabel>Attributes</SectionLabel>
+      {!hasAnything ? (
+        <SectionEmpty actionLabel="Open the calendar" actionHref="/calendar">
+          Set focus, energy or satisfaction on events to unlock attribute
+          patterns — deep-work share, your best time of day, and how demanding
+          your days run.
+        </SectionEmpty>
+      ) : (
+        <StatGrid>
+          <StatCard
+            label="Deep work"
+            value={
+              focusSplit.share !== null
+                ? `${Math.round(focusSplit.share * 100)}%`
+                : "—"
+            }
+            hint={
+              focusSplit.share !== null
+                ? `of ${formatDuration(focusSplit.deepMs + focusSplit.shallowMs)} focus-rated time`
+                : "rate focus on events to track this"
+            }
+          />
+          <StatCard
+            label="Best time of day"
+            value={best ? DAYPART_LABELS[best.daypart].split(" ")[0] : "—"}
+            hint={
+              best
+                ? `satisfaction ${best.agg.mean.toFixed(1)}/5 · n ${best.agg.n}`
+                : `needs ${MIN_DAYPART_RATINGS}+ rated items`
+            }
+          />
+          {worst && worst.daypart !== best?.daypart && (
+            <StatCard
+              label="Toughest time of day"
+              value={DAYPART_LABELS[worst.daypart].split(" ")[0]}
+              hint={`satisfaction ${worst.agg.mean.toFixed(1)}/5 · n ${worst.agg.n}`}
+            />
+          )}
+          <StatCard
+            label="Energy level"
+            value={meanEnergy !== null ? `${meanEnergy.toFixed(1)}/3` : "—"}
+            hint={
+              meanEnergy !== null && energyTotalMs > 0
+                ? `rated on ${Math.round((energyRatedMs / energyTotalMs) * 100)}% of tracked time`
+                : "rate energy on events to track this"
+            }
+          />
+        </StatGrid>
+      )}
+    </section>
   );
 }

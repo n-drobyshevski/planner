@@ -8,6 +8,9 @@ import type {
   OverrideRow,
   Member,
   Category,
+  CategoryGoal,
+  InsightsPrefs,
+  InsightsView,
   Board,
   SleepLog,
   TaskRow,
@@ -90,6 +93,100 @@ export function sleepLogInputToRow(input: SleepLogInput): Row {
     quality: input.quality ?? null,
     fatigue: input.fatigue ?? null,
     note: input.note ?? null,
+  };
+}
+
+export function mapCategoryGoal(r: Row): CategoryGoal {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    categoryId: r.category_id as string,
+    weeklyTargetMs: Number(r.weekly_target_ms), // bigint may arrive as string
+    direction: (r.direction as CategoryGoal["direction"] | null) ?? "at-least",
+    createdBy: r.created_by as string,
+    createdAt: toMs(r.created_at),
+  };
+}
+
+/** Upsert payload for one goal (conflict key workspace_id,category_id). */
+export interface CategoryGoalInput {
+  workspaceId: string;
+  categoryId: string;
+  /** weekly target/budget, ms (DB CHECK: 15 min .. 7 days) */
+  weeklyTargetMs: number;
+  direction?: CategoryGoal["direction"];
+  createdBy: string;
+}
+
+export function categoryGoalInputToRow(input: CategoryGoalInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    category_id: input.categoryId,
+    weekly_target_ms: input.weeklyTargetMs,
+    direction: input.direction ?? "at-least",
+    created_by: input.createdBy,
+  };
+}
+
+export function mapInsightsView(r: Row): InsightsView {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    memberId: r.member_id as string,
+    name: r.name as string,
+    config: r.config, // raw jsonb; lib/insights/views.ts validates on read
+    position: (r.position as number) ?? 0,
+    createdAt: toMs(r.created_at),
+  };
+}
+
+/** Insert payload for a saved view. */
+export interface InsightsViewInput {
+  workspaceId: string;
+  memberId: string;
+  name: string;
+  /** encodeViewConfig output (or any JSON-safe bag; validated on read) */
+  config: unknown;
+  position?: number;
+}
+
+export function insightsViewInputToRow(input: InsightsViewInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    member_id: input.memberId,
+    name: input.name,
+    config: input.config,
+    position: input.position ?? 0,
+  };
+}
+
+/** Lenient read of the prefs `dashboard` jsonb: junk degrades to {}. */
+function mapDashboard(value: unknown): InsightsPrefs["dashboard"] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  const v = value as Record<string, unknown>;
+  const strings = (x: unknown): string[] | undefined =>
+    Array.isArray(x)
+      ? x.filter((s): s is string => typeof s === "string")
+      : undefined;
+  const out: InsightsPrefs["dashboard"] = {};
+  const order = strings(v.order);
+  const hidden = strings(v.hidden);
+  if (order) out.order = order;
+  if (hidden) out.hidden = hidden;
+  return out;
+}
+
+export function mapInsightsPrefs(r: Row): InsightsPrefs {
+  return {
+    memberId: r.member_id as string,
+    workspaceId: r.workspace_id as string,
+    dashboard: mapDashboard(r.dashboard),
+    suppressedKinds: Array.isArray(r.suppressed_kinds)
+      ? (r.suppressed_kinds as unknown[]).filter(
+          (s): s is string => typeof s === "string",
+        )
+      : [],
+    updatedAt: toMs(r.updated_at),
   };
 }
 

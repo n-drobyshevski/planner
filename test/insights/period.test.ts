@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   resolvePeriod,
+  nextWindowOf,
   granularityChoices,
   defaultGranularity,
   parseRangeParam,
@@ -276,5 +277,63 @@ describe("URL codec", () => {
     expect(periodToSearch(state(), "overview", UTC)).toBe(
       "?range=this-week&granularity=day",
     );
+  });
+});
+
+describe("nextWindowOf", () => {
+  it("this-week → the immediately following week (UTC)", () => {
+    const now = utc(2026, 5, 10, 12); // Wed 10 Jun
+    const p = resolvePeriod(state(), { timeZone: UTC, now });
+    const next = nextWindowOf(p, UTC);
+    expect(next.window).toEqual({ start: utc(2026, 5, 15), end: utc(2026, 5, 22) });
+    expect(next.days).toHaveLength(7);
+    expect(next.days[0]).toBe(utc(2026, 5, 15));
+    expect(next.days[6]).toBe(utc(2026, 5, 21));
+  });
+
+  it("keeps the day COUNT (not the calendar unit) for this-month", () => {
+    // June has 30 days → the next window is Jul 1 – Jul 31 (30 days), not July.
+    const now = utc(2026, 5, 10, 12);
+    const p = resolvePeriod(state({ preset: "this-month" }), { timeZone: UTC, now });
+    const next = nextWindowOf(p, UTC);
+    expect(next.window).toEqual({ start: utc(2026, 6, 1), end: utc(2026, 6, 31) });
+    expect(next.days).toHaveLength(30);
+  });
+
+  it("starts exactly where the period ends (windows tile)", () => {
+    const now = utc(2026, 5, 10, 12);
+    const p = resolvePeriod(state({ preset: "last-30d" }), { timeZone: UTC, now });
+    const next = nextWindowOf(p, UTC);
+    expect(next.window.start).toBe(p.window.end);
+    expect(next.days).toHaveLength(p.days.length);
+  });
+
+  it("stays day-aligned when the NEXT window crosses the Berlin spring-forward", () => {
+    // This-week Mon 16 – Sun 22 Mar 2026; the next window Mon 23 – Sun 29
+    // contains the DST jump (Sun 29 Mar, 02:00 → 03:00): 7 day entries, the
+    // last one 23h long, total 7×24h − 1h.
+    const now = Date.UTC(2026, 2, 18, 12); // Wed 18 Mar
+    const p = resolvePeriod(state(), { timeZone: BERLIN, now });
+    const next = nextWindowOf(p, BERLIN);
+    expect(next.window.start).toBe(p.window.end);
+    expect(next.days).toHaveLength(7);
+    expect(next.window.end - next.window.start).toBe(7 * DAY - HOUR);
+    expect(next.window.end - next.days[6]).toBe(23 * HOUR); // DST Sunday
+    // Day boundaries land on local midnight: Mon 23 Mar 00:00 CET = 22 Mar 23:00Z.
+    expect(next.days[0]).toBe(Date.UTC(2026, 2, 22, 23));
+  });
+
+  it("recovers a full-length week right after a DST-shortened one", () => {
+    // This-week Mon 23 – Sun 29 Mar 2026 (the 23h-Sunday week, 167h total);
+    // the next window Mon 30 Mar – Sun 5 Apr is all-CEST: 7 × 24h again.
+    const now = Date.UTC(2026, 2, 25, 12); // Wed 25 Mar
+    const p = resolvePeriod(state(), { timeZone: BERLIN, now });
+    expect(p.window.end - p.window.start).toBe(7 * DAY - HOUR);
+    const next = nextWindowOf(p, BERLIN);
+    expect(next.window.start).toBe(p.window.end);
+    expect(next.days).toHaveLength(7);
+    expect(next.window.end - next.window.start).toBe(7 * DAY);
+    // Mon 30 Mar 00:00 CEST = 29 Mar 22:00Z.
+    expect(next.days[0]).toBe(Date.UTC(2026, 2, 29, 22));
   });
 });
