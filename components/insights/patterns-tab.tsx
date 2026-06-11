@@ -45,7 +45,13 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
     [weekdays],
   );
 
-  if (total === 0) return <InsightsEmpty />;
+  if (total === 0)
+    return (
+      <InsightsEmpty
+        title="No patterns yet"
+        description="Weekday and hour-of-day patterns need at least one timed event in this period."
+      />
+    );
 
   const rows = weekdays.map((w) => ({
     name: WEEKDAYS[w.weekday],

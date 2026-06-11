@@ -4,7 +4,6 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import { useIdlePreload } from "@/lib/lazy";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useWindowEvents, useWorkspaceRealtime } from "@/lib/hooks/use-window-events";
@@ -19,11 +18,13 @@ import {
   type PeriodState,
 } from "@/lib/insights/period";
 import { filterForInsights, type MemberFilter } from "@/lib/insights/filters";
+import { useInsightsFilters } from "@/lib/hooks/use-insights-filters";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadError } from "@/components/shared/load-error";
 import { InsightsToolbar } from "./insights-toolbar";
 import { InsightsFiltersPopover } from "./insights-filters-popover";
 import { ChartSkeleton } from "./chart-skeleton";
+import { InsightsTabSkeleton } from "./insights-tab-skeleton";
 import { cn } from "@/lib/utils";
 import type { Category, Member, Occurrence, TaskRow } from "@/lib/types";
 
@@ -116,11 +117,6 @@ function InsightsShellInner({
   const [state, setState] = useState<PeriodState>(initialState);
   const [tab, setTab] = useState<InsightsTab>(initialTab);
 
-  // Insights-local filters (independent of the calendar's sidebar filters).
-  const [memberFilter, setMemberFilter] = useState<MemberFilter>("both");
-  const [hiddenCategoryIds, setHiddenCategoryIds] = useState<Set<string>>(new Set());
-  const [includeInactive, setIncludeInactive] = useState(false);
-
   // SSR renders without the member's zone/data; paint the frame and fill in
   // after mount. Read "mounted" as an external store (server snapshot false,
   // client true) — no setState-in-effect needed.
@@ -159,6 +155,18 @@ function InsightsShellInner({
   const { tasks, isLoading: tasksLoading, isError: tasksError } = useTasks(wsId);
 
   const viewerId = workspace.data?.currentMember?.id ?? "";
+
+  // Insights-local filters (independent of the calendar's sidebar filters),
+  // remembered per viewer per device.
+  const {
+    memberFilter,
+    hiddenCategoryIds,
+    includeInactive,
+    setMemberFilter,
+    setHiddenCategoryIds,
+    setIncludeInactive,
+  } = useInsightsFilters(viewerId || undefined);
+
   const filterArgs = useMemo(
     () => ({ viewerId, member: memberFilter, hiddenCategoryIds, includeInactive }),
     [viewerId, memberFilter, hiddenCategoryIds, includeInactive],
@@ -248,13 +256,15 @@ function InsightsShellInner({
             onHiddenCategoryIdsChange={setHiddenCategoryIds}
             includeInactive={includeInactive}
             onIncludeInactiveChange={setIncludeInactive}
+            filtersInert={tab === "sleep"}
           />
         }
       />
 
       <Tabs value={tab} onValueChange={(v) => changeTab(v as InsightsTab)}>
         <div className="overflow-x-auto border-b px-3 sm:px-4">
-          <TabsList className="h-10 w-max bg-transparent p-0">
+          {/* h override must mirror the base's group-data variant to out-cascade its h-8 */}
+          <TabsList className="w-max bg-transparent p-0 group-data-horizontal/tabs:h-11 sm:group-data-horizontal/tabs:h-10">
             {INSIGHTS_TABS.map((t) => (
               <TabsTrigger
                 key={t}
@@ -286,8 +296,8 @@ function InsightsShellInner({
         ) : error ? (
           <LoadError subject="insights" onRetry={() => void qc.invalidateQueries()} />
         ) : loading ? (
-          <div className="flex h-full items-center justify-center">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          <div className="mx-auto w-full max-w-5xl p-3 sm:p-4">
+            <InsightsTabSkeleton />
           </div>
         ) : (
           <div className="mx-auto w-full max-w-5xl p-3 sm:p-4">

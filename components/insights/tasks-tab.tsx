@@ -31,7 +31,7 @@ import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
 import { bucketLabel, bucketTick } from "./series";
-import { SectionLabel } from "./tab-bits";
+import { CHART_H, SectionLabel } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /** Lead times run to days/weeks — "9d 17h" reads better than "233h". */
@@ -161,10 +161,10 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
       </div>
 
       <section className="space-y-1.5">
-        <SectionLabel>Velocity</SectionLabel>
+        <SectionLabel>Velocity per {granularity}</SectionLabel>
         <ChartContainer
           config={velocityConfig}
-          className="aspect-auto h-[180px] w-full"
+          className={`aspect-auto ${CHART_H.compact} w-full`}
           aria-label={`Tasks created vs completed per ${granularity}, ${period.label}`}
         >
           <BarChart data={velocityRows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>

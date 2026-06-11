@@ -16,7 +16,7 @@ import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { SleepLog } from "@/lib/types";
 import { StatCard, StatGrid } from "../stat-card";
 import { bucketTick } from "../series";
-import { SectionLabel } from "../tab-bits";
+import { CHART_H, SectionLabel } from "../tab-bits";
 
 const MIN_MS = 60_000;
 const HOUR_MS = 3_600_000;
@@ -169,7 +169,7 @@ export function HistorySection({
         <div className="space-y-1.5">
           <ChartContainer
             config={durationConfig}
-            className="aspect-auto h-[180px] w-full"
+            className={`aspect-auto ${CHART_H.compact} w-full`}
             aria-label="Time in bed per night"
           >
             <BarChart data={rows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>

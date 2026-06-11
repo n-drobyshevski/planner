@@ -214,7 +214,12 @@ function SuggestionList({
           <span className="tabular-nums">
             {dismissedCount} dismissed
           </span>
-          <Button variant="ghost" size="sm" onClick={() => persist([])}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-11 sm:min-h-7"
+            onClick={() => persist([])}
+          >
             Restore dismissed
           </Button>
         </div>

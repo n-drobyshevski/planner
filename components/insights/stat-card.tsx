@@ -1,5 +1,6 @@
 "use client";
 
+import { TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Delta } from "@/lib/analytics/trends";
 
@@ -55,26 +56,47 @@ export function StatCard({
   delta,
   hint,
   warning = false,
+  emphasis = false,
+  className,
 }: {
   label: string;
   value: string;
   delta?: Delta;
   hint?: string;
-  /** tint the value for attention (e.g. overdue count > 0) */
+  /** icon + tint the value for attention (e.g. overdue count > 0) */
   warning?: boolean;
+  /** the tab's lead metric — bigger value, slightly roomier card */
+  emphasis?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="rounded-lg border bg-card p-2.5 shadow-soft">
+    <div
+      className={cn(
+        "rounded-lg border bg-card shadow-soft",
+        emphasis ? "p-3" : "p-2.5",
+        className,
+      )}
+    >
       <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </div>
       <div className="mt-0.5 flex items-baseline gap-1.5">
         <span
           className={cn(
-            "text-base leading-tight font-semibold tabular-nums",
+            "leading-tight font-semibold tabular-nums",
+            emphasis ? "text-2xl" : "text-base",
             warning && "text-destructive",
           )}
         >
+          {warning && (
+            <>
+              <TriangleAlert
+                aria-hidden
+                className="mr-1 inline size-3.5 align-[-0.125em]"
+              />
+              <span className="sr-only">needs attention: </span>
+            </>
+          )}
           {value}
         </span>
         {delta && <DeltaBadge delta={delta} />}

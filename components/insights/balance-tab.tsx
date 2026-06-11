@@ -16,7 +16,7 @@ import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import { InsightsEmpty } from "./insights-empty";
 import { NEUTRAL, bucketLabel, bucketTick, seriesMeta } from "./series";
-import { SectionLabel, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function BalanceTab({ data }: { data: InsightsTabData }) {
@@ -42,7 +42,13 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
     () => shares.reduce((s, r) => s + r.ms, 0),
     [shares],
   );
-  if (total === 0) return <InsightsEmpty />;
+  if (total === 0)
+    return (
+      <InsightsEmpty
+        title="Nothing to compare"
+        description="Context and member balance appear once this period has tracked time."
+      />
+    );
 
   const stackedRows = stacked.rows.map((r) => ({
     key: String(r.start),
@@ -113,7 +119,7 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
         <SectionLabel>Context mix per {granularity}</SectionLabel>
         <ChartContainer
           config={stackedConfig}
-          className="aspect-auto h-[220px] w-full"
+          className={`aspect-auto ${CHART_H.standard} w-full`}
           aria-label={`Stacked tracked time per context per ${granularity}, ${period.label}`}
         >
           <BarChart data={stackedRows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
@@ -216,10 +222,10 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
 
       {showMembers && memberSplit.memberIds.length > 1 && (
         <section className="space-y-1.5">
-          <SectionLabel>Who tracked it</SectionLabel>
+          <SectionLabel>Who tracked it, per {granularity}</SectionLabel>
           <ChartContainer
             config={memberConfig}
-            className="aspect-auto h-[180px] w-full"
+            className={`aspect-auto ${CHART_H.compact} w-full`}
             aria-label={`Tracked time per member per ${granularity}`}
           >
             <BarChart

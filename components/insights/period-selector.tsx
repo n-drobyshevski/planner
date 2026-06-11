@@ -49,8 +49,11 @@ export function PeriodSelector({
     }
   }
 
+  // A fragment, not a wrapper: the children are flex items of the toolbar
+  // header itself, so on phones the custom from/to pair can wrap onto its own
+  // full-width header row instead of overflowing the first one.
   return (
-    <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+    <>
       <Select value={state.preset} onValueChange={(v) => changePreset(v as PeriodPreset)}>
         <SelectTrigger size="sm" aria-label="Period" className="w-[8.5rem] shrink-0">
           <SelectValue />
@@ -65,7 +68,7 @@ export function PeriodSelector({
       </Select>
 
       {state.preset === "custom" ? (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 max-sm:order-last max-sm:basis-full">
           <DatePicker
             aria-label="From"
             value={state.customFrom != null ? msToDateInput(state.customFrom, timeZone) : ""}
@@ -87,10 +90,10 @@ export function PeriodSelector({
           />
         </div>
       ) : (
-        <span className="hidden truncate text-sm text-muted-foreground lg:inline">
+        <span className="hidden min-w-0 truncate text-sm text-muted-foreground sm:block md:hidden lg:block">
           {period.label.split(" · ")[1] ?? period.label}
         </span>
       )}
-    </div>
+    </>
   );
 }

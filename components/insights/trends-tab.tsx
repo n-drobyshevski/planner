@@ -15,7 +15,7 @@ import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { InsightsEmpty } from "./insights-empty";
 import { bucketLabel, bucketTick, seriesMeta } from "./series";
-import { SectionLabel, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function TrendsTab({ data }: { data: InsightsTabData }) {
@@ -69,7 +69,13 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
     return totals;
   }, [catTrend]);
 
-  if (total === 0) return <InsightsEmpty />;
+  if (total === 0)
+    return (
+      <InsightsEmpty
+        title="Nothing to chart over time"
+        description="Timed events in this period will appear here as a trend across days, weeks, or months."
+      />
+    );
 
   const totalConfig: ChartConfig = {
     ms: { label: "Tracked", color: "var(--chart-1)" },
@@ -99,7 +105,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         <SectionLabel>Tracked time per {granularity}</SectionLabel>
         <ChartContainer
           config={totalConfig}
-          className="aspect-auto h-[200px] w-full"
+          className={`aspect-auto ${CHART_H.standard} w-full`}
           aria-label={`Tracked time per ${granularity}, ${period.label}`}
         >
           <ComposedChart data={rows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
@@ -167,7 +173,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           <SectionLabel>By context over time</SectionLabel>
           <ChartContainer
             config={catConfig}
-            className="aspect-auto h-[220px] w-full"
+            className={`aspect-auto ${CHART_H.standard} w-full`}
             aria-label={`Tracked time per context per ${granularity}, top ${Math.min(5, catTrend.seriesKeys.length)} contexts`}
           >
             <LineChart data={catRows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>

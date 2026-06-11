@@ -28,7 +28,7 @@ import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
 import { InsightsEmpty } from "./insights-empty";
 import { NEUTRAL, seriesMeta } from "./series";
-import { SectionLabel, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /** Categories shown individually in the donut before collapsing into "Other". */
@@ -112,6 +112,8 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
           label="Total"
           value={formatDuration(total)}
           delta={delta(total, prevUsage.summary.totalMs)}
+          emphasis
+          className="col-span-2"
         />
         <StatCard
           label="Daily avg"
@@ -171,7 +173,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
             <SectionLabel>Per day</SectionLabel>
             <ChartContainer
               config={perDayConfig}
-              className="aspect-auto h-[180px] w-full"
+              className={`aspect-auto ${CHART_H.compact} w-full`}
               aria-label={`Tracked time per day, ${period.label}`}
             >
               <ComposedChart
@@ -238,7 +240,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
 
           <section className="space-y-2">
             <SectionLabel>By context</SectionLabel>
-            <div className="flex flex-col items-start gap-4 sm:flex-row">
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
               <div className="relative mx-auto h-[170px] w-[170px] shrink-0 sm:mx-0">
                 <ChartContainer
                   config={{}}

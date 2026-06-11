@@ -101,7 +101,13 @@ export function HourHeatmap({
                     key={h}
                     aria-label={`${WEEKDAYS_FULL[w]} ${String(h).padStart(2, "0")}:00 — ${ms > 0 ? formatDuration(ms) : "nothing"}`}
                     title={`${WEEKDAYS_FULL[w]} ${String(h).padStart(2, "0")}:00 — ${formatDuration(ms)}`}
-                    className={cn("h-4 rounded-[2px]", stepOf(ms) === 0 && "bg-muted/50")}
+                    className={cn(
+                      "h-4 rounded-[2px]",
+                      stepOf(ms) === 0 && "bg-muted/50",
+                      // a slightly wider seam every 6 hours so a cell's hour
+                      // can be read against the 00/06/12/18 header ticks
+                      h % 6 === 0 && h > 0 && "border-l-2 border-l-transparent bg-clip-padding",
+                    )}
                     style={cellStyle(stepOf(ms))}
                   />
                 );

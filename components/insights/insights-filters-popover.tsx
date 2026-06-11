@@ -31,6 +31,8 @@ interface FiltersProps {
   onHiddenCategoryIdsChange: (ids: Set<string>) => void;
   includeInactive: boolean;
   onIncludeInactiveChange: (v: boolean) => void;
+  /** true on the Sleep tab, where these filters deliberately have no effect */
+  filtersInert?: boolean;
 }
 
 /**
@@ -48,11 +50,19 @@ export function InsightsFiltersPopover(props: FiltersProps) {
     (props.includeInactive ? 1 : 0);
 
   const trigger = (
-    <Button variant="outline" size="sm" aria-label="Filters">
+    <Button
+      variant="outline"
+      size="sm"
+      aria-label="Filters"
+      className="min-h-11 sm:min-h-7"
+    >
       <SlidersHorizontal data-icon="inline-start" />
       <span className="hidden sm:inline">Filters</span>
       {activeCount > 0 && (
-        <Badge variant="secondary" className="ml-0.5 px-1.5 tabular-nums">
+        <Badge
+          variant={props.filtersInert ? "outline" : "secondary"}
+          className="ml-0.5 px-1.5 tabular-nums"
+        >
           {activeCount}
         </Badge>
       )}
@@ -97,6 +107,7 @@ function FiltersForm({
   onHiddenCategoryIdsChange,
   includeInactive,
   onIncludeInactiveChange,
+  filtersInert = false,
 }: FiltersProps) {
   function toggleCategory(id: string, visible: boolean) {
     const next = new Set(hiddenCategoryIds);
@@ -107,6 +118,12 @@ function FiltersForm({
 
   return (
     <div className="space-y-4">
+      {filtersInert && (
+        <p className="rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">
+          Sleep shows only your own nights, so these filters don&apos;t apply
+          there. They still shape the other tabs.
+        </p>
+      )}
       {members.length > 1 && (
         <fieldset className="space-y-1.5">
           <legend className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -119,6 +136,7 @@ function FiltersForm({
             variant="outline"
             size="sm"
             className="w-full"
+            disabled={filtersInert}
           >
             <ToggleGroupItem value="me" className="flex-1">
               Me

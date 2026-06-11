@@ -12,19 +12,26 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 
-/** Shown when the selected period has no tracked time at all. */
-export function InsightsEmpty() {
+/**
+ * Shown when the selected period has no tracked time. Tabs can override the
+ * copy to say what *they* would show; the calendar CTA stays — scheduling
+ * something is the fix in every case.
+ */
+export function InsightsEmpty({
+  title = "No tracked time in this period",
+  description = "Insights count timed events from your calendar. Schedule something in this range — or pick a different period — to see where your time goes.",
+}: {
+  title?: string;
+  description?: string;
+}) {
   return (
     <Empty className="border-0">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <ChartColumnBig />
         </EmptyMedia>
-        <EmptyTitle>No tracked time in this period</EmptyTitle>
-        <EmptyDescription>
-          Insights count timed events from your calendar. Schedule something in
-          this range — or pick a different period — to see where your time goes.
-        </EmptyDescription>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button variant="outline" size="sm" asChild>
