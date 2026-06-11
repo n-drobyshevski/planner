@@ -71,8 +71,6 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       full: formatWeekdayDayMonth(d.dayMs, timeZone),
     }));
   }, [usage.perDay, timeZone]);
-  const tickInterval =
-    period.days.length <= 14 ? 0 : Math.ceil(period.days.length / 7) - 1;
 
   const donutData = useMemo(() => {
     const rows = usage.byCategory.map((c) => {
@@ -185,8 +183,8 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
                   tickLine={false}
                   axisLine={false}
                   tickMargin={6}
-                  minTickGap={8}
-                  interval={tickInterval}
+                  minTickGap={24}
+                  interval="preserveStartEnd"
                   tickFormatter={(value: string) =>
                     format(Number(value), "d", { in: ctx })
                   }

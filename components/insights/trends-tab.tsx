@@ -89,8 +89,6 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
       return [k, { label: meta.name, color: meta.color }];
     }),
   );
-  const tickInterval =
-    period.buckets.length <= 14 ? 0 : Math.ceil(period.buckets.length / 7) - 1;
 
   const busiest = rows.reduce((a, b) => (b.ms > a.ms ? b : a), rows[0]);
 
@@ -114,8 +112,8 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
               tickLine={false}
               axisLine={false}
               tickMargin={6}
-              minTickGap={8}
-              interval={tickInterval}
+              minTickGap={24}
+              interval="preserveStartEnd"
               tickFormatter={(v: string) => bucketTick(Number(v), granularity, timeZone)}
             />
             <YAxis hide domain={[0, "dataMax"]} />
@@ -182,8 +180,8 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                 tickLine={false}
                 axisLine={false}
                 tickMargin={6}
-                minTickGap={8}
-                interval={tickInterval}
+                minTickGap={24}
+                interval="preserveStartEnd"
                 tickFormatter={(v: string) =>
                   bucketTick(Number(v), granularity, timeZone)
                 }
