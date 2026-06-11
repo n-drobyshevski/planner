@@ -175,7 +175,9 @@ export function TasksShell({
   }, [error]);
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    // SurfaceChrome (the (surfaces) layout) owns the h-dvh frame + header; the
+    // shell fills the content area below it.
+    <div className="flex h-full flex-col">
       <TasksToolbar
         view={view}
         onViewChange={changeView}

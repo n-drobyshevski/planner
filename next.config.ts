@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
   // (per-user appearance is applied client-side from a cookie), so the shell —
   // app chrome — can prerender even on auth-gated routes.
   cacheComponents: true,
+  // "/" → /calendar at the routing layer (was app/page.tsx calling redirect()),
+  // so the home route costs no render. Not permanent: the default surface may
+  // change, and 308s get cached by browsers. Middleware still sends
+  // unauthenticated users to /login first.
+  async redirects() {
+    return [{ source: "/", destination: "/calendar", permanent: false }];
+  },
   // React Compiler (stable in Next 16) auto-memoizes the client tree, so the
   // heavy calendar/task components don't need hand-written React.memo/useCallback.
   // Next applies the Babel pass only to relevant files via an SWC pre-pass, so
