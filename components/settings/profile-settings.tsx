@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useForm } from "@tanstack/react-form";
+import { z } from "zod";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -122,33 +124,41 @@ function NameField({
   initial: string;
   onSave: (name: string) => Promise<boolean>;
 }) {
-  const [name, setName] = React.useState(initial);
-  const [pending, setPending] = React.useState(false);
-  const trimmed = name.trim();
-  const dirty = trimmed !== initial;
-
-  async function save() {
-    if (!dirty || !trimmed) return;
-    setPending(true);
-    try {
+  const form = useForm({
+    defaultValues: { name: initial },
+    onSubmit: async ({ value }) => {
+      const trimmed = value.name.trim();
+      if (trimmed === initial || !trimmed) return;
       await onSave(trimmed);
-    } finally {
-      setPending(false);
-    }
-  }
+    },
+  });
 
   return (
     <div className="flex max-w-md gap-2">
-      <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && save()}
-        placeholder="Your name"
-        aria-label="Display name"
-      />
-      <Button onClick={save} disabled={pending || !dirty || !trimmed}>
-        Save
-      </Button>
+      <form.Field name="name">
+        {(field) => (
+          <Input
+            value={field.state.value}
+            onChange={(e) => field.handleChange(e.target.value)}
+            onBlur={field.handleBlur}
+            onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
+            placeholder="Your name"
+            aria-label="Display name"
+          />
+        )}
+      </form.Field>
+      <form.Subscribe
+        selector={(s) => [s.isSubmitting, s.values.name.trim()] as const}
+      >
+        {([isSubmitting, trimmed]) => (
+          <Button
+            onClick={() => void form.handleSubmit()}
+            disabled={isSubmitting || trimmed === initial || !trimmed}
+          >
+            Save
+          </Button>
+        )}
+      </form.Subscribe>
     </div>
   );
 }
@@ -251,6 +261,26 @@ function PinDialog({
   );
 }
 
+/** New/confirm coupling lives in the schema; PIN lengths gate the button. */
+function pinFormSchema(mode: PinMode) {
+  const needsNew = mode === "set" || mode === "change";
+  return z
+    .object({
+      current: z.string(),
+      next: z.string(),
+      confirm: z.string(),
+    })
+    .superRefine((v, ctx) => {
+      if (needsNew && v.next !== v.confirm) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["confirm"],
+          message: "PINs don't match.",
+        });
+      }
+    });
+}
+
 function PinForm({
   mode,
   verifyCurrentPin,
@@ -265,66 +295,102 @@ function PinForm({
   const needsCurrent = mode === "change" || mode === "remove";
   const needsNew = mode === "set" || mode === "change";
 
-  const [current, setCurrent] = React.useState("");
-  const [next, setNext] = React.useState("");
-  const [confirm, setConfirm] = React.useState("");
+  // Failures the schema can't know about (wrong current PIN, server error).
   const [error, setError] = React.useState<string | null>(null);
-  const [pending, setPending] = React.useState(false);
 
-  const canSubmit =
-    !pending &&
-    (!needsCurrent || current.length === 8) &&
-    (!needsNew || (next.length === 8 && confirm.length === 8));
-
-  async function submit() {
-    setError(null);
-    if (needsNew && next !== confirm) {
-      setError("PINs don't match.");
-      return;
-    }
-    setPending(true);
-    try {
-      if (needsCurrent && !(await verifyCurrentPin(current))) {
+  const form = useForm({
+    defaultValues: { current: "", next: "", confirm: "" },
+    validators: { onSubmit: pinFormSchema(mode) },
+    onSubmit: async ({ value }) => {
+      setError(null);
+      if (needsCurrent && !(await verifyCurrentPin(value.current))) {
         setError("Incorrect PIN.");
         return;
       }
-      const ok = await savePin(mode === "remove" ? null : next);
+      const ok = await savePin(mode === "remove" ? null : value.next);
       if (ok) onClose();
-    } finally {
-      setPending(false);
-    }
-  }
+    },
+  });
 
   return (
     <>
       <ResponsiveDialogBody className="flex flex-col items-center gap-5 py-3">
         {needsCurrent && (
-          <PinInput label="Current PIN" value={current} onChange={setCurrent} autoFocus />
+          <form.Field name="current">
+            {(field) => (
+              <PinInput
+                label="Current PIN"
+                value={field.state.value}
+                onChange={field.handleChange}
+                autoFocus
+              />
+            )}
+          </form.Field>
         )}
         {needsNew && (
           <>
-            <PinInput
-              label={mode === "change" ? "New PIN" : "New 8-digit PIN"}
-              value={next}
-              onChange={setNext}
-              autoFocus={!needsCurrent}
-            />
-            <PinInput label="Confirm PIN" value={confirm} onChange={setConfirm} />
+            <form.Field name="next">
+              {(field) => (
+                <PinInput
+                  label={mode === "change" ? "New PIN" : "New 8-digit PIN"}
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                  autoFocus={!needsCurrent}
+                />
+              )}
+            </form.Field>
+            <form.Field name="confirm">
+              {(field) => (
+                <PinInput
+                  label="Confirm PIN"
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                />
+              )}
+            </form.Field>
           </>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        <form.Subscribe selector={(s) => s.fieldMeta.confirm?.errors}>
+          {(errors) => {
+            const message = error ?? errors?.[0]?.message;
+            return message ? (
+              <p role="alert" className="text-sm text-destructive">
+                {message}
+              </p>
+            ) : null;
+          }}
+        </form.Subscribe>
       </ResponsiveDialogBody>
       <ResponsiveDialogFooter>
-        <Button variant="outline" onClick={onClose} disabled={pending}>
-          Cancel
-        </Button>
-        <Button
-          onClick={submit}
-          disabled={!canSubmit}
-          className={mode === "remove" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
+        <form.Subscribe
+          selector={(s) => [s.isSubmitting, s.values] as const}
         >
-          {pending ? "Saving…" : PIN_COPY[mode].submit}
-        </Button>
+          {([isSubmitting, values]) => {
+            const canSubmit =
+              !isSubmitting &&
+              (!needsCurrent || values.current.length === 8) &&
+              (!needsNew ||
+                (values.next.length === 8 && values.confirm.length === 8));
+            return (
+              <>
+                <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => void form.handleSubmit()}
+                  disabled={!canSubmit}
+                  className={
+                    mode === "remove"
+                      ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      : undefined
+                  }
+                >
+                  {isSubmitting ? "Saving…" : PIN_COPY[mode].submit}
+                </Button>
+              </>
+            );
+          }}
+        </form.Subscribe>
       </ResponsiveDialogFooter>
     </>
   );

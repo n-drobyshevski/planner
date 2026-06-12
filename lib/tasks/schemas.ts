@@ -92,13 +92,41 @@ export const taskFormSchema = z.object({
 });
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
 
+const boardNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Please name the board.")
+  .max(100, "Keep the name under 100 characters.");
+
 export const boardInputSchema = z.object({
   workspaceId: z.uuid(),
   ownerId: nullableUuid,
-  name: z.string().trim().min(1, "Please name the board.").max(100, "Keep the name under 100 characters."),
+  name: boardNameSchema,
   color: z.string().min(1),
   sortOrder: z.number().finite().optional(),
 });
+
+/**
+ * The schedule dialog's field shape. Durations/counts stay strings (select and
+ * number-input values); the submit handler converts and clamps them.
+ */
+export const scheduleTaskFormSchema = z.object({
+  date: z.iso.date("Pick a date."),
+  time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a start time."),
+  mode: z.enum(["single", "split", "subtasks"]),
+  duration: z.string().min(1),
+  totalDuration: z.string().min(1),
+  count: z.string(),
+});
+export type ScheduleTaskFormValues = z.infer<typeof scheduleTaskFormSchema>;
+
+/** The board dialog's field shape (create and edit share it). */
+export const boardFormSchema = z.object({
+  name: boardNameSchema,
+  color: z.string().min(1),
+  shared: z.boolean(),
+});
+export type BoardFormValues = z.infer<typeof boardFormSchema>;
 
 export const boardPatchSchema = boardInputSchema
   .pick({ name: true, color: true, sortOrder: true })

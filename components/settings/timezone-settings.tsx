@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useForm } from "@tanstack/react-form";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { Check, ChevronsUpDown, Globe } from "lucide-react";
@@ -210,7 +211,17 @@ export function TimezoneSettings() {
     suggestions.push({ zone: m.timezone, label: m.name });
   }
 
-  const secondaryOn = secondaryTimeZone != null;
+  // Instant apply: each field's onChange listener writes straight through the
+  // preference setter — no Save step. The reset below resyncs after external
+  // changes (initial load, another device); identical echoes no-op.
+  const form = useForm({
+    defaultValues: { primary: rawTimezone, secondary: secondaryTimeZone },
+  });
+
+  useEffect(() => {
+    form.reset({ primary: rawTimezone, secondary: secondaryTimeZone });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawTimezone, secondaryTimeZone]);
 
   return (
     <Card>
@@ -229,14 +240,21 @@ export function TimezoneSettings() {
             Event times, day boundaries, and the “now” line all render in this
             zone — even when you travel and your device clock changes.
           </FieldDescription>
-          <ZoneCombobox
-            value={rawTimezone}
-            onSelect={setTimezone}
-            deviceZone={deviceZone}
-            allowDevice
-            disabled={disabled}
-            ariaLabel="Your time zone"
-          />
+          <form.Field
+            name="primary"
+            listeners={{ onChange: ({ value }) => setTimezone(value) }}
+          >
+            {(field) => (
+              <ZoneCombobox
+                value={field.state.value}
+                onSelect={field.handleChange}
+                deviceZone={deviceZone}
+                allowDevice
+                disabled={disabled}
+                ariaLabel="Your time zone"
+              />
+            )}
+          </form.Field>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Globe className="size-3.5" />
             Currently <LiveZoneTime zone={timeZone} /> in {friendly(timeZone)}
@@ -245,44 +263,51 @@ export function TimezoneSettings() {
 
         {/* Secondary zone */}
         <FieldSet>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <FieldLegend variant="label">Secondary time zone</FieldLegend>
-              <FieldDescription>
-                Show a second clock alongside the primary in the week and day
-                views — handy for a partner in another zone.
-              </FieldDescription>
-            </div>
-            <Switch
-              checked={secondaryOn}
-              disabled={disabled}
-              aria-label="Show a secondary time zone"
-              onCheckedChange={(on) =>
-                setSecondaryTimezone(
-                  on ? (suggestions[0]?.zone ?? deviceZone ?? "UTC") : null,
-                )
-              }
-            />
-          </div>
-          {secondaryOn && (
-            <>
-              <ZoneCombobox
-                value={secondaryTimeZone}
-                onSelect={(z) => setSecondaryTimezone(z ?? null)}
-                deviceZone={deviceZone}
-                suggestions={suggestions}
-                disabled={disabled}
-                ariaLabel="Secondary time zone"
-              />
-              {secondaryTimeZone && (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Globe className="size-3.5" />
-                  Currently <LiveZoneTime zone={secondaryTimeZone} /> in{" "}
-                  {friendly(secondaryTimeZone)}
-                </p>
-              )}
-            </>
-          )}
+          <form.Field
+            name="secondary"
+            listeners={{ onChange: ({ value }) => setSecondaryTimezone(value) }}
+          >
+            {(field) => (
+              <>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <FieldLegend variant="label">Secondary time zone</FieldLegend>
+                    <FieldDescription>
+                      Show a second clock alongside the primary in the week and day
+                      views — handy for a partner in another zone.
+                    </FieldDescription>
+                  </div>
+                  <Switch
+                    checked={field.state.value != null}
+                    disabled={disabled}
+                    aria-label="Show a secondary time zone"
+                    onCheckedChange={(on) =>
+                      field.handleChange(
+                        on ? (suggestions[0]?.zone ?? deviceZone ?? "UTC") : null,
+                      )
+                    }
+                  />
+                </div>
+                {field.state.value != null && (
+                  <>
+                    <ZoneCombobox
+                      value={field.state.value}
+                      onSelect={(z) => field.handleChange(z ?? null)}
+                      deviceZone={deviceZone}
+                      suggestions={suggestions}
+                      disabled={disabled}
+                      ariaLabel="Secondary time zone"
+                    />
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Globe className="size-3.5" />
+                      Currently <LiveZoneTime zone={field.state.value} /> in{" "}
+                      {friendly(field.state.value)}
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </form.Field>
         </FieldSet>
       </CardContent>
     </Card>

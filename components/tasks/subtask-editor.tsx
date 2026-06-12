@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useForm } from "@tanstack/react-form";
 import {
   DndContext,
   KeyboardSensor,
@@ -63,7 +64,32 @@ export function SubtaskEditor({
   );
   const { done, total } = progressOf(ordered);
 
-  const [draft, setDraft] = useState("");
+  // The add-row is a tiny form of its own; the inline renames stay uncontrolled
+  // blur-commit inputs (SubtaskRow) where a form adds nothing. The body lives in
+  // a function declaration invoked at submit time (not render) so the React
+  // Compiler doesn't treat it — Date.now() included — as render-scoped.
+  const addForm = useForm({
+    defaultValues: { title: "" },
+    onSubmit: ({ value }) => addSubtask(value.title),
+  });
+
+  async function addSubtask(rawTitle: string) {
+    const title = rawTitle.trim();
+    if (!title) return;
+    const input: TaskInput = {
+      workspaceId,
+      ownerId: parent.ownerId,
+      parentId: parent.id,
+      boardId: parent.boardId,
+      assigneeId: parent.assigneeId,
+      categoryId: parent.categoryId,
+      title,
+      isPrivate: parent.isPrivate,
+      position: Date.now(),
+    };
+    addForm.reset();
+    void mutations.create(input);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -86,24 +112,6 @@ export function SubtaskEditor({
     void mutations.update(String(active.id), {
       position: positionBetween(before, after),
     });
-  }
-
-  function addSubtask() {
-    const title = draft.trim();
-    if (!title) return;
-    const input: TaskInput = {
-      workspaceId,
-      ownerId: parent.ownerId,
-      parentId: parent.id,
-      boardId: parent.boardId,
-      assigneeId: parent.assigneeId,
-      categoryId: parent.categoryId,
-      title,
-      isPrivate: parent.isPrivate,
-      position: Date.now(),
-    };
-    setDraft("");
-    void mutations.create(input);
   }
 
   return (
@@ -182,28 +190,36 @@ export function SubtaskEditor({
       )}
 
       <div className="flex items-center gap-2">
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addSubtask();
-            }
-          }}
-          placeholder="Add a subtask"
-          className="h-8"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addSubtask}
-          disabled={!draft.trim()}
-        >
-          <Plus data-icon="inline-start" />
-          Add
-        </Button>
+        <addForm.Field name="title">
+          {(field) => (
+            <Input
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void addForm.handleSubmit();
+                }
+              }}
+              placeholder="Add a subtask"
+              className="h-8"
+            />
+          )}
+        </addForm.Field>
+        <addForm.Subscribe selector={(s) => s.values.title}>
+          {(title) => (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void addForm.handleSubmit()}
+              disabled={!title.trim()}
+            >
+              <Plus data-icon="inline-start" />
+              Add
+            </Button>
+          )}
+        </addForm.Subscribe>
       </div>
     </div>
   );

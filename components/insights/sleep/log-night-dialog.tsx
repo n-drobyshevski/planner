@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useForm } from "@tanstack/react-form";
 import { NotebookPen, Trash2 } from "lucide-react";
 
 import {
@@ -61,9 +62,6 @@ export function LogNightDialog({
   onDelete: (date: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayKey);
-  const [draft, setDraft] = useState<SleepLogDraft>(EMPTY_DRAFT);
-  const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const notify = useNotify();
@@ -94,43 +92,42 @@ export function LogNightDialog({
     };
   }
 
+  const form = useForm({
+    defaultValues: { date: todayKey, draft: EMPTY_DRAFT },
+    onSubmit: async ({ value }) => {
+      try {
+        const { bedtimeAt, wokeAt } = draftToInstants(value.draft, value.date, timeZone);
+        await onSave({
+          date: value.date,
+          bedtimeAt,
+          wokeAt,
+          quality: value.draft.quality,
+          fatigue: value.draft.fatigue,
+          note: value.draft.note.trim() === "" ? null : value.draft.note.trim(),
+        });
+        notify.success("Night saved");
+        setOpen(false);
+      } catch {
+        /* the mutation hook already toasted; keep the dialog open to retry */
+      }
+    },
+  });
+
   function openDialog() {
-    setDate(todayKey);
-    setDraft(seedFor(todayKey));
+    form.reset({ date: todayKey, draft: seedFor(todayKey) });
     setOpen(true);
   }
 
   function pickDate(next: string) {
     if (next === "" || next > todayKey) return; // future mornings can't be logged
-    setDate(next);
-    setDraft(seedFor(next));
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      const { bedtimeAt, wokeAt } = draftToInstants(draft, date, timeZone);
-      await onSave({
-        date,
-        bedtimeAt,
-        wokeAt,
-        quality: draft.quality,
-        fatigue: draft.fatigue,
-        note: draft.note.trim() === "" ? null : draft.note.trim(),
-      });
-      notify.success("Night saved");
-      setOpen(false);
-    } catch {
-      /* the mutation hook already toasted; keep the dialog open to retry */
-    } finally {
-      setSaving(false);
-    }
+    form.setFieldValue("date", next);
+    form.setFieldValue("draft", seedFor(next));
   }
 
   async function confirmDelete() {
     setDeleting(true);
     try {
-      await onDelete(date);
+      await onDelete(form.state.values.date);
       notify.success("Night deleted");
       setConfirmingDelete(false);
       setOpen(false);
@@ -141,8 +138,6 @@ export function LogNightDialog({
       setDeleting(false);
     }
   }
-
-  const hasExistingLog = logByKey.has(date);
 
   return (
     <>
@@ -160,46 +155,66 @@ export function LogNightDialog({
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogBody className="space-y-4">
-            <Field>
-              <FieldLabel htmlFor="backfill-date">Morning of</FieldLabel>
-              <DatePicker
-                id="backfill-date"
-                value={date}
-                onChange={pickDate}
-                maxDate={todayKey}
-                aria-label="Wake date"
-              />
-              <FieldDescription>
-                The date you woke up. Future dates can&apos;t be logged.
-              </FieldDescription>
-            </Field>
-            <SleepLogFields draft={draft} onChange={setDraft} idPrefix="backfill" />
+            <form.Field name="date">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="backfill-date">Morning of</FieldLabel>
+                  <DatePicker
+                    id="backfill-date"
+                    value={field.state.value}
+                    onChange={pickDate}
+                    maxDate={todayKey}
+                    aria-label="Wake date"
+                  />
+                  <FieldDescription>
+                    The date you woke up. Future dates can&apos;t be logged.
+                  </FieldDescription>
+                </Field>
+              )}
+            </form.Field>
+            <form.Field name="draft">
+              {(field) => (
+                <SleepLogFields
+                  draft={field.state.value}
+                  onChange={field.handleChange}
+                  idPrefix="backfill"
+                />
+              )}
+            </form.Field>
           </ResponsiveDialogBody>
           <ResponsiveDialogFooter>
-            {/* The button text swaps aren't announced; this region is. */}
-            <span aria-live="polite" className="sr-only">
-              {saving ? "Saving the night" : deleting ? "Deleting the night" : ""}
-            </span>
-            {hasExistingLog && (
-              <Button
-                variant="ghost"
-                className="text-destructive hover:text-destructive sm:mr-auto"
-                onClick={() => setConfirmingDelete(true)}
-                disabled={deleting}
-              >
-                <Trash2 data-icon="inline-start" />
-                Delete this night
-              </Button>
-            )}
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void save()}
-              disabled={saving || !draftHasContent(draft)}
+            <form.Subscribe
+              selector={(s) => [s.isSubmitting, s.values.date, s.values.draft] as const}
             >
-              {saving ? "Saving…" : "Save night"}
-            </Button>
+              {([saving, date, draft]) => (
+                <>
+                  {/* The button text swaps aren't announced; this region is. */}
+                  <span aria-live="polite" className="sr-only">
+                    {saving ? "Saving the night" : deleting ? "Deleting the night" : ""}
+                  </span>
+                  {logByKey.has(date) && (
+                    <Button
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive sm:mr-auto"
+                      onClick={() => setConfirmingDelete(true)}
+                      disabled={deleting}
+                    >
+                      <Trash2 data-icon="inline-start" />
+                      Delete this night
+                    </Button>
+                  )}
+                  <Button variant="ghost" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => void form.handleSubmit()}
+                    disabled={saving || !draftHasContent(draft)}
+                  >
+                    {saving ? "Saving…" : "Save night"}
+                  </Button>
+                </>
+              )}
+            </form.Subscribe>
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
       </ResponsiveDialog>
@@ -208,8 +223,15 @@ export function LogNightDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this night’s log?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes your check-in for {date} — quality, fatigue, times
-              and note. Nights derived from your calendar are not affected.
+              <form.Subscribe selector={(s) => s.values.date}>
+                {(date) => (
+                  <>
+                    This removes your check-in for {date} — quality, fatigue,
+                    times and note. Nights derived from your calendar are not
+                    affected.
+                  </>
+                )}
+              </form.Subscribe>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
