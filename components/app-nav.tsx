@@ -43,7 +43,9 @@ export function AppNav() {
           aria-label={`Current surface: ${active.label}. Switch surface`}
         >
           <ActiveIcon className="size-4" />
-          <span>{active.label}</span>
+          {/* Phones: icon + chevron only — the header row is tight and the
+              aria-label already names the active surface. */}
+          <span className="hidden sm:inline">{active.label}</span>
           <ChevronDown
             data-icon="inline-end"
             className="size-4 text-muted-foreground"
