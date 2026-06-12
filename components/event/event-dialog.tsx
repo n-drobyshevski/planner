@@ -36,7 +36,8 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
-import { Lock, Eye, Trash2, Loader2, Users, ChevronDown, Plus } from "lucide-react";
+import { Lock, Eye, Trash2, Users, ChevronDown, Plus } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
@@ -776,7 +777,7 @@ export function EventDialog(props: EventDialogProps) {
                       </Button>
                       <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
                         {isSubmitting && (
-                          <Loader2 data-icon="inline-start" className="animate-spin" />
+                          <Spinner data-icon="inline-start" />
                         )}
                         {mode === "create" ? "Create" : "Save"}
                       </Button>

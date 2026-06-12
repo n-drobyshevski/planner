@@ -8,7 +8,7 @@ import { useIdlePreload } from "@/lib/lazy";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { m, AnimatePresence } from "motion/react";
 import { fade } from "@/lib/motion";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
@@ -195,7 +195,7 @@ export function TasksShell({
           <LoadError subject="tasks" onRetry={() => void qc.invalidateQueries()} />
         ) : loading ? (
           <Centered>
-            <Loader2 className="size-5 animate-spin" />
+            <Spinner className="size-5" />
           </Centered>
         ) : !activeBoard ? (
           <Centered>

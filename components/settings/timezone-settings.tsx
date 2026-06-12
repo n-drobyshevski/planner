@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
-import { Check, ChevronsUpDown, Globe } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,15 +15,18 @@ import {
 } from "@/components/ui/card";
 import { FieldSet, FieldLegend, FieldDescription } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from "@/components/ui/command";
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxLabel,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
 import { usePreferences } from "@/lib/hooks/use-preferences";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { localTimeZone } from "@/lib/datetime/local";
@@ -65,6 +67,16 @@ function LiveZoneTime({ zone }: { zone: string }) {
   );
 }
 
+/** One selectable zone; `hint` carries the secondary right-aligned text. */
+interface ZoneItem {
+  value: string;
+  label: string;
+  hint?: string;
+}
+
+/** Sentinel item value for "use the device's zone" (the stored value is null). */
+const DEVICE_VALUE = "__device__";
+
 function ZoneCombobox({
   value,
   onSelect,
@@ -83,7 +95,43 @@ function ZoneCombobox({
   disabled?: boolean;
   ariaLabel: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const groups = useMemo(() => {
+    const out: { label: string; items: ZoneItem[] }[] = [];
+    if (allowDevice) {
+      out.push({
+        label: "Default",
+        items: [
+          {
+            value: DEVICE_VALUE,
+            label: "Use device time zone",
+            hint: deviceZone ? friendly(deviceZone) : undefined,
+          },
+        ],
+      });
+    }
+    if (suggestions.length > 0) {
+      out.push({
+        label: "In your workspace",
+        items: suggestions.map((s) => ({
+          value: s.zone,
+          label: s.label,
+          hint: friendly(s.zone),
+        })),
+      });
+    }
+    out.push({
+      label: "All time zones",
+      items: ALL_ZONES.map((z) => ({ value: z, label: friendly(z) })),
+    });
+    return out;
+  }, [allowDevice, deviceZone, suggestions]);
+
+  // isItemEqualToValue compares by .value, so a synthesized item is fine here.
+  const selected: ZoneItem =
+    value != null
+      ? { value, label: friendly(value) }
+      : { value: DEVICE_VALUE, label: "Use device time zone" };
+
   const triggerLabel =
     value != null
       ? friendly(value)
@@ -92,95 +140,54 @@ function ZoneCombobox({
         : "Device time zone";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          aria-label={ariaLabel}
-          disabled={disabled}
-          className="w-full justify-between font-normal"
-        >
-          <span className="truncate">{triggerLabel}</span>
-          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-(--radix-popover-trigger-width) p-0"
-        align="start"
+    <Combobox
+      items={groups}
+      value={selected}
+      onValueChange={(item: ZoneItem | null) =>
+        onSelect(item == null || item.value === DEVICE_VALUE ? null : item.value)
+      }
+      isItemEqualToValue={(a: ZoneItem, b: ZoneItem) => a?.value === b?.value}
+      itemToStringLabel={(item: ZoneItem) => item.label}
+      disabled={disabled}
+    >
+      <ComboboxTrigger
+        aria-label={ariaLabel}
+        render={
+          <Button
+            variant="outline"
+            disabled={disabled}
+            className="w-full justify-between font-normal"
+          />
+        }
       >
-        <Command>
-          <CommandInput placeholder="Search time zones…" />
-          <CommandList>
-            <CommandEmpty>No time zone found.</CommandEmpty>
-            {allowDevice && (
-              <CommandGroup heading="Default">
-                <CommandItem
-                  value={`device ${deviceZone ?? ""}`}
-                  onSelect={() => {
-                    onSelect(null);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn("mr-2 size-4", value == null ? "opacity-100" : "opacity-0")}
-                  />
-                  <span className="flex-1">Use device time zone</span>
-                  {deviceZone && (
-                    <span className="text-xs text-muted-foreground">
-                      {friendly(deviceZone)}
-                    </span>
-                  )}
-                </CommandItem>
-              </CommandGroup>
-            )}
-            {suggestions.length > 0 && (
-              <CommandGroup heading="In your workspace">
-                {suggestions.map((s) => (
-                  <CommandItem
-                    key={s.zone}
-                    value={`${s.label} ${s.zone}`}
-                    onSelect={() => {
-                      onSelect(s.zone);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 size-4",
-                        value === s.zone ? "opacity-100" : "opacity-0",
-                      )}
-                    />
-                    <span className="flex-1 truncate">{s.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {friendly(s.zone)}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            <CommandGroup heading="All time zones">
-              {ALL_ZONES.map((z) => (
-                <CommandItem
-                  key={z}
-                  value={z}
-                  onSelect={() => {
-                    onSelect(z);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn("mr-2 size-4", value === z ? "opacity-100" : "opacity-0")}
-                  />
-                  {friendly(z)}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        <span className="truncate">{triggerLabel}</span>
+      </ComboboxTrigger>
+      <ComboboxContent>
+        <ComboboxInput
+          placeholder="Search time zones…"
+          showTrigger={false}
+          className="w-full"
+        />
+        <ComboboxEmpty>No time zone found.</ComboboxEmpty>
+        <ComboboxList>
+          {(group: { label: string; items: ZoneItem[] }) => (
+            <ComboboxGroup key={group.label} items={group.items}>
+              <ComboboxLabel>{group.label}</ComboboxLabel>
+              <ComboboxCollection>
+                {(item: ZoneItem) => (
+                  <ComboboxItem key={item.value} value={item}>
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {item.hint && (
+                      <span className="text-xs text-muted-foreground">{item.hint}</span>
+                    )}
+                  </ComboboxItem>
+                )}
+              </ComboboxCollection>
+            </ComboboxGroup>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
 

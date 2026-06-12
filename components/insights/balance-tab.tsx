@@ -10,6 +10,15 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { categoryShares, categoryByBucket, memberByBucket } from "@/lib/analytics/balance";
 import { MIN_CATEGORY_RATINGS, satisfactionByCategory } from "@/lib/analytics/correlations";
 import { formatDuration } from "@/lib/datetime/format";
@@ -162,30 +171,33 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
 
       <section className="space-y-1.5">
         <SectionLabel>Share shifts vs previous period</SectionLabel>
-        <table className="w-full text-xs">
-          <caption className="sr-only">
+        <Table className="text-xs">
+          <TableCaption className="sr-only">
             Context shares of tracked time, this period vs the previous one
-          </caption>
-          <thead>
-            <tr className="border-b text-left text-muted-foreground">
-              <th scope="col" className="py-1.5 font-medium">
+          </TableCaption>
+          <TableHeader>
+            <TableRow className="text-muted-foreground hover:bg-transparent">
+              <TableHead scope="col" className="h-auto px-0 py-1.5 text-muted-foreground">
                 Context
-              </th>
-              <th scope="col" className="py-1.5 text-right font-medium">
+              </TableHead>
+              <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                 Time
-              </th>
-              <th scope="col" className="py-1.5 text-right font-medium">
+              </TableHead>
+              <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                 Share
-              </th>
-              <th scope="col" className="hidden py-1.5 text-right font-medium sm:table-cell">
+              </TableHead>
+              <TableHead
+                scope="col"
+                className="hidden h-auto px-0 py-1.5 text-right text-muted-foreground sm:table-cell"
+              >
                 Prev
-              </th>
-              <th scope="col" className="py-1.5 text-right font-medium">
+              </TableHead>
+              <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                 Δ
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {shares.map((s) => {
               const meta = seriesMeta(
                 s.categoryId ?? "__uncategorized__",
@@ -193,26 +205,26 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
               );
               const pts = Math.round(s.deltaShare * 100);
               return (
-                <tr key={s.categoryId ?? "uncategorized"} className="border-b border-border/60">
-                  <td className="flex items-center gap-2 py-1.5">
+                <TableRow key={s.categoryId ?? "uncategorized"} className="border-border/60">
+                  <TableCell className="flex items-center gap-2 px-0 py-1.5">
                     <span
                       className="size-2.5 shrink-0 rounded-[3px]"
                       style={{ background: meta.color }}
                       aria-hidden
                     />
                     <span className="truncate">{meta.name}</span>
-                  </td>
-                  <td className="py-1.5 text-right font-mono tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
                     {formatDuration(s.ms)}
-                  </td>
-                  <td className="py-1.5 text-right font-mono tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
                     {Math.round(s.share * 100)}%
-                  </td>
-                  <td className="hidden py-1.5 text-right font-mono tabular-nums text-muted-foreground sm:table-cell">
+                  </TableCell>
+                  <TableCell className="hidden px-0 py-1.5 text-right font-mono tabular-nums text-muted-foreground sm:table-cell">
                     {Math.round(s.prevShare * 100)}%
-                  </td>
-                  <td
-                    className="py-1.5 text-right font-mono tabular-nums text-muted-foreground"
+                  </TableCell>
+                  <TableCell
+                    className="px-0 py-1.5 text-right font-mono tabular-nums text-muted-foreground"
                     aria-label={
                       pts === 0
                         ? "no change"
@@ -223,12 +235,12 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
                       {pts > 0 ? "▲" : pts < 0 ? "▼" : "–"}{" "}
                       {pts === 0 ? "" : `${Math.abs(pts)} pts`}
                     </span>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </section>
 
       {data.workspaceId && data.viewerId && (

@@ -1,5 +1,6 @@
 "use client";
 
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -60,16 +61,11 @@ const GROUPS: { title: string; items: { label: string; keys: string[] }[] }[] = 
 
 function Combo({ keys }: { keys: string[] }) {
   return (
-    <span className="flex shrink-0 items-center gap-1">
+    <KbdGroup className="shrink-0">
       {keys.map((k, i) => (
-        <kbd
-          key={i}
-          className="inline-flex min-w-6 items-center justify-center rounded-md border bg-muted px-1.5 py-0.5 text-[0.7rem] leading-none font-medium text-foreground shadow-soft"
-        >
-          {k}
-        </kbd>
+        <Kbd key={i}>{k}</Kbd>
       ))}
-    </span>
+    </KbdGroup>
   );
 }
 

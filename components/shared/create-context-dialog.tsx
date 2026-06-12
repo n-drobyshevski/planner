@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
-import { Users, User, Loader2 } from "lucide-react";
+import { Users, User } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveDialog,
@@ -180,7 +181,7 @@ export function CreateContextDialog({
                   disabled={isSubmitting || !name.trim()}
                 >
                   {isSubmitting && (
-                    <Loader2 data-icon="inline-start" className="animate-spin" />
+                    <Spinner data-icon="inline-start" />
                   )}
                   Add context
                 </Button>

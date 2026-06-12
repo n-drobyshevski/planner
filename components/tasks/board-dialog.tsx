@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
-import { Users, User, Loader2 } from "lucide-react";
+import { Users, User } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -206,7 +207,7 @@ export function BoardDialog({
                   disabled={isSubmitting || !name.trim()}
                 >
                   {isSubmitting && (
-                    <Loader2 data-icon="inline-start" className="animate-spin" />
+                    <Spinner data-icon="inline-start" />
                   )}
                   {mode === "create" ? "Add board" : "Save"}
                 </Button>

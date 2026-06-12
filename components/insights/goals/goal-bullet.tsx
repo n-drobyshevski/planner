@@ -1,5 +1,6 @@
 "use client";
 
+import { Progress } from "@/components/ui/progress";
 import { formatDuration } from "@/lib/datetime/format";
 import type { GoalProgress } from "@/lib/insights/goals";
 import { cn } from "@/lib/utils";
@@ -49,23 +50,26 @@ export function GoalBullet({
         aria-hidden
       />
       <span className="w-28 min-w-0 truncate sm:w-36">{name}</span>
-      <span
-        role="img"
-        aria-label={srLabel}
-        className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
-      >
-        <span
-          className="absolute inset-y-0 left-0 rounded-full"
-          style={{ width: `${fillPct}%`, background: color }}
+      {/* Progress draws the track + fill (and a real progressbar role); the
+          bullet-specific target tick and pace marker overlay it, so they sit
+          in a relative wrapper rather than inside the clipped track. */}
+      <span className="relative min-w-0 flex-1">
+        <Progress
+          value={fillPct}
+          aria-label={srLabel}
+          className="h-2 rounded-full *:data-[slot=progress-indicator]:rounded-full *:data-[slot=progress-indicator]:bg-(--bullet-color)"
+          style={{ "--bullet-color": color } as React.CSSProperties}
         />
         {/* target tick */}
         <span
+          aria-hidden
           className="absolute inset-y-0 w-0.5 bg-foreground/60"
           style={{ left: `calc(${targetPct}% - 1px)` }}
         />
         {/* pace marker (mid-window only) */}
         {pacePct !== null && (
           <span
+            aria-hidden
             className="absolute inset-y-0 w-px bg-foreground/30"
             style={{ left: `${pacePct}%` }}
           />
