@@ -8,17 +8,31 @@ import {
   type SleepPrefs,
   wakesForBedtime,
 } from "@/lib/sleep/cycles";
+import type { HabitualPhase } from "@/lib/sleep/circadian";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
+const UTC = "UTC";
 /** Monday 2026-06-01 00:00 UTC — arbitrary anchor; cycles math is zone-free. */
 const T0 = Date.UTC(2026, 5, 1);
 
 const PREFS: SleepPrefs = {
   cycleLengthMin: 90,
   onsetLatencyMin: 15,
-  targetCycles: 5,
+  targetCycles: 5, // asleep target 5×90 = 450 min (7.5 h)
 };
+
+/** minutes since previous noon for a wall hour:min (≥12 = evening, else morning). */
+const sinceNoon = (h: number, m = 0) => (h >= 12 ? (h - 12) * 60 + m : (h + 12) * 60 + m);
+
+function phase(bedH: number, bedM: number, wakeH: number | null, wakeM = 0): HabitualPhase {
+  return {
+    bedtimeMinSinceNoon: sinceNoon(bedH, bedM),
+    wakeMinSinceNoon: wakeH === null ? null : sinceNoon(wakeH, wakeM),
+    spreadMin: 20,
+    nights: 14,
+  };
+}
 
 describe("bedtimesForWake", () => {
   it("computes bedtime = wake − latency − N×cycle for N = 4..6", () => {
@@ -68,100 +82,108 @@ describe("wakesForBedtime", () => {
 });
 
 describe("recommendTonight", () => {
-  const eventStart = T0 + 9 * HOUR; // 09:00 tomorrow
+  // Tomorrow's wake day is 2026-06-02; the night before is 2026-06-01.
+  const D2 = (h: number, m = 0) => Date.UTC(2026, 5, 2, h, m);
+  const D1 = (h: number, m = 0) => Date.UTC(2026, 5, 1, h, m);
+  const nightBefore = D1(21); // 21:00 the evening before
 
-  it("wakes GET_READY_MS before the first event and recommends targetCycles", () => {
+  it("cold start (no habitual phase) reproduces schedule-only behavior", () => {
     const out = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
+      tomorrowFirstEventStart: D2(7),
       prefs: PREFS,
-      now: T0 - 3 * HOUR, // 21:00 the night before
-    });
-    expect(out.wakeMs).toBe(eventStart - GET_READY_MS);
-    expect(out.options.map((o) => o.cycles)).toEqual([6, 5, 4]);
-    expect(out.recommended.cycles).toBe(5);
-    expect(out.recommended.bedtimeMs).toBe(
-      out.wakeMs - 15 * MIN - 5 * 90 * MIN,
-    );
+      habitualPhase: null,
+      now: nightBefore,
+      timeZone: UTC,
+    })!;
+    expect(out.wakeWindow.end).toBe(D2(7) - GET_READY_MS); // 06:15
+    expect(out.bedtimeMs).toBe(D2(7) - GET_READY_MS - 15 * MIN - 450 * MIN); // 22:30
+    expect(out.durationMs).toBe(450 * MIN);
+    expect(out.cyclesApprox).toBe(5);
+    expect(out.conflict).toBeNull();
+    expect(out.source).toBe("schedule");
   });
 
-  it("clamps targetCycles into the offered 4..6 range", () => {
-    const low = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
-      prefs: { ...PREFS, targetCycles: 3 },
-      now: T0 - 3 * HOUR,
-    });
-    expect(low.recommended.cycles).toBe(4);
-    const high = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
-      prefs: { ...PREFS, targetCycles: 7 },
-      now: T0 - 3 * HOUR,
-    });
-    expect(high.recommended.cycles).toBe(6);
+  it("holds the bedtime at the phase-advance limit when an early event fights the clock", () => {
+    // Body sleeps ~00:45; a 07:00 event wants bed at 22:30 — a >2 h advance.
+    const out = recommendTonight({
+      tomorrowFirstEventStart: D2(7),
+      prefs: PREFS,
+      habitualPhase: phase(0, 45, 8, 0),
+      now: nightBefore,
+      timeZone: UTC,
+    })!;
+    expect(out.bedtimeMs).toBe(D2(0, 15)); // habitual 00:45 − 30 min cap
+    expect(out.conflict).not.toBeNull();
+    expect(out.conflict!.scheduleBedtimeMs).toBe(D1(22, 30));
+    expect(out.conflict!.habitualBedtimeMs).toBe(D2(0, 45));
+    expect(out.conflict!.shortfallMs).toBe(105 * MIN); // 450 target − 345 achievable
+    expect(out.conflict!.glideNights).toBe(5); // ceil(135 / 30)
+    expect(out.source).toBe("schedule");
   });
 
-  it("flags tooLate when the recommended bedtime has already passed", () => {
-    const base = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
+  it("wakes at the habitual time and recommends the habitual bedtime when the event is late", () => {
+    // Event 10:00 doesn't force an early wake; body wakes 07:00, sleeps 23:00.
+    const out = recommendTonight({
+      tomorrowFirstEventStart: D2(10),
       prefs: PREFS,
-      now: T0 - 3 * HOUR,
-    });
-    const bedtime = base.recommended.bedtimeMs;
-    // exactly at the bedtime → not yet too late (half-open spirit)
+      habitualPhase: phase(23, 0, 7, 0),
+      now: nightBefore,
+      timeZone: UTC,
+    })!;
+    expect(out.wakeWindow.end).toBe(D2(7)); // habitual wake, not event − getready
+    expect(out.bedtimeMs).toBe(D1(23)); // habitual bedtime, regularity-first
+    expect(out.conflict).toBeNull();
+    expect(out.source).toBe("circadian");
+  });
+
+  it("recommends the habitual phase when there is no commitment tomorrow", () => {
+    const out = recommendTonight({
+      tomorrowFirstEventStart: null,
+      prefs: PREFS,
+      habitualPhase: phase(23, 0, 7, 0),
+      now: nightBefore,
+      timeZone: UTC,
+    })!;
+    expect(out.bedtimeMs).toBe(D1(23));
+    expect(out.wakeWindow.end).toBe(D2(7));
+    expect(out.source).toBe("circadian");
+    expect(out.conflict).toBeNull();
+  });
+
+  it("returns null with no commitment and no habitual phase", () => {
     expect(
       recommendTonight({
-        tomorrowFirstEventStart: eventStart,
+        tomorrowFirstEventStart: null,
         prefs: PREFS,
-        now: bedtime,
-      }).tooLate,
-    ).toBe(false);
-    expect(
-      recommendTonight({
-        tomorrowFirstEventStart: eventStart,
-        prefs: PREFS,
-        now: bedtime + MIN,
-      }).tooLate,
-    ).toBe(true);
+        habitualPhase: null,
+        now: nightBefore,
+        timeZone: UTC,
+      }),
+    ).toBeNull();
   });
 
-  it("offers the best still-feasible option once the recommended one passed", () => {
-    const base = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
-      prefs: PREFS,
-      now: T0 - 3 * HOUR,
-    });
-    // Just past the 5-cycle bedtime → 4 cycles is the best that still fits.
+  it("nudges the target up by recent debt, bounded by the nudge cap", () => {
     const out = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
+      tomorrowFirstEventStart: D2(9),
       prefs: PREFS,
-      now: base.recommended.bedtimeMs + MIN,
-    });
-    expect(out.tooLate).toBe(true);
-    expect(out.bestFeasible?.cycles).toBe(4);
+      habitualPhase: null,
+      recentDebtMs: 5 * HOUR, // far over the cap
+      now: nightBefore,
+      timeZone: UTC,
+    })!;
+    // 450 base + 60 cap = 510 min asleep target.
+    expect(out.durationMs).toBe(510 * MIN);
   });
 
-  it("reports cycles-from-now when every option has passed", () => {
-    const base = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
+  it("flags tooLate once now is past the recommended bedtime", () => {
+    const args = {
+      tomorrowFirstEventStart: D2(7),
       prefs: PREFS,
-      now: T0 - 3 * HOUR,
-    });
-    const lastBedtime = base.options[base.options.length - 1].bedtimeMs; // 4 cycles
-    // 1 minute past the latest option: 4×90 no longer fits, 3 full ones do.
-    const out = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
-      prefs: PREFS,
-      now: lastBedtime + MIN,
-    });
-    expect(out.tooLate).toBe(true);
-    expect(out.bestFeasible).toBeNull();
-    expect(out.cyclesFromNow).toBe(3);
-
-    // So close to wake that not even one cycle fits.
-    const veryLate = recommendTonight({
-      tomorrowFirstEventStart: eventStart,
-      prefs: PREFS,
-      now: base.wakeMs - 30 * MIN,
-    });
-    expect(veryLate.cyclesFromNow).toBe(0);
+      habitualPhase: null,
+      timeZone: UTC,
+    };
+    const bed = recommendTonight({ ...args, now: nightBefore })!.bedtimeMs;
+    expect(recommendTonight({ ...args, now: bed })!.tooLate).toBe(false);
+    expect(recommendTonight({ ...args, now: bed + MIN })!.tooLate).toBe(true);
   });
 });

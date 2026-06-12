@@ -1,28 +1,28 @@
 "use client";
 
 import { useMemo } from "react";
-import { BadgeCheck, MoonStar } from "lucide-react";
+import { CircleAlert, MoonStar, Sunrise } from "lucide-react";
 
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
 import { dayStartOffset } from "@/lib/datetime/local";
 import { formatDuration, formatTime } from "@/lib/datetime/format";
-import {
-  recommendTonight,
-  type CycleOption,
-  type SleepPrefs,
-} from "@/lib/sleep/cycles";
+import { recommendTonight, type SleepPrefs } from "@/lib/sleep/cycles";
+import type { HabitualPhase } from "@/lib/sleep/circadian";
 
 /**
- * Bedtime options for tonight, anchored to tomorrow's first commitment.
- * Fetches its own 1-day window (day-aligned → stable query key; realtime
- * updates ride the existing events-key predicate) so the card works whatever
- * period the rest of the tab is showing.
+ * Tonight's single safe bedtime + wake window, anchored to tomorrow's first
+ * commitment AND the viewer's habitual circadian phase. Fetches its own 1-day
+ * window (day-aligned → stable query key) so it works whatever period the rest
+ * of the tab shows; the habitual phase and recent debt are passed in from the
+ * tab (computed once from the trailing-30-day history).
  */
 export function TonightCard({
   workspaceId,
   viewerId,
   sharedCategoryIds,
   prefs,
+  habitualPhase,
+  recentDebtMs,
   timeZone,
   now,
 }: {
@@ -30,6 +30,8 @@ export function TonightCard({
   viewerId: string;
   sharedCategoryIds: ReadonlySet<string>;
   prefs: SleepPrefs;
+  habitualPhase: HabitualPhase | null;
+  recentDebtMs: number;
   timeZone: string;
   now: number;
 }) {
@@ -58,10 +60,15 @@ export function TonightCard({
 
   const rec = useMemo(
     () =>
-      firstEvent
-        ? recommendTonight({ tomorrowFirstEventStart: firstEvent.start, prefs, now })
-        : null,
-    [firstEvent, prefs, now],
+      recommendTonight({
+        tomorrowFirstEventStart: firstEvent?.start ?? null,
+        prefs,
+        habitualPhase,
+        recentDebtMs,
+        now,
+        timeZone,
+      }),
+    [firstEvent, prefs, habitualPhase, recentDebtMs, now, timeZone],
   );
 
   return (
@@ -70,83 +77,83 @@ export function TonightCard({
         <MoonStar aria-hidden className="size-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">Tonight</h3>
       </div>
-      {rec && firstEvent ? (
+
+      {rec === null ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          No commitment tomorrow yet. Log a few nights and this will suggest a
+          bedtime that fits your rhythm — or pick a wake time in the calculator
+          below.
+        </p>
+      ) : (
         <>
           <p className="mt-1 text-xs text-muted-foreground">
-            “{firstEvent.title}” starts at {formatTime(firstEvent.start, timeZone)}{" "}
-            tomorrow — waking by{" "}
-            <span className="tabular-nums">{formatTime(rec.wakeMs, timeZone)}</span>{" "}
-            leaves time to get ready.
+            {firstEvent ? (
+              <>
+                “{firstEvent.title}” starts at{" "}
+                <span className="tabular-nums">
+                  {formatTime(firstEvent.start, timeZone)}
+                </span>{" "}
+                tomorrow.
+              </>
+            ) : (
+              "No timed commitments tomorrow — this keeps your usual rhythm."
+            )}
           </p>
-          <ul role="list" className="mt-2 flex flex-col gap-1">
-            {rec.options.map((opt) => (
-              <BedtimeOption
-                key={opt.cycles}
-                option={opt}
-                recommended={opt.cycles === rec.recommended.cycles}
-                timeZone={timeZone}
-              />
-            ))}
-          </ul>
-          {rec.tooLate && rec.bestFeasible && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              The recommended bedtime has already passed —{" "}
+
+          {/* Primary recommendation: a bedtime + a wake window, framed in hours. */}
+          <div className="mt-2 rounded-md border-2 border-primary/50 px-2.5 py-2">
+            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="text-sm">Go to bed by</span>
+              <span className="text-base font-semibold tabular-nums">
+                {formatTime(rec.bedtimeMs, timeZone)}
+              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                ~{formatDuration(rec.durationMs)} sleep · ≈ {rec.cyclesApprox}{" "}
+                {rec.cyclesApprox === 1 ? "cycle" : "cycles"}
+              </span>
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Sunrise aria-hidden className="size-3.5" />
+              Be up between{" "}
               <span className="tabular-nums">
-                {formatTime(rec.bestFeasible.bedtimeMs, timeZone)}
+                {formatTime(rec.wakeWindow.start, timeZone)}
               </span>{" "}
-              still fits {rec.bestFeasible.cycles} cycles.
+              and{" "}
+              <span className="tabular-nums">
+                {formatTime(rec.wakeWindow.end, timeZone)}
+              </span>
+              .
+            </p>
+          </div>
+
+          {rec.conflict && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                Tomorrow starts earlier than your body clock (usually around{" "}
+                <span className="tabular-nums">
+                  {formatTime(rec.conflict.habitualBedtimeMs, timeZone)}
+                </span>
+                ). Tonight&apos;s bedtime is as early as is healthy to shift in
+                one night — about {formatDuration(rec.conflict.shortfallMs)} under
+                your target. Move ~30 min earlier each night to fully adjust over
+                ~{rec.conflict.glideNights} nights.
+              </span>
             </p>
           )}
-          {rec.tooLate && !rec.bestFeasible && (
+
+          {rec.tooLate && (
             <p className="mt-2 text-xs text-muted-foreground">
-              All cycle bedtimes have passed —{" "}
+              That bedtime has already passed —{" "}
               {rec.cyclesFromNow >= 1
-                ? `going to bed now still fits ${rec.cyclesFromNow} full ${
+                ? `going to bed now still fits about ${rec.cyclesFromNow} ${
                     rec.cyclesFromNow === 1 ? "cycle" : "cycles"
                   }.`
                 : "less than one full cycle fits before your wake time."}
             </p>
           )}
         </>
-      ) : (
-        <p className="mt-1 text-xs text-muted-foreground">
-          No timed commitments tomorrow — pick a wake time in the calculator
-          below.
-        </p>
       )}
     </section>
-  );
-}
-
-function BedtimeOption({
-  option,
-  recommended,
-  timeZone,
-}: {
-  option: CycleOption;
-  recommended: boolean;
-  timeZone: string;
-}) {
-  return (
-    <li
-      className={
-        recommended
-          ? "flex items-center gap-2 rounded-md border-2 border-primary/50 px-2.5 py-1.5"
-          : "flex items-center gap-2 rounded-md border px-2.5 py-1.5"
-      }
-    >
-      <span className="text-sm font-semibold tabular-nums">
-        {formatTime(option.bedtimeMs, timeZone)}
-      </span>
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {option.cycles} cycles · {formatDuration(option.durationMs)} asleep
-      </span>
-      {recommended && (
-        <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-          <BadgeCheck aria-hidden className="size-3.5" />
-          Recommended
-        </span>
-      )}
-    </li>
   );
 }

@@ -38,18 +38,20 @@ export function AppNav() {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
           data-app-nav
           aria-label={`Current surface: ${active.label}. Switch surface`}
+          className="h-8 gap-2 pl-1 pr-2.5"
         >
-          <ActiveIcon className="size-4" />
-          {/* Phones: icon + chevron only — the header row is tight and the
+          {/* The brand tile now lives inside the surface switcher, so the logo
+              and the mode selector read as one control. It carries the active
+              surface's icon and updates as you switch. */}
+          <span className="flex size-6 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <ActiveIcon className="size-4" />
+          </span>
+          {/* Phones: brand tile + chevron only — the header row is tight and the
               aria-label already names the active surface. */}
           <span className="hidden sm:inline">{active.label}</span>
-          <ChevronDown
-            data-icon="inline-end"
-            className="size-4 text-muted-foreground"
-          />
+          <ChevronDown className="size-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-40">

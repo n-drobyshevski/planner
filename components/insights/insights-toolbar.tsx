@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartColumnBig, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -55,11 +55,6 @@ export function InsightsToolbar({
 
   return (
     <>
-      <ToolbarSlot name="leading">
-        <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
-          <ChartColumnBig className="size-4" />
-        </span>
-      </ToolbarSlot>
       <ToolbarSlot name="center">
         <PeriodSelector
           state={state}

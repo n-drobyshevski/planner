@@ -5,9 +5,7 @@
 // shows "log N more mornings" instead). Every hint body states its sample
 // size. Severity renders as icon + text label, never color alone.
 
-import { format } from "date-fns";
-import { tz } from "@date-fns/tz";
-
+import { minutesSinceNoon } from "@/lib/sleep/clock";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { DerivedNight } from "@/lib/sleep/derive";
 import type { SleepLog } from "@/lib/types";
@@ -107,15 +105,6 @@ function comparisonSeverity(c: { qualityDiff: number; fatigueDiff: number }): Sl
   return c.qualityDiff >= QUALITY_ATTENTION || c.fatigueDiff >= FATIGUE_ATTENTION
     ? "attention"
     : "info";
-}
-
-/** Bedtime as minutes since the previous local noon — continuous across the
- *  20:00→12:00 night span, so no midnight wrap distorts the spread. */
-function minutesSinceNoon(ms: number, timeZone: string): number {
-  const ctx = { in: tz(timeZone) };
-  const h = Number(format(ms, "H", ctx));
-  const m = Number(format(ms, "m", ctx));
-  return h >= 12 ? (h - 12) * 60 + m : (h + 12) * 60 + m;
 }
 
 export function computeSleepHints(input: SleepHintsInput): SleepHint[] {

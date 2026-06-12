@@ -1,16 +1,28 @@
 "use client";
 
-import { useEffect } from "react";
 import { m } from "motion/react";
 import { tween } from "@/lib/motion";
 
-// Persists across client navigations within a session (module scope), but resets
-// on a full reload. We use it to skip the transition on the very first paint:
-// animating the initial load would be a page-load sequence (the product bans
-// that — users load into a task, they don't want to watch it appear). The flag
-// is shared by every template that renders <Crossfade>, so whichever one mounts
-// first claims the "initial paint" and the rest animate normally.
+// Shared by every <Crossfade> in the tree (the root + (surfaces) templates) and
+// persists across client navigations within a session (module scope); a full
+// reload resets it. It gates the enter animation so the very first paint of a
+// session never animates — animating the initial load would be a page-load
+// sequence, which the product bans (users load straight into a task; they don't
+// want to watch it appear).
+//
+// It flips on the first real route change (reported by the navigation watcher in
+// app/providers), NOT on mount. Mounting also happens during initial hydration,
+// and the (surfaces) segment hydrates late inside a React <Activity>, so a
+// mount-time flip let the root template's effect set the flag before the nested
+// template hydrated — which then rendered an enter wrapper the server never
+// emitted, i.e. a hydration mismatch. Flipping only on navigation keeps the flag
+// false for the entire initial load, so server and client agree.
 let navigated = false;
+
+/** Reported by the navigation watcher (app/providers) on the first route change. */
+export function markNavigated() {
+  navigated = true;
+}
 
 /**
  * A subtle crossfade on route navigation, rendered by the route templates
@@ -22,12 +34,7 @@ let navigated = false;
  * refetches.
  */
 export function Crossfade({ children }: { children: React.ReactNode }) {
-  const animate = navigated;
-  useEffect(() => {
-    navigated = true;
-  }, []);
-
-  if (!animate) return <>{children}</>;
+  if (!navigated) return <>{children}</>;
 
   return (
     <m.div

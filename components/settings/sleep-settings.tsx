@@ -69,6 +69,8 @@ export function SleepSettings() {
 
   const targetMs =
     (targetSleepCycles * sleepCycleLengthMin + sleepOnsetLatencyMin) * MIN_MS;
+  const asleepMs = targetSleepCycles * sleepCycleLengthMin * MIN_MS;
+  const SEVEN_HOURS_MS = 7 * 60 * MIN_MS;
 
   const current = {
     cycleLength: String(sleepCycleLengthMin),
@@ -129,7 +131,8 @@ export function SleepSettings() {
                 </SelectContent>
               </Select>
               <FieldDescription>
-                One full light–deep–REM cycle. 90 minutes fits most adults.
+                One light–deep–REM pass — about 90 minutes on average, though it
+                varies night to night, so cycle counts are estimates.
               </FieldDescription>
             </Field>
           )}
@@ -185,8 +188,12 @@ export function SleepSettings() {
                 </SelectContent>
               </Select>
               <FieldDescription>
-                With your settings that&apos;s {formatDuration(targetMs)} in bed per
-                night.
+                With your settings that&apos;s {formatDuration(targetMs)} in bed
+                ({formatDuration(asleepMs)} asleep) per night. Adults do best on
+                7–9 hours of sleep (AASM)
+                {asleepMs < SEVEN_HOURS_MS
+                  ? " — your target is on the short side."
+                  : "."}
               </FieldDescription>
             </Field>
           )}

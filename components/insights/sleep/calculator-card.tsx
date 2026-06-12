@@ -98,15 +98,16 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
               {formatTime(r.ms, "UTC")}
             </span>
             <span className="text-xs text-muted-foreground tabular-nums">
-              {mode === "wake" ? "go to bed" : "wake up"} · {r.cycles} cycles ·{" "}
-              {formatDuration(r.durationMs)} asleep
+              {mode === "wake" ? "go to bed" : "wake up"} ·{" "}
+              {formatDuration(r.durationMs)} asleep · ≈ {r.cycles} cycles
             </span>
           </li>
         ))}
       </ul>
       <FieldDescription className="mt-2">
-        A cycle is one light–deep–REM pass. Uses your {prefs.cycleLengthMin}
-        -minute cycles and {prefs.onsetLatencyMin} minutes to fall asleep —{" "}
+        Sleep-cycle length varies night to night, so these are estimates — not
+        exact wake moments. Uses your {prefs.cycleLengthMin}-minute cycles and{" "}
+        {prefs.onsetLatencyMin} minutes to fall asleep —{" "}
         <Link
           href="/settings#sleep"
           className="underline underline-offset-2 hover:text-foreground"

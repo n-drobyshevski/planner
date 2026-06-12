@@ -1,9 +1,26 @@
-// Sleep-cycle calculator — pure epoch-ms arithmetic, deliberately zone-free.
-// A "cycle" is one full sleep cycle (member pref, default 90 min); onset
-// latency is the time to fall asleep after getting into bed. Bedtimes/wakes
-// are wall instants; the UI formats them in the viewer's zone. DST nights
-// shift results by the skipped/repeated hour — accepted: "count back 7.5h"
-// is what people expect from a cycle calculator.
+// Sleep-cycle calculator + the Tonight recommendation.
+//
+// The cycle helpers (bedtimesForWake / wakesForBedtime) are pure epoch-ms
+// arithmetic, deliberately zone-free. A "cycle" is one full sleep cycle (member
+// pref, default 90 min — note the literature median is ~96 min and varies
+// widely, so cycle counts are an estimate, not a precise wake target); onset
+// latency is the time to fall asleep after getting into bed.
+//
+// recommendTonight is the zone-aware orchestrator: it blends tomorrow's first
+// commitment (schedule) with the viewer's habitual circadian phase and a
+// bounded recent sleep debt, and never advances the bedtime more than one
+// night's worth past the body clock (see lib/sleep/circadian). It returns a
+// single safe bedtime + a wake window rather than minute-precise cycle options.
+
+import {
+  BAND_MAX_MS,
+  DEBT_NUDGE_CAP_MS,
+  MAX_ADVANCE_PER_NIGHT_MS,
+  projectClockOntoNight,
+  WAKE_WINDOW_MS,
+  type HabitualPhase,
+} from "@/lib/sleep/circadian";
+import { dayStartOffset } from "@/lib/datetime/local";
 
 export interface SleepPrefs {
   cycleLengthMin: number;
@@ -58,48 +75,148 @@ export function wakesForBedtime(
   }));
 }
 
-/**
- * Tonight's bedtime options for tomorrow's first commitment. Wake is
- * GET_READY_MS before the event; the recommended option is the member's
- * target cycle count clamped into the offered range. `tooLate` is true once
- * `now` is strictly past the recommended bedtime; `bestFeasible` is the
- * highest-cycle option whose bedtime hasn't passed (null when they all have),
- * and `cyclesFromNow` is how many full cycles still fit going to bed at `now`.
- */
-export function recommendTonight(input: {
-  tomorrowFirstEventStart: number;
+export interface TonightInput {
+  /** start of tomorrow's first commitment; null = no commitment tomorrow */
+  tomorrowFirstEventStart: number | null;
   prefs: SleepPrefs;
+  /** habitual circadian phase from recent history; null = cold start */
+  habitualPhase: HabitualPhase | null;
+  /** bounded recent sleep debt (ms); nudges the target up. Default 0. */
+  recentDebtMs?: number;
   now: number;
-}): {
-  wakeMs: number;
-  options: CycleOption[];
-  recommended: CycleOption;
+  timeZone: string;
+}
+
+export interface TonightRec {
+  /** "be up between" — the window ends at the latest-safe wake instant */
+  wakeWindow: { start: number; end: number };
+  /** the single recommended bedtime */
+  bedtimeMs: number;
+  /** asleep time achievable at `bedtimeMs` (excludes onset latency) */
+  durationMs: number;
+  /** the duration aimed for (target, debt-nudged within the healthy band) */
+  targetMs: number;
+  /** ≈ whole cycles for `durationMs` — a rough note, not a precise wake target */
+  cyclesApprox: number;
+  /** what drove the bedtime: the schedule, or the body clock (regularity) */
+  source: "schedule" | "circadian";
+  /** set when the phase-advance guardrail held the bedtime later than the
+   *  schedule wanted (tomorrow's start fights the body clock) */
+  conflict: {
+    /** the (earlier) bedtime the schedule alone wanted */
+    scheduleBedtimeMs: number;
+    /** the body's usual bedtime, projected onto tonight */
+    habitualBedtimeMs: number;
+    /** sleep sacrificed at the safe bedtime vs the target */
+    shortfallMs: number;
+    /** nights to fully reach the schedule, advancing ≤ the per-night limit */
+    glideNights: number;
+  } | null;
+  /** true once `now` is strictly past the recommended bedtime */
   tooLate: boolean;
-  bestFeasible: CycleOption | null;
+  /** full cycles that still fit going to bed at `now` (for the "too late" note) */
   cyclesFromNow: number;
-} {
-  const wakeMs = input.tomorrowFirstEventStart - GET_READY_MS;
-  const options = bedtimesForWake(wakeMs, input.prefs);
-  const lo = Math.min(...CYCLE_RANGE);
-  const hi = Math.max(...CYCLE_RANGE);
-  const target = Math.min(hi, Math.max(lo, input.prefs.targetCycles));
-  const recommended = options.find((o) => o.cycles === target) ?? options[0];
-  // Options are earliest-bedtime (most cycles) first, so the first one that
-  // hasn't passed is the best the night can still hold.
-  const bestFeasible = options.find((o) => o.bedtimeMs >= input.now) ?? null;
+}
+
+/**
+ * Tonight's single safe bedtime + wake window. Blends three anchors:
+ *   • schedule  — wake by `tomorrowFirstEventStart − GET_READY_MS`;
+ *   • circadian — the viewer's habitual phase (regularity-first, and a hard cap
+ *                 on advancing earlier than the body clock can move in a night);
+ *   • homeostatic — recent sleep debt nudges the target up within the band.
+ * Returns null only when there is nothing to anchor to (no commitment and no
+ * habitual phase) — the caller shows the calculator instead.
+ */
+export function recommendTonight(input: TonightInput): TonightRec | null {
+  const { prefs, habitualPhase, now, timeZone } = input;
+  const onsetMs = prefs.onsetLatencyMin * MIN_MS;
+  const cycleMs = prefs.cycleLengthMin * MIN_MS;
+  const baseTargetMs = prefs.targetCycles * cycleMs;
+  // Debt raises the target, bounded by the per-night cap and the healthy-band
+  // ceiling — and never below the member's own (possibly long) target.
+  const nudge = Math.min(
+    input.recentDebtMs ?? 0,
+    DEBT_NUDGE_CAP_MS,
+    Math.max(0, BAND_MAX_MS - baseTargetMs),
+  );
+  const targetMs = baseTargetMs + nudge;
+
+  // The night the recommendation lands on: the wake day is tomorrow's local
+  // date (commitment present → the event's day; absent → the day after `now`).
+  const hasEvent = input.tomorrowFirstEventStart !== null;
+  if (!hasEvent && !habitualPhase) return null;
+
+  const wakeDayRef = hasEvent
+    ? (input.tomorrowFirstEventStart as number)
+    : dayStartOffset(now, 1, timeZone);
+
+  const habitualBed =
+    habitualPhase !== null
+      ? projectClockOntoNight(wakeDayRef, habitualPhase.bedtimeMinSinceNoon, timeZone)
+      : null;
+  const habitualWake =
+    habitualPhase?.wakeMinSinceNoon != null
+      ? projectClockOntoNight(wakeDayRef, habitualPhase.wakeMinSinceNoon, timeZone)
+      : null;
+
+  // Wake target. With a commitment you wake by event − get-ready, but no later
+  // than your habitual wake (a late event doesn't make the body sleep in). With
+  // no commitment, wake at the habitual time (or target hours past bedtime).
+  let wakeAnchor: number;
+  if (hasEvent) {
+    const eventWake = (input.tomorrowFirstEventStart as number) - GET_READY_MS;
+    wakeAnchor = habitualWake !== null ? Math.min(eventWake, habitualWake) : eventWake;
+  } else {
+    wakeAnchor =
+      habitualWake ?? (habitualBed as number) + onsetMs + targetMs;
+  }
+
+  const scheduleBed = wakeAnchor - onsetMs - targetMs;
+
+  let bedtimeMs: number;
+  let conflict: TonightRec["conflict"] = null;
+  if (habitualBed === null) {
+    bedtimeMs = scheduleBed; // cold start = schedule-only (legacy behavior)
+  } else {
+    const earliestSafeBed = habitualBed - MAX_ADVANCE_PER_NIGHT_MS;
+    if (earliestSafeBed > scheduleBed) {
+      // The schedule wants an earlier bed than the clock can safely reach
+      // tonight — hold at the advance limit and surface the shortfall.
+      bedtimeMs = earliestSafeBed;
+      const achievable = wakeAnchor - bedtimeMs - onsetMs;
+      conflict = {
+        scheduleBedtimeMs: scheduleBed,
+        habitualBedtimeMs: habitualBed,
+        shortfallMs: Math.max(0, targetMs - achievable),
+        glideNights: Math.max(
+          1,
+          Math.ceil((habitualBed - scheduleBed) / MAX_ADVANCE_PER_NIGHT_MS),
+        ),
+      };
+    } else {
+      // Safe range exists — prefer the habitual bedtime (regularity), but go a
+      // little earlier if the schedule needs it to hit the target.
+      bedtimeMs = Math.min(habitualBed, scheduleBed);
+    }
+  }
+
+  const durationMs = Math.max(0, wakeAnchor - bedtimeMs - onsetMs);
+  const source: TonightRec["source"] =
+    habitualBed !== null && bedtimeMs === habitualBed ? "circadian" : "schedule";
   const cyclesFromNow = Math.max(
     0,
-    Math.floor(
-      (wakeMs - input.now - input.prefs.onsetLatencyMin * MIN_MS) /
-        (input.prefs.cycleLengthMin * MIN_MS),
-    ),
+    Math.floor((wakeAnchor - now - onsetMs) / cycleMs),
   );
+
   return {
-    wakeMs,
-    options,
-    recommended,
-    tooLate: recommended.bedtimeMs < input.now,
-    bestFeasible,
+    wakeWindow: { start: wakeAnchor - WAKE_WINDOW_MS, end: wakeAnchor },
+    bedtimeMs,
+    durationMs,
+    targetMs,
+    cyclesApprox: Math.round(durationMs / cycleMs),
+    source,
+    conflict,
+    tooLate: bedtimeMs < now,
     cyclesFromNow,
   };
 }
