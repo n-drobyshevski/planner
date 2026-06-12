@@ -17,6 +17,15 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { bucketUsage, categoryTrends, rollingAverage } from "@/lib/analytics/trends";
 import { activeStreak, bucketTrend, consistency, dayAnomalies } from "@/lib/analytics/momentum";
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
@@ -318,48 +327,48 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           }
           series={catSeries}
           table={
-            <table className="w-full text-xs">
-              <caption className="sr-only">
+            <Table className="text-xs">
+              <TableCaption className="sr-only">
                 Total tracked time per context for {period.label}
-              </caption>
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th scope="col" className="py-1.5 font-medium">
+              </TableCaption>
+              <TableHeader>
+                <TableRow className="text-muted-foreground hover:bg-transparent">
+                  <TableHead scope="col" className="h-auto px-0 py-1.5 text-muted-foreground">
                     Context
-                  </th>
-                  <th scope="col" className="py-1.5 text-right font-medium">
+                  </TableHead>
+                  <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                     Time
-                  </th>
-                  <th scope="col" className="py-1.5 text-right font-medium">
+                  </TableHead>
+                  <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                     Share
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {catTrend.seriesKeys.map((k) => {
                   const meta = seriesMeta(k, data.categories);
                   const ms = catTotals.get(k) ?? 0;
                   return (
-                    <tr key={k} className="border-b border-border/60">
-                      <td className="flex items-center gap-2 py-1.5">
+                    <TableRow key={k} className="border-border/60">
+                      <TableCell className="flex items-center gap-2 px-0 py-1.5">
                         <span
                           className="size-2.5 shrink-0 rounded-[3px]"
                           style={{ background: meta.color }}
                           aria-hidden
                         />
                         <span className="truncate">{meta.name}</span>
-                      </td>
-                      <td className="py-1.5 text-right font-mono tabular-nums">
+                      </TableCell>
+                      <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
                         {formatDuration(ms)}
-                      </td>
-                      <td className="py-1.5 text-right font-mono tabular-nums text-muted-foreground">
+                      </TableCell>
+                      <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
                         {srPercent(ms, total)}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           }
         >
           {(settings) => (

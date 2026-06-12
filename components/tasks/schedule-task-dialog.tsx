@@ -25,7 +25,8 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { CalendarPlus, Loader2 } from "lucide-react";
+import { CalendarPlus } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import {
   scheduleTaskFormSchema,
@@ -282,7 +283,7 @@ export function ScheduleTaskDialog({
                 </Button>
                 <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 data-icon="inline-start" className="animate-spin" />
+                    <Spinner data-icon="inline-start" />
                   ) : (
                     <CalendarPlus data-icon="inline-start" />
                   )}

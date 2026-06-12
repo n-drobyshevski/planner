@@ -12,6 +12,15 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -206,53 +215,57 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
       {boards.length > 1 && (
         <section className="space-y-1.5">
           <SectionLabel>By board</SectionLabel>
-          <table className="w-full text-xs">
-            <caption className="sr-only">Task throughput per board, {period.label}</caption>
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th scope="col" className="py-1.5 font-medium">
+          <Table className="text-xs">
+            <TableCaption className="sr-only">
+              Task throughput per board, {period.label}
+            </TableCaption>
+            <TableHeader>
+              <TableRow className="text-muted-foreground hover:bg-transparent">
+                <TableHead scope="col" className="h-auto px-0 py-1.5 text-muted-foreground">
                   Board
-                </th>
-                <th scope="col" className="py-1.5 text-right font-medium">
+                </TableHead>
+                <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                   Done
-                </th>
-                <th scope="col" className="py-1.5 text-right font-medium">
+                </TableHead>
+                <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                   Created
-                </th>
-                <th scope="col" className="py-1.5 text-right font-medium">
+                </TableHead>
+                <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                   Due
-                </th>
-                <th scope="col" className="py-1.5 text-right font-medium">
+                </TableHead>
+                <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                   Overdue
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {boards.map((b) => (
-                <tr key={b.boardId ?? "none"} className="border-b border-border/60">
-                  <td className="max-w-0 truncate py-1.5">{boardName(b.boardId)}</td>
-                  <td className="py-1.5 text-right font-mono tabular-nums">
+                <TableRow key={b.boardId ?? "none"} className="border-border/60">
+                  <TableCell className="max-w-0 truncate px-0 py-1.5">
+                    {boardName(b.boardId)}
+                  </TableCell>
+                  <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
                     {b.completedCount}
-                  </td>
-                  <td className="py-1.5 text-right font-mono tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
                     {b.createdCount}
-                  </td>
-                  <td className="py-1.5 text-right font-mono tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
                     {b.dueCount}
-                  </td>
-                  <td
+                  </TableCell>
+                  <TableCell
                     className={
                       b.overdueOpenCount > 0
-                        ? "py-1.5 text-right font-mono tabular-nums text-destructive"
-                        : "py-1.5 text-right font-mono tabular-nums text-muted-foreground"
+                        ? "px-0 py-1.5 text-right font-mono tabular-nums text-destructive"
+                        : "px-0 py-1.5 text-right font-mono tabular-nums text-muted-foreground"
                     }
                   >
                     {b.overdueOpenCount}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </section>
       )}
     </div>

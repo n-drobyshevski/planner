@@ -40,7 +40,8 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { Trash2, Loader2, CalendarPlus, ChevronDown } from "lucide-react";
+import { Trash2, CalendarPlus, ChevronDown } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { SubtaskEditor } from "./subtask-editor";
 import { AttributeFields } from "@/components/shared/attribute-fields";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
@@ -407,7 +408,7 @@ export function TaskDialog(props: TaskDialogProps) {
                         Compiler doesn't treat the submit body — Date.now() included —
                         as render-scoped. */}
                     <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
-                      {isSubmitting && <Loader2 data-icon="inline-start" className="animate-spin" />}
+                      {isSubmitting && <Spinner data-icon="inline-start" />}
                       {mode === "create" ? "Create" : "Save"}
                     </Button>
                   </div>
