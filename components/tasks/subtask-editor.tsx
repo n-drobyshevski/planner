@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useOptimisticOrder } from "@/lib/hooks/use-optimistic-order";
 import { sortByPosition, progressOf } from "@/lib/tasks/tree";
@@ -140,12 +141,12 @@ export function SubtaskEditor({
       </div>
 
       {total > 0 && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
-            style={{ width: `${total ? (done / total) * 100 : 0}%` }}
-          />
-        </div>
+        <Progress
+          value={(done / total) * 100}
+          aria-label={`${done} of ${total} subtasks done`}
+          // Match the previous bar's pacing; collapse for reduced motion.
+          className="h-1.5 *:data-[slot=progress-indicator]:duration-300 *:data-[slot=progress-indicator]:motion-reduce:transition-none"
+        />
       )}
 
       {parent.sequential && total > 0 && (
