@@ -3,7 +3,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { CircleAlert, Lock, MoonStar, RotateCw } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Empty,
   EmptyContent,
@@ -35,8 +37,9 @@ import { HintsSection } from "./sleep/hints-section";
 import { HistorySection } from "./sleep/history-section";
 import { LogNightDialog } from "./sleep/log-night-dialog";
 import { TonightCard } from "./sleep/tonight-card";
+import { InsightCard, Takeaway } from "./insight-card";
 import { SectionEmpty } from "./insights-empty";
-import { SectionLabel, TabGrid } from "./tab-bits";
+import { TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /**
@@ -203,8 +206,15 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
   const hasAnyData =
     viewerSpans.length > 0 || logs.length > 0 || logsLoading;
 
+  const nightsWithData = nights.filter((n) => n.durationMs > 0).length;
+
   return (
     <div className="flex flex-col gap-4">
+      {nightsWithData > 0 && (
+        <Takeaway>
+          {`${nightsWithData} night${nightsWithData === 1 ? "" : "s"} with sleep data this period — see how your nights track with the days that followed below.`}
+        </Takeaway>
+      )}
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Lock aria-hidden className="size-3" />
         Sleep is personal — this tab shows yours only, and your check-ins are
@@ -212,9 +222,10 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
       </p>
 
       {logsError && (
-        <div
+        <Card
+          size="sm"
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 shadow-soft"
+          className="flex-row flex-wrap items-center justify-between gap-3 px-3 py-3"
         >
           <p className="flex items-center gap-2 text-sm">
             <CircleAlert aria-hidden className="size-4 shrink-0 text-muted-foreground" />
@@ -225,7 +236,7 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
             <RotateCw data-icon="inline-start" />
             Try again
           </Button>
-        </div>
+        </Card>
       )}
 
       {!logsLoading && !logsError && (!hasLogToday || checkinPending) && (
@@ -340,8 +351,7 @@ function SleepCorrelationsSection({
   const rows = correlations.filter((c) => c.rho !== null);
 
   return (
-    <section className="space-y-2">
-      <SectionLabel>Sleep &amp; your days</SectionLabel>
+    <InsightCard title="Sleep & your days" metric="sleep-correlation">
       {rows.length === 0 ? (
         <SectionEmpty>
           Once you&apos;ve logged enough nights alongside rated days, this shows
@@ -353,10 +363,7 @@ function SleepCorrelationsSection({
           {rows.map((c) => {
             const rho = c.rho as number;
             return (
-              <li
-                key={`${c.metric}-${c.vs}`}
-                className="flex items-center gap-2 rounded-lg border bg-card p-2.5 text-xs shadow-soft"
-              >
+              <li key={`${c.metric}-${c.vs}`} className="flex items-center gap-2 text-xs">
                 <span className="min-w-0 flex-1">
                   <span className="font-medium">
                     {CORRELATION_METRIC_LABELS[c.metric]}
@@ -366,14 +373,15 @@ function SleepCorrelationsSection({
                     {CORRELATION_SIDE_LABELS[c.vs]}
                   </span>
                 </span>
-                <span
+                <Badge
+                  variant="outline"
                   className="shrink-0 font-mono tabular-nums text-muted-foreground"
                   aria-label={`Spearman correlation ${rho.toFixed(2)} over ${c.n} nights`}
                 >
                   {rho > 0 ? "+" : ""}
                   {rho.toFixed(2)}
-                </span>
-                <span className="w-12 shrink-0 text-right font-mono tabular-nums text-muted-foreground/70">
+                </Badge>
+                <span className="w-10 shrink-0 text-right font-mono tabular-nums text-muted-foreground/70">
                   n {c.n}
                 </span>
               </li>
@@ -381,6 +389,6 @@ function SleepCorrelationsSection({
           })}
         </ul>
       )}
-    </section>
+    </InsightCard>
   );
 }

@@ -38,9 +38,11 @@ import {
 import { delta } from "@/lib/analytics/trends";
 import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
-import { StatCard, StatGrid } from "./stat-card";
+import { StatCard, StatGrid, type Judgment } from "./stat-card";
+import { InsightCard, Takeaway } from "./insight-card";
+import { Sparkline } from "./sparkline";
 import { bucketLabel, bucketTick } from "./series";
-import { CHART_H, SectionLabel, TabGrid } from "./tab-bits";
+import { CHART_H, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /** Lead times run to days/weeks — "9d 17h" reads better than "233h". */
@@ -111,8 +113,23 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
 
   const hasBoardBreakdown = boards.length > 1;
 
+  const onTimeJudgment: Judgment | undefined =
+    stats.adherenceRate === null
+      ? undefined
+      : stats.adherenceRate >= 0.8
+        ? { tone: "good", text: "on track" }
+        : stats.adherenceRate < 0.5
+          ? { tone: "attention", text: "often late" }
+          : { tone: "neutral", text: "mixed" };
+
   return (
     <div className="space-y-4">
+      <Takeaway>
+        {`${stats.completedCount} task${stats.completedCount === 1 ? "" : "s"} completed, ${stats.createdCount} created.`}
+        {stats.overdueOpenCount > 0
+          ? ` ${stats.overdueOpenCount} open ${stats.overdueOpenCount === 1 ? "task is" : "tasks are"} overdue.`
+          : " Nothing's overdue."}
+      </Takeaway>
       <p className="sr-only">
         {stats.completedCount} tasks completed and {stats.createdCount} created in{" "}
         {period.label}. {stats.overdueOpenCount} open tasks are overdue.
@@ -123,31 +140,41 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
         <StatGrid>
           <StatCard
             label="Completed"
+            metric="tasks-done"
             value={String(stats.completedCount)}
             delta={delta(stats.completedCount, prevStats.completedCount)}
+            sparkline={<Sparkline data={velocity.map((v) => v.completed)} color="var(--chart-2)" />}
           />
           <StatCard
             label="Created"
             value={String(stats.createdCount)}
             delta={delta(stats.createdCount, prevStats.createdCount)}
+            sparkline={<Sparkline data={velocity.map((v) => v.created)} color="var(--chart-4)" />}
           />
           <StatCard
             label="On time"
+            metric="on-time"
             value={
               stats.adherenceRate === null
                 ? "—"
                 : `${Math.round(stats.adherenceRate * 100)}%`
             }
+            judgment={onTimeJudgment}
             hint={stats.dueCount > 0 ? `${stats.dueCount} due this period` : "nothing due"}
           />
           <StatCard
             label="Overdue"
+            metric="overdue"
             value={String(stats.overdueOpenCount)}
-            warning={stats.overdueOpenCount > 0}
-            hint="open past their due day"
+            judgment={
+              stats.overdueOpenCount > 0
+                ? { tone: "attention", text: "past due" }
+                : { tone: "good", text: "all clear" }
+            }
           />
           <StatCard
             label="Done of created"
+            metric="done-of-created"
             value={
               stats.completionRate === null
                 ? "—"
@@ -157,6 +184,7 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
           />
           <StatCard
             label="Lead time"
+            metric="lead-time"
             value={
               stats.medianLeadTimeMs !== null
                 ? formatLeadTime(stats.medianLeadTimeMs)
@@ -170,8 +198,10 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
         </p>
       </div>
 
-      <section className={hasBoardBreakdown ? "space-y-1.5" : "space-y-1.5 xl:col-span-2"}>
-        <SectionLabel>Velocity per {granularity}</SectionLabel>
+      <InsightCard
+        title={`Velocity per ${granularity}`}
+        className={hasBoardBreakdown ? undefined : "xl:col-span-2"}
+      >
         <ChartContainer
           config={velocityConfig}
           className={`aspect-auto ${CHART_H.compact} w-full`}
@@ -213,11 +243,10 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
             />
           </BarChart>
         </ChartContainer>
-      </section>
+      </InsightCard>
 
       {hasBoardBreakdown && (
-        <section className="space-y-1.5">
-          <SectionLabel>By board</SectionLabel>
+        <InsightCard title="By board">
           <Table className="text-xs">
             <TableCaption className="sr-only">
               Task throughput per board, {period.label}
@@ -269,7 +298,7 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
               ))}
             </TableBody>
           </Table>
-        </section>
+        </InsightCard>
       )}
       </TabGrid>
     </div>

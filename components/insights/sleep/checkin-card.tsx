@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sunrise, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useNotify } from "@/lib/hooks/use-notify";
 import type { SleepLogInput } from "@/lib/supabase/mappers";
 import type { DerivedNight } from "@/lib/sleep/derive";
@@ -96,10 +97,7 @@ export function CheckinCard({
   }
 
   return (
-    <section
-      aria-label="Morning check-in"
-      className="rounded-lg border bg-card p-3 shadow-soft"
-    >
+    <Card size="sm" aria-label="Morning check-in" className="gap-0 px-3 py-3">
       <div className="flex items-start gap-3">
         <Sunrise aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
@@ -135,6 +133,6 @@ export function CheckinCard({
           {saving ? "Saving…" : "Save check-in"}
         </Button>
       </div>
-    </section>
+    </Card>
   );
 }

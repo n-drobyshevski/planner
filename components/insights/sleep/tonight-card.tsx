@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { BadgeCheck, MoonStar } from "lucide-react";
 
+import { Card } from "@/components/ui/card";
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
 import { dayStartOffset } from "@/lib/datetime/local";
 import { formatDuration, formatTime } from "@/lib/datetime/format";
@@ -65,7 +66,7 @@ export function TonightCard({
   );
 
   return (
-    <section aria-label="Tonight" className="rounded-lg border bg-card p-3 shadow-soft">
+    <Card size="sm" aria-label="Tonight" className="gap-0 px-3 py-3">
       <div className="flex items-center gap-2">
         <MoonStar aria-hidden className="size-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">Tonight</h3>
@@ -114,7 +115,7 @@ export function TonightCard({
           below.
         </p>
       )}
-    </section>
+    </Card>
   );
 }
 

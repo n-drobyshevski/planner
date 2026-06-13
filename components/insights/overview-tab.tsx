@@ -38,14 +38,17 @@ import {
 } from "@/lib/hooks/use-insights-prefs";
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
-import { StatCard, StatGrid } from "./stat-card";
+import { Badge } from "@/components/ui/badge";
+import { StatCard, StatGrid, type Judgment } from "./stat-card";
 import { ChartCard } from "./chart-card";
+import { InsightCard, Takeaway } from "./insight-card";
+import { Sparkline } from "./sparkline";
 import { CustomizeDashboardSheet } from "./customize-dashboard-sheet";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { GoalsSection } from "./goals/goals-section";
 import { InsightsEmpty } from "./insights-empty";
 import { NEUTRAL, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
+import { CHART_H, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /** Categories shown individually in the donut before collapsing into "Other". */
@@ -199,13 +202,26 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
 
   // --- Card registry: every dashboard id renders through these two maps. ----
 
+  // On-time and overdue carry a judged reading (good / mixed / attention) rather
+  // than a bare number — the same calm tone the rest of the app uses.
+  const onTimeJudgment: Judgment | undefined =
+    taskStats.adherenceRate === null
+      ? undefined
+      : taskStats.adherenceRate >= 0.8
+        ? { tone: "good", text: "on track" }
+        : taskStats.adherenceRate < 0.5
+          ? { tone: "attention", text: "often late" }
+          : { tone: "neutral", text: "mixed" };
+
   const statCards: Record<string, React.ReactNode> = {
     total: (
       <StatCard
         key="total"
         label="Total"
+        metric="total"
         value={formatDuration(total)}
         delta={delta(total, prevUsage.summary.totalMs)}
+        sparkline={<Sparkline data={usage.perDay.map((d) => d.ms)} />}
         emphasis
         className="col-span-2"
       />
@@ -214,6 +230,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="daily-avg"
         label="Daily avg"
+        metric="daily-avg"
         value={formatDuration(usage.summary.dailyAverageMs)}
         delta={delta(usage.summary.dailyAverageMs, prevUsage.summary.dailyAverageMs)}
       />
@@ -222,6 +239,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="events"
         label="Events"
+        metric="events"
         value={String(usage.summary.eventCount)}
         delta={delta(usage.summary.eventCount, prevUsage.summary.eventCount)}
         hint="tracked this period"
@@ -231,6 +249,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="avg-session"
         label="Avg session"
+        metric="avg-session"
         value={
           usage.summary.eventCount > 0
             ? formatDuration(total / usage.summary.eventCount)
@@ -243,6 +262,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="busiest-day"
         label="Busiest day"
+        metric="busiest-day"
         value={
           usage.summary.busiestDay ? formatDuration(usage.summary.busiestDay.ms) : "—"
         }
@@ -257,6 +277,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="active-days"
         label="Active days"
+        metric="active-days"
         value={`${usage.summary.activeDays}/${period.days.length}`}
       />
     ),
@@ -264,6 +285,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="tasks-done"
         label="Tasks done"
+        metric="tasks-done"
         value={String(taskStats.completedCount)}
         delta={delta(taskStats.completedCount, prevTaskStats.completedCount)}
       />
@@ -272,11 +294,13 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="on-time"
         label="On time"
+        metric="on-time"
         value={
           taskStats.adherenceRate === null
             ? "—"
             : `${Math.round(taskStats.adherenceRate * 100)}%`
         }
+        judgment={onTimeJudgment}
         hint={taskStats.dueCount > 0 ? `${taskStats.dueCount} due` : "nothing due"}
       />
     ),
@@ -284,9 +308,13 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="overdue"
         label="Overdue"
+        metric="overdue"
         value={String(taskStats.overdueOpenCount)}
-        warning={taskStats.overdueOpenCount > 0}
-        hint="open past their due day"
+        judgment={
+          taskStats.overdueOpenCount > 0
+            ? { tone: "attention", text: "past due" }
+            : { tone: "good", text: "all clear" }
+        }
       />
     ),
   };
@@ -420,11 +448,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       </ChartCard>
     ),
     "by-context": (
-      <section key="by-context" className="space-y-2">
-        <div className="space-y-0.5">
-          <SectionLabel>By context</SectionLabel>
-          {donutHeadline && <p className="text-sm font-medium">{donutHeadline}</p>}
-        </div>
+      <InsightCard key="by-context" title="By context" description={donutHeadline}>
         <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <div className="relative mx-auto h-[170px] w-[170px] shrink-0 sm:mx-0">
             <ChartContainer
@@ -501,12 +525,11 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
             ))}
           </ul>
         </div>
-      </section>
+      </InsightCard>
     ),
     shifts:
       shiftChips.length > 0 ? (
-        <section key="shifts" className="space-y-1.5">
-          <SectionLabel>Shifts vs previous period</SectionLabel>
+        <InsightCard key="shifts" title="Shifts vs previous period">
           <ul className="flex flex-wrap gap-1.5">
             {shiftChips.map((s) => {
               const meta = seriesMeta(
@@ -515,27 +538,27 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
               );
               const pts = Math.round(s.deltaShare * 100);
               return (
-                <li
-                  key={s.categoryId ?? "uncategorized"}
-                  className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs"
-                >
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ background: meta.color }}
-                    aria-hidden
-                  />
-                  <span className="max-w-32 truncate">{meta.name}</span>
-                  <span
-                    className="font-mono tabular-nums text-muted-foreground"
+                <li key={s.categoryId ?? "uncategorized"}>
+                  <Badge
+                    variant="outline"
+                    className="gap-1.5"
                     aria-label={`${meta.name}: share ${pts > 0 ? "up" : "down"} ${Math.abs(pts)} points vs previous period`}
                   >
-                    {pts > 0 ? "▲" : "▼"} {Math.abs(pts)} pts
-                  </span>
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ background: meta.color }}
+                      aria-hidden
+                    />
+                    <span className="max-w-32 truncate">{meta.name}</span>
+                    <span className="font-mono tabular-nums text-muted-foreground">
+                      {pts > 0 ? "▲" : "▼"} {Math.abs(pts)} pts
+                    </span>
+                  </Badge>
                 </li>
               );
             })}
           </ul>
-        </section>
+        </InsightCard>
       ) : null,
     goals:
       workspaceId && viewerId ? (
@@ -555,13 +578,19 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       </div>
 
       {total > 0 && (
-        <p className="sr-only">
-          {formatDuration(total)} tracked in {period.label}.
-          {usage.summary.busiestDay
-            ? ` Busiest day ${format(usage.summary.busiestDay.dayMs, "EEEE d MMMM", { in: ctx })} with ${formatDuration(usage.summary.busiestDay.ms)}.`
-            : ""}
-          {donutData[0] ? ` Most time went to ${donutData[0].name}.` : ""}
-        </p>
+        <>
+          <Takeaway>
+            {perDayHeadline}
+            {donutHeadline ? ` ${donutHeadline}` : ""}
+          </Takeaway>
+          <p className="sr-only">
+            {formatDuration(total)} tracked in {period.label}.
+            {usage.summary.busiestDay
+              ? ` Busiest day ${format(usage.summary.busiestDay.dayMs, "EEEE d MMMM", { in: ctx })} with ${formatDuration(usage.summary.busiestDay.ms)}.`
+              : ""}
+            {donutData[0] ? ` Most time went to ${donutData[0].name}.` : ""}
+          </p>
+        </>
       )}
 
       {/* Stat rows and the wide per-day chart take the full width; the donut,

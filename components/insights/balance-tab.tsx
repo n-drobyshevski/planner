@@ -24,10 +24,12 @@ import { MIN_CATEGORY_RATINGS, satisfactionByCategory } from "@/lib/analytics/co
 import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { toPaletteColor } from "@/lib/theme/appearance";
+import { Progress } from "@/components/ui/progress";
 import { GoalsSection } from "./goals/goals-section";
+import { InsightCard, Takeaway } from "./insight-card";
 import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { NEUTRAL, bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
+import { CHART_H, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function BalanceTab({ data }: { data: InsightsTabData }) {
@@ -127,17 +129,17 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
     />
   );
 
+  const takeaway = topShare
+    ? `${seriesMeta(topShare.categoryId ?? "__uncategorized__", data.categories).name} takes the largest share at ${srPercent(topShare.ms, total)} of tracked time.`
+    : "";
+
   return (
     <div className="space-y-4">
-      <p className="sr-only">
-        {topShare
-          ? `${seriesMeta(topShare.categoryId ?? "__uncategorized__", data.categories).name} takes the largest share at ${srPercent(topShare.ms, total)} of tracked time.`
-          : ""}
-      </p>
+      <Takeaway>{takeaway}</Takeaway>
+      <p className="sr-only">{takeaway}</p>
 
       <TabGrid>
-      <section className="space-y-1.5 xl:col-span-2">
-        <SectionLabel>Context mix per {granularity}</SectionLabel>
+      <InsightCard title={`Context mix per ${granularity}`} className="xl:col-span-2">
         <ChartContainer
           config={stackedConfig}
           className={`aspect-auto ${CHART_H.standard} w-full`}
@@ -168,10 +170,9 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
             ))}
           </BarChart>
         </ChartContainer>
-      </section>
+      </InsightCard>
 
-      <section className="space-y-1.5">
-        <SectionLabel>Share shifts vs previous period</SectionLabel>
+      <InsightCard title="Share shifts vs previous period">
         <Table className="text-xs">
           <TableCaption className="sr-only">
             Context shares of tracked time, this period vs the previous one
@@ -242,21 +243,20 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
             })}
           </TableBody>
         </Table>
-      </section>
+      </InsightCard>
 
       {data.workspaceId && data.viewerId && (
         <GoalsSection data={data} actualByCategory={actualByCategory} />
       )}
 
-      <section className="space-y-1.5">
-        <SectionLabel>Satisfaction by context</SectionLabel>
+      <InsightCard title="Satisfaction by context">
         {satisfaction.length === 0 ? (
           <SectionEmpty actionLabel="Open the calendar" actionHref="/calendar">
             Rate satisfaction on at least {MIN_CATEGORY_RATINGS} events in a
             context to see which parts of your time feel best, looking back.
           </SectionEmpty>
         ) : (
-          <ul className="space-y-1.5" role="list">
+          <ul className="space-y-2" role="list">
             {satisfaction.map(({ categoryId, agg }) => {
               const meta = seriesMeta(categoryId ?? "__uncategorized__", data.categories);
               const pct = (agg.mean / 5) * 100;
@@ -268,16 +268,12 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
                     aria-hidden
                   />
                   <span className="w-28 min-w-0 truncate sm:w-36">{meta.name}</span>
-                  <span
-                    className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
-                    role="img"
+                  <Progress
+                    value={pct}
                     aria-label={`${meta.name}: mean satisfaction ${agg.mean.toFixed(1)} of 5, from ${agg.n} rated items`}
-                  >
-                    <span
-                      className="block h-full rounded-full"
-                      style={{ width: `${pct}%`, background: meta.color }}
-                    />
-                  </span>
+                    className="h-1.5 min-w-0 flex-1 *:data-[slot=progress-indicator]:bg-(--bar-color)"
+                    style={{ "--bar-color": meta.color } as React.CSSProperties}
+                  />
                   <span className="w-12 text-right font-mono tabular-nums">
                     {agg.mean.toFixed(1)}/5
                   </span>
@@ -289,11 +285,10 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
             })}
           </ul>
         )}
-      </section>
+      </InsightCard>
 
       {showMembers && memberSplit.memberIds.length > 1 && (
-        <section className="space-y-1.5 xl:col-span-2">
-          <SectionLabel>Who tracked it, per {granularity}</SectionLabel>
+        <InsightCard title={`Who tracked it, per ${granularity}`} className="xl:col-span-2">
           <ChartContainer
             config={memberConfig}
             className={`aspect-auto ${CHART_H.compact} w-full`}
@@ -331,7 +326,7 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
           <p className="text-[11px] text-muted-foreground">
             Joint events count for their owner&apos;s calendar.
           </p>
-        </section>
+        </InsightCard>
       )}
       </TabGrid>
     </div>

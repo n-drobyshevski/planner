@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDigest } from "@/lib/hooks/use-digest";
 import type { DigestPayload } from "@/lib/insights/digest-payload";
-import { SectionLabel } from "./tab-bits";
+import { InsightCard } from "./insight-card";
 
 /**
  * The AI weekly digest atop the Optimize tab. Renders nothing when the server
@@ -20,9 +20,8 @@ export function DigestCard({ payload }: { payload: DigestPayload }) {
   if (available === false) return null;
 
   return (
-    <section className="space-y-1.5">
-      <SectionLabel>Digest</SectionLabel>
-      <div className="rounded-lg border bg-card p-3 shadow-soft">
+    <InsightCard title="Digest">
+      <div>
         {digest === null ? (
           isGenerating ? (
             <div className="space-y-2" aria-busy aria-label="Writing the digest">
@@ -89,6 +88,6 @@ export function DigestCard({ payload }: { payload: DigestPayload }) {
           </div>
         )}
       </div>
-    </section>
+    </InsightCard>
   );
 }

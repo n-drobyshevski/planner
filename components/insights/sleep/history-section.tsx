@@ -15,6 +15,7 @@ import type { DerivedNight } from "@/lib/sleep/derive";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { SleepLog } from "@/lib/types";
 import { StatCard, StatGrid } from "../stat-card";
+import { InsightCard } from "../insight-card";
 import { bucketTick } from "../series";
 import { CHART_H, SectionLabel } from "../tab-bits";
 
@@ -157,28 +158,28 @@ export function HistorySection({
   };
 
   return (
-    <section className="space-y-3">
-      <div className="flex min-h-8 items-center justify-between gap-2">
-        <SectionLabel>Sleep history</SectionLabel>
-        {action}
-      </div>
+    <InsightCard title="Sleep history" action={action} contentClassName="space-y-3">
       <StatGrid>
         <StatCard
           label="Avg per night"
+          metric="avg-per-night"
           value={avgMs !== null ? formatDuration(Math.round(avgMs)) : "—"}
           hint={`${withData.length} night${withData.length === 1 ? "" : "s"} with data`}
         />
         <StatCard
           label="Avg bedtime"
+          metric="avg-bedtime"
           value={avgBedtime !== null ? fromNoon(avgBedtime) : "—"}
         />
         <StatCard
           label="Bedtime spread"
+          metric="bedtime-spread"
           value={spread !== null ? `±${Math.round(spread)} min` : "—"}
           hint="lower is steadier"
         />
         <StatCard
           label="Debt vs target"
+          metric="debt-vs-target"
           value={withData.length > 0 ? formatDuration(Math.round(debtMs)) : "—"}
           hint={`target ${formatDuration(targetMs)} in bed`}
         />
@@ -336,6 +337,6 @@ export function HistorySection({
           </p>
         </div>
       )}
-    </section>
+    </InsightCard>
   );
 }

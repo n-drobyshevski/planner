@@ -18,9 +18,10 @@ import {
 import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
+import { InsightCard, Takeaway } from "./insight-card";
 import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { HourHeatmap } from "./hour-heatmap";
-import { SectionLabel, TabGrid } from "./tab-bits";
+import { TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 const DAYPART_LABELS: Record<Daypart, string> = {
@@ -99,6 +100,12 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
 
   return (
     <div className="space-y-4">
+      <Takeaway>
+        {`Average tracked time peaks on ${top.full} at ${formatDuration(top.avg)} per day.`}
+        {frag.blockCount > 0
+          ? ` The period splits into ${frag.blockCount} busy blocks, typically ${formatDuration(frag.medianBlockMs ?? 0)} long.`
+          : ""}
+      </Takeaway>
       <p className="sr-only">
         Average tracked time peaks on {top.full} at {formatDuration(top.avg)} per day.
         {frag.blockCount > 0
@@ -107,8 +114,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
       </p>
 
       <TabGrid>
-      <section className="space-y-1.5">
-        <SectionLabel>By weekday</SectionLabel>
+      <InsightCard title="By weekday">
         <ChartContainer
           config={config}
           className="aspect-auto w-full"
@@ -162,7 +168,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
             />
           </BarChart>
         </ChartContainer>
-      </section>
+      </InsightCard>
 
       <AttributesSection
         focusSplit={focusSplit}
@@ -170,36 +176,38 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
         energyDays={energyDays}
       />
 
-      <section className="space-y-1.5 xl:col-span-2">
-        <SectionLabel>By hour of day</SectionLabel>
+      <InsightCard title="By hour of day" className="xl:col-span-2">
         <HourHeatmap
           occurrences={occurrences}
           window={period.window}
           timeZone={timeZone}
         />
-      </section>
+      </InsightCard>
 
-      <section className="space-y-1.5 xl:col-span-2">
-        <SectionLabel>Fragmentation</SectionLabel>
+      <InsightCard title="Fragmentation" className="xl:col-span-2">
         <StatGrid>
           <StatCard
             label="Busy blocks"
+            metric="busy-blocks"
             value={String(frag.blockCount)}
             hint="back-to-back events count as one"
           />
           <StatCard
             label="Typical block"
+            metric="typical-block"
             value={frag.medianBlockMs !== null ? formatDuration(frag.medianBlockMs) : "—"}
             hint="median length"
           />
           <StatCard
             label="Longest block"
+            metric="longest-block"
             value={
               frag.longestBlockMs !== null ? formatDuration(frag.longestBlockMs) : "—"
             }
           />
           <StatCard
             label="Short blocks"
+            metric="short-blocks"
             value={
               frag.shortBlockShare !== null
                 ? `${Math.round(frag.shortBlockShare * 100)}%`
@@ -209,11 +217,12 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
           />
           <StatCard
             label="Typical gap"
+            metric="typical-gap"
             value={frag.avgGapMs !== null ? formatDuration(frag.avgGapMs) : "—"}
             hint="between blocks, same day"
           />
         </StatGrid>
-      </section>
+      </InsightCard>
       </TabGrid>
     </div>
   );
@@ -247,8 +256,7 @@ function AttributesSection({
     focusSplit.share !== null || best !== null || meanEnergy !== null;
 
   return (
-    <section className="space-y-1.5">
-      <SectionLabel>Attributes</SectionLabel>
+    <InsightCard title="Attributes">
       {!hasAnything ? (
         <SectionEmpty actionLabel="Open the calendar" actionHref="/calendar">
           Set focus, energy or satisfaction on events to unlock attribute
@@ -259,6 +267,7 @@ function AttributesSection({
         <StatGrid>
           <StatCard
             label="Deep work"
+            metric="deep-work"
             value={
               focusSplit.share !== null
                 ? `${Math.round(focusSplit.share * 100)}%`
@@ -272,6 +281,7 @@ function AttributesSection({
           />
           <StatCard
             label="Best time of day"
+            metric="best-time"
             value={best ? DAYPART_LABELS[best.daypart].split(" ")[0] : "—"}
             hint={
               best
@@ -282,12 +292,14 @@ function AttributesSection({
           {worst && worst.daypart !== best?.daypart && (
             <StatCard
               label="Toughest time of day"
+              metric="toughest-time"
               value={DAYPART_LABELS[worst.daypart].split(" ")[0]}
               hint={`satisfaction ${worst.agg.mean.toFixed(1)}/5 · n ${worst.agg.n}`}
             />
           )}
           <StatCard
             label="Energy level"
+            metric="energy-level"
             value={meanEnergy !== null ? `${meanEnergy.toFixed(1)}/3` : "—"}
             hint={
               meanEnergy !== null && energyTotalMs > 0
@@ -297,6 +309,6 @@ function AttributesSection({
           />
         </StatGrid>
       )}
-    </section>
+    </InsightCard>
   );
 }
