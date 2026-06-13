@@ -26,6 +26,11 @@ import {
   type SleepCorrelation,
 } from "@/lib/analytics/sleep-cross";
 import { computeSleepHints, HINTS_WINDOW_DAYS } from "@/lib/sleep/adaptive";
+import {
+  computeHabitualPhase,
+  DEBT_NUDGE_CAP_MS,
+  recentSleepDebtMs,
+} from "@/lib/sleep/circadian";
 import { deriveNights, type DeriveOptions } from "@/lib/sleep/derive";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { Occurrence } from "@/lib/types";
@@ -196,6 +201,18 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
     [hintsNights, hintsLogs, prefs, timeZone],
   );
 
+  // The same trailing-30-day history feeds the Tonight recommendation: the
+  // viewer's habitual circadian phase, and a recent sleep debt bounded to the
+  // most a single night's target may be nudged up (more is irrelevant here).
+  const habitualPhase = useMemo(
+    () => computeHabitualPhase(hintsNights, hintsLogs, timeZone),
+    [hintsNights, hintsLogs, timeZone],
+  );
+  const recentDebtMs = useMemo(() => {
+    const targetAsleepMs = prefs.targetCycles * prefs.cycleLengthMin * 60_000;
+    return recentSleepDebtMs(hintsNights, hintsLogs, targetAsleepMs, DEBT_NUDGE_CAP_MS);
+  }, [hintsNights, hintsLogs, prefs.targetCycles, prefs.cycleLengthMin]);
+
   const todayKey = dateKeyInZone(now, timeZone);
   const hasLogToday = logs.some((l) => l.date === todayKey);
   const derivedToday = nights.find((n) => n.dateKey === todayKey) ?? null;
@@ -244,6 +261,8 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
         viewerId={viewerId}
         sharedCategoryIds={sharedCategoryIds}
         prefs={prefs}
+        habitualPhase={habitualPhase}
+        recentDebtMs={recentDebtMs}
         timeZone={timeZone}
         now={now}
       />

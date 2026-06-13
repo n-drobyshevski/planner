@@ -9,7 +9,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { formatDuration, formatTime } from "@/lib/datetime/format";
+import { formatDuration } from "@/lib/datetime/format";
+import { fromNoon, minutesSinceNoon } from "@/lib/sleep/clock";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import type { DerivedNight } from "@/lib/sleep/derive";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
@@ -80,8 +81,7 @@ export function HistorySection({
       const log = logByKey.get(n.dateKey);
       const at = log?.bedtimeAt ?? n.start;
       if (at == null) continue;
-      const [hh, mm] = formatTime(at, timeZone).split(":").map(Number);
-      out.push(hh >= 12 ? (hh - 12) * 60 + mm : (hh + 12) * 60 + mm);
+      out.push(minutesSinceNoon(at, timeZone));
     }
     return out;
   }, [nights, logByKey, timeZone]);
@@ -147,13 +147,6 @@ export function HistorySection({
   const scoreConfig: ChartConfig = {
     quality: { label: "Quality (1–5)", color: "var(--chart-2)" },
     fatigue: { label: "Sleepiness (1–9)", color: "var(--chart-4)" },
-  };
-
-  /** Format minutes-since-noon back to a wall clock "HH:mm". */
-  const fromNoon = (min: number) => {
-    const h = (Math.floor(min / 60) + 12) % 24;
-    const m = Math.round(min % 60);
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   };
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, ListChecks, MoreVertical } from "lucide-react";
+import { Plus, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -21,8 +21,10 @@ export type TasksView = "board" | "list";
 /**
  * Tasks controls, portaled into the shared surface header (SurfaceChrome owns
  * the <header>, AppNav, swipe, and the desktop user menu). The board switcher
- * renders once and stays put across breakpoints; below `md` the view toggle
- * collapses into the `⋯` menu so the row never overflows a phone.
+ * sits in the center slot — right of the AppNav mode switcher, mirroring how
+ * Insights places its period selector — and stays put across breakpoints; below
+ * `md` the view toggle collapses into the `⋯` menu so the row never overflows a
+ * phone.
  */
 export function TasksToolbar({
   view,
@@ -43,10 +45,7 @@ export function TasksToolbar({
 }) {
   return (
     <>
-      <ToolbarSlot name="leading">
-        <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground md:flex">
-          <ListChecks className="size-4" />
-        </span>
+      <ToolbarSlot name="center">
         <BoardSwitcher
           activeBoardId={activeBoardId}
           onActiveBoardChange={onBoardChange}
