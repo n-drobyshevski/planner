@@ -12,6 +12,8 @@
 export type DashboardCardId =
   | "total"
   | "daily-avg"
+  | "events"
+  | "avg-session"
   | "busiest-day"
   | "active-days"
   | "tasks-done"
@@ -35,6 +37,8 @@ export interface DashboardCardDef {
 export const DASHBOARD_CARDS: readonly DashboardCardDef[] = [
   { id: "total", label: "Total tracked", kind: "stat", defaultVisible: true },
   { id: "daily-avg", label: "Daily average", kind: "stat", defaultVisible: true },
+  { id: "events", label: "Events", kind: "stat", defaultVisible: true },
+  { id: "avg-session", label: "Average session", kind: "stat", defaultVisible: true },
   { id: "busiest-day", label: "Busiest day", kind: "stat", defaultVisible: true },
   { id: "active-days", label: "Active days", kind: "stat", defaultVisible: true },
   { id: "tasks-done", label: "Tasks done", kind: "stat", defaultVisible: true },

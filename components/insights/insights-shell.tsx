@@ -352,25 +352,31 @@ function InsightsShellInner({
       />
 
       <Tabs value={tab} onValueChange={(v) => changeTab(v as InsightsTab)}>
-        <div className="overflow-x-auto border-b px-3 sm:px-4">
-          {/* h override must mirror the base's group-data variant to out-cascade its h-8 */}
-          <TabsList className="w-max bg-transparent p-0 group-data-horizontal/tabs:h-11 sm:group-data-horizontal/tabs:h-10">
-            {INSIGHTS_TABS.map((t) => (
-              <TabsTrigger
-                key={t}
-                value={t}
-                className="rounded-none border-0 border-b-2 border-transparent px-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-              >
-                {TAB_LABELS[t]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        {/* Border is full-bleed; the tab row aligns to the same centered
+            1600px column as the content below it. */}
+        <div className="border-b">
+          <div className="mx-auto w-full max-w-[1600px] overflow-x-auto px-3 sm:px-4 xl:px-6">
+            {/* h override must mirror the base's group-data variant to out-cascade its h-8 */}
+            <TabsList className="w-max bg-transparent p-0 group-data-horizontal/tabs:h-11 sm:group-data-horizontal/tabs:h-10">
+              {INSIGHTS_TABS.map((t) => (
+                <TabsTrigger
+                  key={t}
+                  value={t}
+                  className="rounded-none border-0 border-b-2 border-transparent px-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                >
+                  {TAB_LABELS[t]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
         </div>
       </Tabs>
 
       {period.clamped && (
-        <p className="border-b bg-muted/50 px-4 py-1.5 text-xs text-muted-foreground">
-          Showing the most recent 366 days of the selected range.
+        <p className="border-b bg-muted/50 py-1.5 text-xs text-muted-foreground">
+          <span className="mx-auto block w-full max-w-[1600px] px-4 xl:px-6">
+            Showing the most recent 366 days of the selected range.
+          </span>
         </p>
       )}
 
@@ -386,11 +392,11 @@ function InsightsShellInner({
         ) : error ? (
           <LoadError subject="insights" onRetry={() => void qc.invalidateQueries()} />
         ) : loading ? (
-          <div className="mx-auto w-full max-w-5xl p-3 sm:p-4">
+          <div className="mx-auto w-full max-w-[1600px] p-3 sm:p-4 xl:px-6">
             <InsightsTabSkeleton />
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-5xl p-3 sm:p-4">
+          <div className="mx-auto w-full max-w-[1600px] p-3 sm:p-4 xl:px-6">
             <h2 className="sr-only">{period.label}</h2>
             {tab === "overview" && <OverviewTab data={data} />}
             {tab === "trends" && <TrendsTab data={data} />}

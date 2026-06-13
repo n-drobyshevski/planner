@@ -67,7 +67,7 @@ import { dateInputToMs, dateKeyInZone } from "@/lib/datetime/local";
 import { DigestCard } from "./digest-card";
 import { InsightsEmpty } from "./insights-empty";
 import { StatCard, StatGrid } from "./stat-card";
-import { SectionLabel } from "./tab-bits";
+import { SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 // Dismissals live in ONE viewer-scoped localStorage entry: a JSON map of
@@ -346,22 +346,26 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
 
   const periodKey = `${period.window.start}-${period.window.end}`;
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <p className="sr-only">
         {suggestions.length === 0
           ? "No suggestions for this period."
           : `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"} for this period.`}
       </p>
       <DigestCard payload={digestPayload} />
-      {period.window.end > now && (
-        <OutlookSection
-          forecast={forecast}
-          futureWindow={data.futureWindow}
-          loading={data.futureLoading}
-          timeZone={timeZone}
-        />
-      )}
-      <CoverageCard coverage={coverage} />
+      {/* Outlook and coverage pair two-up on desktop; the digest above and the
+          suggestion list below read the whole period and stay full width. */}
+      <TabGrid>
+        {period.window.end > now && (
+          <OutlookSection
+            forecast={forecast}
+            futureWindow={data.futureWindow}
+            loading={data.futureLoading}
+            timeZone={timeZone}
+          />
+        )}
+        <CoverageCard coverage={coverage} />
+      </TabGrid>
       {/* Keyed remount per period + viewer: dismissed state re-reads storage
           in its lazy initializer; no setState-in-effect. */}
       <SuggestionList

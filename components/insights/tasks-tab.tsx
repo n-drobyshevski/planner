@@ -40,7 +40,7 @@ import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
 import { bucketLabel, bucketTick } from "./series";
-import { CHART_H, SectionLabel } from "./tab-bits";
+import { CHART_H, SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /** Lead times run to days/weeks — "9d 17h" reads better than "233h". */
@@ -109,14 +109,17 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
   const boardName = (id: string | null) =>
     id === null ? "No board" : (data.boards.find((b) => b.id === id)?.name ?? "Unknown");
 
+  const hasBoardBreakdown = boards.length > 1;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <p className="sr-only">
         {stats.completedCount} tasks completed and {stats.createdCount} created in{" "}
         {period.label}. {stats.overdueOpenCount} open tasks are overdue.
       </p>
 
-      <div className="space-y-1.5">
+      <TabGrid>
+      <div className="space-y-1.5 xl:col-span-2">
         <StatGrid>
           <StatCard
             label="Completed"
@@ -167,7 +170,7 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
         </p>
       </div>
 
-      <section className="space-y-1.5">
+      <section className={hasBoardBreakdown ? "space-y-1.5" : "space-y-1.5 xl:col-span-2"}>
         <SectionLabel>Velocity per {granularity}</SectionLabel>
         <ChartContainer
           config={velocityConfig}
@@ -212,7 +215,7 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
         </ChartContainer>
       </section>
 
-      {boards.length > 1 && (
+      {hasBoardBreakdown && (
         <section className="space-y-1.5">
           <SectionLabel>By board</SectionLabel>
           <Table className="text-xs">
@@ -268,6 +271,7 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
           </Table>
         </section>
       )}
+      </TabGrid>
     </div>
   );
 }
