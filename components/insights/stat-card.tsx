@@ -106,7 +106,12 @@ export function StatCard({
   );
 }
 
-/** Responsive stat grid: 2-up on phones, denser as space allows. */
+/**
+ * Responsive stat grid: 2-up on phones, denser as space allows. Density keys
+ * off the grid's OWN width via a container query — so the same component reads
+ * right whether it spans the full insights column (6–7 up) or sits in a
+ * half-width dashboard cell (~4 up), without the caller knowing where it lives.
+ */
 export function StatGrid({
   children,
   className,
@@ -115,8 +120,10 @@ export function StatGrid({
   className?: string;
 }) {
   return (
-    <div className={cn("grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4", className)}>
-      {children}
+    <div className={cn("@container", className)}>
+      <div className="grid grid-cols-2 gap-2 @sm:grid-cols-3 @lg:grid-cols-4 @3xl:grid-cols-6 @5xl:grid-cols-7">
+        {children}
+      </div>
     </div>
   );
 }

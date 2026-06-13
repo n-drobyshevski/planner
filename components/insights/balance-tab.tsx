@@ -27,7 +27,7 @@ import { toPaletteColor } from "@/lib/theme/appearance";
 import { GoalsSection } from "./goals/goals-section";
 import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { NEUTRAL, bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function BalanceTab({ data }: { data: InsightsTabData }) {
@@ -128,14 +128,15 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <p className="sr-only">
         {topShare
           ? `${seriesMeta(topShare.categoryId ?? "__uncategorized__", data.categories).name} takes the largest share at ${srPercent(topShare.ms, total)} of tracked time.`
           : ""}
       </p>
 
-      <section className="space-y-1.5">
+      <TabGrid>
+      <section className="space-y-1.5 xl:col-span-2">
         <SectionLabel>Context mix per {granularity}</SectionLabel>
         <ChartContainer
           config={stackedConfig}
@@ -291,7 +292,7 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
       </section>
 
       {showMembers && memberSplit.memberIds.length > 1 && (
-        <section className="space-y-1.5">
+        <section className="space-y-1.5 xl:col-span-2">
           <SectionLabel>Who tracked it, per {granularity}</SectionLabel>
           <ChartContainer
             config={memberConfig}
@@ -332,6 +333,7 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
           </p>
         </section>
       )}
+      </TabGrid>
     </div>
   );
 }

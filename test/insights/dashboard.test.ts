@@ -45,6 +45,8 @@ describe("layoutRuns", () => {
       ids: [
         "total",
         "daily-avg",
+        "events",
+        "avg-session",
         "busiest-day",
         "active-days",
         "tasks-done",
@@ -63,7 +65,7 @@ describe("layoutRuns", () => {
   it("splits stat runs when a section is interleaved, and skips hidden cards", () => {
     const layout = normalizeLayout({
       order: ["total", "per-day", "daily-avg", "busiest-day"],
-      hidden: ["daily-avg", "by-context", "shifts", "goals", "active-days", "tasks-done", "on-time", "overdue"],
+      hidden: ["daily-avg", "events", "avg-session", "by-context", "shifts", "goals", "active-days", "tasks-done", "on-time", "overdue"],
     });
     expect(layoutRuns(layout)).toEqual([
       { type: "stats", ids: ["total"] },

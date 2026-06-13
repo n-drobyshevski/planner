@@ -20,7 +20,7 @@ import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
 import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { HourHeatmap } from "./hour-heatmap";
-import { SectionLabel } from "./tab-bits";
+import { SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 const DAYPART_LABELS: Record<Daypart, string> = {
@@ -98,7 +98,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <p className="sr-only">
         Average tracked time peaks on {top.full} at {formatDuration(top.avg)} per day.
         {frag.blockCount > 0
@@ -106,6 +106,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
           : ""}
       </p>
 
+      <TabGrid>
       <section className="space-y-1.5">
         <SectionLabel>By weekday</SectionLabel>
         <ChartContainer
@@ -163,7 +164,13 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
         </ChartContainer>
       </section>
 
-      <section className="space-y-1.5">
+      <AttributesSection
+        focusSplit={focusSplit}
+        dayparts={dayparts}
+        energyDays={energyDays}
+      />
+
+      <section className="space-y-1.5 xl:col-span-2">
         <SectionLabel>By hour of day</SectionLabel>
         <HourHeatmap
           occurrences={occurrences}
@@ -172,13 +179,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
         />
       </section>
 
-      <AttributesSection
-        focusSplit={focusSplit}
-        dayparts={dayparts}
-        energyDays={energyDays}
-      />
-
-      <section className="space-y-1.5">
+      <section className="space-y-1.5 xl:col-span-2">
         <SectionLabel>Fragmentation</SectionLabel>
         <StatGrid>
           <StatCard
@@ -213,6 +214,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
           />
         </StatGrid>
       </section>
+      </TabGrid>
     </div>
   );
 }

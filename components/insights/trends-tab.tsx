@@ -35,7 +35,7 @@ import { ChartCard } from "./chart-card";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { InsightsEmpty } from "./insights-empty";
 import { bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function TrendsTab({ data }: { data: InsightsTabData }) {
@@ -146,14 +146,16 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <p className="sr-only">
         {formatDuration(total)} tracked across {rows.length} {granularity} buckets.
         Busiest: {busiest.full} with {formatDuration(busiest.ms)}.
       </p>
 
+      <TabGrid>
       <ChartCard
         id="trends-per-bucket"
+        className="xl:col-span-2"
         viewerId={viewerId}
         title={`Tracked time per ${granularity}`}
         headline={`Busiest ${granularity}: ${busiest.full} (${formatDuration(busiest.ms)}).${trendClause}`}
@@ -268,7 +270,11 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         )}
       </ChartCard>
 
-      {perDay && (streak || steadiness !== null || anomalies.length > 0) && (
+      {perDay &&
+        (streak ||
+          steadiness !== null ||
+          anomalies.length > 0 ||
+          trend.direction !== null) && (
         <section className="space-y-1.5">
           <SectionLabel>Momentum</SectionLabel>
           <StatGrid>
@@ -291,6 +297,21 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                 label="Consistency"
                 value={`${Math.round(steadiness * 100)}%`}
                 hint="days near your typical load"
+              />
+            )}
+            {/* Theil–Sen slope of the day series — the steady drift behind the
+                "trending up/down" verdict, as a per-day figure. */}
+            {trend.direction !== null && trend.slopeMsPerBucket !== null && (
+              <StatCard
+                label="Trend rate"
+                value={
+                  trend.direction === "flat"
+                    ? "Level"
+                    : `${trend.slopeMsPerBucket > 0 ? "+" : "−"}${formatDuration(
+                        Math.abs(trend.slopeMsPerBucket),
+                      )}`
+                }
+                hint={trend.direction === "flat" ? "holding steady" : "per day, typical drift"}
               />
             )}
           </StatGrid>
@@ -433,6 +454,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           )}
         </ChartCard>
       )}
+      </TabGrid>
 
       <DayDetailSheet
         dayMs={detailDay}

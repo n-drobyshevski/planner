@@ -45,11 +45,18 @@ import { DayDetailSheet } from "./day-detail-sheet";
 import { GoalsSection } from "./goals/goals-section";
 import { InsightsEmpty } from "./insights-empty";
 import { NEUTRAL, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /** Categories shown individually in the donut before collapsing into "Other". */
 const TOP_CATEGORIES = 6;
+
+/**
+ * Section cards that earn the full grid width on desktop (their content reads
+ * better wide); everything else flows two-up under TabGrid. The per-day chart
+ * is the period's centrepiece — a half-width strip would crush its day ticks.
+ */
+const FULL_WIDTH_SECTIONS = new Set<DashboardCardId>(["per-day"]);
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -209,6 +216,27 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
         label="Daily avg"
         value={formatDuration(usage.summary.dailyAverageMs)}
         delta={delta(usage.summary.dailyAverageMs, prevUsage.summary.dailyAverageMs)}
+      />
+    ),
+    events: (
+      <StatCard
+        key="events"
+        label="Events"
+        value={String(usage.summary.eventCount)}
+        delta={delta(usage.summary.eventCount, prevUsage.summary.eventCount)}
+        hint="tracked this period"
+      />
+    ),
+    "avg-session": (
+      <StatCard
+        key="avg-session"
+        label="Avg session"
+        value={
+          usage.summary.eventCount > 0
+            ? formatDuration(total / usage.summary.eventCount)
+            : "—"
+        }
+        hint="per tracked event"
       />
     ),
     "busiest-day": (
@@ -518,7 +546,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   const runs = layoutRuns(layout);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex justify-end">
         <CustomizeDashboardSheet
           layout={layout}
@@ -536,20 +564,35 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
         </p>
       )}
 
-      {runs.map((run, i) => {
-        if (run.type === "stats") {
-          const cards = run.ids
-            .map((id) => statCards[id])
-            .filter((node): node is React.ReactNode => node != null);
-          return cards.length > 0 ? (
-            <StatGrid key={`stats-${i}`}>{cards}</StatGrid>
-          ) : null;
-        }
-        // Sections other than goals need tracked time; goals shows its own
-        // empty/progress state regardless (a budget can be "on track" at 0h).
-        if (total === 0 && run.id !== "goals") return null;
-        return sections[run.id] ?? null;
-      })}
+      {/* Stat rows and the wide per-day chart take the full width; the donut,
+          shift chips and goals flow two-up on desktop. */}
+      <TabGrid>
+        {runs.map((run, i) => {
+          if (run.type === "stats") {
+            const cards = run.ids
+              .map((id) => statCards[id])
+              .filter((node): node is React.ReactNode => node != null);
+            return cards.length > 0 ? (
+              <StatGrid key={`stats-${i}`} className="xl:col-span-2">
+                {cards}
+              </StatGrid>
+            ) : null;
+          }
+          // Sections other than goals need tracked time; goals shows its own
+          // empty/progress state regardless (a budget can be "on track" at 0h).
+          if (total === 0 && run.id !== "goals") return null;
+          const node = sections[run.id];
+          if (node == null) return null;
+          return (
+            <div
+              key={run.id}
+              className={FULL_WIDTH_SECTIONS.has(run.id) ? "xl:col-span-2" : undefined}
+            >
+              {node}
+            </div>
+          );
+        })}
+      </TabGrid>
 
       {total === 0 && <InsightsEmpty />}
 

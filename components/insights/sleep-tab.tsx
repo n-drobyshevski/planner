@@ -20,6 +20,11 @@ import {
 } from "@/lib/hooks/use-sleep-logs";
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
+import {
+  buildSleepDayPairs,
+  sleepCorrelations,
+  type SleepCorrelation,
+} from "@/lib/analytics/sleep-cross";
 import { computeSleepHints, HINTS_WINDOW_DAYS } from "@/lib/sleep/adaptive";
 import { deriveNights, type DeriveOptions } from "@/lib/sleep/derive";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
@@ -30,6 +35,8 @@ import { HintsSection } from "./sleep/hints-section";
 import { HistorySection } from "./sleep/history-section";
 import { LogNightDialog } from "./sleep/log-night-dialog";
 import { TonightCard } from "./sleep/tonight-card";
+import { SectionEmpty } from "./insights-empty";
+import { SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /**
@@ -128,6 +135,25 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
     [logs, nightKeys],
   );
 
+  // Cross-analysis: does a night's duration / quality track with the next
+  // day's load, focus blocks or satisfaction? Pairs each logged night with the
+  // viewer's OWN active tracked time on the day they woke into (sleep is
+  // viewer-only, so a partner's events never enter the relation).
+  const viewerDayOccurrences = useMemo(
+    () => rawOccurrences.filter((o) => o.ownerId === viewerId),
+    [rawOccurrences, viewerId],
+  );
+  const correlations = useMemo(() => {
+    const pairs = buildSleepDayPairs(
+      logs,
+      viewerDayOccurrences,
+      period.days,
+      period.window,
+      timeZone,
+    );
+    return sleepCorrelations(pairs);
+  }, [logs, viewerDayOccurrences, period.days, period.window, timeZone]);
+
   // Hints read a fixed trailing window, not the period picker: switching to
   // "this week" shouldn't make patterns vanish below the minimum sample. The
   // window fetches day-aligned (stable query key, the Tonight card pattern).
@@ -223,13 +249,46 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
       />
 
       {hasAnyData ? (
+        // History spans the full width (its charts read better wide); hints,
+        // the new sleep↔day correlations and the calculator flow two-up.
+        <TabGrid>
+          <div className="xl:col-span-2">
+            <HistorySection
+              nights={nights}
+              logs={periodLogs}
+              prefs={prefs}
+              timeZone={timeZone}
+              action={
+                <LogNightDialog
+                  todayKey={todayKey}
+                  timeZone={timeZone}
+                  nights={nights}
+                  logs={logs}
+                  onSave={upsert}
+                  onDelete={deleteLog}
+                />
+              }
+            />
+          </div>
+          <HintsSection hints={hints} scoredCount={scoredCount} />
+          <SleepCorrelationsSection correlations={correlations} />
+          <CalculatorCard prefs={prefs} />
+        </TabGrid>
+      ) : logsError ? null : (
         <>
-          <HistorySection
-            nights={nights}
-            logs={periodLogs}
-            prefs={prefs}
-            timeZone={timeZone}
-            action={
+          <Empty className="border-0">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MoonStar />
+              </EmptyMedia>
+              <EmptyTitle>No sleep data yet</EmptyTitle>
+              <EmptyDescription>
+                Log a night below, or mark your nightly events as inactive in the
+                event dialog — Insights derives your nights from them
+                automatically.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
               <LogNightDialog
                 todayKey={todayKey}
                 timeZone={timeZone}
@@ -238,37 +297,90 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
                 onSave={upsert}
                 onDelete={deleteLog}
               />
-            }
-          />
-          <HintsSection hints={hints} scoredCount={scoredCount} />
+            </EmptyContent>
+          </Empty>
+          <CalculatorCard prefs={prefs} />
         </>
-      ) : logsError ? null : (
-        <Empty className="border-0">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <MoonStar />
-            </EmptyMedia>
-            <EmptyTitle>No sleep data yet</EmptyTitle>
-            <EmptyDescription>
-              Log a night below, or mark your nightly events as inactive in the
-              event dialog — Insights derives your nights from them
-              automatically.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <LogNightDialog
-              todayKey={todayKey}
-              timeZone={timeZone}
-              nights={nights}
-              logs={logs}
-              onSave={upsert}
-              onDelete={deleteLog}
-            />
-          </EmptyContent>
-        </Empty>
       )}
-
-      <CalculatorCard prefs={prefs} />
     </div>
+  );
+}
+
+const CORRELATION_METRIC_LABELS: Record<SleepCorrelation["metric"], string> = {
+  load: "Next-day load",
+  fragmentation: "Next-day focus blocks",
+  satisfaction: "Next-day satisfaction",
+};
+const CORRELATION_SIDE_LABELS: Record<SleepCorrelation["vs"], string> = {
+  duration: "sleep duration",
+  quality: "sleep quality",
+};
+
+/** |rho| → plain-language strength; sign carries the direction separately. */
+function correlationStrength(rho: number): string {
+  const a = Math.abs(rho);
+  if (a < 0.2) return "no clear link";
+  if (a < 0.4) return rho > 0 ? "slightly higher" : "slightly lower";
+  if (a < 0.6) return rho > 0 ? "tends higher" : "tends lower";
+  return rho > 0 ? "strongly higher" : "strongly lower";
+}
+
+/**
+ * Sleep ↔ next-day relations: the six Spearman correlations
+ * (load / focus blocks / satisfaction vs sleep duration / quality), computed
+ * from logged nights paired with the day woken into. Only combos that clear
+ * the minimum-pairs gate (rho non-null) are shown; below that the section
+ * coaches the member to log more.
+ */
+function SleepCorrelationsSection({
+  correlations,
+}: {
+  correlations: SleepCorrelation[];
+}) {
+  const rows = correlations.filter((c) => c.rho !== null);
+
+  return (
+    <section className="space-y-2">
+      <SectionLabel>Sleep &amp; your days</SectionLabel>
+      {rows.length === 0 ? (
+        <SectionEmpty>
+          Once you&apos;ve logged enough nights alongside rated days, this shows
+          how your sleep duration and quality track with the next day&apos;s
+          load, focus and satisfaction.
+        </SectionEmpty>
+      ) : (
+        <ul className="space-y-1.5" role="list">
+          {rows.map((c) => {
+            const rho = c.rho as number;
+            return (
+              <li
+                key={`${c.metric}-${c.vs}`}
+                className="flex items-center gap-2 rounded-lg border bg-card p-2.5 text-xs shadow-soft"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">
+                    {CORRELATION_METRIC_LABELS[c.metric]}
+                  </span>{" "}
+                  <span className="text-muted-foreground">
+                    {correlationStrength(rho)} after more{" "}
+                    {CORRELATION_SIDE_LABELS[c.vs]}
+                  </span>
+                </span>
+                <span
+                  className="shrink-0 font-mono tabular-nums text-muted-foreground"
+                  aria-label={`Spearman correlation ${rho.toFixed(2)} over ${c.n} nights`}
+                >
+                  {rho > 0 ? "+" : ""}
+                  {rho.toFixed(2)}
+                </span>
+                <span className="w-12 shrink-0 text-right font-mono tabular-nums text-muted-foreground/70">
+                  n {c.n}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
