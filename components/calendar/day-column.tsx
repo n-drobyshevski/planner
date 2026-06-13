@@ -4,8 +4,9 @@ import { useMemo, type CSSProperties } from "react";
 import { FolderPlus, FolderMinus, Pencil, Trash2, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { packDay } from "@/lib/layout/pack-day";
+import { clashRanges } from "@/lib/layout/clash-seams";
 import { enclosingContext } from "@/lib/calendar/contexts";
-import { msToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
+import { msToY, minutesToY, durationToHeight, HOUR_PX } from "@/lib/datetime/grid-math";
 import { EventBlock } from "./event-block";
 import { ContextBackdrop } from "./context-backdrop";
 import { NowLine } from "./now-line";
@@ -120,6 +121,11 @@ export function DayColumn({
     const nested = segs.map((s) => enclosingContext(ctxOccs, s.occ.start) !== null);
     return { segments: segs, packed: packDay(segs), nestedFlags: nested };
   }, [occurrences, dayStart, dayEnd, contextSegs, canEdit]);
+
+  // Direct time-overlaps within the day → a whisper hairline "seam" on the front
+  // (right-staggered) block of each clashing pair, so a double-booking reads as
+  // a clash instead of two innocent neighbours. Derived from the same packing.
+  const clashes = useMemo(() => clashRanges(segments, packed), [segments, packed]);
 
   // Recolor routes to the whole selection when the item is part of a multi-pick,
   // otherwise just the one item.
@@ -237,6 +243,14 @@ export function DayColumn({
           : `calc(${p.widthPct}% - 3px)`;
         const editable = canEdit(seg.occ);
         const settling = settleKeys?.has(seg.occ.key) ?? false;
+        // Pixel range (relative to this block's top) for the clash seam, if any.
+        const cr = clashes[i];
+        const clash = cr
+          ? {
+              topPx: minutesToY((cr.start - seg.start) / 60000, hourPx),
+              heightPx: minutesToY((cr.end - cr.start) / 60000, hourPx),
+            }
+          : null;
         return (
           <ItemContextMenu
             key={seg.occ.key}
@@ -278,6 +292,7 @@ export function DayColumn({
                   ? () => onToggleTaskDone(taskId)
                   : undefined
               }
+              clash={clash}
               style={
                 {
                   top: msToY(seg.start, dayStart, hourPx),

@@ -195,6 +195,7 @@ export const CalendarPager = React.forwardRef<CalendarPagerHandle, Props>(
           <div
             ref={prevRef}
             aria-hidden
+            inert
             className="h-full w-full shrink-0 overflow-hidden [&_*]:pointer-events-none"
           >
             {neighborsOn ? prev : null}
@@ -205,6 +206,7 @@ export const CalendarPager = React.forwardRef<CalendarPagerHandle, Props>(
           <div
             ref={nextRef}
             aria-hidden
+            inert
             className="h-full w-full shrink-0 overflow-hidden [&_*]:pointer-events-none"
           >
             {neighborsOn ? next : null}

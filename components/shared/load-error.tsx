@@ -17,7 +17,10 @@ export function LoadError({
   onRetry?: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+    <div
+      role="alert"
+      className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center"
+    >
       <div className="max-w-xs space-y-1">
         <p className="text-sm font-medium text-foreground">
           We couldn&apos;t load your {subject}.

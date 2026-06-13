@@ -43,7 +43,9 @@ export function useEventMutations(workspaceId: string | undefined) {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
-  const runUndo = useHistoryStore((s) => s.runUndo);
+  // undoById reverses exactly the action this toast belongs to (Ctrl+Z, via
+  // components/undo-hotkey.tsx, still uses runUndo to pop the newest entry).
+  const undoById = useHistoryStore((s) => s.undoById);
   const notify = useNotify();
 
   const invalidate = () => {
@@ -169,19 +171,34 @@ export function useEventMutations(workspaceId: string | undefined) {
     undo?: (result: T) => UndoSpec | null,
     /** Apply an optimistic cache patch now; returns the rollback for the catch. */
     optimistic?: () => () => void,
+    /** Toast options: a longer-lived destructive toast (offerUndo) + subtitle. */
+    opts?: { description?: string; offerUndo?: boolean },
   ): Promise<boolean> {
     const rollback = optimistic?.();
     try {
       const result = await p;
       invalidate();
       const spec = undo?.(result) ?? null;
-      if (spec) pushUndo(spec);
-      // Undoable actions get a visible Undo on the toast (works on mobile, where
-      // there's no Ctrl+Z); it pops the same history entry Ctrl+Z would.
-      notify.success(
-        okMsg,
-        spec ? { action: { label: "Undo", onClick: () => void runUndo() } } : undefined,
-      );
+      const undoId = spec ? pushUndo(spec) : null;
+      // Every undoable action gets a visible Undo on the toast (works on mobile,
+      // where there's no Ctrl+Z); it reverses exactly THIS action via undoById.
+      // Destructive actions (offerUndo) add a subtitle and hold the toast longer
+      // so there's time to reach for it. Goes through notify so it respects the
+      // member's showSuccessToasts pref; Ctrl+Z works regardless.
+      notify.success(okMsg, {
+        description: opts?.description,
+        duration: opts?.offerUndo ? 8000 : undefined,
+        action:
+          undoId != null
+            ? {
+                label: "Undo",
+                onClick: () =>
+                  void undoById(undoId).then(
+                    (label) => label && notify.success(`Undone: ${label}`),
+                  ),
+              }
+            : undefined,
+      });
       return true;
     } catch (e) {
       rollback?.(); // restore the pre-patch snapshot on failure
@@ -271,12 +288,13 @@ export function useEventMutations(workspaceId: string | undefined) {
           return () => rollbacks.forEach((r) => r());
         },
       ),
-    remove: (id: string) =>
+    remove: (id: string, opts?: { description?: string }) =>
       run(
         m.deleteEventDeep(sb, id),
         "Event deleted",
         (snap) => inverse("delete", () => m.restoreDeleted(sb, snap)),
         () => removeEventFromWindows(id),
+        { description: opts?.description, offerUndo: true },
       ),
     /** Delete several items — whole rows and/or single-occurrence cancels. */
     removeMany: (ops: DeleteOp[]) =>
@@ -305,6 +323,8 @@ export function useEventMutations(workspaceId: string | undefined) {
           };
           return inverse("delete", () => m.restoreDeleted(sb, merged));
         },
+        undefined,
+        { offerUndo: true },
       ),
 
     /** Assign an event to a Context (category), or clear it (categoryId = null). */
@@ -395,8 +415,12 @@ export function useEventMutations(workspaceId: string | undefined) {
         ),
       ),
     deleteAll: (id: string) =>
-      run(m.deleteEventDeep(sb, id), "Series deleted", (snap) =>
-        inverse("delete series", () => m.restoreDeleted(sb, snap)),
+      run(
+        m.deleteEventDeep(sb, id),
+        "Series deleted",
+        (snap) => inverse("delete series", () => m.restoreDeleted(sb, snap)),
+        undefined,
+        { offerUndo: true },
       ),
   };
 }

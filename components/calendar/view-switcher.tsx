@@ -21,10 +21,9 @@ export function ViewSwitcher({
       size="sm"
     >
       <ToggleGroupItem value="agenda">Agenda</ToggleGroupItem>
-      <ToggleGroupItem value="month">Month</ToggleGroupItem>
-      <ToggleGroupItem value="week">Week</ToggleGroupItem>
-      <ToggleGroupItem value="3day">3 Day</ToggleGroupItem>
       <ToggleGroupItem value="day">Day</ToggleGroupItem>
+      <ToggleGroupItem value="week">Week</ToggleGroupItem>
+      <ToggleGroupItem value="month">Month</ToggleGroupItem>
     </ToggleGroup>
   );
 }

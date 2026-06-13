@@ -31,12 +31,21 @@ export const EventBlock = forwardRef<
     editable?: boolean;
     taskDone?: boolean;
     onToggleTaskDone?: () => void;
-    /** Open the event from the keyboard (Enter / Space on the focused block). */
+    /**
+     * When this event double-books against another, the pixel range (relative
+     * to this block's top) over which to draw the whisper "clash" seam. null /
+     * undefined = no overlap. The seam is currentColor-inset so it inherits the
+     * block's own legible ink-vs-fill contrast on both filled and outlined fills.
+     */
+    clash?: { topPx: number; heightPx: number } | null;
+    /** Keyboard / assistive-tech activation (Enter or Space): open this event's
+     *  details. The pointer "click to open" is handled by TimeGrid; this is the
+     *  keyboard equivalent so a focused block is operable without a mouse. */
     onActivate?: () => void;
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
 >(function EventBlock(
-  { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, onActivate, onMenu, className, ...rest },
+  { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, clash, onActivate, onMenu, className, ...rest },
   ref,
 ) {
   const timeZone = useViewerTimeZone();
@@ -51,10 +60,40 @@ export const EventBlock = forwardRef<
   // the room instead of being clipped. The px threshold tracks the live zoom.
   const heightPx = typeof style.height === "number" ? style.height : null;
   const compact = heightPx != null && heightPx < 44;
+  // Accessible name read aloud on focus, e.g. "Dinner, 18:30 to 20:00, shared".
+  const a11yLabel = [
+    occ.title || "Untitled event",
+    `${formatTime(occ.start, timeZone)} to ${formatTime(occ.end, timeZone)}`,
+    occ.isShared ? "shared" : null,
+    !editable ? "another member's, read-only" : null,
+    occ.status === "cancelled" ? "cancelled" : occ.status === "planned" ? "planned" : null,
+    isTask ? (taskDone ? "task, done" : "task") : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  // Enter/Space open the block (Delete is handled centrally by the grid's window
+  // listener so it never races a multi-selection delete). Ignore keys bubbling
+  // from inner controls (the task toggle / ⋮ menu handle their own); arrow keys
+  // bubble to the grid container, which moves focus between blocks (roving).
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onActivate?.();
+    }
+  }
   return (
     <div
       ref={ref}
       data-occ-key={occ.key}
+      role="button"
+      // Roving tabindex: the grid's column container (TimeGrid) is the single
+      // Tab stop; blocks are reached from there with the arrow keys, so each one
+      // is programmatically focusable (-1) but not its own tab stop. This trades
+      // ~60 tab stops in a dense week for one. Enter / Space still opens.
+      tabIndex={-1}
+      aria-label={a11yLabel}
+      onKeyDown={onKeyDown}
       style={{ ...style, ...fill }}
       className={cn(
         // z-index comes from --evt-z (the cascade order set by day-column);
@@ -71,27 +110,14 @@ export const EventBlock = forwardRef<
         // implying a drag. Skipped when selected/focused (those own the ring).
         !editable && !selected && "hover:ring-1 hover:ring-foreground/20",
         selected && "z-30 ring-2 ring-foreground",
+        // Keyboard focus ring (foreground ink contrasts every fill, matching the
+        // selection ring) so a focused block is always visible.
         "focus-visible:z-30 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none",
         // Inactive styling (faint wash + flat) is handled by eventFillStyle's
         // inline fill, so the grayscale `evt-inactive` filter isn't applied here.
         eventStatusClass(occ.status),
         className,
       )}
-      role="button"
-      // Roving tabindex: the grid's column container (TimeGrid) is the single
-      // Tab stop; blocks are reached from there with the arrow keys, so each one
-      // is programmatically focusable (-1) but not its own tab stop. This trades
-      // ~60 tab stops in a dense week for one. Enter / Space still opens.
-      tabIndex={-1}
-      onKeyDown={(e) => {
-        // Enter / Space opens the event (mouse uses the grid's pointer handler);
-        // makes the week/day grid keyboard-completable, like the agenda rows.
-        // Arrow keys bubble to the container, which moves focus between blocks.
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onActivate?.();
-        }
-      }}
       {...rest}
     >
       <div className="flex items-start gap-1">
@@ -157,6 +183,25 @@ export const EventBlock = forwardRef<
         <span className="truncate text-[11px] leading-tight opacity-90 tabular-nums">
           {formatTime(occ.start, timeZone)}–{formatTime(occ.end, timeZone)}
         </span>
+      )}
+      {clash && (
+        <>
+          {/* Whisper clash seam: a hairline down the leading edge over exactly
+              the overlap range, marking a double-booking without a banner. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-[2px] w-[2px] rounded-full bg-current"
+            style={{
+              top: clash.topPx,
+              height: Math.max(clash.heightPx, 4),
+              // 1px paper sliver to the left detaches the seam from the block's
+              // own border, so it stays legible even on outlined (partner's)
+              // blocks where currentColor equals the border color.
+              boxShadow: "-1px 0 0 0 var(--background)",
+            }}
+          />
+          <span className="sr-only">, overlaps another event</span>
+        </>
       )}
       {editable && (
         <>

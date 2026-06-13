@@ -88,4 +88,46 @@ describe("history store", () => {
     expect(stack[stack.length - 1].label).toBe("39");
     expect(stack[0].label).toBe("10");
   });
+
+  it("push returns the new entry's id", () => {
+    const id = useHistoryStore.getState().push({ label: "x", undo: async () => true });
+    expect(typeof id).toBe("string");
+    expect(useHistoryStore.getState().stack[0].id).toBe(id);
+  });
+
+  it("undoById runs and removes a SPECIFIC entry, regardless of position", async () => {
+    const ran: string[] = [];
+    const idA = useHistoryStore.getState().push({
+      label: "older",
+      undo: async () => (ran.push("older"), true),
+    });
+    useHistoryStore.getState().push({
+      label: "newer",
+      undo: async () => (ran.push("newer"), true),
+    });
+    expect(await useHistoryStore.getState().undoById(idA)).toBe("older");
+    expect(ran).toEqual(["older"]); // newer untouched
+    expect(useHistoryStore.getState().stack.map((e) => e.label)).toEqual(["newer"]);
+  });
+
+  it("undoById after Ctrl+Z does not double-run (entry already gone)", async () => {
+    let runs = 0;
+    const id = useHistoryStore.getState().push({
+      label: "delete",
+      undo: async () => (runs++, true),
+    });
+    await useHistoryStore.getState().runUndo(); // Ctrl+Z
+    expect(await useHistoryStore.getState().undoById(id)).toBeNull(); // toast click after
+    expect(runs).toBe(1);
+  });
+
+  it("undoById on an unknown id is a no-op", async () => {
+    expect(await useHistoryStore.getState().undoById("nope")).toBeNull();
+  });
+
+  it("undoById clears the entry even when the inverse fails", async () => {
+    const id = useHistoryStore.getState().push({ label: "x", undo: async () => false });
+    expect(await useHistoryStore.getState().undoById(id)).toBeNull();
+    expect(useHistoryStore.getState().stack).toHaveLength(0);
+  });
 });

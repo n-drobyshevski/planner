@@ -9,7 +9,7 @@ import {
   useViewerTimeZone,
   useSecondaryTimeZone,
 } from "@/lib/datetime/timezone-context";
-import { Pencil, Trash2, Eye } from "lucide-react";
+import { Pencil, Trash2, Eye, Repeat, Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { eventStatusClass, toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
@@ -1060,15 +1060,19 @@ export function TimeGrid({
               >
                 {preview.copy && (
                   <span
-                    className="mt-px shrink-0 rounded bg-primary px-1 text-[10px] font-bold leading-tight text-primary-foreground"
                     aria-hidden
+                    className="mt-px flex shrink-0 items-center rounded bg-primary p-0.5 text-primary-foreground"
                   >
-                    +
+                    <Plus className="size-2.5" />
                   </span>
                 )}
                 {preview.series && (
-                  <span className="mt-px shrink-0 rounded bg-primary px-1 text-[10px] font-medium leading-tight text-primary-foreground">
-                    ⟳ series
+                  <span
+                    aria-hidden
+                    className="mt-px flex shrink-0 items-center gap-0.5 rounded bg-primary px-1 py-0.5 text-[10px] font-medium leading-tight text-primary-foreground"
+                  >
+                    <Repeat className="size-2.5" />
+                    Series
                   </span>
                 )}
                 <span className="truncate text-xs font-medium text-primary">

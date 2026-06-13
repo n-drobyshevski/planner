@@ -13,6 +13,7 @@ import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { TimezoneProvider } from "@/lib/datetime/timezone-context";
 import { filterVisible, canEdit } from "@/lib/scope/visibility";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
+import { sharedRemovalNote } from "@/lib/calendar/delete-copy";
 import {
   contextOccurrences,
   enclosingContext,
@@ -243,6 +244,13 @@ export function CalendarShell({
   const setBacklogOpen = useUiStore((s) => s.setTaskBacklogOpen);
 
   const viewerId = workspace.data?.currentMember?.id ?? "";
+  // The other member in this two-person workspace — for "also removed from
+  // <partner>'s calendar" copy when a JOINT event is deleted. null if it can't
+  // be resolved (e.g. solo workspace), where the copy falls back to generic.
+  const partnerName = useMemo(() => {
+    const others = (workspace.data?.members ?? []).filter((m) => m.id !== viewerId);
+    return others.length === 1 ? others[0].name : null;
+  }, [workspace.data, viewerId]);
   // Month-view display preference (week/day always show inactive events).
   const showInactiveInMonth = workspace.data?.currentMember?.showInactiveInMonth ?? true;
   // Week/day display: how context blocks are labelled (top bar vs side label).
@@ -450,7 +458,10 @@ export function CalendarShell({
     if (!ev) return;
     if (ev.rrule) setPendingDelete({ event: ev, occurrence: occ });
     else if (ev.kind === "context") setDeletingContext(ev);
-    else void mutations.remove(ev.id);
+    else
+      void mutations.remove(ev.id, {
+        description: sharedRemovalNote(occ.isShared, partnerName),
+      });
   }
   function onDeleteScope(scope: RecurrenceScope) {
     const p = pendingDelete;
@@ -751,11 +762,28 @@ export function CalendarShell({
       }
     }
     const inTimeGrid = view === "day" || view === "week" || view === "3day";
-    if (!inTimeGrid || selectedKeys.size === 0) return;
+    // No selection guard here: a single keyboard-FOCUSED block is deletable even
+    // with nothing multi-selected (see the focused-block branch below).
+    if (!inTimeGrid) return;
     if (e.key === "Delete" || e.key === "Backspace") {
-      e.preventDefault();
-      deleteSelected(e.altKey); // Alt → delete the whole recurring family
-    } else if (e.key === "Escape") {
+      // A pointer-built multi-selection deletes as a batch (Alt → whole family)…
+      if (selectedKeys.size > 0) {
+        e.preventDefault();
+        deleteSelected(e.altKey); // Alt → delete the whole recurring family
+        return;
+      }
+      // …otherwise delete the single keyboard-focused block, if it's editable.
+      // (onDeleteEvent still routes recurring → scope prompt, context → confirm.)
+      const key =
+        ae instanceof HTMLElement
+          ? ae.closest("[data-occ-key]")?.getAttribute("data-occ-key") ?? null
+          : null;
+      const occ = key ? visible.find((o) => o.key === key) : undefined;
+      if (occ && canEditOcc(occ)) {
+        e.preventDefault();
+        onDeleteEvent(occ);
+      }
+    } else if (e.key === "Escape" && selectedKeys.size > 0) {
       clearSelection();
     }
   };

@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  CalendarDays,
   CalendarCheck,
   PanelLeft,
   PanelRight,
@@ -45,9 +46,9 @@ const VIEW_OPTIONS: { value: CalendarView; label: string }[] = [
 /**
  * Calendar controls, portaled into the shared surface header (SurfaceChrome
  * owns the <header>, AppNav, swipe, and the desktop user menu). One responsive
- * sequence: desktop shows sidebar toggle · period nav · label · view switcher ·
- * actions; below `md` everything but Filters, the label, New and the `⋯` menu
- * hides, and the collapsed controls live in the `⋯` menu.
+ * sequence: desktop shows sidebar toggle · brand · period nav · label · view
+ * switcher · actions; below `md` everything but Filters, the label, New and
+ * the `⋯` menu hides, and the collapsed controls live in the `⋯` menu.
  */
 export function CalendarToolbar({
   view,
@@ -99,6 +100,14 @@ export function CalendarToolbar({
         >
           <PanelLeft />
         </Button>
+        <div className="hidden items-center gap-2 md:flex">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <CalendarDays className="size-4" />
+          </span>
+          <span className="hidden font-heading text-sm font-semibold lg:inline">
+            {workspace?.workspaceName ?? "Planner"}
+          </span>
+        </div>
         <Button
           variant="ghost"
           size="icon"
