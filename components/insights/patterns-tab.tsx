@@ -16,11 +16,14 @@ import {
   type Daypart,
 } from "@/lib/analytics/correlations";
 import { formatDuration } from "@/lib/datetime/format";
+import { derivePatternsLede } from "@/lib/insights/ledes";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
+import { InsightLede } from "./insight-lede";
+import { BalanceSections } from "./balance-tab";
 import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { HourHeatmap } from "./hour-heatmap";
-import { SectionLabel, TabGrid } from "./tab-bits";
+import { Figure, SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 const DAYPART_LABELS: Record<Daypart, string> = {
@@ -93,6 +96,16 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
   }));
   const top = rows.reduce((a, b) => (b.avg > a.avg ? b : a), rows[0]);
 
+  const ratedParts = dayparts.filter((d) => d.agg.n >= MIN_DAYPART_RATINGS);
+  const bestPart = ratedParts.length
+    ? ratedParts.reduce((a, b) => (b.agg.mean > a.agg.mean ? b : a))
+    : null;
+  const lede = derivePatternsLede({
+    topWeekday: { full: top.full, avgMs: top.avg },
+    bestDaypart: bestPart ? DAYPART_LABELS[bestPart.daypart].split(" ")[0] : null,
+    frag,
+  });
+
   const config: ChartConfig = {
     avg: { label: "Avg per day", color: "var(--chart-1)" },
   };
@@ -105,6 +118,8 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
           ? ` The period splits into ${frag.blockCount} busy blocks, typically ${formatDuration(frag.medianBlockMs ?? 0)} long.`
           : ""}
       </p>
+
+      {lede && <InsightLede lede={lede} />}
 
       <TabGrid>
       <section className="space-y-1.5">
@@ -181,39 +196,35 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
 
       <section className="space-y-1.5 xl:col-span-2">
         <SectionLabel>Fragmentation</SectionLabel>
-        <StatGrid>
-          <StatCard
-            label="Busy blocks"
-            value={String(frag.blockCount)}
-            hint="back-to-back events count as one"
-          />
-          <StatCard
+        <dl className="flex flex-wrap gap-x-6 gap-y-2">
+          <Figure label="Busy blocks" value={String(frag.blockCount)} />
+          <Figure
             label="Typical block"
             value={frag.medianBlockMs !== null ? formatDuration(frag.medianBlockMs) : "—"}
-            hint="median length"
           />
-          <StatCard
+          <Figure
             label="Longest block"
-            value={
-              frag.longestBlockMs !== null ? formatDuration(frag.longestBlockMs) : "—"
-            }
+            value={frag.longestBlockMs !== null ? formatDuration(frag.longestBlockMs) : "—"}
           />
-          <StatCard
+          <Figure
             label="Short blocks"
             value={
               frag.shortBlockShare !== null
                 ? `${Math.round(frag.shortBlockShare * 100)}%`
                 : "—"
             }
-            hint="under 30 minutes"
           />
-          <StatCard
+          <Figure
             label="Typical gap"
             value={frag.avgGapMs !== null ? formatDuration(frag.avgGapMs) : "—"}
-            hint="between blocks, same day"
           />
-        </StatGrid>
+        </dl>
       </section>
+
+      {/* Second half: how that time splits across contexts and the two of you
+          (folded in from the former Balance tab). */}
+      <div className="border-t border-border/60 xl:col-span-2" aria-hidden />
+      <BalanceSections data={data} />
       </TabGrid>
     </div>
   );

@@ -25,12 +25,18 @@ import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import { GoalsSection } from "./goals/goals-section";
-import { InsightsEmpty, SectionEmpty } from "./insights-empty";
+import { SectionEmpty } from "./insights-empty";
 import { NEUTRAL, bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
+import { CHART_H, SectionLabel } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
-export function BalanceTab({ data }: { data: InsightsTabData }) {
+/**
+ * Context + member balance, as a set of sections (not a standalone tab). The
+ * 7→5 consolidation folds Balance into the Patterns tab, which renders these
+ * inside its own grid and owns the empty state. Returns a fragment so each
+ * section becomes a direct grid child (the col-span classes still apply).
+ */
+export function BalanceSections({ data }: { data: InsightsTabData }) {
   const reduced = usePrefersReducedMotion();
   const { period, occurrences, prevOccurrences, timeZone, memberFilter } = data;
   const { granularity } = period;
@@ -64,13 +70,9 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
     () => new Map<string | null, number>(shares.map((s) => [s.categoryId, s.ms])),
     [shares],
   );
-  if (total === 0)
-    return (
-      <InsightsEmpty
-        title="Nothing to compare"
-        description="Context and member balance appear once this period has tracked time."
-      />
-    );
+  // The host tab (Patterns) owns the empty state; when Patterns has tracked
+  // time these always do too, so there's simply nothing to add at zero.
+  if (total === 0) return null;
 
   const stackedRows = stacked.rows.map((r) => ({
     key: String(r.start),
@@ -103,8 +105,6 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
     }),
   );
 
-  const topShare = shares[0];
-
   const tooltipContent = (config: ChartConfig) => (
     <ChartTooltipContent
       labelFormatter={(_l, payload) =>
@@ -128,14 +128,7 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
   );
 
   return (
-    <div className="space-y-4">
-      <p className="sr-only">
-        {topShare
-          ? `${seriesMeta(topShare.categoryId ?? "__uncategorized__", data.categories).name} takes the largest share at ${srPercent(topShare.ms, total)} of tracked time.`
-          : ""}
-      </p>
-
-      <TabGrid>
+    <>
       <section className="space-y-1.5 xl:col-span-2">
         <SectionLabel>Context mix per {granularity}</SectionLabel>
         <ChartContainer
@@ -333,7 +326,6 @@ export function BalanceTab({ data }: { data: InsightsTabData }) {
           </p>
         </section>
       )}
-      </TabGrid>
-    </div>
+    </>
   );
 }

@@ -120,13 +120,13 @@ function FiltersForm({
     <div className="space-y-4">
       {filtersInert && (
         <p className="rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">
-          Sleep shows only your own nights, so these filters don&apos;t apply
-          there. They still shape the other tabs.
+          The You tab shows only your own nights, so these filters don&apos;t
+          apply there. They still shape the other tabs.
         </p>
       )}
       {members.length > 1 && (
         <fieldset className="space-y-1.5">
-          <legend className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <legend className="text-xs font-medium text-muted-foreground">
             Whose time
           </legend>
           <ToggleGroup
@@ -153,7 +153,7 @@ function FiltersForm({
 
       {categories.length > 0 && (
         <fieldset className="space-y-1.5">
-          <legend className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <legend className="text-xs font-medium text-muted-foreground">
             Categories
           </legend>
           <div className="max-h-48 space-y-1 overflow-y-auto pr-1">

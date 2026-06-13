@@ -30,12 +30,13 @@ import { bucketUsage, categoryTrends, rollingAverage } from "@/lib/analytics/tre
 import { activeStreak, bucketTrend, consistency, dayAnomalies } from "@/lib/analytics/momentum";
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
-import { StatCard, StatGrid } from "./stat-card";
+import { deriveTrendsLede } from "@/lib/insights/ledes";
 import { ChartCard } from "./chart-card";
+import { InsightLede } from "./insight-lede";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { InsightsEmpty } from "./insights-empty";
 import { bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
+import { CHART_H, Figure, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function TrendsTab({ data }: { data: InsightsTabData }) {
@@ -145,12 +146,20 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
       )
     : null;
 
+  const lede = deriveTrendsLede({
+    trend,
+    granularity,
+    busiest: { full: busiest.full, ms: busiest.ms },
+  });
+
   return (
     <div className="space-y-4">
       <p className="sr-only">
         {formatDuration(total)} tracked across {rows.length} {granularity} buckets.
         Busiest: {busiest.full} with {formatDuration(busiest.ms)}.
       </p>
+
+      <InsightLede lede={lede} />
 
       <TabGrid>
       <ChartCard
@@ -277,44 +286,37 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           trend.direction !== null) && (
         <section className="space-y-1.5">
           <SectionLabel>Momentum</SectionLabel>
-          <StatGrid>
+          <dl className="flex flex-wrap gap-x-6 gap-y-2">
             {streak && (
-              <StatCard
+              <Figure
                 label="Current streak"
                 value={`${streak.current} ${streak.current === 1 ? "day" : "days"}`}
-                hint="ending at the period's last day"
               />
             )}
             {streak && (
-              <StatCard
+              <Figure
                 label="Longest streak"
                 value={`${streak.longest} ${streak.longest === 1 ? "day" : "days"}`}
-                hint="consecutive days with tracked time"
               />
             )}
             {steadiness !== null && (
-              <StatCard
-                label="Consistency"
-                value={`${Math.round(steadiness * 100)}%`}
-                hint="days near your typical load"
-              />
+              <Figure label="Consistency" value={`${Math.round(steadiness * 100)}%`} />
             )}
             {/* Theil–Sen slope of the day series — the steady drift behind the
                 "trending up/down" verdict, as a per-day figure. */}
             {trend.direction !== null && trend.slopeMsPerBucket !== null && (
-              <StatCard
+              <Figure
                 label="Trend rate"
                 value={
                   trend.direction === "flat"
                     ? "Level"
                     : `${trend.slopeMsPerBucket > 0 ? "+" : "−"}${formatDuration(
                         Math.abs(trend.slopeMsPerBucket),
-                      )}`
+                      )}/day`
                 }
-                hint={trend.direction === "flat" ? "holding steady" : "per day, typical drift"}
               />
             )}
-          </StatGrid>
+          </dl>
           {anomalies.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {anomalies.map((a) => (

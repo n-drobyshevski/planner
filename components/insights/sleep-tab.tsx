@@ -13,6 +13,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { dateKeyInZone, dayStartOffset } from "@/lib/datetime/local";
+import { formatDuration } from "@/lib/datetime/format";
+import type { Lede } from "@/lib/insights/ledes";
 import {
   useDeleteSleepLog,
   useSleepLogs,
@@ -34,6 +36,7 @@ import {
 import { deriveNights, type DeriveOptions } from "@/lib/sleep/derive";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { Occurrence } from "@/lib/types";
+import { InsightLede } from "./insight-lede";
 import { CheckinCard } from "./sleep/checkin-card";
 import { CalculatorCard } from "./sleep/calculator-card";
 import { HintsSection } from "./sleep/hints-section";
@@ -220,6 +223,37 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
   const hasAnyData =
     viewerSpans.length > 0 || logs.length > 0 || logsLoading;
 
+  // The tab lede: a recent sleep-debt nudge takes priority (the one genuinely
+  // actionable signal); otherwise the strongest sleep↔next-day relation, if it
+  // clears the link threshold. Stays null while there's nothing to say.
+  const youLede = useMemo<Lede | null>(() => {
+    if (!hasAnyData) return null;
+    if (recentDebtMs >= 45 * 60_000) {
+      return {
+        headline: `You're carrying about ${formatDuration(recentDebtMs)} of recent sleep debt.`,
+        tone: "attention",
+        support: "Tonight's recommendation below already accounts for it.",
+      };
+    }
+    const strongest = correlations
+      .filter((c): c is SleepCorrelation & { rho: number } => c.rho !== null)
+      .reduce<(SleepCorrelation & { rho: number }) | null>(
+        (best, c) =>
+          best === null || Math.abs(c.rho) > Math.abs(best.rho) ? c : best,
+        null,
+      );
+    if (strongest && Math.abs(strongest.rho) >= 0.2) {
+      return {
+        headline: `${CORRELATION_METRIC_LABELS[strongest.metric]} ${correlationStrength(
+          strongest.rho,
+        )} after more ${CORRELATION_SIDE_LABELS[strongest.vs]}.`,
+        tone: "neutral",
+        support: `Seen across ${strongest.n} logged nights.`,
+      };
+    }
+    return null;
+  }, [hasAnyData, recentDebtMs, correlations]);
+
   return (
     <div className="flex flex-col gap-4">
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -227,6 +261,8 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
         Sleep is personal — this tab shows yours only, and your check-ins are
         never visible to your partner.
       </p>
+
+      {youLede && <InsightLede lede={youLede} />}
 
       {logsError && (
         <div

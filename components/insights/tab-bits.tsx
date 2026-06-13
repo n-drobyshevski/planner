@@ -38,9 +38,23 @@ export function TabGrid({
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="px-0.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-      {children}
-    </h3>
+    <h3 className="px-0.5 text-sm font-semibold text-foreground">{children}</h3>
+  );
+}
+
+/**
+ * A compact inline statistic — a small label over a tabular value — for the
+ * secondary numbers that would over-weight a view as a grid of StatCards now
+ * that the lede carries the lead metric. Group several inside a
+ * `<dl className="flex flex-wrap gap-x-6 gap-y-2">` for a quiet figure row that
+ * reads differently from the dashboard stat grids.
+ */
+export function Figure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-semibold tabular-nums">{value}</dd>
+    </div>
   );
 }
 

@@ -495,7 +495,7 @@ function CoverageCard({
   const pct = Math.round(coverage.share * 100);
   return (
     <div className="rounded-lg border bg-card p-3 shadow-soft">
-      <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+      <div className="text-xs font-medium text-muted-foreground">
         Optimization details
       </div>
       <div className="mt-0.5 text-base leading-tight font-semibold tabular-nums">

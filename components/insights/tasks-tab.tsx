@@ -37,8 +37,10 @@ import {
 } from "@/lib/analytics/task-stats";
 import { delta } from "@/lib/analytics/trends";
 import { formatDuration } from "@/lib/datetime/format";
+import { deriveTasksLede } from "@/lib/insights/ledes";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
+import { InsightLede } from "./insight-lede";
 import { bucketLabel, bucketTick } from "./series";
 import { CHART_H, SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
@@ -111,12 +113,16 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
 
   const hasBoardBreakdown = boards.length > 1;
 
+  const lede = deriveTasksLede({ stats, prevStats, preset: data.preset });
+
   return (
     <div className="space-y-4">
       <p className="sr-only">
         {stats.completedCount} tasks completed and {stats.createdCount} created in{" "}
         {period.label}. {stats.overdueOpenCount} open tasks are overdue.
       </p>
+
+      <InsightLede lede={lede} />
 
       <TabGrid>
       <div className="space-y-1.5 xl:col-span-2">

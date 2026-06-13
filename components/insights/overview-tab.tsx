@@ -38,11 +38,14 @@ import {
 } from "@/lib/hooks/use-insights-prefs";
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
+import { deriveOverviewLede } from "@/lib/insights/ledes";
 import { StatCard, StatGrid } from "./stat-card";
 import { ChartCard } from "./chart-card";
+import { InsightLede } from "./insight-lede";
 import { CustomizeDashboardSheet } from "./customize-dashboard-sheet";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { GoalsSection } from "./goals/goals-section";
+import { OptimizeTab } from "./optimize-tab";
 import { InsightsEmpty } from "./insights-empty";
 import { NEUTRAL, seriesMeta } from "./series";
 import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
@@ -196,6 +199,21 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   const donutHeadline = donutData[0]
     ? `Most time went to ${donutData[0].name} (${srPercent(donutData[0].ms, total)}).`
     : undefined;
+
+  // The tab lede: the period's answer in one sentence, above everything.
+  const topCat = usage.byCategory[0];
+  const lede = deriveOverviewLede({
+    usage,
+    prevUsage,
+    preset: data.preset,
+    topContext: topCat
+      ? {
+          name: seriesMeta(topCat.categoryId ?? "__uncategorized__", data.categories)
+            .name,
+          ms: topCat.ms,
+        }
+      : null,
+  });
 
   // --- Card registry: every dashboard id renders through these two maps. ----
 
@@ -547,7 +565,12 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-start justify-between gap-3">
+        {lede ? (
+          <InsightLede lede={lede} className="min-w-0 flex-1" />
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
         <CustomizeDashboardSheet
           layout={layout}
           onChange={(next) => void updatePrefs({ dashboard: next }).catch(() => {})}
@@ -593,6 +616,17 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
           );
         })}
       </TabGrid>
+
+      {/* "What to do": the actionable layer folded in from the former Optimize
+          tab, beneath the answer + the dashboard so Overview still opens with
+          the takeaway. Guarded on tracked time so it never doubles the empty
+          state below. */}
+      {total > 0 && (
+        <section className="space-y-2 border-t pt-4">
+          <SectionLabel>What to do</SectionLabel>
+          <OptimizeTab data={data} />
+        </section>
+      )}
 
       {total === 0 && <InsightsEmpty />}
 

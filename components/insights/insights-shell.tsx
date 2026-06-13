@@ -16,6 +16,7 @@ import {
   INSIGHTS_TABS,
   type Granularity,
   type InsightsTab,
+  type PeriodPreset,
   type PeriodState,
 } from "@/lib/insights/period";
 import { filterForInsights, type MemberFilter } from "@/lib/insights/filters";
@@ -39,43 +40,35 @@ const TAB_LABELS: Record<InsightsTab, string> = {
   overview: "Overview",
   trends: "Trends",
   patterns: "Patterns",
-  balance: "Balance",
   tasks: "Tasks",
-  optimize: "Optimize",
-  sleep: "Sleep",
+  you: "You",
 };
 
 // Each tab is its own lazy chunk (recharts stays out of the route JS); warmed
-// during idle so switching tabs never shows the skeleton in practice.
+// during idle so switching tabs never shows the skeleton in practice. After
+// the 7→5 consolidation the former Balance and Optimize bodies render inside
+// Patterns and Overview respectively (they fold into those chunks), and Sleep
+// backs the private "You" tab.
 const tabLoading = () => <ChartSkeleton height={360} className="mt-1" />;
 const loadOverview = () => import("./overview-tab").then((m) => m.OverviewTab);
 const loadTrends = () => import("./trends-tab").then((m) => m.TrendsTab);
 const loadPatterns = () => import("./patterns-tab").then((m) => m.PatternsTab);
-const loadBalance = () => import("./balance-tab").then((m) => m.BalanceTab);
 const loadTasksTab = () => import("./tasks-tab").then((m) => m.TasksTab);
-const loadOptimize = () => import("./optimize-tab").then((m) => m.OptimizeTab);
-const loadSleep = () => import("./sleep-tab").then((m) => m.SleepTab);
+const loadYou = () => import("./sleep-tab").then((m) => m.SleepTab);
 const OverviewTab = dynamic(loadOverview, { ssr: false, loading: tabLoading });
 const TrendsTab = dynamic(loadTrends, { ssr: false, loading: tabLoading });
 const PatternsTab = dynamic(loadPatterns, { ssr: false, loading: tabLoading });
-const BalanceTab = dynamic(loadBalance, { ssr: false, loading: tabLoading });
 const TasksTab = dynamic(loadTasksTab, { ssr: false, loading: tabLoading });
-const OptimizeTab = dynamic(loadOptimize, { ssr: false, loading: tabLoading });
-const SleepTab = dynamic(loadSleep, { ssr: false, loading: tabLoading });
+const YouTab = dynamic(loadYou, { ssr: false, loading: tabLoading });
 
-const TAB_PRELOADS = [
-  loadOverview,
-  loadTrends,
-  loadPatterns,
-  loadBalance,
-  loadTasksTab,
-  loadOptimize,
-  loadSleep,
-];
+const TAB_PRELOADS = [loadOverview, loadTrends, loadPatterns, loadTasksTab, loadYou];
 
 /** Everything a tab needs, computed once in the shell. */
 export interface InsightsTabData {
   period: ReturnType<typeof resolvePeriod>;
+  /** the active preset — lets ledes name the comparison unit (week/month/
+   *  period) to match resolvePeriod's previous-window semantics */
+  preset: PeriodPreset;
   /** insights-filtered occurrences of the focused window */
   occurrences: Occurrence[];
   /** same filter over the comparison window */
@@ -242,6 +235,7 @@ function InsightsShellInner({
 
   const data: InsightsTabData = {
     period,
+    preset: state.preset,
     occurrences,
     prevOccurrences,
     rawOccurrences: cur.occurrences,
@@ -346,7 +340,7 @@ function InsightsShellInner({
             onHiddenCategoryIdsChange={setHiddenCategoryIds}
             includeInactive={includeInactive}
             onIncludeInactiveChange={setIncludeInactive}
-            filtersInert={tab === "sleep"}
+            filtersInert={tab === "you"}
           />
         }
       />
@@ -355,14 +349,17 @@ function InsightsShellInner({
         {/* Border is full-bleed; the tab row aligns to the same centered
             1600px column as the content below it. */}
         <div className="border-b">
-          <div className="mx-auto w-full max-w-[1600px] overflow-x-auto px-3 sm:px-4 xl:px-6">
-            {/* h override must mirror the base's group-data variant to out-cascade its h-8 */}
-            <TabsList className="w-max bg-transparent p-0 group-data-horizontal/tabs:h-11 sm:group-data-horizontal/tabs:h-10">
+          <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-4 xl:px-6">
+            {/* 5 tabs fit a phone row, so they spread full-width (flex-1) on
+                mobile instead of horizontal-scrolling; left-aligned at natural
+                width from sm up. h override mirrors the base's group-data
+                variant to out-cascade its h-8. */}
+            <TabsList className="w-full bg-transparent p-0 group-data-horizontal/tabs:h-11 sm:w-max sm:group-data-horizontal/tabs:h-10">
               {INSIGHTS_TABS.map((t) => (
                 <TabsTrigger
                   key={t}
                   value={t}
-                  className="rounded-none border-0 border-b-2 border-transparent px-3 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                  className="flex-1 rounded-none border-0 border-b-2 border-transparent px-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:flex-none sm:px-3 sm:text-sm"
                 >
                   {TAB_LABELS[t]}
                 </TabsTrigger>
@@ -401,10 +398,8 @@ function InsightsShellInner({
             {tab === "overview" && <OverviewTab data={data} />}
             {tab === "trends" && <TrendsTab data={data} />}
             {tab === "patterns" && <PatternsTab data={data} />}
-            {tab === "balance" && <BalanceTab data={data} />}
             {tab === "tasks" && <TasksTab data={data} />}
-            {tab === "optimize" && <OptimizeTab data={data} />}
-            {tab === "sleep" && <SleepTab data={data} />}
+            {tab === "you" && <YouTab data={data} />}
           </div>
         )}
       </main>

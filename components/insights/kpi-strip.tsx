@@ -81,14 +81,12 @@ export function KpiCard({
         className,
       )}
     >
-      <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div className="mt-0.5 flex items-baseline gap-1.5">
         <span
           className={cn(
             "leading-tight font-semibold tabular-nums",
-            emphasis ? "text-2xl" : "text-base",
+            emphasis ? "text-lg" : "text-base",
           )}
         >
           {value}

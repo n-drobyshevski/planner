@@ -64,9 +64,7 @@ export function SavedViewsMenu({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-3 p-3">
-        <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          Saved views
-        </p>
+        <p className="text-sm font-semibold text-foreground">Saved views</p>
         {views.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             Save the period and filters you keep coming back to — &ldquo;Weekly

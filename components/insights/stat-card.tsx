@@ -65,7 +65,8 @@ export function StatCard({
   hint?: string;
   /** icon + tint the value for attention (e.g. overdue count > 0) */
   warning?: boolean;
-  /** the tab's lead metric — bigger value, slightly roomier card */
+  /** slightly larger value + roomier card; the InsightLede sentence, not a
+   *  StatCard, owns the tab's lead metric now */
   emphasis?: boolean;
   className?: string;
 }) {
@@ -77,14 +78,12 @@ export function StatCard({
         className,
       )}
     >
-      <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div className="mt-0.5 flex items-baseline gap-1.5">
         <span
           className={cn(
             "leading-tight font-semibold tabular-nums",
-            emphasis ? "text-2xl" : "text-base",
+            emphasis ? "text-lg" : "text-base",
             warning && "text-destructive",
           )}
         >
