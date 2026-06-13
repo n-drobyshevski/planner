@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { goalProgress } from "@/lib/insights/goals";
 import { useCategoryGoals } from "@/lib/hooks/use-category-goals";
 import type { InsightsTabData } from "../insights-shell";
-import { SectionLabel } from "../tab-bits";
+import { InsightCard } from "../insight-card";
 import { seriesMeta } from "../series";
 import { GoalBullet } from "./goal-bullet";
 import { ManageGoalsDialog } from "./manage-goals-dialog";
@@ -58,11 +58,7 @@ export function GoalsSection({
   );
 
   return (
-    <section className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <SectionLabel>Goals</SectionLabel>
-        {manage}
-      </div>
+    <InsightCard title="Goals" action={manage}>
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-3">
           <p className="text-xs text-muted-foreground">
@@ -86,6 +82,6 @@ export function GoalsSection({
           })}
         </ul>
       )}
-    </section>
+    </InsightCard>
   );
 }

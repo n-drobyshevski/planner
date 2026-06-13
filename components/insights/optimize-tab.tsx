@@ -28,7 +28,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -65,9 +67,10 @@ import { useSleepLogs } from "@/lib/hooks/use-sleep-logs";
 import { formatDuration } from "@/lib/datetime/format";
 import { dateInputToMs, dateKeyInZone } from "@/lib/datetime/local";
 import { DigestCard } from "./digest-card";
+import { InsightCard, Takeaway } from "./insight-card";
 import { InsightsEmpty } from "./insights-empty";
 import { StatCard, StatGrid } from "./stat-card";
-import { SectionLabel, TabGrid } from "./tab-bits";
+import { TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 // Dismissals live in ONE viewer-scoped localStorage entry: a JSON map of
@@ -347,6 +350,11 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
   const periodKey = `${period.window.start}-${period.window.end}`;
   return (
     <div className="flex flex-col gap-4">
+      <Takeaway>
+        {suggestions.length === 0
+          ? "Nothing stands out to optimize this period — it looks balanced."
+          : `${suggestions.length} thing${suggestions.length === 1 ? "" : "s"} worth a look this period.`}
+      </Takeaway>
       <p className="sr-only">
         {suggestions.length === 0
           ? "No suggestions for this period."
@@ -424,10 +432,11 @@ function OutlookSection({
 
   if (loading) {
     return (
-      <section className="space-y-1.5" aria-busy>
-        <SectionLabel>Outlook · {rangeLabel}</SectionLabel>
-        <Skeleton className="h-20 w-full rounded-lg" />
-      </section>
+      <InsightCard title={`Outlook · ${rangeLabel}`}>
+        <div aria-busy>
+          <Skeleton className="h-20 w-full rounded-lg" />
+        </div>
+      </InsightCard>
     );
   }
 
@@ -436,26 +445,30 @@ function OutlookSection({
     forecast.capacityRatio === null ? null : Math.round(forecast.capacityRatio * 100);
 
   return (
-    <section className="space-y-1.5">
-      <SectionLabel>Outlook · {rangeLabel}</SectionLabel>
+    <InsightCard title={`Outlook · ${rangeLabel}`} contentClassName="space-y-2">
       <StatGrid>
         <StatCard
           label="Committed"
+          metric="committed"
           value={formatDuration(committedMs)}
           hint="already scheduled"
         />
         <StatCard
           label="Of typical pace"
+          metric="of-typical-pace"
           value={pacePct === null ? "—" : `${pacePct}%`}
-          warning={pacePct !== null && pacePct > 110}
-          hint={
+          judgment={
             pacePct === null
-              ? "no baseline yet"
-              : `typical day ${formatDuration(forecast.typicalDayMs)}`
+              ? undefined
+              : pacePct > 110
+                ? { tone: "attention", text: "heavier than usual" }
+                : { tone: "neutral", text: `typical day ${formatDuration(forecast.typicalDayMs)}` }
           }
+          hint={pacePct === null ? "no baseline yet" : undefined}
         />
         <StatCard
           label="Busiest day"
+          metric="outlook-busiest"
           value={forecast.busiestDay ? formatDuration(forecast.busiestDay.ms) : "—"}
           hint={
             forecast.busiestDay
@@ -465,7 +478,7 @@ function OutlookSection({
         />
       </StatGrid>
       {forecast.dueUnscheduled.length > 0 && (
-        <ul className="space-y-1 pt-1" role="list">
+        <ul className="space-y-1" role="list">
           {forecast.dueUnscheduled.slice(0, 4).map((t) => (
             <li
               key={t.taskId}
@@ -482,7 +495,7 @@ function OutlookSection({
           ))}
         </ul>
       )}
-    </section>
+    </InsightCard>
   );
 }
 
@@ -494,19 +507,14 @@ function CoverageCard({
   if (coverage.share === null) return null;
   const pct = Math.round(coverage.share * 100);
   return (
-    <div className="rounded-lg border bg-card p-3 shadow-soft">
-      <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        Optimization details
-      </div>
-      <div className="mt-0.5 text-base leading-tight font-semibold tabular-nums">
-        {pct}%
-      </div>
-      <p className="mt-0.5 text-xs text-muted-foreground">
+    <InsightCard title="Optimization details">
+      <div className="text-2xl leading-tight font-semibold tabular-nums">{pct}%</div>
+      <p className="mt-1 text-xs text-muted-foreground">
         of timed events in this period carry details ({coverage.withAttributes} of{" "}
         {coverage.tracked}). Set energy, flexibility, focus or satisfaction in any
         event or task dialog — suggestions get sharper as coverage grows.
       </p>
-    </div>
+    </InsightCard>
   );
 }
 
@@ -603,15 +611,19 @@ function SuggestionCard({
   const [thanked, setThanked] = useState(false);
 
   return (
-    <li className="flex items-start gap-3 rounded-lg border bg-card p-3 shadow-soft">
+    <li>
+      <Card size="sm" className="flex-row items-start gap-3 px-3 py-3">
       <KindIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="text-sm font-medium">{suggestion.title}</span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+          <Badge
+            variant={suggestion.severity === "attention" ? "destructive" : "secondary"}
+            className="gap-1 font-normal"
+          >
             <SeverityIcon aria-hidden className="size-3" />
             {suggestion.severity === "attention" ? "Worth a look" : "FYI"}
-          </span>
+          </Badge>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">{suggestion.body}</p>
         {suggestion.meta && suggestion.meta.length > 0 && (
@@ -700,6 +712,7 @@ function SuggestionCard({
       >
         <X />
       </Button>
+      </Card>
     </li>
   );
 }

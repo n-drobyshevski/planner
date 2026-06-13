@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
-import { SectionLabel } from "./tab-bits";
+import { InsightCard } from "./insight-card";
+import type { MetricKey } from "@/lib/insights/metric-defs";
 
 const STORAGE_PREFIX = "planner:insights:chart:v1:";
 
@@ -135,6 +136,7 @@ export function ChartCard({
   viewerId,
   title,
   headline,
+  metric,
   chartTypes,
   comparison = false,
   comparisonLabel = "Compare with previous period",
@@ -149,10 +151,12 @@ export function ChartCard({
   /** Stable id for settings persistence (per viewer per device). */
   id: string;
   viewerId: string;
-  /** Small uppercase section label. */
+  /** Card title. */
   title: string;
   /** The takeaway — one sentence of meaning ("Most time went to Work, up 2h"). */
   headline?: string;
+  /** Optional metric explainer wired into the card header. */
+  metric?: MetricKey;
   /** Offer a chart-type switch between these (omit / 1 entry = no switch). */
   chartTypes?: ChartType[];
   /** Offer the previous-period ghost-overlay toggle. */
@@ -177,70 +181,71 @@ export function ChartCard({
   const typeChoices = chartTypes && chartTypes.length > 1 ? chartTypes : null;
   const hasControls = Boolean(typeChoices || comparison);
 
-  return (
-    <section className={cn("space-y-1.5", className)}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 space-y-0.5">
-          <SectionLabel>{title}</SectionLabel>
-          {headline && <p className="text-sm font-medium">{headline}</p>}
-        </div>
-        {hasControls && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mt-1 size-11 shrink-0 text-muted-foreground sm:size-8"
-                aria-label={`Chart options: ${title}`}
-              >
-                <SlidersHorizontal />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 space-y-3 p-3">
-              {typeChoices && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Chart type</Label>
-                  <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    value={settings.chartType}
-                    onValueChange={(v) => v && setChartType(v as ChartType)}
-                    className="w-full"
+  const optionsControl = hasControls ? (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-11 shrink-0 text-muted-foreground sm:size-8"
+          aria-label={`Chart options: ${title}`}
+        >
+          <SlidersHorizontal />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 space-y-3 p-3">
+        {typeChoices && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Chart type</Label>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              value={settings.chartType}
+              onValueChange={(v) => v && setChartType(v as ChartType)}
+              className="w-full"
+            >
+              {typeChoices.map((t) => {
+                const Icon = TYPE_ICONS[t];
+                return (
+                  <ToggleGroupItem
+                    key={t}
+                    value={t}
+                    aria-label={`${TYPE_LABELS[t]} chart`}
+                    className="min-h-9 flex-1 gap-1.5"
                   >
-                    {typeChoices.map((t) => {
-                      const Icon = TYPE_ICONS[t];
-                      return (
-                        <ToggleGroupItem
-                          key={t}
-                          value={t}
-                          aria-label={`${TYPE_LABELS[t]} chart`}
-                          className="min-h-9 flex-1 gap-1.5"
-                        >
-                          <Icon aria-hidden className="size-3.5" />
-                          {TYPE_LABELS[t]}
-                        </ToggleGroupItem>
-                      );
-                    })}
-                  </ToggleGroup>
-                </div>
-              )}
-              {comparison && (
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor={`${id}-compare`} className="text-xs">
-                    {comparisonLabel}
-                  </Label>
-                  <Switch
-                    id={`${id}-compare`}
-                    checked={settings.showComparison}
-                    onCheckedChange={setShowComparison}
-                  />
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
+                    <Icon aria-hidden className="size-3.5" />
+                    {TYPE_LABELS[t]}
+                  </ToggleGroupItem>
+                );
+              })}
+            </ToggleGroup>
+          </div>
         )}
-      </div>
+        {comparison && (
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`${id}-compare`} className="text-xs">
+              {comparisonLabel}
+            </Label>
+            <Switch
+              id={`${id}-compare`}
+              checked={settings.showComparison}
+              onCheckedChange={setShowComparison}
+            />
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  ) : undefined;
 
+  return (
+    <InsightCard
+      title={title}
+      description={headline}
+      metric={metric}
+      action={optionsControl}
+      className={className}
+      contentClassName="space-y-1.5"
+    >
       {series && series.length > 1 && (
         <ul className="flex flex-wrap gap-1" aria-label="Toggle series">
           {series.map((s) => {
@@ -291,6 +296,6 @@ export function ChartCard({
           <CollapsibleContent>{table}</CollapsibleContent>
         </Collapsible>
       )}
-    </section>
+    </InsightCard>
   );
 }

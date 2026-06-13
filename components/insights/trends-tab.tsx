@@ -30,12 +30,14 @@ import { bucketUsage, categoryTrends, rollingAverage } from "@/lib/analytics/tre
 import { activeStreak, bucketTrend, consistency, dayAnomalies } from "@/lib/analytics/momentum";
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
+import { Badge } from "@/components/ui/badge";
 import { StatCard, StatGrid } from "./stat-card";
 import { ChartCard } from "./chart-card";
+import { InsightCard, Takeaway } from "./insight-card";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { InsightsEmpty } from "./insights-empty";
 import { bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
+import { CHART_H, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function TrendsTab({ data }: { data: InsightsTabData }) {
@@ -147,6 +149,9 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
 
   return (
     <div className="space-y-4">
+      <Takeaway>
+        {`Busiest ${granularity}: ${busiest.full} (${formatDuration(busiest.ms)}).${trendClause}`}
+      </Takeaway>
       <p className="sr-only">
         {formatDuration(total)} tracked across {rows.length} {granularity} buckets.
         Busiest: {busiest.full} with {formatDuration(busiest.ms)}.
@@ -275,12 +280,12 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           steadiness !== null ||
           anomalies.length > 0 ||
           trend.direction !== null) && (
-        <section className="space-y-1.5">
-          <SectionLabel>Momentum</SectionLabel>
+        <InsightCard title="Momentum" contentClassName="space-y-2">
           <StatGrid>
             {streak && (
               <StatCard
                 label="Current streak"
+                metric="current-streak"
                 value={`${streak.current} ${streak.current === 1 ? "day" : "days"}`}
                 hint="ending at the period's last day"
               />
@@ -288,6 +293,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
             {streak && (
               <StatCard
                 label="Longest streak"
+                metric="longest-streak"
                 value={`${streak.longest} ${streak.longest === 1 ? "day" : "days"}`}
                 hint="consecutive days with tracked time"
               />
@@ -295,6 +301,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
             {steadiness !== null && (
               <StatCard
                 label="Consistency"
+                metric="consistency"
                 value={`${Math.round(steadiness * 100)}%`}
                 hint="days near your typical load"
               />
@@ -304,6 +311,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
             {trend.direction !== null && trend.slopeMsPerBucket !== null && (
               <StatCard
                 label="Trend rate"
+                metric="trend-rate"
                 value={
                   trend.direction === "flat"
                     ? "Level"
@@ -318,22 +326,21 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           {anomalies.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {anomalies.map((a) => (
-                <li
-                  key={a.dayMs}
-                  className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs"
-                >
-                  <span className="text-muted-foreground">
-                    {a.direction === "high" ? "Unusually heavy" : "Unusually light"}:
-                  </span>
-                  <span>{formatWeekdayDayMonth(a.dayMs, timeZone)}</span>
-                  <span className="font-mono tabular-nums text-muted-foreground">
-                    {formatDuration(a.ms)}
-                  </span>
+                <li key={a.dayMs}>
+                  <Badge variant="outline" className="gap-1.5 font-normal">
+                    <span className="text-muted-foreground">
+                      {a.direction === "high" ? "Unusually heavy" : "Unusually light"}:
+                    </span>
+                    <span>{formatWeekdayDayMonth(a.dayMs, timeZone)}</span>
+                    <span className="font-mono tabular-nums text-muted-foreground">
+                      {formatDuration(a.ms)}
+                    </span>
+                  </Badge>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </InsightCard>
       )}
 
       {catTrend.seriesKeys.length > 0 && (

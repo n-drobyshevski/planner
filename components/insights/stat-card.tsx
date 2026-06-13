@@ -1,14 +1,18 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, Minus, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { MetricInfo } from "./insight-card";
+import type { MetricKey } from "@/lib/insights/metric-defs";
 import type { Delta } from "@/lib/analytics/trends";
 
 /**
- * Compact change indicator vs the previous period. Direction is carried by
- * the arrow glyph + aria-label (never color alone); the tone stays neutral —
- * more or less time isn't inherently good or bad on a calendar. A null pct
- * with movement means the previous period was empty → "new".
+ * Compact change indicator vs the previous period, as a shadcn Badge. Direction
+ * is carried by the arrow glyph + aria-label (never color alone); the tone stays
+ * neutral — more or less time isn't inherently good or bad on a calendar. A null
+ * pct with movement means the previous period was empty → "new".
  */
 export function DeltaBadge({ delta, className }: { delta: Delta; className?: string }) {
   let glyph: string;
@@ -34,27 +38,89 @@ export function DeltaBadge({ delta, className }: { delta: Delta; className?: str
         : `${delta.deltaPct > 0 ? "up" : "down"} ${pct}% vs previous period`;
   }
   return (
-    <span
+    <Badge
+      variant="secondary"
       aria-label={srText}
       className={cn(
-        "inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums text-muted-foreground",
+        "gap-0.5 px-1.5 font-normal text-muted-foreground tabular-nums",
         className,
       )}
     >
       <span aria-hidden className="text-[9px] leading-none">
         {glyph}
       </span>
-      <span aria-hidden>{text}</span>
-    </span>
+      {text && <span aria-hidden>{text}</span>}
+    </Badge>
   );
 }
 
-/** Label / big tabular value / optional delta + hint, insights flavor. */
+// --- Judgment (good / neutral / attention), the dashboard pattern of judging a
+// value against a target/baseline instead of leaving a bare number. Always icon
+// + text + color, never color alone; the tone stays calm (no red alarms for
+// personal data). Moved here from the former kpi-strip so the KPI card is the
+// single place that owns it.
+
+export type JudgmentTone = "good" | "neutral" | "attention";
+
+export interface Judgment {
+  tone: JudgmentTone;
+  /** Short clause, e.g. "above your typical week", "on track". */
+  text: string;
+}
+
+const JUDGMENT_ICONS: Record<JudgmentTone, LucideIcon> = {
+  good: CircleCheck,
+  neutral: Minus,
+  attention: CircleAlert,
+};
+
+const JUDGMENT_CLASSES: Record<JudgmentTone, string> = {
+  good: "text-[var(--swatch-green)]",
+  neutral: "text-muted-foreground",
+  attention: "text-destructive",
+};
+
+export function JudgmentLine({
+  judgment,
+  className,
+}: {
+  judgment: Judgment;
+  className?: string;
+}) {
+  const Icon = JUDGMENT_ICONS[judgment.tone];
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1 text-[11px]",
+        JUDGMENT_CLASSES[judgment.tone],
+        className,
+      )}
+    >
+      <Icon aria-hidden className="size-3 shrink-0" />
+      <span className="truncate">
+        <span className="sr-only">
+          {judgment.tone === "attention" ? "needs attention: " : ""}
+        </span>
+        {judgment.text}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The unified KPI tile (shadcn Card): label + optional explainer, a big tabular
+ * value with an optional delta badge, then either a judgment line or a plain
+ * hint, and an optional decorative sparkline. `emphasis` makes it the tab's lead
+ * metric; `warning` tints the value for hard attention (e.g. overdue > 0).
+ */
 export function StatCard({
   label,
   value,
   delta,
   hint,
+  judgment,
+  metric,
+  sparkline,
   warning = false,
   emphasis = false,
   className,
@@ -63,6 +129,12 @@ export function StatCard({
   value: string;
   delta?: Delta;
   hint?: string;
+  /** judged reading (good/neutral/attention) — shown instead of the hint */
+  judgment?: Judgment;
+  /** wires a MetricInfo explainer beside the label */
+  metric?: MetricKey;
+  /** a <Sparkline/> node (kept as a node so this module stays recharts-free) */
+  sparkline?: React.ReactNode;
   /** icon + tint the value for attention (e.g. overdue count > 0) */
   warning?: boolean;
   /** the tab's lead metric — bigger value, slightly roomier card */
@@ -70,17 +142,14 @@ export function StatCard({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-lg border bg-card shadow-soft",
-        emphasis ? "p-3" : "p-2.5",
-        className,
-      )}
-    >
-      <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
+    <Card size="sm" className={cn("justify-between gap-1.5 px-3 py-3", className)}>
+      <div className="flex items-start justify-between gap-1.5">
+        <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          {label}
+        </span>
+        {metric && <MetricInfo metric={metric} label={label} />}
       </div>
-      <div className="mt-0.5 flex items-baseline gap-1.5">
+      <div className="flex items-baseline gap-1.5">
         <span
           className={cn(
             "leading-tight font-semibold tabular-nums",
@@ -101,16 +170,21 @@ export function StatCard({
         </span>
         {delta && <DeltaBadge delta={delta} />}
       </div>
-      {hint && <div className="truncate text-[11px] text-muted-foreground">{hint}</div>}
-    </div>
+      {judgment ? (
+        <JudgmentLine judgment={judgment} />
+      ) : hint ? (
+        <div className="truncate text-[11px] text-muted-foreground">{hint}</div>
+      ) : null}
+      {sparkline}
+    </Card>
   );
 }
 
 /**
- * Responsive stat grid: 2-up on phones, denser as space allows. Density keys
- * off the grid's OWN width via a container query — so the same component reads
- * right whether it spans the full insights column (6–7 up) or sits in a
- * half-width dashboard cell (~4 up), without the caller knowing where it lives.
+ * Responsive KPI grid: 2-up on phones, denser as space allows. Density keys off
+ * the grid's OWN width via a container query — so the same component reads right
+ * whether it spans the full insights column or sits in a half-width cell. Tiles
+ * carry more now (explainer, judgment, sparkline), so the ceiling is 4-up.
  */
 export function StatGrid({
   children,
@@ -121,7 +195,7 @@ export function StatGrid({
 }) {
   return (
     <div className={cn("@container", className)}>
-      <div className="grid grid-cols-2 gap-2 @sm:grid-cols-3 @lg:grid-cols-4 @3xl:grid-cols-6 @5xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @2xl:grid-cols-4">
         {children}
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Calculator } from "lucide-react";
 
+import { Card } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { TimeField } from "@/components/ui/time-field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -46,10 +47,7 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
         }));
 
   return (
-    <section
-      aria-label="Sleep cycle calculator"
-      className="rounded-lg border bg-card p-3 shadow-soft"
-    >
+    <Card size="sm" aria-label="Sleep cycle calculator" className="gap-0 px-3 py-3">
       <div className="flex items-center gap-2">
         <Calculator aria-hidden className="size-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">Cycle calculator</h3>
@@ -115,6 +113,6 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
         </Link>
         .
       </FieldDescription>
-    </section>
+    </Card>
   );
 }
