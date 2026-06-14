@@ -7,7 +7,7 @@
 // scrollable, zoomable date axis. Layout math is pure (lib/tasks/flows-layout);
 // this file owns the scroll frame, ruler, gutter, zoom, and empty/loading.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ChevronRight, CalendarRange, LocateFixed } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, addDays, addMonths, format } from "date-fns";
@@ -65,7 +65,13 @@ export function TaskFlows({
   const t = useTranslations("tasks");
   const locale = useLocale();
   const timeZone = useViewerTimeZone();
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // The canvas is the only scroll container; the ruler (horizontal) and gutter
+  // (vertical) are overflow-hidden panes slaved to it, so horizontal scroll and
+  // zoom can never move the side panel.
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const gutterRef = useRef<HTMLDivElement | null>(null);
+  const rulerRef = useRef<HTMLDivElement | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
   const didCenter = useRef(false);
 
   // Captured once: a minute of drift in the now-line is invisible, and a stable
@@ -73,12 +79,12 @@ export function TaskFlows({
   const [nowMs] = useState(() => Date.now());
   const [pxPerDay, setPxPerDay] = useState<number>(ZOOM.week);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  // Measured scroll-viewport size. Width drives the side padding that lets the
-  // now-line reach the track centre even when the data is narrower than the
-  // screen; height lets the gutter + track fill the view instead of stopping at
-  // the last lane. Measured before paint so centring doesn't flicker.
-  const [viewportW, setViewportW] = useState(0);
-  const [viewportH, setViewportH] = useState(0);
+  // Measured canvas viewport. Width drives the side padding that lets the
+  // now-line reach the centre even when the data is narrower than the screen;
+  // height lets the track fill the view. Measured before paint (callback ref)
+  // so centring doesn't flicker.
+  const [canvasW, setCanvasW] = useState(0);
+  const [canvasH, setCanvasH] = useState(0);
 
   const lanes = useMemo(
     () => buildFlowLanes({ topLevel: tasks, childrenByParent, eventsByTask, nowMs }),
@@ -88,7 +94,8 @@ export function TaskFlows({
   // by half the visible track so any point (incl. "now") can be scrolled to the
   // centre. The pad is empty but dated — it reads as scroll/planning slack.
   const data = useMemo(() => flowsWindow(lanes, nowMs), [lanes, nowMs]);
-  const visibleTrack = Math.max(0, viewportW - G.gutterWidth);
+  // The canvas viewport IS the track viewport (the gutter is a separate pane).
+  const visibleTrack = canvasW;
   const padMs = pxPerDay > 0 ? ((visibleTrack / 2) / pxPerDay) * DAY_MS : 0;
   const t0 = data.t0 - padMs; // render origin (left pad)
   const t1 = data.t1 + padMs; // render right edge (right pad)
@@ -97,9 +104,10 @@ export function TaskFlows({
     [lanes, expanded],
   );
   const trackWidth = Math.ceil(((t1 - t0) / DAY_MS) * pxPerDay);
-  // Fill the viewport below the ruler so the gutter + track don't stop at the
-  // last lane; grow past it (and scroll) when there are more lanes than fit.
-  const fillHeight = Math.max(totalHeight, viewportH - G.rulerHeight);
+  // Fill the canvas so the gutter + track don't stop at the last lane; grow
+  // past it (and scroll) when there are more lanes than fit. canvasH already
+  // excludes the frozen header row.
+  const fillHeight = Math.max(totalHeight, canvasH);
 
   const ticks = useMemo(
     () => buildTicks(t0, t1, pxPerDay, timeZone, locale),
@@ -107,51 +115,61 @@ export function TaskFlows({
   );
   const gridMs = useMemo(() => ticks.map((tk) => tk.ms), [ticks]);
 
-  // Track the viewport width (initial + on resize) for the side padding.
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+  // Measure the canvas + wire its non-passive Ctrl/⌘-wheel zoom when it mounts.
+  // A callback ref (not an effect) so it fires even when the view first renders
+  // as the loading skeleton and the canvas appears only later.
+  const attachCanvas = useCallback((node: HTMLDivElement | null) => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    canvasRef.current = node;
+    if (!node) return;
     const measure = () => {
-      setViewportW(el.clientWidth);
-      setViewportH(el.clientHeight);
+      setCanvasW(node.clientWidth);
+      setCanvasH(node.clientHeight);
     };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // Ctrl/Cmd + wheel zooms the time axis (a non-passive listener so we can
-  // preventDefault the page scroll).
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    ro.observe(node);
     const onWheel = (e: WheelEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
+      if (!(e.ctrlKey || e.metaKey)) return; // plain wheel scrolls; ctrl/⌘ zooms
       e.preventDefault();
       setPxPerDay((p) => clamp(p * (e.deltaY < 0 ? 1.15 : 0.87), ZOOM_MIN, ZOOM_MAX));
     };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    node.addEventListener("wheel", onWheel, { passive: false });
+    cleanupRef.current = () => {
+      ro.disconnect();
+      node.removeEventListener("wheel", onWheel);
+    };
   }, []);
+  useEffect(() => () => cleanupRef.current?.(), []);
 
-  function scrollToNow() {
-    const el = scrollRef.current;
-    if (!el) return;
-    const nowX = xForTime(Math.min(nowMs, t1), t0, pxPerDay);
-    const viewport = el.clientWidth - G.gutterWidth;
-    el.scrollLeft = Math.max(0, nowX - viewport / 2);
+  // The canvas is the only scroller; mirror its offsets onto the ruler
+  // (horizontal) and gutter (vertical). Both are overflow-hidden, so this is the
+  // only thing that moves them — the side panel never scrolls horizontally.
+  function syncScroll() {
+    const c = canvasRef.current;
+    if (!c) return;
+    if (rulerRef.current) rulerRef.current.scrollLeft = c.scrollLeft;
+    if (gutterRef.current) gutterRef.current.scrollTop = c.scrollTop;
   }
 
-  // Centre the now-line once the viewport is measured and there's data — in a
+  function scrollToNow() {
+    const c = canvasRef.current;
+    if (!c) return;
+    const nowX = xForTime(Math.min(nowMs, t1), t0, pxPerDay);
+    c.scrollLeft = Math.max(0, nowX - c.clientWidth / 2);
+    syncScroll();
+  }
+
+  // Centre the now-line once the canvas is measured and there's data — in a
   // layout effect (before paint) so the padded track is already in the DOM and
   // there's no left-aligned flash before it settles on centre.
   useLayoutEffect(() => {
-    if (didCenter.current || viewportW === 0 || rows.length === 0) return;
+    if (didCenter.current || canvasW === 0 || rows.length === 0) return;
     didCenter.current = true;
     scrollToNow();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot centering on first layout
-  }, [viewportW, rows.length]);
+  }, [canvasW, rows.length]);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -190,12 +208,12 @@ export function TaskFlows({
   }
 
   return (
-    <div ref={scrollRef} className="relative h-full overflow-auto">
-      {/* sticky ruler */}
-      <div className="sticky top-0 z-20 flex" style={{ height: G.rulerHeight }}>
+    <div className="flex h-full flex-col">
+      {/* Frozen header: zoom controls (corner) + the date ruler */}
+      <div className="flex shrink-0 border-b border-border" style={{ height: G.rulerHeight }}>
         <div
-          className="sticky left-0 z-30 flex shrink-0 items-center gap-1 overflow-hidden border-r border-b border-border bg-card px-2"
-          style={{ width: G.gutterWidth, height: G.rulerHeight }}
+          className="flex shrink-0 items-center gap-1 overflow-hidden border-r border-border bg-card px-2"
+          style={{ width: G.gutterWidth }}
         >
           <ToggleGroup
             type="single"
@@ -220,36 +238,42 @@ export function TaskFlows({
             <LocateFixed className="size-4" />
           </Button>
         </div>
-        <div
-          className="relative shrink-0 border-b border-border bg-background"
-          style={{ width: trackWidth, height: G.rulerHeight }}
-        >
-          {ticks.map((tk, i) => {
-            const x = xForTime(tk.ms, t0, pxPerDay);
-            // A boundary tick can land before the window start (negative x);
-            // its gridline is clipped by the SVG, and the label would bleed
-            // under the sticky corner, so skip it.
-            if (x < 0) return null;
-            return (
-              <div
-                key={i}
-                className="absolute top-0 flex h-full items-center pl-1.5 text-[11px] tabular-nums text-muted-foreground"
-                style={{ left: x }}
-              >
-                {tk.label}
-              </div>
-            );
-          })}
+        <div ref={rulerRef} className="relative flex-1 overflow-hidden bg-background">
+          <div className="relative h-full" style={{ width: trackWidth }}>
+            {ticks.map((tk, i) => {
+              const x = xForTime(tk.ms, t0, pxPerDay);
+              // A boundary tick can land before the window start (negative x);
+              // its gridline is clipped, and its label would bleed under the
+              // corner, so skip it.
+              if (x < 0) return null;
+              return (
+                <div
+                  key={i}
+                  className="absolute top-0 flex h-full items-center pl-1.5 text-[11px] tabular-nums text-muted-foreground"
+                  style={{ left: x }}
+                >
+                  {tk.label}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* body: sticky gutter + graph track */}
-      <div className="flex">
+      {/* Body: frozen gutter (left) + the scrolling canvas (right) */}
+      <div className="flex min-h-0 flex-1">
         <div
-          className="sticky left-0 z-10 shrink-0 border-r border-border bg-card"
-          style={{ width: G.gutterWidth, height: fillHeight }}
+          ref={gutterRef}
+          onWheel={(e) => {
+            if (e.ctrlKey || e.metaKey) return; // zoom is canvas-only
+            const c = canvasRef.current;
+            if (c) c.scrollTop += e.deltaY; // wheel over the panel scrolls lanes
+          }}
+          className="shrink-0 overflow-hidden border-r border-border bg-card"
+          style={{ width: G.gutterWidth }}
         >
-          {rows.map(({ lane, top, isExpanded, branchRows }) => {
+          <div className="relative" style={{ width: G.gutterWidth, height: fillHeight }}>
+            {rows.map(({ lane, top, isExpanded, branchRows }) => {
             const ownerColor = members.get(lane.task.ownerId)?.color ?? colorOf(lane.task);
             const hasChildren = lane.branches.length > 0;
             return (
@@ -319,22 +343,25 @@ export function TaskFlows({
               </div>
             );
           })}
+          </div>
         </div>
 
-        <FlowTrack
-          rows={rows}
-          height={fillHeight}
-          t0={t0}
-          t1={t1}
-          pxPerDay={pxPerDay}
-          trackWidth={trackWidth}
-          nowMs={nowMs}
-          gridMs={gridMs}
-          colorOf={colorOf}
-          currentMemberId={currentMemberId}
-          nodeLabel={nodeLabel}
-          onOpenTask={actions.open}
-        />
+        <div ref={attachCanvas} onScroll={syncScroll} className="flex-1 overflow-auto">
+          <FlowTrack
+            rows={rows}
+            height={fillHeight}
+            t0={t0}
+            t1={t1}
+            pxPerDay={pxPerDay}
+            trackWidth={trackWidth}
+            nowMs={nowMs}
+            gridMs={gridMs}
+            colorOf={colorOf}
+            currentMemberId={currentMemberId}
+            nodeLabel={nodeLabel}
+            onOpenTask={actions.open}
+          />
+        </div>
       </div>
     </div>
   );
