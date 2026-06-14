@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ChevronRight, CalendarRange } from "lucide-react";
+import { ChevronRight, CalendarRange, LocateFixed } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, addDays, addMonths, format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { cn } from "@/lib/utils";
@@ -118,7 +118,7 @@ export function TaskFlows({
     if (didCenter.current || rows.length === 0) return;
     didCenter.current = true;
     scrollToNow();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot centering
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot centering on first data
   }, [rows.length]);
 
   const toggle = (id: string) =>
@@ -162,7 +162,7 @@ export function TaskFlows({
       {/* sticky ruler */}
       <div className="sticky top-0 z-20 flex" style={{ height: G.rulerHeight }}>
         <div
-          className="sticky left-0 z-30 flex items-center gap-1 border-r border-b border-border bg-card px-2"
+          className="sticky left-0 z-30 flex items-center gap-1 overflow-hidden border-r border-b border-border bg-card px-2"
           style={{ width: G.gutterWidth, height: G.rulerHeight }}
         >
           <ToggleGroup
@@ -177,8 +177,15 @@ export function TaskFlows({
             <ToggleGroupItem value="week">{t("flows.zoom.week")}</ToggleGroupItem>
             <ToggleGroupItem value="day">{t("flows.zoom.day")}</ToggleGroupItem>
           </ToggleGroup>
-          <Button variant="ghost" size="sm" onClick={scrollToNow} className="ml-auto">
-            {t("flows.today")}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={scrollToNow}
+            aria-label={t("flows.today")}
+            title={t("flows.today")}
+            className="ml-auto size-7 shrink-0"
+          >
+            <LocateFixed className="size-4" />
           </Button>
         </div>
         <div
@@ -187,6 +194,10 @@ export function TaskFlows({
         >
           {ticks.map((tk, i) => {
             const x = xForTime(tk.ms, t0, pxPerDay);
+            // A boundary tick can land before the window start (negative x);
+            // its gridline is clipped by the SVG, and the label would bleed
+            // under the sticky corner, so skip it.
+            if (x < 0) return null;
             return (
               <div
                 key={i}

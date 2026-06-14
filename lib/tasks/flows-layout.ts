@@ -48,7 +48,7 @@ export const FLOW_GEOM = {
   dueRadius: 5,
   trunkWidth: 2.5,
   branchWidth: 1.5,
-  gutterWidth: 224, // left label column
+  gutterWidth: 272, // left label column (fits the ru zoom labels + Today control)
   rulerHeight: 36,
   minDaySpan: 7,
   defaultLookbackDays: 90,
