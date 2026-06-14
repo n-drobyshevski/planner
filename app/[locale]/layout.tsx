@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Manrope, Geist_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
@@ -13,12 +13,20 @@ import {
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/theme/appearance-cookie";
 import { routing } from "@/i18n/routing";
 
+// Latin brand face. Plus Jakarta Sans has no basic-Cyrillic glyphs (only
+// `cyrillic-ext`, which omits U+0410–044F), so Russian text falls through
+// (per-glyph) to Manrope below via the `--font-sans` stack — Latin stays Jakarta.
 const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-sans",
-  // Plus Jakarta Sans has no basic-Cyrillic glyphs (only `cyrillic-ext`, which
-  // omits U+0410–044F), so Russian text falls through to the Cyrillic-capable
-  // companion below via the `--font-sans` stack — Latin stays Jakarta.
+  variable: "--font-jakarta",
   subsets: ["latin"],
+});
+
+// Cyrillic companion (geometric-humanist, pairs with Jakarta; matching 200–800
+// variable range). Only fills the glyphs Jakarta lacks — Latin stays Jakarta
+// because it comes first in the family stack.
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin", "cyrillic"],
 });
 
 const geistMono = Geist_Mono({
@@ -79,7 +87,7 @@ export default async function RootLayout({
       data-accent={DEFAULT_ACCENT}
       data-tone={DEFAULT_TONE}
       data-palette={DEFAULT_PALETTE}
-      className={`${jakarta.variable} ${geistMono.variable} h-full`}
+      className={`${jakarta.variable} ${manrope.variable} ${geistMono.variable} h-full`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_INIT_SCRIPT }} />
