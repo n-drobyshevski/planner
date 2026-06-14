@@ -1,21 +1,15 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Eye, EyeOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
+import { PinInput } from "@/components/auth/pin-input";
 import { signIn } from "@/app/[locale]/login/actions";
 
 /**
@@ -26,7 +20,6 @@ import { signIn } from "@/app/[locale]/login/actions";
 export function LoginScreen() {
   const t = useTranslations("auth");
   const tv = useTranslations("validation");
-  const [showPin, setShowPin] = useState(false);
   // The transition keeps `pending` true through the post-sign-in redirect,
   // which the form's own isSubmitting wouldn't cover.
   const [pending, startTransition] = useTransition();
@@ -95,44 +88,11 @@ export function LoginScreen() {
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className="flex w-full items-center justify-between">
-                    <span className="text-sm font-medium">{t("pinLabel")}</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowPin((s) => !s)}
-                      className="flex items-center gap-1 rounded text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={showPin ? t("hidePinLabel") : t("showPinLabel")}
-                      aria-pressed={showPin}
-                    >
-                      {showPin ? (
-                        <EyeOff className="size-4" aria-hidden />
-                      ) : (
-                        <Eye className="size-4" aria-hidden />
-                      )}
-                      {showPin ? t("hidePin") : t("showPin")}
-                    </button>
-                  </div>
-                  <InputOTP
-                    maxLength={8}
+                  <PinInput
                     value={field.state.value}
                     onChange={field.handleChange}
                     disabled={pending}
-                    containerClassName="self-start"
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} mask={!showPin} />
-                      <InputOTPSlot index={1} mask={!showPin} />
-                      <InputOTPSlot index={2} mask={!showPin} />
-                      <InputOTPSlot index={3} mask={!showPin} />
-                    </InputOTPGroup>
-                    <InputOTPSeparator />
-                    <InputOTPGroup>
-                      <InputOTPSlot index={4} mask={!showPin} />
-                      <InputOTPSlot index={5} mask={!showPin} />
-                      <InputOTPSlot index={6} mask={!showPin} />
-                      <InputOTPSlot index={7} mask={!showPin} />
-                    </InputOTPGroup>
-                  </InputOTP>
+                  />
                   {isInvalid ? (
                     <FieldError
                       className="self-start"

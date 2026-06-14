@@ -10,8 +10,16 @@
   "userMenu": {
     "ariaLabel": "Меню профиля",
     "signedInAs": "Ты вошёл как {name}",
+    "switchTo": "Войти как {name}",
     "settings": "Настройки",
-    "signOut": "Выйти"
+    "signOut": "Выйти",
+    "switchDialog": {
+      "title": "Войти как {name}",
+      "description": "Введи PIN-код {name}, чтобы переключиться на этот аккаунт.",
+      "cancel": "Отмена",
+      "submit": "Переключиться",
+      "switching": "Переключаемся…"
+    }
   },
   "itemMenu": {
     "color": "Цвет",
