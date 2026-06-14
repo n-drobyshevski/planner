@@ -60,7 +60,7 @@ export function HintsSection({
           night lengths or bedtimes in the last {HINTS_WINDOW_DAYS} days.
         </p>
       ) : (
-        <ul role="list" className="flex flex-col gap-2">
+        <ul role="list" className="flex flex-col gap-3">
           {hints.map((h) => (
             <HintCard key={h.id} hint={h} />
           ))}
@@ -74,7 +74,7 @@ function HintCard({ hint }: { hint: SleepHint }) {
   const KindIcon = KIND_ICONS[hint.kind];
   const SeverityIcon = hint.severity === "attention" ? CircleAlert : Info;
   return (
-    <li className="flex items-start gap-3 rounded-lg border bg-card p-3 shadow-soft">
+    <li className="flex items-start gap-3 px-0.5">
       <KindIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

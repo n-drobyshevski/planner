@@ -1,20 +1,22 @@
 "use client";
 
 import { useMemo } from "react";
-import { CircleAlert, MoonStar, Sunrise } from "lucide-react";
+import { CircleAlert, MoonStar } from "lucide-react";
 
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
 import { dayStartOffset } from "@/lib/datetime/local";
 import { formatDuration, formatTime } from "@/lib/datetime/format";
 import { recommendTonight, type SleepPrefs } from "@/lib/sleep/cycles";
 import type { HabitualPhase } from "@/lib/sleep/circadian";
+import { LeadFigures } from "../tab-bits";
 
 /**
- * Tonight's single safe bedtime + wake window, anchored to tomorrow's first
- * commitment AND the viewer's habitual circadian phase. Fetches its own 1-day
- * window (day-aligned → stable query key) so it works whatever period the rest
- * of the tab shows; the habitual phase and recent debt are passed in from the
- * tab (computed once from the trailing-30-day history).
+ * The Sleep tab's answer: tonight's single safe bedtime + wake window, anchored
+ * to tomorrow's first commitment AND the viewer's habitual circadian phase.
+ * Rendered flat on the paper as the lead "reading" (like the Overview lede) —
+ * prominence from position + weight, never a bordered hero card. Fetches its
+ * own 1-day window (day-aligned → stable query key) so it works whatever period
+ * the rest of the tab shows.
  */
 export function TonightCard({
   workspaceId,
@@ -71,89 +73,75 @@ export function TonightCard({
     [firstEvent, prefs, habitualPhase, recentDebtMs, now, timeZone],
   );
 
-  return (
-    <section aria-label="Tonight" className="rounded-lg border bg-card p-3 shadow-soft">
-      <div className="flex items-center gap-2">
-        <MoonStar aria-hidden className="size-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium">Tonight</h3>
-      </div>
-
-      {rec === null ? (
-        <p className="mt-1 text-xs text-muted-foreground">
-          No commitment tomorrow yet. Log a few nights and this will suggest a
-          bedtime that fits your rhythm — or pick a wake time in the calculator
-          below.
-        </p>
-      ) : (
-        <>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {firstEvent ? (
-              <>
-                “{firstEvent.title}” starts at{" "}
-                <span className="tabular-nums">
-                  {formatTime(firstEvent.start, timeZone)}
-                </span>{" "}
-                tomorrow.
-              </>
-            ) : (
-              "No timed commitments tomorrow — this keeps your usual rhythm."
-            )}
+  if (rec === null) {
+    return (
+      <section aria-label="Tonight" className="flex items-start gap-2.5 px-0.5">
+        <MoonStar aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-base leading-snug font-semibold">
+            No bedtime to suggest tonight yet.
           </p>
+          <p className="text-sm leading-snug text-muted-foreground text-pretty">
+            Log a few nights and this will suggest a bedtime that fits your
+            rhythm — or pick a wake time in the calculator below.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
-          {/* Primary recommendation: a bedtime + a wake window, framed in hours. */}
-          <div className="mt-2 rounded-md border-2 border-primary/50 px-2.5 py-2">
-            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-sm">Go to bed by</span>
-              <span className="text-base font-semibold tabular-nums">
-                {formatTime(rec.bedtimeMs, timeZone)}
-              </span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                ~{formatDuration(rec.durationMs)} sleep · ≈ {rec.cyclesApprox}{" "}
-                {rec.cyclesApprox === 1 ? "cycle" : "cycles"}
-              </span>
-            </p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Sunrise aria-hidden className="size-3.5" />
-              Be up between{" "}
-              <span className="tabular-nums">
-                {formatTime(rec.wakeWindow.start, timeZone)}
-              </span>{" "}
-              and{" "}
-              <span className="tabular-nums">
-                {formatTime(rec.wakeWindow.end, timeZone)}
-              </span>
-              .
-            </p>
-          </div>
+  // One support clause: the "why". Conflict (the body-clock guardrail held the
+  // bedtime later than the schedule wanted) is the more important read when
+  // present, so it wins the clause; otherwise the commitment context.
+  const support = rec.conflict
+    ? `Tomorrow starts earlier than your body clock (usually around ${formatTime(rec.conflict.habitualBedtimeMs, timeZone)}). This is as early as is healthy to shift in one night; move ~30 min earlier each night to fully adjust over ~${rec.conflict.glideNights} nights.`
+    : firstEvent
+      ? `“${firstEvent.title}” starts at ${formatTime(firstEvent.start, timeZone)} tomorrow.`
+      : "No timed commitments tomorrow — this keeps your usual rhythm.";
 
-          {rec.conflict && (
-            <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
-              <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                Tomorrow starts earlier than your body clock (usually around{" "}
-                <span className="tabular-nums">
-                  {formatTime(rec.conflict.habitualBedtimeMs, timeZone)}
-                </span>
-                ). Tonight&apos;s bedtime is as early as is healthy to shift in
-                one night — about {formatDuration(rec.conflict.shortfallMs)} under
-                your target. Move ~30 min earlier each night to fully adjust over
-                ~{rec.conflict.glideNights} nights.
-              </span>
-            </p>
-          )}
+  return (
+    <section aria-label="Tonight" className="flex items-start gap-2.5 px-0.5">
+      <MoonStar aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1 space-y-3">
+        <div className="space-y-1">
+          <p className="text-base leading-snug font-semibold text-balance">
+            Go to bed by{" "}
+            <span className="tabular-nums">{formatTime(rec.bedtimeMs, timeZone)}</span>{" "}
+            tonight.
+          </p>
+          <p className="text-sm leading-snug text-muted-foreground text-pretty">
+            {support}
+          </p>
+        </div>
 
-          {rec.tooLate && (
-            <p className="mt-2 text-xs text-muted-foreground">
+        <LeadFigures
+          items={[
+            {
+              label: "Be up by",
+              value: `${formatTime(rec.wakeWindow.start, timeZone)}–${formatTime(rec.wakeWindow.end, timeZone)}`,
+            },
+            { label: "Sleep", value: `~${formatDuration(rec.durationMs)}` },
+            {
+              label: "Cycles",
+              value: `≈ ${rec.cyclesApprox}`,
+            },
+          ]}
+        />
+
+        {rec.tooLate && (
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+            <span>
               That bedtime has already passed —{" "}
               {rec.cyclesFromNow >= 1
                 ? `going to bed now still fits about ${rec.cyclesFromNow} ${
                     rec.cyclesFromNow === 1 ? "cycle" : "cycles"
                   }.`
                 : "less than one full cycle fits before your wake time."}
-            </p>
-          )}
-        </>
-      )}
+            </span>
+          </p>
+        )}
+      </div>
     </section>
   );
 }

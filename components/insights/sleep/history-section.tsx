@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Bar, BarChart, Cell, Line, LineChart, ReferenceLine, YAxis } from "recharts";
+import { Line, LineChart, YAxis } from "recharts";
 
 import {
   ChartContainer,
@@ -14,18 +14,17 @@ import { fromNoon, minutesSinceNoon } from "@/lib/sleep/clock";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import type { DerivedNight } from "@/lib/sleep/derive";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
+import { targetInBedMs } from "@/lib/sleep/nights-view";
 import type { SleepLog } from "@/lib/types";
 import { StatCard, StatGrid } from "../stat-card";
 import {
   INSIGHTS_CHART_MARGIN,
   insightsGrid,
   insightsXAxis,
-  insightsYAxis,
 } from "../chart-frame";
 import { bucketTick } from "../series";
-import { CHART_H, SectionLabel } from "../tab-bits";
+import { SectionLabel } from "../tab-bits";
 
-const MIN_MS = 60_000;
 const HOUR_MS = 3_600_000;
 
 interface NightRow {
@@ -92,8 +91,7 @@ export function HistorySection({
     return out;
   }, [nights, logByKey, timeZone]);
 
-  const targetMs =
-    (prefs.targetCycles * prefs.cycleLengthMin + prefs.onsetLatencyMin) * MIN_MS;
+  const targetMs = targetInBedMs(prefs);
 
   const avgMs =
     withData.length > 0
@@ -147,9 +145,6 @@ export function HistorySection({
     .filter(Boolean)
     .join("; ");
 
-  const durationConfig: ChartConfig = {
-    hours: { label: "In bed", color: "var(--chart-1)" },
-  };
   const scoreConfig: ChartConfig = {
     quality: { label: "Quality (1–5)", color: "var(--chart-2)" },
     fatigue: { label: "Sleepiness (1–9)", color: "var(--chart-4)" },
@@ -194,81 +189,6 @@ export function HistorySection({
           : ""}
         .
       </p>
-
-      {withData.length > 0 && (
-        <div className="space-y-1.5">
-          <ChartContainer
-            config={durationConfig}
-            className={`aspect-auto ${CHART_H.compact} w-full`}
-            aria-label="Time in bed per night"
-          >
-            <BarChart data={rows} accessibilityLayer margin={INSIGHTS_CHART_MARGIN}>
-              <defs>
-                {/* hatched fill marks calendar-derived nights (shape, not color) */}
-                <pattern
-                  id="sleep-derived-hatch"
-                  patternUnits="userSpaceOnUse"
-                  width="5"
-                  height="5"
-                  patternTransform="rotate(45)"
-                >
-                  <line x1="0" y1="0" x2="0" y2="5" stroke="var(--chart-1)" strokeWidth="2.5" opacity="0.55" />
-                </pattern>
-              </defs>
-              {insightsGrid()}
-              {insightsXAxis({
-                tickFormatter: (v) => bucketTick(Number(v), "day", timeZone),
-              })}
-              {insightsYAxis({ tickCount: 3 })}
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(_l, payload) => {
-                      const row = payload?.[0]?.payload as NightRow | undefined;
-                      return row
-                        ? `${bucketTick(Number(row.key), "day", timeZone)} — ${
-                            row.source === "logged" ? "logged" : "from calendar"
-                          }`
-                        : "";
-                    }}
-                    formatter={(_value, _name, item) => {
-                      const row = item.payload as NightRow;
-                      return (
-                        <span className="font-mono tabular-nums">
-                          {row.ms > 0 ? formatDuration(row.ms) : "no data"}
-                        </span>
-                      );
-                    }}
-                  />
-                }
-              />
-              <ReferenceLine
-                y={targetMs / HOUR_MS}
-                stroke="var(--chart-2)"
-                strokeDasharray="4 3"
-                ifOverflow="extendDomain"
-              />
-              <Bar dataKey="hours" radius={[3, 3, 0, 0]} isAnimationActive={!reduced}>
-                {rows.map((r) => (
-                  <Cell
-                    key={r.key}
-                    fill={
-                      r.source === "logged"
-                        ? "var(--chart-1)"
-                        : "url(#sleep-derived-hatch)"
-                    }
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ChartContainer>
-          <p className="text-xs text-muted-foreground">
-            Solid bars: logged check-ins · hatched: derived from inactive calendar
-            events · dashed line: your target
-          </p>
-        </div>
-      )}
 
       {hasScores && (
         <div className="space-y-1.5">

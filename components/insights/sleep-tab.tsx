@@ -42,9 +42,10 @@ import { CalculatorCard } from "./sleep/calculator-card";
 import { HintsSection } from "./sleep/hints-section";
 import { HistorySection } from "./sleep/history-section";
 import { LogNightDialog } from "./sleep/log-night-dialog";
+import { RhythmChart } from "./sleep/rhythm-chart";
 import { TonightCard } from "./sleep/tonight-card";
 import { SectionEmpty } from "./insights-empty";
-import { SectionLabel, TabGrid } from "./tab-bits";
+import { Reading, SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /**
@@ -255,58 +256,74 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
   }, [hasAnyData, recentDebtMs, correlations]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Lock aria-hidden className="size-3" />
-        Sleep is personal — this tab shows yours only, and your check-ins are
-        never visible to your partner.
-      </p>
+    <Reading>
+      {/* Movement 1 — the answer: what to do tonight, and any standout signal. */}
+      <div className="space-y-4">
+        <p className="flex items-center gap-1.5 px-0.5 text-xs text-muted-foreground">
+          <Lock aria-hidden className="size-3" />
+          Sleep is personal — this tab shows yours only, and your check-ins are
+          never visible to your partner.
+        </p>
 
-      {youLede && <InsightLede lede={youLede} />}
+        {youLede && <InsightLede lede={youLede} />}
 
-      {logsError && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 shadow-soft"
-        >
-          <p className="flex items-center gap-2 text-sm">
-            <CircleAlert aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-            We couldn&apos;t load your sleep logs. Check your connection and try
-            again.
-          </p>
-          <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
-            <RotateCw data-icon="inline-start" />
-            Try again
-          </Button>
-        </div>
-      )}
+        {logsError && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 shadow-soft"
+          >
+            <p className="flex items-center gap-2 text-sm">
+              <CircleAlert aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              We couldn&apos;t load your sleep logs. Check your connection and
+              try again.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
+              <RotateCw data-icon="inline-start" />
+              Try again
+            </Button>
+          </div>
+        )}
 
-      {!logsLoading && !logsError && (!hasLogToday || checkinPending) && (
-        <CheckinCard
-          key={`${viewerId}:${todayKey}`}
+        <TonightCard
+          workspaceId={wsId}
           viewerId={viewerId}
-          todayKey={todayKey}
+          sharedCategoryIds={sharedCategoryIds}
+          prefs={prefs}
+          habitualPhase={habitualPhase}
+          recentDebtMs={recentDebtMs}
           timeZone={timeZone}
-          derivedToday={derivedToday}
-          onSave={saveCheckin}
+          now={now}
         />
-      )}
 
-      <TonightCard
-        workspaceId={wsId}
-        viewerId={viewerId}
-        sharedCategoryIds={sharedCategoryIds}
-        prefs={prefs}
-        habitualPhase={habitualPhase}
-        recentDebtMs={recentDebtMs}
-        timeZone={timeZone}
-        now={now}
-      />
+        {/* The morning check-in is an input prompt — it keeps a card frame
+            (interactive), subordinate to the answer above it. */}
+        {!logsLoading && !logsError && (!hasLogToday || checkinPending) && (
+          <CheckinCard
+            key={`${viewerId}:${todayKey}`}
+            viewerId={viewerId}
+            todayKey={todayKey}
+            timeZone={timeZone}
+            derivedToday={derivedToday}
+            onSave={saveCheckin}
+          />
+        )}
+      </div>
 
+      {/* Movement 2 — the evidence, de-carded onto the paper: the rhythm strip
+          and the night history read full width; hints and the sleep↔day
+          relations flow two-up. */}
       {hasAnyData ? (
-        // History spans the full width (its charts read better wide); hints,
-        // the new sleep↔day correlations and the calculator flow two-up.
         <TabGrid>
+          <div className="xl:col-span-2">
+            <RhythmChart
+              nights={nights}
+              logs={periodLogs}
+              habitualPhase={habitualPhase}
+              timeZone={timeZone}
+              windowStartHour={viewer?.nightWindowStartHour ?? 20}
+              windowEndHour={viewer?.nightWindowEndHour ?? 12}
+            />
+          </div>
           <div className="xl:col-span-2">
             <HistorySection
               nights={nights}
@@ -327,37 +344,40 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
           </div>
           <HintsSection hints={hints} scoredCount={scoredCount} />
           <SleepCorrelationsSection correlations={correlations} />
-          <CalculatorCard prefs={prefs} />
         </TabGrid>
       ) : logsError ? null : (
-        <>
-          <Empty className="border-0">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <MoonStar />
-              </EmptyMedia>
-              <EmptyTitle>No sleep data yet</EmptyTitle>
-              <EmptyDescription>
-                Log a night below, or mark your nightly events as inactive in the
-                event dialog — Insights derives your nights from them
-                automatically.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <LogNightDialog
-                todayKey={todayKey}
-                timeZone={timeZone}
-                nights={nights}
-                logs={logs}
-                onSave={upsert}
-                onDelete={deleteLog}
-              />
-            </EmptyContent>
-          </Empty>
-          <CalculatorCard prefs={prefs} />
-        </>
+        <Empty className="border-0">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MoonStar />
+            </EmptyMedia>
+            <EmptyTitle>No sleep data yet</EmptyTitle>
+            <EmptyDescription>
+              Log a night below, or mark your nightly events as inactive in the
+              event dialog — Insights derives your nights from them
+              automatically.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <LogNightDialog
+              todayKey={todayKey}
+              timeZone={timeZone}
+              nights={nights}
+              logs={logs}
+              onSave={upsert}
+              onDelete={deleteLog}
+            />
+          </EmptyContent>
+        </Empty>
       )}
-    </div>
+
+      {/* Movement 3 — tools: the calculator is an interactive input, so it keeps
+          its frame, set apart at the foot like the Overview's "What to do". */}
+      <section className="space-y-2 border-t pt-5">
+        <SectionLabel>Plan a night</SectionLabel>
+        <CalculatorCard prefs={prefs} />
+      </section>
+    </Reading>
   );
 }
 
@@ -404,13 +424,13 @@ function SleepCorrelationsSection({
           load, focus and satisfaction.
         </SectionEmpty>
       ) : (
-        <ul className="space-y-1.5" role="list">
+        <ul className="space-y-1" role="list">
           {rows.map((c) => {
             const rho = c.rho as number;
             return (
               <li
                 key={`${c.metric}-${c.vs}`}
-                className="flex items-center gap-2 rounded-lg border bg-card p-2.5 text-xs shadow-soft"
+                className="flex items-center gap-2 text-xs"
               >
                 <span className="min-w-0 flex-1">
                   <span className="font-medium">
