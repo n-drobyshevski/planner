@@ -18,6 +18,7 @@
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { computeUsage } from "@/lib/analytics/usage";
 import { fragmentation } from "@/lib/analytics/patterns";
 import { categoryShares } from "@/lib/analytics/balance";
@@ -34,6 +35,9 @@ import type { Forecast } from "@/lib/analytics/forecast";
 import type { SleepDayPair } from "@/lib/analytics/sleep-cross";
 import type { GoalProgress } from "@/lib/insights/goals";
 import type { Occurrence, TaskRow, TimeWindow } from "@/lib/types";
+
+/** The "insights"-namespace translator from `useTranslations("insights")`. */
+type Translator = (key: string, values?: Record<string, string | number>) => string;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -114,6 +118,11 @@ export interface Suggestion {
 }
 
 export interface SuggestionsInput {
+  /** "insights"-namespace translator; every user-visible string is built from
+   *  "suggestions.<kind>.<field>" keys through it. */
+  t: Translator;
+  /** App locale ("en" | "ru") — localizes date-fns day labels and durations. */
+  locale: string;
   /** Insights-filtered occurrences of the selected period. */
   occurrences: Occurrence[];
   /** Same filter, previous comparison period. */
@@ -165,12 +174,16 @@ const KIND_PRIORITY: Record<SuggestionKind, number> = {
 };
 
 export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
-  const { window, prevWindow, days, prevDays, timeZone, now, categoryName } = input;
+  const { t, locale, window, prevWindow, days, prevDays, timeZone, now, categoryName } =
+    input;
   const ctx = tz(timeZone);
-  const dayLabel = (ms: number) => format(ms, "EEE d MMM", { in: ctx });
+  const dfLocale = dateFnsLocale(locale);
+  const dayLabel = (ms: number) =>
+    format(ms, "EEE d MMM", { in: ctx, locale: dfLocale });
+  const dur = (ms: number) => formatDuration(ms, locale);
   const windowLabel =
     input.periodLabel ??
-    `${format(window.start, "d MMM", { in: ctx })} – ${format(window.end - 1, "d MMM", { in: ctx })}`;
+    `${format(window.start, "d MMM", { in: ctx, locale: dfLocale })} – ${format(window.end - 1, "d MMM", { in: ctx, locale: dfLocale })}`;
   const calendarDayHref = (dayMs: number) =>
     `/calendar?date=${dateKeyInZone(dayMs, timeZone)}&view=day`;
 
@@ -209,22 +222,29 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       id: `overloaded-day:${dateKeyInZone(d.dayMs, timeZone)}`,
       kind: "overloaded-day",
       severity: d.ms >= OVERLOAD_ATTENTION_MS ? "attention" : "info",
-      title: `Heavy day: ${dayLabel(d.dayMs)}`,
-      body: "Noticeably more scheduled time than a typical day — worth keeping some buffer.",
+      title: t("suggestions.overloadedDay.title", { day: dayLabel(d.dayMs) }),
+      body: t("suggestions.overloadedDay.body"),
       meta: [
-        `${formatDuration(d.ms)} scheduled`,
-        `typical day ${formatDuration(typicalMs)}`,
+        t("suggestions.overloadedDay.metaScheduled", { duration: dur(d.ms) }),
+        t("suggestions.overloadedDay.metaTypical", { duration: dur(typicalMs) }),
       ],
       evidence: {
-        summary: `${formatDuration(d.ms)} scheduled on ${dayLabel(d.dayMs)} vs a ${formatDuration(typicalMs)} typical day.`,
+        summary: t("suggestions.overloadedDay.evidenceSummary", {
+          duration: dur(d.ms),
+          day: dayLabel(d.dayMs),
+          typical: dur(typicalMs),
+        }),
         n: nonzero.length,
         threshold:
           nonzero.length >= OVERLOAD_MIN_SAMPLE
-            ? "Fires when a day exceeds 1.5× the median active day of this and the previous period (at least 6h)."
-            : "Fires above 8h when there are too few active days for a typical-day baseline.",
+            ? t("suggestions.overloadedDay.evidenceThreshold")
+            : t("suggestions.overloadedDay.evidenceThresholdSparse"),
         windowLabel,
       },
-      action: { label: "See the day", href: calendarDayHref(d.dayMs) },
+      action: {
+        label: t("suggestions.actionSeeDay"),
+        href: calendarDayHref(d.dayMs),
+      },
     });
   }
 
@@ -249,23 +269,31 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     stranded += 1;
     const names = movable
       .slice(0, 2)
-      .map((o) => `“${o.title}”`)
-      .join(" and ");
+      .map((o) => t("suggestions.strandedFlexible.quotedName", { name: o.title }))
+      .join(t("suggestions.strandedFlexible.nameJoin"));
     out.push({
       id: `stranded-flexible:${dateKeyInZone(d.dayMs, timeZone)}`,
       kind: "stranded-flexible",
       severity: "info",
-      title: `Movable items on ${dayLabel(d.dayMs)}`,
-      body: `${names} ${movable.length === 1 ? "is" : "are"} marked movable — ${dayLabel(
-        lightest.dayMs,
-      )} looks lighter.`,
+      title: t("suggestions.strandedFlexible.title", { day: dayLabel(d.dayMs) }),
+      body: t("suggestions.strandedFlexible.body", {
+        names,
+        count: movable.length,
+        lighterDay: dayLabel(lightest.dayMs),
+      }),
       evidence: {
-        summary: `${movable.length} movable item${movable.length === 1 ? "" : "s"} sit${movable.length === 1 ? "s" : ""} on ${dayLabel(d.dayMs)}, a day above your overload threshold; ${dayLabel(lightest.dayMs)} has the least scheduled time.`,
-        threshold:
-          "Fires when items marked movable or flexible fall on a day above the heavy-day threshold.",
+        summary: t("suggestions.strandedFlexible.evidenceSummary", {
+          count: movable.length,
+          day: dayLabel(d.dayMs),
+          lighterDay: dayLabel(lightest.dayMs),
+        }),
+        threshold: t("suggestions.strandedFlexible.evidenceThreshold"),
         windowLabel,
       },
-      action: { label: "See the day", href: calendarDayHref(d.dayMs) },
+      action: {
+        label: t("suggestions.actionSeeDay"),
+        href: calendarDayHref(d.dayMs),
+      },
     });
   }
 
@@ -286,23 +314,29 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
         id: "fragmentation:regression",
         kind: "fragmentation",
         severity: "info",
-        title: "Days are getting choppier",
-        body: "More short scattered blocks than last period — batching similar items protects focus.",
+        title: t("suggestions.fragmentation.title"),
+        body: t("suggestions.fragmentation.body"),
         meta:
           curFrag.avgBlockMs !== null && prevFrag.avgBlockMs !== null
             ? [
-                `avg block ${formatDuration(curFrag.avgBlockMs)}`,
-                `was ${formatDuration(prevFrag.avgBlockMs)}`,
+                t("suggestions.fragmentation.metaAvg", {
+                  duration: dur(curFrag.avgBlockMs),
+                }),
+                t("suggestions.fragmentation.metaWas", {
+                  duration: dur(prevFrag.avgBlockMs),
+                }),
               ]
             : undefined,
         evidence: {
           summary:
             curFrag.avgBlockMs !== null && prevFrag.avgBlockMs !== null
-              ? `Average busy block is ${formatDuration(curFrag.avgBlockMs)}, down from ${formatDuration(prevFrag.avgBlockMs)} last period.`
-              : "The share of short scattered blocks jumped vs the previous period.",
+              ? t("suggestions.fragmentation.evidenceSummary", {
+                  duration: dur(curFrag.avgBlockMs),
+                  prev: dur(prevFrag.avgBlockMs),
+                })
+              : t("suggestions.fragmentation.evidenceSummaryShare"),
           n: curFrag.blockCount,
-          threshold:
-            "Fires when the short-block share jumps 15+ points, or the average block drops to ≤75% of last period's, over at least 5 blocks in each.",
+          threshold: t("suggestions.fragmentation.evidenceThreshold"),
           windowLabel,
         },
       });
@@ -352,16 +386,23 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       id: `late-night:${dateKeyInZone(days[m], timeZone)}`,
       kind: "late-night",
       severity: "info",
-      title: `Short night into ${dayLabel(days[m])}`,
-      body: "A late evening ran close to an early start — under 8 hours between them.",
-      meta: [`${formatDuration(Math.max(0, gap))} of rest`],
+      title: t("suggestions.lateNight.title", { day: dayLabel(days[m]) }),
+      body: t("suggestions.lateNight.body"),
+      meta: [
+        t("suggestions.lateNight.metaRest", { duration: dur(Math.max(0, gap)) }),
+      ],
       evidence: {
-        summary: `${formatDuration(Math.max(0, gap))} of real elapsed time between the late end and the ${dayLabel(days[m])} early start.`,
-        threshold:
-          "Fires when under 8 hours separate an evening ending at 23:00 or later (or past midnight) from a 4–8 am start the next morning.",
+        summary: t("suggestions.lateNight.evidenceSummary", {
+          duration: dur(Math.max(0, gap)),
+          day: dayLabel(days[m]),
+        }),
+        threshold: t("suggestions.lateNight.evidenceThreshold"),
         windowLabel,
       },
-      action: { label: "See the morning", href: calendarDayHref(days[m]) },
+      action: {
+        label: t("suggestions.lateNight.action"),
+        href: calendarDayHref(days[m]),
+      },
     });
   }
 
@@ -381,21 +422,28 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     if (top) {
       const name = categoryName(top.categoryId);
       const pts = Math.round(Math.abs(top.deltaShare) * 100);
-      const direction = top.deltaShare > 0 ? "larger" : "smaller";
+      const direction = top.deltaShare > 0 ? "up" : "down";
       out.push({
         id: `category-drift:${top.categoryId ?? "uncategorized"}`,
         kind: "category-drift",
         severity: "info",
-        title: `${name} shifted ${pts} pts`,
-        body: `${name} took a noticeably ${direction} share of your time than in the previous period.`,
+        title: t("suggestions.categoryDrift.title", { name, pts }),
+        body: t("suggestions.categoryDrift.body", { name, direction, pts }),
         meta: [
-          `now ${Math.round(top.share * 100)}%`,
-          `was ${Math.round(top.prevShare * 100)}%`,
+          t("suggestions.categoryDrift.metaNow", {
+            pct: Math.round(top.share * 100),
+          }),
+          t("suggestions.categoryDrift.metaWas", {
+            pct: Math.round(top.prevShare * 100),
+          }),
         ],
         evidence: {
-          summary: `${name} holds ${Math.round(top.share * 100)}% of tracked time, vs ${Math.round(top.prevShare * 100)}% in the previous period.`,
-          threshold:
-            "Fires on a 15+ point share shift with at least 3h in either period and 8h tracked in both.",
+          summary: t("suggestions.categoryDrift.evidenceSummary", {
+            name,
+            pct: Math.round(top.share * 100),
+            prevPct: Math.round(top.prevShare * 100),
+          }),
+          threshold: t("suggestions.categoryDrift.evidenceThreshold"),
           windowLabel,
         },
       });
@@ -406,34 +454,39 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
   if (window.end > now) {
     const startOfToday = dateInputToMs(dateKeyInZone(now, timeZone), timeZone);
     const candidates = input.tasks
-      .filter((t) => {
-        if (t.parentId !== null || t.status === "done") return false;
-        if (t.priority !== 3 || t.dueDate === null) return false;
-        const dueMs = dateInputToMs(t.dueDate, timeZone);
+      .filter((task) => {
+        if (task.parentId !== null || task.status === "done") return false;
+        if (task.priority !== 3 || task.dueDate === null) return false;
+        const dueMs = dateInputToMs(task.dueDate, timeZone);
         if (dueMs < startOfToday || dueMs >= startOfToday + DUE_HORIZON_MS) return false;
         // "Scheduled" = an upcoming block in this period's fetch.
-        return !input.occurrences.some((o) => o.taskId === t.id && o.end > now);
+        return !input.occurrences.some((o) => o.taskId === task.id && o.end > now);
       })
       .sort(
         (a, b) =>
           (a.dueDate as string).localeCompare(b.dueDate as string) ||
           a.title.localeCompare(b.title),
       );
-    for (const t of candidates.slice(0, 2)) {
-      const dueMs = dateInputToMs(t.dueDate as string, timeZone);
+    for (const task of candidates.slice(0, 2)) {
+      const dueMs = dateInputToMs(task.dueDate as string, timeZone);
       out.push({
-        id: `unscheduled-task:${t.id}`,
+        id: `unscheduled-task:${task.id}`,
         kind: "unscheduled-task",
         severity: dueMs - startOfToday <= DUE_ATTENTION_MS ? "attention" : "info",
-        title: `Due soon: ${t.title}`,
-        body: `High priority and due ${dayLabel(dueMs)}, with no upcoming time blocked in this period.`,
+        title: t("suggestions.unscheduledTask.title", { title: task.title }),
+        body: t("suggestions.unscheduledTask.body", { day: dayLabel(dueMs) }),
         evidence: {
-          summary: `“${t.title}” is high priority, due ${dayLabel(dueMs)}, and has no upcoming block in this period's calendar.`,
-          threshold:
-            "Fires for open high-priority tasks due within 7 days that have no upcoming scheduled block.",
+          summary: t("suggestions.unscheduledTask.evidenceSummary", {
+            title: task.title,
+            day: dayLabel(dueMs),
+          }),
+          threshold: t("suggestions.unscheduledTask.evidenceThreshold"),
           windowLabel,
         },
-        action: { label: "Open tasks", href: "/tasks" },
+        action: {
+          label: t("suggestions.unscheduledTask.action"),
+          href: "/tasks",
+        },
       });
     }
   }
@@ -450,18 +503,24 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       id: `goal-over-budget:${g.goal.categoryId}`,
       kind: "goal-over-budget",
       severity: g.ratio >= GOAL_OVER_ATTENTION_RATIO ? "attention" : "info",
-      title: `${name} is over budget`,
-      body: `Time in ${name} has passed the cap you set for this period.`,
+      title: t("suggestions.goalOverBudget.title", { name }),
+      body: t("suggestions.goalOverBudget.body", { name }),
       meta: [
-        `${formatDuration(g.actualMs)} tracked`,
-        `cap ${formatDuration(g.targetMs)}`,
+        t("suggestions.goalOverBudget.metaTracked", { duration: dur(g.actualMs) }),
+        t("suggestions.goalOverBudget.metaCap", { duration: dur(g.targetMs) }),
       ],
       evidence: {
-        summary: `${formatDuration(g.actualMs)} tracked against a ${formatDuration(g.targetMs)} cap (the weekly budget scaled to this period).`,
-        threshold: "Fires when tracked time passes an at-most goal's period-scaled cap.",
+        summary: t("suggestions.goalOverBudget.evidenceSummary", {
+          duration: dur(g.actualMs),
+          cap: dur(g.targetMs),
+        }),
+        threshold: t("suggestions.goalOverBudget.evidenceThreshold"),
         windowLabel,
       },
-      action: { label: "Review goals", href: "/insights?tab=balance" },
+      action: {
+        label: t("suggestions.goalOverBudget.action"),
+        href: "/insights?tab=balance",
+      },
     });
   }
   // Behind-pace targets only fire mid-window — a finished window has no pace
@@ -481,18 +540,27 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       id: `goal-under-budget:${g.goal.categoryId}`,
       kind: "goal-under-budget",
       severity: "info",
-      title: `${name} is behind pace`,
-      body: `There's still room to reach the ${name} target — a block or two would close the gap.`,
+      title: t("suggestions.goalUnderBudget.title", { name }),
+      body: t("suggestions.goalUnderBudget.body", { name }),
       meta: [
-        `${formatDuration(g.actualMs)} of ${formatDuration(g.targetMs)}`,
+        t("suggestions.goalUnderBudget.metaProgress", {
+          actual: dur(g.actualMs),
+          target: dur(g.targetMs),
+        }),
       ],
       evidence: {
-        summary: `${formatDuration(g.actualMs)} tracked where the elapsed share of the period implies ${formatDuration((g.expected as number) * g.targetMs)} to stay on pace for ${formatDuration(g.targetMs)}.`,
-        threshold:
-          "Fires mid-window when tracked time is under the pace an at-least target implies.",
+        summary: t("suggestions.goalUnderBudget.evidenceSummary", {
+          actual: dur(g.actualMs),
+          expected: dur((g.expected as number) * g.targetMs),
+          target: dur(g.targetMs),
+        }),
+        threshold: t("suggestions.goalUnderBudget.evidenceThreshold"),
         windowLabel,
       },
-      action: { label: "Open the calendar", href: "/calendar" },
+      action: {
+        label: t("suggestions.actionOpenCalendar"),
+        href: "/calendar",
+      },
     });
   }
 
@@ -511,21 +579,30 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       kind: "forecast-overload",
       severity:
         forecast.capacityRatio >= FORECAST_ATTENTION_RATIO ? "attention" : "info",
-      title: "Next period already looks heavy",
-      body: "More time is committed ahead than you typically track — worth rebalancing before it starts.",
+      title: t("suggestions.forecastOverload.title"),
+      body: t("suggestions.forecastOverload.body"),
       meta: [
-        `${formatDuration(committedMs)} committed`,
-        `${pct}% of typical pace`,
+        t("suggestions.forecastOverload.metaCommitted", {
+          duration: dur(committedMs),
+        }),
+        t("suggestions.forecastOverload.metaPace", { pct }),
       ],
       evidence: {
-        summary: `${formatDuration(committedMs)} already scheduled next period — ${pct}% of your typical pace (${formatDuration(forecast.typicalDayMs)}/day over ${forecast.perDay.length} days).`,
-        threshold:
-          "Fires when committed time for the next window exceeds 110% of the typical-day pace.",
+        summary: t("suggestions.forecastOverload.evidenceSummary", {
+          duration: dur(committedMs),
+          pct,
+          typical: dur(forecast.typicalDayMs),
+          days: forecast.perDay.length,
+        }),
+        threshold: t("suggestions.forecastOverload.evidenceThreshold"),
         windowLabel,
       },
       action: forecast.busiestDay
-        ? { label: "See the busiest day", href: calendarDayHref(forecast.busiestDay.dayMs) }
-        : { label: "Open the calendar", href: "/calendar" },
+        ? {
+            label: t("suggestions.forecastOverload.actionBusiest"),
+            href: calendarDayHref(forecast.busiestDay.dayMs),
+          }
+        : { label: t("suggestions.actionOpenCalendar"), href: "/calendar" },
     });
   }
 
@@ -540,19 +617,22 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       id: `anomaly:${dateKeyInZone(a.dayMs, timeZone)}`,
       kind: "anomaly",
       severity: "info",
-      title: `Out-of-pattern day: ${dayLabel(a.dayMs)}`,
-      body:
-        a.direction === "high"
-          ? "Tracked time sat far above your usual day — worth a look at what piled up."
-          : "Tracked time sat far below your usual day — fine if it was a rest day, worth a look if not.",
-      meta: [`${formatDuration(a.ms)} tracked`],
+      title: t("suggestions.anomaly.title", { day: dayLabel(a.dayMs) }),
+      body: t("suggestions.anomaly.body", { direction: a.direction }),
+      meta: [t("suggestions.anomaly.metaTracked", { duration: dur(a.ms) })],
       evidence: {
-        summary: `${formatDuration(a.ms)} on ${dayLabel(a.dayMs)} — a robust z-score of ${a.z.toFixed(1)} against the period's median day.`,
-        threshold:
-          "Fires at |z| ≥ 3 (median/MAD) over at least 14 active days, so single odd days on short ranges never alarm.",
+        summary: t("suggestions.anomaly.evidenceSummary", {
+          duration: dur(a.ms),
+          day: dayLabel(a.dayMs),
+          z: a.z.toFixed(1),
+        }),
+        threshold: t("suggestions.anomaly.evidenceThreshold"),
         windowLabel,
       },
-      action: { label: "See the day", href: calendarDayHref(a.dayMs) },
+      action: {
+        label: t("suggestions.actionSeeDay"),
+        href: calendarDayHref(a.dayMs),
+      },
     });
   }
 
@@ -563,12 +643,14 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       id: `streak-broken:${streak.longest}`,
       kind: "streak-broken",
       severity: "info",
-      title: `A ${streak.longest}-day streak ended`,
-      body: "You tracked time several days in a row earlier in this period — one small block today restarts the run.",
-      meta: [`longest run ${streak.longest} days`],
+      title: t("suggestions.streakBroken.title", { days: streak.longest }),
+      body: t("suggestions.streakBroken.body"),
+      meta: [t("suggestions.streakBroken.metaLongest", { days: streak.longest })],
       evidence: {
-        summary: `The longest run of consecutive active days this period reached ${streak.longest}; the most recent day has nothing tracked.`,
-        threshold: "Fires when a streak of 5+ active days ends within the period.",
+        summary: t("suggestions.streakBroken.evidenceSummary", {
+          days: streak.longest,
+        }),
+        threshold: t("suggestions.streakBroken.evidenceThreshold"),
         windowLabel,
       },
     });
@@ -591,16 +673,26 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
         id: "sleep-debt:recent",
         kind: "sleep-debt",
         severity: "info",
-        title: "Sleep is running short",
-        body: "Several recent nights came in under 7 hours — an earlier evening or two would pay it back.",
-        meta: [`avg ${formatDuration(Math.round(avgMs))}`, `${short.length} short nights`],
+        title: t("suggestions.sleepDebt.title"),
+        body: t("suggestions.sleepDebt.body"),
+        meta: [
+          t("suggestions.sleepDebt.metaAvg", { duration: dur(Math.round(avgMs)) }),
+          t("suggestions.sleepDebt.metaShort", { count: short.length }),
+        ],
         evidence: {
-          summary: `${short.length} of your last ${recent.length} logged nights were under 7h (average ${formatDuration(Math.round(avgMs))}).`,
+          summary: t("suggestions.sleepDebt.evidenceSummary", {
+            short: short.length,
+            total: recent.length,
+            avg: dur(Math.round(avgMs)),
+          }),
           n: recent.length,
-          threshold: "Fires when 3 of the last 7 logged nights are under 7 hours.",
+          threshold: t("suggestions.sleepDebt.evidenceThreshold"),
           windowLabel,
         },
-        action: { label: "Open the Sleep tab", href: "/insights?tab=sleep" },
+        action: {
+          label: t("suggestions.sleepDebt.action"),
+          href: "/insights?tab=sleep",
+        },
       });
     }
   }
@@ -614,13 +706,27 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
       id: `correlation-insight:satisfaction:${lowest.categoryId ?? "uncategorized"}`,
       kind: "correlation-insight",
       severity: "info",
-      title: `${name} keeps rating low`,
-      body: `Time in ${name} averaged ${lowest.agg.mean.toFixed(1)} of 5 satisfaction — worth a look at what makes it drag.`,
-      meta: [`${lowest.agg.mean.toFixed(1)}/5`, `n ${lowest.agg.n}`],
+      title: t("suggestions.correlationInsight.title", { name }),
+      body: t("suggestions.correlationInsight.body", {
+        name,
+        mean: lowest.agg.mean.toFixed(1),
+      }),
+      meta: [
+        t("suggestions.correlationInsight.metaMean", {
+          mean: lowest.agg.mean.toFixed(1),
+        }),
+        t("suggestions.correlationInsight.metaN", { n: lowest.agg.n }),
+      ],
       evidence: {
-        summary: `${lowest.agg.n} rated items in ${name} average ${lowest.agg.mean.toFixed(1)} of 5, duration-weighted. A pattern, not a cause — only you know why.`,
+        summary: t("suggestions.correlationInsight.evidenceSummary", {
+          n: lowest.agg.n,
+          name,
+          mean: lowest.agg.mean.toFixed(1),
+        }),
         n: lowest.agg.n,
-        threshold: `Fires when a context's duration-weighted satisfaction averages ≤2.5 of 5 over at least ${MIN_CATEGORY_RATINGS} rated items.`,
+        threshold: t("suggestions.correlationInsight.evidenceThreshold", {
+          min: MIN_CATEGORY_RATINGS,
+        }),
         windowLabel,
       },
     });

@@ -16,6 +16,7 @@ import {
 } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { toDateParam, parseDateParam } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import type { TimeWindow } from "@/lib/types";
 
 export type PeriodPreset =
@@ -94,6 +95,13 @@ interface PeriodOpts {
   weekStartsOn?: 0 | 1;
   /** "now" for preset anchoring (default: Date.now()) — injectable for tests */
   now?: number;
+  /** App locale ("en" | "ru") for the date range in `.label`. Defaults to "en"
+   *  so server-side callers (digest) and tests keep English without passing it. */
+  locale?: string;
+  /** Localized preset labels for `.label` ("This week" / "На этой неделе"). The
+   *  caller resolves these from the "insights.period" namespace; omitted ⇒ the
+   *  English defaults below, so untouched callers stay English. */
+  presetLabels?: Record<Exclude<PeriodPreset, "custom">, string>;
 }
 
 const DEFAULT_WEEK_STARTS_ON = 1 as const;
@@ -175,7 +183,13 @@ export function defaultGranularity(
   return "month";
 }
 
-const PRESET_LABELS: Record<Exclude<PeriodPreset, "custom">, string> = {
+/**
+ * English preset labels — the default for `.label` when the caller passes no
+ * `presetLabels`. The five keys mirror "insights.period" in the message
+ * catalogs; the insights shell passes the localized strings, server/test
+ * callers fall through to these.
+ */
+export const PRESET_LABELS: Record<Exclude<PeriodPreset, "custom">, string> = {
   "this-week": "This week",
   "last-week": "Last week",
   "this-month": "This month",
@@ -183,20 +197,27 @@ const PRESET_LABELS: Record<Exclude<PeriodPreset, "custom">, string> = {
   "last-90d": "Last 90 days",
 };
 
-/** "8 – 14 Jun 2026" / "28 May – 3 Jun 2026" / "30 Dec 2025 – 4 Jan 2026". */
-function rangeText(window: TimeWindow, ctx: ReturnType<typeof tz>): string {
+/** "8 – 14 Jun 2026" / "28 May – 3 Jun 2026" / "30 Dec 2025 – 4 Jan 2026". The
+ *  date-fns locale localizes month names (Cyrillic genitive for "ru"). */
+function rangeText(
+  window: TimeWindow,
+  ctx: ReturnType<typeof tz>,
+  locale = "en",
+): string {
+  const loc = dateFnsLocale(locale);
   const lastDay = window.end - 1; // exclusive end → a ms inside the last day
   const sameMonth =
-    format(window.start, "MMM yyyy", { in: ctx }) ===
-    format(lastDay, "MMM yyyy", { in: ctx });
+    format(window.start, "MMM yyyy", { in: ctx, locale: loc }) ===
+    format(lastDay, "MMM yyyy", { in: ctx, locale: loc });
   const sameYear =
-    format(window.start, "yyyy", { in: ctx }) === format(lastDay, "yyyy", { in: ctx });
+    format(window.start, "yyyy", { in: ctx, locale: loc }) ===
+    format(lastDay, "yyyy", { in: ctx, locale: loc });
   const left = sameMonth
-    ? format(window.start, "d", { in: ctx })
+    ? format(window.start, "d", { in: ctx, locale: loc })
     : sameYear
-      ? format(window.start, "d MMM", { in: ctx })
-      : format(window.start, "d MMM yyyy", { in: ctx });
-  return `${left} – ${format(lastDay, "d MMM yyyy", { in: ctx })}`;
+      ? format(window.start, "d MMM", { in: ctx, locale: loc })
+      : format(window.start, "d MMM yyyy", { in: ctx, locale: loc });
+  return `${left} – ${format(lastDay, "d MMM yyyy", { in: ctx, locale: loc })}`;
 }
 
 /**
@@ -289,9 +310,10 @@ export function resolvePeriod(state: PeriodState, opts: PeriodOpts): ResolvedPer
     : defaultGranularity(state.preset, window);
   const buckets = listBuckets(window, days, granularity, ctx, weekStartsOn);
 
-  const range = rangeText(window, ctx);
+  const range = rangeText(window, ctx, opts.locale);
+  const presetLabels = opts.presetLabels ?? PRESET_LABELS;
   const label =
-    state.preset === "custom" ? range : `${PRESET_LABELS[state.preset]} · ${range}`;
+    state.preset === "custom" ? range : `${presetLabels[state.preset]} · ${range}`;
 
   return { window, days, buckets, granularity, prevWindow, prevDays, label, clamped };
 }

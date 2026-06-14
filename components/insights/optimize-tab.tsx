@@ -243,6 +243,8 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
 
   const suggestions = useMemo(() => {
     return computeSuggestions({
+      t,
+      locale,
       occurrences,
       prevOccurrences,
       tasks,
@@ -267,7 +269,7 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
       suppressedKinds: new Set(suppressedKinds),
       periodLabel: period.label,
     });
-  }, [occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goalsProgress, anomalies, streak, forecast, memberFilter, sleepLogs, suppressedKinds]);
+  }, [t, locale, occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goalsProgress, anomalies, streak, forecast, memberFilter, sleepLogs, suppressedKinds]);
 
   const coverage = useMemo(() => attributeCoverage(occurrences), [occurrences]);
 
@@ -280,12 +282,13 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     const shares = categoryShares(active, prevActive, period.window, period.prevWindow);
     const taskStats = computeTaskStats(tasks, period.window, now, timeZone);
     const name = (id: string | null) =>
-      id === null ? "Uncategorized" : (categories.get(id)?.name ?? "a context");
+      id === null ? t("series.noContext") : (categories.get(id)?.name ?? t("series.unknown"));
     const futureCommittedMs = forecast.perDay.reduce((s, d) => s + d.committedMs, 0);
     return buildDigestPayload({
       periodLabel: period.label,
       dayCount: period.days.length,
       lens: memberFilter,
+      locale: locale === "ru" ? "ru" : "en",
       totalMs: usage.cur.summary.totalMs,
       prevTotalMs: usage.prev.summary.totalMs,
       dailyAvgMs: usage.cur.summary.dailyAverageMs,

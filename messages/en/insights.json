@@ -321,6 +321,115 @@
       "correlationInsight": "satisfaction tips"
     }
   },
+  "suggestions": {
+    "actionSeeDay": "See the day",
+    "actionOpenCalendar": "Open the calendar",
+    "overloadedDay": {
+      "title": "Heavy day: {day}",
+      "body": "Noticeably more scheduled time than a typical day — worth keeping some buffer.",
+      "metaScheduled": "{duration} scheduled",
+      "metaTypical": "typical day {duration}",
+      "evidenceSummary": "{duration} scheduled on {day} vs a {typical} typical day.",
+      "evidenceThreshold": "Fires when a day exceeds 1.5× the median active day of this and the previous period (at least 6h).",
+      "evidenceThresholdSparse": "Fires above 8h when there are too few active days for a typical-day baseline."
+    },
+    "strandedFlexible": {
+      "quotedName": "“{name}”",
+      "nameJoin": " and ",
+      "title": "Movable items on {day}",
+      "body": "{names} {count, plural, one {is} other {are}} marked movable — {lighterDay} looks lighter.",
+      "evidenceSummary": "{count, plural, one {# movable item sits} other {# movable items sit}} on {day}, a day above your overload threshold; {lighterDay} has the least scheduled time.",
+      "evidenceThreshold": "Fires when items marked movable or flexible fall on a day above the heavy-day threshold."
+    },
+    "fragmentation": {
+      "title": "Days are getting choppier",
+      "body": "More short scattered blocks than last period — batching similar items protects focus.",
+      "metaAvg": "avg block {duration}",
+      "metaWas": "was {duration}",
+      "evidenceSummary": "Average busy block is {duration}, down from {prev} last period.",
+      "evidenceSummaryShare": "The share of short scattered blocks jumped vs the previous period.",
+      "evidenceThreshold": "Fires when the short-block share jumps 15+ points, or the average block drops to ≤75% of last period's, over at least 5 blocks in each."
+    },
+    "lateNight": {
+      "title": "Short night into {day}",
+      "body": "A late evening ran close to an early start — under 8 hours between them.",
+      "metaRest": "{duration} of rest",
+      "evidenceSummary": "{duration} of real elapsed time between the late end and the {day} early start.",
+      "evidenceThreshold": "Fires when under 8 hours separate an evening ending at 23:00 or later (or past midnight) from a 4–8 am start the next morning.",
+      "action": "See the morning"
+    },
+    "categoryDrift": {
+      "title": "{name} shifted {pts} pts",
+      "body": "{name}: share {direction, select, up {grew} other {shrank}} by {pts} points vs the previous period.",
+      "metaNow": "now {pct}%",
+      "metaWas": "was {pct}%",
+      "evidenceSummary": "{name} holds {pct}% of tracked time, vs {prevPct}% in the previous period.",
+      "evidenceThreshold": "Fires on a 15+ point share shift with at least 3h in either period and 8h tracked in both."
+    },
+    "unscheduledTask": {
+      "title": "Due soon: {title}",
+      "body": "High priority and due {day}, with no upcoming time blocked in this period.",
+      "evidenceSummary": "“{title}” is high priority, due {day}, and has no upcoming block in this period's calendar.",
+      "evidenceThreshold": "Fires for open high-priority tasks due within 7 days that have no upcoming scheduled block.",
+      "action": "Open tasks"
+    },
+    "goalOverBudget": {
+      "title": "{name}: over budget",
+      "body": "{name}: time has passed the cap you set for this period.",
+      "metaTracked": "{duration} tracked",
+      "metaCap": "cap {duration}",
+      "evidenceSummary": "{duration} tracked against a {cap} cap (the weekly budget scaled to this period).",
+      "evidenceThreshold": "Fires when tracked time passes an at-most goal's period-scaled cap.",
+      "action": "Review goals"
+    },
+    "goalUnderBudget": {
+      "title": "{name}: behind pace",
+      "body": "{name}: there's still room to reach the target — a block or two would close the gap.",
+      "metaProgress": "{actual} of {target}",
+      "evidenceSummary": "{actual} tracked where the elapsed share of the period implies {expected} to stay on pace for {target}.",
+      "evidenceThreshold": "Fires mid-window when tracked time is under the pace an at-least target implies."
+    },
+    "forecastOverload": {
+      "title": "Next period already looks heavy",
+      "body": "More time is committed ahead than you typically track — worth rebalancing before it starts.",
+      "metaCommitted": "{duration} committed",
+      "metaPace": "{pct}% of typical pace",
+      "evidenceSummary": "{duration} already scheduled next period — {pct}% of your typical pace ({typical}/day over {days, plural, one {# day} other {# days}}).",
+      "evidenceThreshold": "Fires when committed time for the next window exceeds 110% of the typical-day pace.",
+      "actionBusiest": "See the busiest day"
+    },
+    "anomaly": {
+      "title": "Out-of-pattern day: {day}",
+      "body": "{direction, select, high {Tracked time sat far above your usual day — worth a look at what piled up.} other {Tracked time sat far below your usual day — fine if it was a rest day, worth a look if not.}}",
+      "metaTracked": "{duration} tracked",
+      "evidenceSummary": "{duration} on {day} — a robust z-score of {z} against the period's median day.",
+      "evidenceThreshold": "Fires at |z| ≥ 3 (median/MAD) over at least 14 active days, so single odd days on short ranges never alarm."
+    },
+    "streakBroken": {
+      "title": "A {days, plural, one {#-day} other {#-day}} streak ended",
+      "body": "You tracked time several days in a row earlier in this period — one small block today restarts the run.",
+      "metaLongest": "longest run {days, plural, one {# day} other {# days}}",
+      "evidenceSummary": "The longest run of consecutive active days this period reached {days}; the most recent day has nothing tracked.",
+      "evidenceThreshold": "Fires when a streak of 5+ active days ends within the period."
+    },
+    "sleepDebt": {
+      "title": "Sleep is running short",
+      "body": "Several recent nights came in under 7 hours — an earlier evening or two would pay it back.",
+      "metaAvg": "avg {duration}",
+      "metaShort": "{count, plural, one {# short night} other {# short nights}}",
+      "evidenceSummary": "{short} of your last {total} logged nights were under 7h (average {avg}).",
+      "evidenceThreshold": "Fires when 3 of the last 7 logged nights are under 7 hours.",
+      "action": "Open the Sleep tab"
+    },
+    "correlationInsight": {
+      "title": "{name} keeps rating low",
+      "body": "Time in {name} averaged {mean} of 5 satisfaction — worth a look at what makes it drag.",
+      "metaMean": "{mean}/5",
+      "metaN": "n {n}",
+      "evidenceSummary": "{n, plural, one {# rated item} other {# rated items}} in {name} average {mean} of 5, duration-weighted. A pattern, not a cause — only you know why.",
+      "evidenceThreshold": "Fires when a context's duration-weighted satisfaction averages ≤2.5 of 5 over at least {min} rated items."
+    }
+  },
   "digest": {
     "label": "Digest",
     "writing": "Writing the digest",

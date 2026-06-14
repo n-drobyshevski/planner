@@ -47,6 +47,26 @@ describe("resolvePeriod — calendar presets (UTC)", () => {
     expect(p.clamped).toBe(false);
   });
 
+  it("localizes the label via locale + presetLabels (Russian)", () => {
+    // The insights shell passes the localized preset strings and the app
+    // locale; the date range then prints Cyrillic genitive months.
+    const p = resolvePeriod(state(), {
+      timeZone: UTC,
+      now,
+      locale: "ru",
+      presetLabels: {
+        "this-week": "На этой неделе",
+        "last-week": "На прошлой неделе",
+        "this-month": "В этом месяце",
+        "last-30d": "Последние 30 дней",
+        "last-90d": "Последние 90 дней",
+      },
+    });
+    expect(p.label).toContain("На этой неделе");
+    expect(p.label).toContain("·");
+    expect(p.label).toContain("8 – 14 июн. 2026");
+  });
+
   it("last-week is the week before, comparing to the one before that", () => {
     const p = resolvePeriod(state({ preset: "last-week" }), { timeZone: UTC, now });
     expect(p.window).toEqual({ start: utc(2026, 5, 1), end: utc(2026, 5, 8) });

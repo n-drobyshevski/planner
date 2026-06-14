@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import dynamic from "next/dynamic";
 import { m } from "motion/react";
@@ -123,6 +123,7 @@ function InsightsShellInner({
   initialTab: InsightsTab;
 }) {
   const t = useTranslations("insights");
+  const locale = useLocale();
   const router = useRouter();
   const timeZone = useViewerTimeZone();
   const [state, setState] = useState<PeriodState>(initialState);
@@ -156,9 +157,23 @@ function InsightsShellInner({
   // "now" anchors the relative presets. Captured at mount and refreshed on
   // every period change (event handlers may be impure; render must stay pure).
   const [now, setNow] = useState(() => Date.now());
+  // Localized preset labels for `period.label` — resolved once and threaded
+  // into resolvePeriod so the label ("На этой неделе · 8 – 14 июн. 2026") is
+  // localized everywhere it flows (every tab's aria/captions, the digest, the
+  // period selector). Keys mirror "insights.period.*".
+  const presetLabels = useMemo(
+    () => ({
+      "this-week": t("period.thisWeek"),
+      "last-week": t("period.lastWeek"),
+      "this-month": t("period.thisMonth"),
+      "last-30d": t("period.last30d"),
+      "last-90d": t("period.last90d"),
+    }),
+    [t],
+  );
   const period = useMemo(
-    () => resolvePeriod(state, { timeZone, now }),
-    [state, timeZone, now],
+    () => resolvePeriod(state, { timeZone, now, locale, presetLabels }),
+    [state, timeZone, now, locale, presetLabels],
   );
 
   // Roll "now" forward when the local date changes (tab left open overnight),

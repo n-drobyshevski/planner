@@ -25,6 +25,8 @@ export const digestPayloadSchema = z.object({
     days: z.number().int().min(1).max(366),
     /** the member lens the numbers were computed under */
     lens: z.enum(["me", "partner", "both"]),
+    /** UI language the digest should be written in */
+    locale: z.enum(["en", "ru"]),
   }),
   time: z.object({
     totalMin: z.number().int().min(0),
@@ -99,6 +101,8 @@ export interface DigestPayloadInput {
   periodLabel: string;
   dayCount: number;
   lens: "me" | "partner" | "both";
+  /** UI language ("en" | "ru") — the digest is written in it. */
+  locale: "en" | "ru";
   totalMs: number;
   prevTotalMs: number;
   dailyAvgMs: number;
@@ -131,6 +135,7 @@ export function buildDigestPayload(input: DigestPayloadInput): DigestPayload {
       label: input.periodLabel.slice(0, 80),
       days: input.dayCount,
       lens: input.lens,
+      locale: input.locale,
     },
     time: {
       totalMin: toMin(input.totalMs),

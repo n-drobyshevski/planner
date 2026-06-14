@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
+import { createTranslator } from "next-intl";
 
 import {
   attributeCoverage,
   computeSuggestions,
   type SuggestionsInput,
 } from "@/lib/insights/suggestions";
+import enInsights from "@/messages/en/insights.json";
 import type { Occurrence, TaskRow, TimeWindow } from "@/lib/types";
+
+// A real English translator over the actual `insights` catalog, so these tests
+// exercise the same ICU messages the app renders (suggestions copy now lives in
+// messages/en/insights.json under "suggestions" rather than inline strings).
+const t = createTranslator({
+  locale: "en",
+  messages: { insights: enInsights },
+  namespace: "insights",
+}) as (key: string, values?: Record<string, string | number>) => string;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -82,6 +93,8 @@ function makeInput(over: Partial<SuggestionsInput> = {}): SuggestionsInput {
   const window: TimeWindow = { start: T0, end: T0 + 7 * DAY };
   const prevWindow: TimeWindow = { start: T0 - 7 * DAY, end: T0 };
   return {
+    t,
+    locale: "en",
     occurrences: [],
     prevOccurrences: [],
     tasks: [],

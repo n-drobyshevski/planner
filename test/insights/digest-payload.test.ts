@@ -13,6 +13,7 @@ function input(over: Partial<DigestPayloadInput> = {}): DigestPayloadInput {
     periodLabel: "This week",
     dayCount: 7,
     lens: "me",
+    locale: "en",
     totalMs: 20 * HOUR,
     prevTotalMs: 18 * HOUR,
     dailyAvgMs: 2.5 * HOUR,

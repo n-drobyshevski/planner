@@ -37,7 +37,14 @@ Rules:
 - If the data is thin, say so honestly in the summary rather than padding.`;
 
 function userPrompt(payload: DigestPayload): string {
-  return `Period statistics as JSON:\n\n${JSON.stringify(payload)}\n\nWrite the digest for this period ("${payload.period.label}", lens: ${payload.period.lens}).`;
+  // The digest is written in the member's UI language. English is the default
+  // voice in SYSTEM_PROMPT; for Russian, direct the model explicitly (informal
+  // "ты", Russian duration units) so it never mirrors the English examples.
+  const langDirective =
+    payload.period.locale === "ru"
+      ? `\n\nWrite the ENTIRE digest in Russian, addressing the reader informally ("ты"). Render durations in Russian units (e.g. "2 ч 30 мин", "45 мин"), not "2h 30m".`
+      : "";
+  return `Period statistics as JSON:\n\n${JSON.stringify(payload)}\n\nWrite the digest for this period ("${payload.period.label}", lens: ${payload.period.lens}).${langDirective}`;
 }
 
 export async function POST(request: Request) {

@@ -14,6 +14,7 @@ const PAYLOAD = buildDigestPayload({
   periodLabel: "This week",
   dayCount: 7,
   lens: "me",
+  locale: "en",
   totalMs: 0,
   prevTotalMs: 0,
   dailyAvgMs: 0,
