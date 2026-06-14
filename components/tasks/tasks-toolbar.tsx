@@ -17,7 +17,7 @@ import { MobileAccountSection } from "@/components/mobile-account-section";
 import { BoardSwitcher } from "./board-switcher";
 import type { Member } from "@/lib/types";
 
-export type TasksView = "board" | "list";
+export type TasksView = "board" | "list" | "flows";
 
 /**
  * Tasks controls, portaled into the shared surface header (SurfaceChrome owns
@@ -65,6 +65,7 @@ export function TasksToolbar({
         >
           <ToggleGroupItem value="board">{t("toolbar.board")}</ToggleGroupItem>
           <ToggleGroupItem value="list">{t("toolbar.list")}</ToggleGroupItem>
+          <ToggleGroupItem value="flows">{t("toolbar.flows")}</ToggleGroupItem>
         </ToggleGroup>
         {/* New task: a labelled button on desktop, a square icon button below md.
             An icon-only button needs its own aria-label — a CSS-hidden label is

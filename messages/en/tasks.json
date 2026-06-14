@@ -14,8 +14,32 @@
     "view": "View",
     "board": "Board",
     "list": "List",
+    "flows": "Flows",
     "newTask": "New task",
     "moreOptions": "More options"
+  },
+  "flows": {
+    "empty": {
+      "title": "No tasks to chart yet",
+      "body": "Create a task and the Flows view traces its path from To Do to Done over time."
+    },
+    "node": {
+      "created": "Created",
+      "started": "Started",
+      "done": "Done",
+      "reopened": "Reopened",
+      "due": "Due",
+      "overdue": "Overdue"
+    },
+    "zoom": {
+      "label": "Time scale",
+      "day": "Day",
+      "week": "Week",
+      "month": "Month"
+    },
+    "today": "Today",
+    "expand": "Show subtasks",
+    "collapse": "Hide subtasks"
   },
   "board": {
     "addTaskTo": "Add task to {title}",

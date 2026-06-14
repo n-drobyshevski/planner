@@ -12,6 +12,7 @@ import { fade } from "@/lib/motion";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useTasks } from "@/lib/hooks/use-tasks";
+import { useTaskStatusEvents } from "@/lib/hooks/use-task-status-events";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
 import { resolveTaskColor } from "@/lib/tasks/colors";
@@ -33,7 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { TaskActions } from "./task-actions";
-import type { TaskRow } from "@/lib/types";
+import type { TaskRow, TaskStatusEvent } from "@/lib/types";
 
 // Defer the task/schedule dialogs out of the initial /tasks JS (both portaled →
 // null fallback, no layout cost). Warmed on idle via useIdlePreload so the
@@ -48,8 +49,14 @@ const ScheduleTaskDialog = dynamic(loadScheduleTaskDialog, {
   loading: () => null,
 });
 
-/** Overlays warmed during idle so their first open is instant. */
-const OVERLAY_PRELOADS = [loadTaskDialog, loadScheduleTaskDialog];
+// The Flows view carries the SVG/zoom weight, so it's code-split out of the
+// initial /tasks JS (Board/List stay inline as the common defaults) and warmed
+// on idle so the first switch is instant.
+const loadTaskFlows = () => import("./task-flows").then((m) => m.TaskFlows);
+const TaskFlows = dynamic(loadTaskFlows, { ssr: false, loading: () => null });
+
+/** Overlays + the Flows view, warmed during idle so their first open is instant. */
+const OVERLAY_PRELOADS = [loadTaskDialog, loadScheduleTaskDialog, loadTaskFlows];
 
 export function TasksShell({
   initialView,
@@ -92,6 +99,9 @@ export function TasksShell({
   const workspaceId = workspace.data?.workspaceId;
   const timeZone = useViewerTimeZone();
   const { tasks, isLoading, isError } = useTasks(workspaceId);
+  // Status-change history powers the Flows view; it loads alongside tasks and
+  // its own loading state gates only that view's skeleton.
+  const { events, isLoading: eventsLoading } = useTaskStatusEvents(workspaceId);
   const mutations = useTaskMutations(workspaceId);
 
   const members = workspace.data?.members ?? [];
@@ -126,6 +136,17 @@ export function TasksShell({
 
   const childrenByParent = useMemo(() => groupByParent(boardTasks), [boardTasks]);
   const topLevel = childrenByParent.get(null) ?? [];
+
+  // Status events grouped by task id, for the Flows view's per-lane timelines.
+  const eventsByTask = useMemo(() => {
+    const map = new Map<string, TaskStatusEvent[]>();
+    for (const e of events) {
+      const arr = map.get(e.taskId);
+      if (arr) arr.push(e);
+      else map.set(e.taskId, [e]);
+    }
+    return map;
+  }, [events]);
   const progressFor = (t: TaskRow) => {
     const c = childrenByParent.get(t.id) ?? [];
     return c.length ? progressOf(c) : null;
@@ -216,7 +237,18 @@ export function TasksShell({
               exit="exit"
               className="h-full"
             >
-              {view === "board" ? (
+              {view === "flows" && !isMobile ? (
+                <TaskFlows
+                  tasks={topLevel}
+                  childrenByParent={childrenByParent}
+                  eventsByTask={eventsByTask}
+                  colorOf={colorOf}
+                  members={memberMap}
+                  currentMemberId={workspace.data?.currentMember?.id ?? null}
+                  actions={actions}
+                  loading={eventsLoading}
+                />
+              ) : view === "board" ? (
                 <TaskBoard
                   tasks={topLevel}
                   colorOf={colorOf}

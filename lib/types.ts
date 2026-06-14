@@ -210,6 +210,22 @@ export interface TaskRow {
   updatedAt: number;
 }
 
+/**
+ * One recorded task status transition. Append-only history behind the Flows
+ * view; written by a DB trigger, never by the client. `fromStatus` is null for
+ * the creation event (and for backfilled completions, where the prior status
+ * was never recorded).
+ */
+export interface TaskStatusEvent {
+  id: string;
+  taskId: string;
+  workspaceId: string;
+  fromStatus: TaskStatus | null;
+  toStatus: TaskStatus;
+  changedBy: string | null;
+  changedAt: number;
+}
+
 export interface OverrideRow {
   id: string;
   workspaceId: string;

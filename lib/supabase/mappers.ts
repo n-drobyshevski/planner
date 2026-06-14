@@ -14,6 +14,7 @@ import type {
   Board,
   SleepLog,
   TaskRow,
+  TaskStatusEvent,
   AppLocale,
   ThemePreference,
   AccentId,
@@ -267,6 +268,18 @@ export function mapTask(r: Row): TaskRow {
     attributes: parseAttributes(r.attributes),
     createdAt: toMs(r.created_at),
     updatedAt: toMs(r.updated_at),
+  };
+}
+
+export function mapStatusEvent(r: Row): TaskStatusEvent {
+  return {
+    id: r.id as string,
+    taskId: r.task_id as string,
+    workspaceId: r.workspace_id as string,
+    fromStatus: (r.from_status as TaskStatusEvent["fromStatus"]) ?? null,
+    toStatus: r.to_status as TaskStatusEvent["toStatus"],
+    changedBy: (r.changed_by as string | null) ?? null,
+    changedAt: toMs(r.changed_at),
   };
 }
 

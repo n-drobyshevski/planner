@@ -10,6 +10,7 @@ import type {
   Board,
   SleepLog,
   TaskRow,
+  TaskStatusEvent,
   TimeWindow,
 } from "@/lib/types";
 import {
@@ -23,6 +24,7 @@ import {
   mapBoard,
   mapSleepLog,
   mapTask,
+  mapStatusEvent,
 } from "./mappers";
 
 export interface WorkspaceBundle {
@@ -118,6 +120,24 @@ export async function fetchTasks(
     .order("created_at");
   if (error) throw error;
   return (data ?? []).map(mapTask);
+}
+
+/**
+ * The full status-change history for the workspace, oldest first. Append-only
+ * and tiny (a handful of rows per task), so it's a single un-windowed cache
+ * entry like fetchTasks. RLS only returns events for tasks the viewer can see.
+ */
+export async function fetchTaskStatusEvents(
+  sb: SupabaseClient,
+  workspaceId: string,
+): Promise<TaskStatusEvent[]> {
+  const { data, error } = await sb
+    .from("task_status_events")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("changed_at");
+  if (error) throw error;
+  return (data ?? []).map(mapStatusEvent);
 }
 
 /**

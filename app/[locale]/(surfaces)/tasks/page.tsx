@@ -28,8 +28,10 @@ async function TasksRoute({
   const sp = await searchParams;
   // Params are normalized OUT here, in the dynamic scope; the plain results
   // become the cache key below (one entry per view/board combination).
-  const initialView = sp.view === "list" ? "list" : "board";
-  const viewFromUrl = sp.view === "list" || sp.view === "board";
+  const initialView: TasksView =
+    sp.view === "list" ? "list" : sp.view === "flows" ? "flows" : "board";
+  const viewFromUrl =
+    sp.view === "list" || sp.view === "board" || sp.view === "flows";
   return (
     <CachedTasks
       view={initialView}
