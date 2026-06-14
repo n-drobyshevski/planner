@@ -7,7 +7,7 @@
 // scrollable, zoomable date axis. Layout math is pure (lib/tasks/flows-layout);
 // this file owns the scroll frame, ruler, gutter, zoom, and empty/loading.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ChevronRight, CalendarRange, LocateFixed } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, addDays, addMonths, format } from "date-fns";
@@ -73,12 +73,23 @@ export function TaskFlows({
   const [nowMs] = useState(() => Date.now());
   const [pxPerDay, setPxPerDay] = useState<number>(ZOOM.week);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  // Measured scroll-viewport width — drives the side padding that lets the
+  // now-line reach the track centre even when the data alone is narrower than
+  // the screen. Measured synchronously before paint so centring doesn't flicker.
+  const [viewportW, setViewportW] = useState(0);
 
   const lanes = useMemo(
     () => buildFlowLanes({ topLevel: tasks, childrenByParent, eventsByTask, nowMs }),
     [tasks, childrenByParent, eventsByTask, nowMs],
   );
-  const { t0, t1 } = useMemo(() => flowsWindow(lanes, nowMs), [lanes, nowMs]);
+  // The data window is the meaningful extent; the render window pads each side
+  // by half the visible track so any point (incl. "now") can be scrolled to the
+  // centre. The pad is empty but dated — it reads as scroll/planning slack.
+  const data = useMemo(() => flowsWindow(lanes, nowMs), [lanes, nowMs]);
+  const visibleTrack = Math.max(0, viewportW - G.gutterWidth);
+  const padMs = pxPerDay > 0 ? ((visibleTrack / 2) / pxPerDay) * DAY_MS : 0;
+  const t0 = data.t0 - padMs; // render origin (left pad)
+  const t1 = data.t1 + padMs; // render right edge (right pad)
   const { rows, totalHeight } = useMemo(
     () => layoutRows(lanes, expanded),
     [lanes, expanded],
@@ -90,6 +101,16 @@ export function TaskFlows({
     [t0, t1, pxPerDay, timeZone, locale],
   );
   const gridMs = useMemo(() => ticks.map((tk) => tk.ms), [ticks]);
+
+  // Track the viewport width (initial + on resize) for the side padding.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setViewportW(el.clientWidth);
+    const ro = new ResizeObserver(() => setViewportW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Ctrl/Cmd + wheel zooms the time axis (a non-passive listener so we can
   // preventDefault the page scroll).
@@ -113,13 +134,15 @@ export function TaskFlows({
     el.scrollLeft = Math.max(0, nowX - viewport / 2);
   }
 
-  // Center the now-line on first paint so "today" is in view.
-  useEffect(() => {
-    if (didCenter.current || rows.length === 0) return;
+  // Centre the now-line once the viewport is measured and there's data — in a
+  // layout effect (before paint) so the padded track is already in the DOM and
+  // there's no left-aligned flash before it settles on centre.
+  useLayoutEffect(() => {
+    if (didCenter.current || viewportW === 0 || rows.length === 0) return;
     didCenter.current = true;
     scrollToNow();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot centering on first data
-  }, [rows.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot centering on first layout
+  }, [viewportW, rows.length]);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
