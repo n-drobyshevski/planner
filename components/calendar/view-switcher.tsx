@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CalendarView } from "@/lib/types";
 
@@ -10,6 +11,7 @@ export function ViewSwitcher({
   view: CalendarView;
   onViewChange: (v: CalendarView) => void;
 }) {
+  const t = useTranslations("calendar");
   return (
     <ToggleGroup
       type="single"
@@ -20,11 +22,11 @@ export function ViewSwitcher({
       variant="outline"
       size="sm"
     >
-      <ToggleGroupItem value="agenda">Agenda</ToggleGroupItem>
-      <ToggleGroupItem value="day">Day</ToggleGroupItem>
-      <ToggleGroupItem value="3day">3 Day</ToggleGroupItem>
-      <ToggleGroupItem value="week">Week</ToggleGroupItem>
-      <ToggleGroupItem value="month">Month</ToggleGroupItem>
+      <ToggleGroupItem value="agenda">{t("views.agenda")}</ToggleGroupItem>
+      <ToggleGroupItem value="day">{t("views.day")}</ToggleGroupItem>
+      <ToggleGroupItem value="3day">{t("views.threeDay")}</ToggleGroupItem>
+      <ToggleGroupItem value="week">{t("views.week")}</ToggleGroupItem>
+      <ToggleGroupItem value="month">{t("views.month")}</ToggleGroupItem>
     </ToggleGroup>
   );
 }

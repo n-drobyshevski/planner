@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CalendarPlus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import {
@@ -46,12 +47,12 @@ import type { TaskRow } from "@/lib/types";
 type Mode = ScheduleTaskFormValues["mode"];
 
 const DURATIONS = [
-  ["15", "15 min"],
-  ["30", "30 min"],
-  ["45", "45 min"],
-  ["60", "1 hour"],
-  ["90", "1.5 hours"],
-  ["120", "2 hours"],
+  ["15", "schedule.durations.15min"],
+  ["30", "schedule.durations.30min"],
+  ["45", "schedule.durations.45min"],
+  ["60", "schedule.durations.1hour"],
+  ["90", "schedule.durations.1andHalfHours"],
+  ["120", "schedule.durations.2hours"],
 ] as const;
 
 export function ScheduleTaskDialog({
@@ -69,6 +70,8 @@ export function ScheduleTaskDialog({
   workspaceId: string;
   defaultStartMs?: number;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const mutations = useTaskMutations(workspaceId);
   const timeZone = useViewerTimeZone();
   const hasSubtasks = subtasks.length > 0;
@@ -130,7 +133,7 @@ export function ScheduleTaskDialog({
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>Add to calendar</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>{t("schedule.title")}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="truncate">
             {task.title}
           </ResponsiveDialogDescription>
@@ -145,12 +148,12 @@ export function ScheduleTaskDialog({
                   field.state.meta.isTouched && !field.state.meta.isValid;
                 return (
                   <Field data-invalid={isInvalid || undefined}>
-                    <FieldLabel htmlFor="sched-date">Date</FieldLabel>
+                    <FieldLabel htmlFor="sched-date">{t("schedule.dateLabel")}</FieldLabel>
                     <DatePicker
                       id="sched-date"
                       value={field.state.value}
                       onChange={field.handleChange}
-                      aria-label="Date"
+                      aria-label={t("schedule.dateLabel")}
                     />
                     {isInvalid && <FieldError errors={field.state.meta.errors} />}
                   </Field>
@@ -163,12 +166,12 @@ export function ScheduleTaskDialog({
                   field.state.meta.isTouched && !field.state.meta.isValid;
                 return (
                   <Field data-invalid={isInvalid || undefined}>
-                    <FieldLabel htmlFor="sched-time">Start</FieldLabel>
+                    <FieldLabel htmlFor="sched-time">{t("schedule.startLabel")}</FieldLabel>
                     <TimeField
                       id="sched-time"
                       value={field.state.value}
                       onChange={field.handleChange}
-                      aria-label="Start"
+                      aria-label={t("schedule.startLabel")}
                     />
                     {isInvalid && <FieldError errors={field.state.meta.errors} />}
                   </Field>
@@ -180,7 +183,7 @@ export function ScheduleTaskDialog({
           <form.Field name="mode">
             {(field) => (
               <Field>
-                <FieldLabel>How</FieldLabel>
+                <FieldLabel>{t("schedule.howLabel")}</FieldLabel>
                 <ToggleGroup
                   type="single"
                   variant="outline"
@@ -188,10 +191,10 @@ export function ScheduleTaskDialog({
                   onValueChange={(v) => v && field.handleChange(v as Mode)}
                   className="justify-start"
                 >
-                  <ToggleGroupItem value="single">One block</ToggleGroupItem>
-                  <ToggleGroupItem value="split">Split</ToggleGroupItem>
+                  <ToggleGroupItem value="single">{t("schedule.oneBlock")}</ToggleGroupItem>
+                  <ToggleGroupItem value="split">{t("schedule.split")}</ToggleGroupItem>
                   {hasSubtasks && (
-                    <ToggleGroupItem value="subtasks">Subtasks</ToggleGroupItem>
+                    <ToggleGroupItem value="subtasks">{t("schedule.subtasks")}</ToggleGroupItem>
                   )}
                 </ToggleGroup>
               </Field>
@@ -205,7 +208,7 @@ export function ScheduleTaskDialog({
                   <form.Field name="duration">
                     {(field) => (
                       <Field>
-                        <FieldLabel>Duration</FieldLabel>
+                        <FieldLabel>{t("schedule.durationLabel")}</FieldLabel>
                         <DurationSelect
                           value={field.state.value}
                           onChange={field.handleChange}
@@ -220,7 +223,7 @@ export function ScheduleTaskDialog({
                     <form.Field name="totalDuration">
                       {(field) => (
                         <Field>
-                          <FieldLabel>Total duration</FieldLabel>
+                          <FieldLabel>{t("schedule.totalDurationLabel")}</FieldLabel>
                           <DurationSelect
                             value={field.state.value}
                             onChange={field.handleChange}
@@ -231,7 +234,7 @@ export function ScheduleTaskDialog({
                     <form.Field name="count">
                       {(field) => (
                         <Field>
-                          <FieldLabel htmlFor="sched-count">Blocks</FieldLabel>
+                          <FieldLabel htmlFor="sched-count">{t("schedule.blocksLabel")}</FieldLabel>
                           <Input
                             id="sched-count"
                             type="number"
@@ -251,14 +254,15 @@ export function ScheduleTaskDialog({
                   <form.Field name="duration">
                     {(field) => (
                       <Field>
-                        <FieldLabel>Each subtask</FieldLabel>
+                        <FieldLabel>{t("schedule.eachSubtaskLabel")}</FieldLabel>
                         <DurationSelect
                           value={field.state.value}
                           onChange={field.handleChange}
                         />
                         <p className="text-xs text-muted-foreground">
-                          {ordered.length} subtask{ordered.length === 1 ? "" : "s"} scheduled
-                          back-to-back{task.sequential ? ", in order" : ""}.
+                          {task.sequential
+                            ? t("schedule.subtasksHintInOrder", { count: ordered.length })
+                            : t("schedule.subtasksHint", { count: ordered.length })}
                         </p>
                       </Field>
                     )}
@@ -279,7 +283,7 @@ export function ScheduleTaskDialog({
                   onClick={() => onOpenChange(false)}
                   disabled={isSubmitting}
                 >
-                  Cancel
+                  {tc("cancel")}
                 </Button>
                 <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
                   {isSubmitting ? (
@@ -287,7 +291,7 @@ export function ScheduleTaskDialog({
                   ) : (
                     <CalendarPlus data-icon="inline-start" />
                   )}
-                  Add to calendar
+                  {t("schedule.title")}
                 </Button>
               </>
             )}
@@ -305,6 +309,7 @@ function DurationSelect({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useTranslations("tasks");
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger>
@@ -312,9 +317,9 @@ function DurationSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>
-          {DURATIONS.map(([v, label]) => (
+          {DURATIONS.map(([v, labelKey]) => (
             <SelectItem key={v} value={v}>
-              {label}
+              {t(labelKey)}
             </SelectItem>
           ))}
         </SelectGroup>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import {
@@ -32,6 +33,7 @@ import {
   useUpdateInsightsPrefs,
 } from "@/lib/hooks/use-insights-prefs";
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { deriveOverviewLede } from "@/lib/insights/ledes";
 import { StatCard, StatGrid } from "./stat-card";
@@ -49,7 +51,7 @@ import { DayDetailSheet } from "./day-detail-sheet";
 import { GoalsSection } from "./goals/goals-section";
 import { OptimizeTab } from "./optimize-tab";
 import { InsightsEmpty } from "./insights-empty";
-import { NEUTRAL, seriesMeta } from "./series";
+import { NEUTRAL, seriesFallbackLabels, seriesMeta } from "./series";
 import { CHART_H, Reading, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
@@ -87,6 +89,10 @@ function median(values: number[]): number {
  * prefs reproduces the classic layout exactly.
  */
 export function OverviewTab({ data }: { data: InsightsTabData }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
+  const dfLocale = dateFnsLocale(locale);
+  const seriesLabels = useMemo(() => seriesFallbackLabels(t), [t]);
   const reduced = usePrefersReducedMotion();
   const {
     period,
@@ -142,9 +148,9 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       avg: avg[i].avgMs,
       // Previous period aligned by position (day 1 vs day 1, …).
       prevMs: prevUsage.perDay[i]?.ms,
-      full: formatWeekdayDayMonth(d.dayMs, timeZone),
+      full: formatWeekdayDayMonth(d.dayMs, timeZone, locale),
     }));
-  }, [usage.perDay, prevUsage.perDay, timeZone]);
+  }, [usage.perDay, prevUsage.perDay, timeZone, locale]);
 
   // "Typical day" baseline: median nonzero day across both windows — the same
   // baseline the Optimize overload rule judges against.
@@ -158,14 +164,14 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
 
   const shareData = useMemo(() => {
     const rows = usage.byCategory.map((c) => {
-      const meta = seriesMeta(c.categoryId ?? "__uncategorized__", data.categories);
+      const meta = seriesMeta(c.categoryId ?? "__uncategorized__", data.categories, seriesLabels);
       return { id: c.categoryId ?? "uncategorized", ...meta, ms: c.ms };
     });
     if (rows.length <= TOP_CATEGORIES) return rows;
     const head = rows.slice(0, TOP_CATEGORIES);
     const restMs = rows.slice(TOP_CATEGORIES).reduce((s, r) => s + r.ms, 0);
-    return [...head, { id: "other", name: "Other", color: NEUTRAL, ms: restMs }];
-  }, [usage.byCategory, data.categories]);
+    return [...head, { id: "other", name: t("overview.other"), color: NEUTRAL, ms: restMs }];
+  }, [usage.byCategory, data.categories, seriesLabels, t]);
 
   // Biggest share shifts vs the previous period (only meaningful with data on
   // both sides).
@@ -192,22 +198,34 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   );
 
   const perDayConfig: ChartConfig = {
-    ms: { label: "Tracked", color: "var(--chart-1)" },
-    avg: { label: "7-day avg", color: "var(--chart-2)" },
-    prevMs: { label: "Previous period", color: COMPARISON_COLOR },
+    ms: { label: t("overview.seriesTracked"), color: "var(--chart-1)" },
+    avg: { label: t("overview.seriesAvg"), color: "var(--chart-2)" },
+    prevMs: { label: t("overview.seriesPrev"), color: COMPARISON_COLOR },
   };
 
   // Takeaway headline: total + direction vs the previous period.
   const totalDelta = delta(total, prevUsage.summary.totalMs);
-  const perDayHeadline =
-    totalDelta.deltaPct === null
-      ? `${formatDuration(total)} tracked this period.`
-      : totalDelta.deltaPct === 0
-        ? `${formatDuration(total)} tracked, level with the previous period.`
-        : `${formatDuration(total)} tracked, ${totalDelta.deltaPct > 0 ? "up" : "down"} ${Math.round(Math.abs(totalDelta.deltaPct) * 100)}% vs the previous period.`;
+  const perDayHeadline = t("overview.perDayHeadline", {
+    trend:
+      totalDelta.deltaPct === null
+        ? "none"
+        : totalDelta.deltaPct === 0
+          ? "level"
+          : totalDelta.deltaPct > 0
+            ? "up"
+            : "down",
+    total: formatDuration(total, locale),
+    pct:
+      totalDelta.deltaPct === null
+        ? 0
+        : Math.round(Math.abs(totalDelta.deltaPct) * 100),
+  });
 
   const shareHeadline = shareData[0]
-    ? `Most time went to ${shareData[0].name} (${srPercent(shareData[0].ms, total)}).`
+    ? t("overview.shareHeadline", {
+        name: shareData[0].name,
+        pct: srPercent(shareData[0].ms, total),
+      })
     : undefined;
 
   // The tab lede: the period's answer in one sentence, above everything.
@@ -218,11 +236,13 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     preset: data.preset,
     topContext: topCat
       ? {
-          name: seriesMeta(topCat.categoryId ?? "__uncategorized__", data.categories)
+          name: seriesMeta(topCat.categoryId ?? "__uncategorized__", data.categories, seriesLabels)
             .name,
           ms: topCat.ms,
         }
       : null,
+    t,
+    locale,
   });
 
   // The lead figures under the answer sentence — the three numbers that frame
@@ -230,10 +250,13 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   const leadFigures =
     total > 0
       ? [
-          { label: "Total", value: formatDuration(total) },
-          { label: "Daily avg", value: formatDuration(usage.summary.dailyAverageMs) },
+          { label: t("overview.leadTotal"), value: formatDuration(total, locale) },
           {
-            label: "Active days",
+            label: t("overview.leadDailyAvg"),
+            value: formatDuration(usage.summary.dailyAverageMs, locale),
+          },
+          {
+            label: t("overview.leadActiveDays"),
             value: `${usage.summary.activeDays}/${period.days.length}`,
           },
         ]
@@ -248,36 +271,38 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="events"
         flat
-        label="Events"
+        label={t("overview.events")}
         value={String(usage.summary.eventCount)}
         delta={delta(usage.summary.eventCount, prevUsage.summary.eventCount)}
-        hint="tracked this period"
+        hint={t("overview.eventsHint")}
       />
     ),
     "avg-session": (
       <StatCard
         key="avg-session"
         flat
-        label="Avg session"
+        label={t("overview.avgSession")}
         value={
           usage.summary.eventCount > 0
-            ? formatDuration(total / usage.summary.eventCount)
+            ? formatDuration(total / usage.summary.eventCount, locale)
             : "—"
         }
-        hint="per tracked event"
+        hint={t("overview.avgSessionHint")}
       />
     ),
     "busiest-day": (
       <StatCard
         key="busiest-day"
         flat
-        label="Busiest day"
+        label={t("overview.busiestDay")}
         value={
-          usage.summary.busiestDay ? formatDuration(usage.summary.busiestDay.ms) : "—"
+          usage.summary.busiestDay
+            ? formatDuration(usage.summary.busiestDay.ms, locale)
+            : "—"
         }
         hint={
           usage.summary.busiestDay
-            ? format(usage.summary.busiestDay.dayMs, "EEE d MMM", { in: ctx })
+            ? format(usage.summary.busiestDay.dayMs, "EEE d MMM", { in: ctx, locale: dfLocale })
             : undefined
         }
       />
@@ -286,7 +311,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="tasks-done"
         flat
-        label="Tasks done"
+        label={t("overview.tasksDone")}
         value={String(taskStats.completedCount)}
         delta={delta(taskStats.completedCount, prevTaskStats.completedCount)}
       />
@@ -295,23 +320,27 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       <StatCard
         key="on-time"
         flat
-        label="On time"
+        label={t("overview.onTime")}
         value={
           taskStats.adherenceRate === null
             ? "—"
             : `${Math.round(taskStats.adherenceRate * 100)}%`
         }
-        hint={taskStats.dueCount > 0 ? `${taskStats.dueCount} due` : "nothing due"}
+        hint={
+          taskStats.dueCount > 0
+            ? t("overview.onTimeDue", { count: taskStats.dueCount })
+            : t("overview.onTimeNothing")
+        }
       />
     ),
     overdue: (
       <StatCard
         key="overdue"
         flat
-        label="Overdue"
+        label={t("overview.overdue")}
         value={String(taskStats.overdueOpenCount)}
         warning={taskStats.overdueOpenCount > 0}
-        hint="open past their due day"
+        hint={t("overview.overdueHint")}
       />
     ),
   };
@@ -322,21 +351,23 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
         key="per-day"
         id="overview-per-day"
         viewerId={viewerId}
-        title="Per day"
+        title={t("overview.perDay")}
         headline={perDayHeadline}
         chartTypes={["bar", "line", "area"]}
         comparison
         footnote={
           typicalDayMs > 0
-            ? `Dashed line: typical day (${formatDuration(typicalDayMs)}) · curve: trailing 7-day average · tap a day for detail`
-            : "Curve: trailing 7-day average · tap a day for detail"
+            ? t("overview.perDayFootnoteTypical", {
+                typical: formatDuration(typicalDayMs, locale),
+              })
+            : t("overview.perDayFootnote")
         }
       >
         {(settings) => (
           <ChartContainer
             config={perDayConfig}
             className={`aspect-auto ${CHART_H.compact} w-full`}
-            aria-label={`Tracked time per day, ${period.label}`}
+            aria-label={t("overview.perDayAria", { label: period.label })}
           >
             <ComposedChart
               data={perDayData}
@@ -364,7 +395,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
                       <TooltipRow
                         color={item.color}
                         label={perDayConfig[name as string]?.label ?? name}
-                        value={formatDuration(Number(value))}
+                        value={formatDuration(Number(value), locale)}
                       />
                     )}
                   />
@@ -433,7 +464,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     "by-context": (
       <section key="by-context" className="space-y-3">
         <div className="space-y-0.5">
-          <SectionLabel>By context</SectionLabel>
+          <SectionLabel>{t("overview.byContext")}</SectionLabel>
           {shareHeadline && <p className="text-sm font-medium">{shareHeadline}</p>}
         </div>
         {/* A 100% share bar — quieter than a donut and a more direct read of
@@ -464,7 +495,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
               />
               <span className="min-w-0 flex-1 truncate">{d.name}</span>
               <span className="font-mono tabular-nums text-muted-foreground">
-                {formatDuration(d.ms)}
+                {formatDuration(d.ms, locale)}
               </span>
               <span className="w-9 text-right font-mono tabular-nums text-muted-foreground">
                 {srPercent(d.ms, total)}
@@ -477,12 +508,13 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     shifts:
       shiftChips.length > 0 ? (
         <section key="shifts" className="space-y-1.5">
-          <SectionLabel>Shifts vs previous period</SectionLabel>
+          <SectionLabel>{t("overview.shifts")}</SectionLabel>
           <ul className="flex flex-wrap gap-1.5">
             {shiftChips.map((s) => {
               const meta = seriesMeta(
                 s.categoryId ?? "__uncategorized__",
                 data.categories,
+                seriesLabels,
               );
               const pts = Math.round(s.deltaShare * 100);
               return (
@@ -498,9 +530,13 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
                   <span className="max-w-32 truncate">{meta.name}</span>
                   <span
                     className="font-mono tabular-nums text-muted-foreground"
-                    aria-label={`${meta.name}: share ${pts > 0 ? "up" : "down"} ${Math.abs(pts)} points vs previous period`}
+                    aria-label={t("overview.shiftPoints", {
+                      name: meta.name,
+                      direction: pts > 0 ? "up" : "down",
+                      points: Math.abs(pts),
+                    })}
                   >
-                    {pts > 0 ? "▲" : "▼"} {Math.abs(pts)} pts
+                    {pts > 0 ? "▲" : "▼"} {t("overview.shiftPts", { points: Math.abs(pts) })}
                   </span>
                 </li>
               );
@@ -533,11 +569,17 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
 
       {total > 0 && (
         <p className="sr-only">
-          {formatDuration(total)} tracked in {period.label}.
+          {t("overview.srSummary", {
+            total: formatDuration(total, locale),
+            label: period.label,
+          })}
           {usage.summary.busiestDay
-            ? ` Busiest day ${format(usage.summary.busiestDay.dayMs, "EEEE d MMMM", { in: ctx })} with ${formatDuration(usage.summary.busiestDay.ms)}.`
+            ? t("overview.srBusiest", {
+                day: format(usage.summary.busiestDay.dayMs, "EEEE d MMMM", { in: ctx, locale: dfLocale }),
+                ms: formatDuration(usage.summary.busiestDay.ms, locale),
+              })
             : ""}
-          {shareData[0] ? ` Most time went to ${shareData[0].name}.` : ""}
+          {shareData[0] ? t("overview.srTopContext", { name: shareData[0].name }) : ""}
         </p>
       )}
 
@@ -551,7 +593,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
                 .map((id) => statCards[id])
                 .filter((node): node is React.ReactNode => node != null);
               return cards.length > 0 ? (
-                <StatGrid key={`stats-${i}`} className="xl:col-span-2">
+                <StatGrid key={`stats-${i}`} className="lg:col-span-2">
                   {cards}
                 </StatGrid>
               ) : null;
@@ -564,7 +606,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
               <div
                 key={run.id}
                 className={
-                  FULL_WIDTH_SECTIONS.has(run.id) ? "xl:col-span-2" : undefined
+                  FULL_WIDTH_SECTIONS.has(run.id) ? "lg:col-span-2" : undefined
                 }
               >
                 {node}
@@ -586,7 +628,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
           Optimize tab, subordinate beneath the answer + evidence. */}
       {total > 0 && (
         <section className="space-y-2 border-t pt-5">
-          <SectionLabel>What to do</SectionLabel>
+          <SectionLabel>{t("overview.whatToDo")}</SectionLabel>
           <OptimizeTab data={data} />
         </section>
       )}

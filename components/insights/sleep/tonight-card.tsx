@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { CircleAlert, MoonStar } from "lucide-react";
 
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
@@ -37,6 +38,8 @@ export function TonightCard({
   timeZone: string;
   now: number;
 }) {
+  const t = useTranslations("sleep");
+  const locale = useLocale();
   const win = useMemo(
     () => ({
       start: dayStartOffset(now, 1, timeZone),
@@ -75,15 +78,14 @@ export function TonightCard({
 
   if (rec === null) {
     return (
-      <section aria-label="Tonight" className="flex items-start gap-2.5 px-0.5">
+      <section aria-label={t("tonight.ariaLabel")} className="flex items-start gap-2.5 px-0.5">
         <MoonStar aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-base leading-snug font-semibold">
-            No bedtime to suggest tonight yet.
+            {t("tonight.emptyTitle")}
           </p>
           <p className="text-sm leading-snug text-muted-foreground text-pretty">
-            Log a few nights and this will suggest a bedtime that fits your
-            rhythm — or pick a wake time in the calculator below.
+            {t("tonight.emptyBody")}
           </p>
         </div>
       </section>
@@ -94,20 +96,28 @@ export function TonightCard({
   // bedtime later than the schedule wanted) is the more important read when
   // present, so it wins the clause; otherwise the commitment context.
   const support = rec.conflict
-    ? `Tomorrow starts earlier than your body clock (usually around ${formatTime(rec.conflict.habitualBedtimeMs, timeZone)}). This is as early as is healthy to shift in one night; move ~30 min earlier each night to fully adjust over ~${rec.conflict.glideNights} nights.`
+    ? t("tonight.supportConflict", {
+        bedtime: formatTime(rec.conflict.habitualBedtimeMs, timeZone),
+        nights: rec.conflict.glideNights,
+      })
     : firstEvent
-      ? `“${firstEvent.title}” starts at ${formatTime(firstEvent.start, timeZone)} tomorrow.`
-      : "No timed commitments tomorrow — this keeps your usual rhythm.";
+      ? t("tonight.supportEvent", {
+          title: firstEvent.title,
+          time: formatTime(firstEvent.start, timeZone),
+        })
+      : t("tonight.supportNoCommitments");
 
   return (
-    <section aria-label="Tonight" className="flex items-start gap-2.5 px-0.5">
+    <section aria-label={t("tonight.ariaLabel")} className="flex items-start gap-2.5 px-0.5">
       <MoonStar aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1 space-y-3">
         <div className="space-y-1">
           <p className="text-base leading-snug font-semibold text-balance">
-            Go to bed by{" "}
-            <span className="tabular-nums">{formatTime(rec.bedtimeMs, timeZone)}</span>{" "}
-            tonight.
+            {t.rich("tonight.goToBedBy", {
+              time: () => (
+                <span className="tabular-nums">{formatTime(rec.bedtimeMs, timeZone)}</span>
+              ),
+            })}
           </p>
           <p className="text-sm leading-snug text-muted-foreground text-pretty">
             {support}
@@ -117,12 +127,12 @@ export function TonightCard({
         <LeadFigures
           items={[
             {
-              label: "Be up by",
+              label: t("tonight.beUpBy"),
               value: `${formatTime(rec.wakeWindow.start, timeZone)}–${formatTime(rec.wakeWindow.end, timeZone)}`,
             },
-            { label: "Sleep", value: `~${formatDuration(rec.durationMs)}` },
+            { label: t("tonight.sleep"), value: `~${formatDuration(rec.durationMs, locale)}` },
             {
-              label: "Cycles",
+              label: t("tonight.cycles"),
               value: `≈ ${rec.cyclesApprox}`,
             },
           ]}
@@ -132,12 +142,10 @@ export function TonightCard({
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" />
             <span>
-              That bedtime has already passed —{" "}
+              {t("tonight.tooLatePassed")}{" "}
               {rec.cyclesFromNow >= 1
-                ? `going to bed now still fits about ${rec.cyclesFromNow} ${
-                    rec.cyclesFromNow === 1 ? "cycle" : "cycles"
-                  }.`
-                : "less than one full cycle fits before your wake time."}
+                ? t("tonight.tooLateFits", { count: rec.cyclesFromNow })
+                : t("tonight.tooLateLessThanOne")}
             </span>
           </p>
         )}

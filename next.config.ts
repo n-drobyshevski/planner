@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 const nextConfig: NextConfig = {
   // Cache Components (PPR + "use cache" + dynamicIO, unified). Pages are dynamic
@@ -7,13 +10,10 @@ const nextConfig: NextConfig = {
   // (per-user appearance is applied client-side from a cookie), so the shell —
   // app chrome — can prerender even on auth-gated routes.
   cacheComponents: true,
-  // "/" → /calendar at the routing layer (was app/page.tsx calling redirect()),
-  // so the home route costs no render. Not permanent: the default surface may
-  // change, and 308s get cached by browsers. Middleware still sends
-  // unauthenticated users to /login first.
-  async redirects() {
-    return [{ source: "/", destination: "/calendar", permanent: false }];
-  },
+  // "/" → the calendar surface is handled per-locale inside the routing layer
+  // (app/[locale]/page.tsx) now that next-intl owns the locale segment — a flat
+  // next.config redirect can't be locale-aware (it would strip /ru). The proxy
+  // still sends unauthenticated users to /login first.
   // React Compiler (stable in Next 16) auto-memoizes the client tree, so the
   // heavy calendar/task components don't need hand-written React.memo/useCallback.
   // Next applies the Babel pass only to relevant files via an SWC pre-pass, so
@@ -33,4 +33,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { CircleAlert, Lock, MoonStar, RotateCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -44,8 +45,9 @@ import { HistorySection } from "./sleep/history-section";
 import { LogNightDialog } from "./sleep/log-night-dialog";
 import { RhythmChart } from "./sleep/rhythm-chart";
 import { TonightCard } from "./sleep/tonight-card";
+import { TypicalNight } from "./sleep/typical-night";
 import { SectionEmpty } from "./insights-empty";
-import { Reading, SectionLabel, TabGrid } from "./tab-bits";
+import { Reading, SectionLabel } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /**
@@ -57,6 +59,8 @@ import type { InsightsTabData } from "./insights-shell";
  * in the toolbar deliberately has no effect here.
  */
 export function SleepTab({ data }: { data: InsightsTabData }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
   const { period, rawOccurrences, members, viewerId, timeZone, now } = data;
 
   const workspace = useWorkspace();
@@ -231,9 +235,9 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
     if (!hasAnyData) return null;
     if (recentDebtMs >= 45 * 60_000) {
       return {
-        headline: `You're carrying about ${formatDuration(recentDebtMs)} of recent sleep debt.`,
+        headline: t("sleep.debtHeadline", { ms: formatDuration(recentDebtMs, locale) }),
         tone: "attention",
-        support: "Tonight's recommendation below already accounts for it.",
+        support: t("sleep.debtSupport"),
       };
     }
     const strongest = correlations
@@ -245,24 +249,28 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
       );
     if (strongest && Math.abs(strongest.rho) >= 0.2) {
       return {
-        headline: `${CORRELATION_METRIC_LABELS[strongest.metric]} ${correlationStrength(
-          strongest.rho,
-        )} after more ${CORRELATION_SIDE_LABELS[strongest.vs]}.`,
+        headline: t("sleep.correlationHeadline", {
+          metric: t(CORRELATION_METRIC_KEYS[strongest.metric]),
+          strength: t(correlationStrengthKey(strongest.rho)),
+          side: t(CORRELATION_SIDE_KEYS[strongest.vs]),
+        }),
         tone: "neutral",
-        support: `Seen across ${strongest.n} logged nights.`,
+        support: t("sleep.correlationSupport", { count: strongest.n }),
       };
     }
     return null;
-  }, [hasAnyData, recentDebtMs, correlations]);
+  }, [hasAnyData, recentDebtMs, correlations, t, locale]);
 
   return (
     <Reading>
-      {/* Movement 1 — the answer: what to do tonight, and any standout signal. */}
+      {/* Movement 1 — the answer band: what to do tonight (prescriptive) beside
+          your typical night (descriptive), so the recommendation never reads as
+          a lonely sentence and the desktop width carries real substance. The
+          privacy note, any standout lede and the error sit full width above. */}
       <div className="space-y-4">
         <p className="flex items-center gap-1.5 px-0.5 text-xs text-muted-foreground">
           <Lock aria-hidden className="size-3" />
-          Sleep is personal — this tab shows yours only, and your check-ins are
-          never visible to your partner.
+          {t("sleep.privacyNote")}
         </p>
 
         {youLede && <InsightLede lede={youLede} />}
@@ -274,29 +282,49 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
           >
             <p className="flex items-center gap-2 text-sm">
               <CircleAlert aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-              We couldn&apos;t load your sleep logs. Check your connection and
-              try again.
+              {t("sleep.loadError")}
             </p>
             <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
               <RotateCw data-icon="inline-start" />
-              Try again
+              {t("sleep.tryAgain")}
             </Button>
           </div>
         )}
 
-        <TonightCard
-          workspaceId={wsId}
-          viewerId={viewerId}
-          sharedCategoryIds={sharedCategoryIds}
-          prefs={prefs}
-          habitualPhase={habitualPhase}
-          recentDebtMs={recentDebtMs}
-          timeZone={timeZone}
-          now={now}
-        />
+        {hasAnyData ? (
+          <div className="grid grid-cols-1 items-start gap-x-8 gap-y-4 lg:grid-cols-2">
+            <TonightCard
+              workspaceId={wsId}
+              viewerId={viewerId}
+              sharedCategoryIds={sharedCategoryIds}
+              prefs={prefs}
+              habitualPhase={habitualPhase}
+              recentDebtMs={recentDebtMs}
+              timeZone={timeZone}
+              now={now}
+            />
+            <TypicalNight
+              nights={nights}
+              logs={periodLogs}
+              prefs={prefs}
+              timeZone={timeZone}
+            />
+          </div>
+        ) : (
+          <TonightCard
+            workspaceId={wsId}
+            viewerId={viewerId}
+            sharedCategoryIds={sharedCategoryIds}
+            prefs={prefs}
+            habitualPhase={habitualPhase}
+            recentDebtMs={recentDebtMs}
+            timeZone={timeZone}
+            now={now}
+          />
+        )}
 
         {/* The morning check-in is an input prompt — it keeps a card frame
-            (interactive), subordinate to the answer above it. */}
+            (interactive), full width below the band. */}
         {!logsLoading && !logsError && (!hasLogToday || checkinPending) && (
           <CheckinCard
             key={`${viewerId}:${todayKey}`}
@@ -309,53 +337,44 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
         )}
       </div>
 
-      {/* Movement 2 — the evidence, de-carded onto the paper: the rhythm strip
-          and the night history read full width; hints and the sleep↔day
-          relations flow two-up. */}
+      {/* Movements 2 & 3 — the rhythm strip stands alone as the tab's anchor;
+          the remaining signals (check-in trends, hints, sleep↔day relations)
+          flow as an even evidence grid beneath it. */}
       {hasAnyData ? (
-        <TabGrid>
-          <div className="xl:col-span-2">
-            <RhythmChart
-              nights={nights}
-              logs={periodLogs}
-              habitualPhase={habitualPhase}
-              timeZone={timeZone}
-              windowStartHour={viewer?.nightWindowStartHour ?? 20}
-              windowEndHour={viewer?.nightWindowEndHour ?? 12}
-            />
+        <>
+          <RhythmChart
+            nights={nights}
+            logs={periodLogs}
+            habitualPhase={habitualPhase}
+            timeZone={timeZone}
+            windowStartHour={viewer?.nightWindowStartHour ?? 20}
+            windowEndHour={viewer?.nightWindowEndHour ?? 12}
+            action={
+              <LogNightDialog
+                todayKey={todayKey}
+                timeZone={timeZone}
+                nights={nights}
+                logs={logs}
+                onSave={upsert}
+                onDelete={deleteLog}
+              />
+            }
+          />
+          <div className="grid grid-cols-1 items-start gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
+            <HistorySection nights={nights} logs={periodLogs} timeZone={timeZone} />
+            <HintsSection hints={hints} scoredCount={scoredCount} />
+            <SleepCorrelationsSection correlations={correlations} />
           </div>
-          <div className="xl:col-span-2">
-            <HistorySection
-              nights={nights}
-              logs={periodLogs}
-              prefs={prefs}
-              timeZone={timeZone}
-              action={
-                <LogNightDialog
-                  todayKey={todayKey}
-                  timeZone={timeZone}
-                  nights={nights}
-                  logs={logs}
-                  onSave={upsert}
-                  onDelete={deleteLog}
-                />
-              }
-            />
-          </div>
-          <HintsSection hints={hints} scoredCount={scoredCount} />
-          <SleepCorrelationsSection correlations={correlations} />
-        </TabGrid>
+        </>
       ) : logsError ? null : (
         <Empty className="border-0">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <MoonStar />
             </EmptyMedia>
-            <EmptyTitle>No sleep data yet</EmptyTitle>
+            <EmptyTitle>{t("sleep.noDataTitle")}</EmptyTitle>
             <EmptyDescription>
-              Log a night below, or mark your nightly events as inactive in the
-              event dialog — Insights derives your nights from them
-              automatically.
+              {t("sleep.noDataDescription")}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -371,33 +390,33 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
         </Empty>
       )}
 
-      {/* Movement 3 — tools: the calculator is an interactive input, so it keeps
+      {/* Movement 4 — tools: the calculator is an interactive input, so it keeps
           its frame, set apart at the foot like the Overview's "What to do". */}
       <section className="space-y-2 border-t pt-5">
-        <SectionLabel>Plan a night</SectionLabel>
+        <SectionLabel>{t("sleep.planANight")}</SectionLabel>
         <CalculatorCard prefs={prefs} />
       </section>
     </Reading>
   );
 }
 
-const CORRELATION_METRIC_LABELS: Record<SleepCorrelation["metric"], string> = {
-  load: "Next-day load",
-  fragmentation: "Next-day focus blocks",
-  satisfaction: "Next-day satisfaction",
+const CORRELATION_METRIC_KEYS: Record<SleepCorrelation["metric"], string> = {
+  load: "sleep.metricLoad",
+  fragmentation: "sleep.metricFragmentation",
+  satisfaction: "sleep.metricSatisfaction",
 };
-const CORRELATION_SIDE_LABELS: Record<SleepCorrelation["vs"], string> = {
-  duration: "sleep duration",
-  quality: "sleep quality",
+const CORRELATION_SIDE_KEYS: Record<SleepCorrelation["vs"], string> = {
+  duration: "sleep.sideDuration",
+  quality: "sleep.sideQuality",
 };
 
-/** |rho| → plain-language strength; sign carries the direction separately. */
-function correlationStrength(rho: number): string {
+/** |rho| → plain-language strength key; sign carries the direction separately. */
+function correlationStrengthKey(rho: number): string {
   const a = Math.abs(rho);
-  if (a < 0.2) return "no clear link";
-  if (a < 0.4) return rho > 0 ? "slightly higher" : "slightly lower";
-  if (a < 0.6) return rho > 0 ? "tends higher" : "tends lower";
-  return rho > 0 ? "strongly higher" : "strongly lower";
+  if (a < 0.2) return "sleep.strengthNoLink";
+  if (a < 0.4) return rho > 0 ? "sleep.strengthSlightlyHigher" : "sleep.strengthSlightlyLower";
+  if (a < 0.6) return rho > 0 ? "sleep.strengthTendsHigher" : "sleep.strengthTendsLower";
+  return rho > 0 ? "sleep.strengthStronglyHigher" : "sleep.strengthStronglyLower";
 }
 
 /**
@@ -412,16 +431,15 @@ function SleepCorrelationsSection({
 }: {
   correlations: SleepCorrelation[];
 }) {
+  const t = useTranslations("insights");
   const rows = correlations.filter((c) => c.rho !== null);
 
   return (
     <section className="space-y-2">
-      <SectionLabel>Sleep &amp; your days</SectionLabel>
+      <SectionLabel>{t("sleep.correlationsTitle")}</SectionLabel>
       {rows.length === 0 ? (
         <SectionEmpty>
-          Once you&apos;ve logged enough nights alongside rated days, this shows
-          how your sleep duration and quality track with the next day&apos;s
-          load, focus and satisfaction.
+          {t("sleep.correlationsEmpty")}
         </SectionEmpty>
       ) : (
         <ul className="space-y-1" role="list">
@@ -434,16 +452,18 @@ function SleepCorrelationsSection({
               >
                 <span className="min-w-0 flex-1">
                   <span className="font-medium">
-                    {CORRELATION_METRIC_LABELS[c.metric]}
+                    {t(CORRELATION_METRIC_KEYS[c.metric])}
                   </span>{" "}
                   <span className="text-muted-foreground">
-                    {correlationStrength(rho)} after more{" "}
-                    {CORRELATION_SIDE_LABELS[c.vs]}
+                    {t("sleep.correlationRow", {
+                      strength: t(correlationStrengthKey(rho)),
+                      side: t(CORRELATION_SIDE_KEYS[c.vs]),
+                    })}
                   </span>
                 </span>
                 <span
                   className="shrink-0 font-mono tabular-nums text-muted-foreground"
-                  aria-label={`Spearman correlation ${rho.toFixed(2)} over ${c.n} nights`}
+                  aria-label={t("sleep.correlationAria", { rho: rho.toFixed(2), count: c.n })}
                 >
                   {rho > 0 ? "+" : ""}
                   {rho.toFixed(2)}

@@ -25,6 +25,7 @@ import {
   ResponsiveDialogBody,
   ResponsiveDialogFooter,
 } from "@/components/ui/responsive-dialog";
+import { useTranslations, useLocale } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -37,12 +38,6 @@ import {
 import { parseRRule, summarizeRecurrence } from "@/lib/recurrence/rrule-build";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import type { EventRow, Occurrence, TaskRow } from "@/lib/types";
-
-const TASK_STATUS_LABEL: Record<TaskRow["status"], string> = {
-  todo: "To do",
-  in_progress: "In progress",
-  done: "Done",
-};
 
 interface EventDetailsProps {
   open: boolean;
@@ -95,9 +90,13 @@ export function EventDetails({
   onCopyToMine,
   onToggleTaskDone,
 }: EventDetailsProps) {
+  const t = useTranslations("events");
+  const tc = useTranslations("common");
+  const tr = useTranslations("recurrence");
+  const locale = useLocale();
   const isContext = occurrence.kind === "context";
   const rec = parseRRule(event.rrule);
-  const recText = rec ? summarizeRecurrence(rec) : null;
+  const recText = rec ? summarizeRecurrence(rec, tr, locale) : null;
   const timeZone = useViewerTimeZone();
   const secondaryTimeZone = useSecondaryTimeZone();
   // All-day events are floating dates (same for everyone), so a secondary zone
@@ -115,27 +114,27 @@ export function EventDetails({
               style={{ backgroundColor: toPaletteColor(color) }}
               aria-hidden
             />
-            <span className="min-w-0 truncate">{occurrence.title || "Untitled"}</span>
+            <span className="min-w-0 truncate">{occurrence.title || t("details.untitled")}</span>
           </ResponsiveDialogTitle>
           {(occurrence.isPrivate ||
             occurrence.isShared ||
             isContext ||
             occurrence.status !== "confirmed") && (
             <div className="mt-1 flex flex-wrap gap-1.5">
-              {isContext && <Badge variant="outline">Context</Badge>}
+              {isContext && <Badge variant="outline">{t("details.context")}</Badge>}
               {occurrence.status !== "confirmed" && (
-                <Badge variant="outline" className="text-muted-foreground capitalize">
-                  {occurrence.status}
+                <Badge variant="outline" className="text-muted-foreground">
+                  {t(`dialog.status${occurrence.status === "planned" ? "Planned" : "Cancelled"}`)}
                 </Badge>
               )}
               {occurrence.isPrivate && (
                 <Badge variant="outline" className="gap-1 text-muted-foreground">
-                  <Lock /> Private
+                  <Lock /> {t("details.private")}
                 </Badge>
               )}
               {occurrence.isShared && (
                 <Badge variant="outline" className="gap-1 text-muted-foreground">
-                  <Users /> Shared
+                  <Users /> {t("details.shared")}
                 </Badge>
               )}
             </div>
@@ -151,6 +150,7 @@ export function EventDetails({
                   occurrence.end,
                   occurrence.allDay,
                   timeZone,
+                  locale,
                 )}
               </div>
               {showSecondary && (
@@ -160,6 +160,7 @@ export function EventDetails({
                     occurrence.end,
                     occurrence.allDay,
                     secondaryTimeZone!,
+                    locale,
                   )}{" "}
                   ({secondaryLabel})
                 </div>
@@ -175,17 +176,19 @@ export function EventDetails({
 
             {!isOwn && (
               <Row icon={CalendarDays}>
-                <span className="text-muted-foreground">{ownerName}&apos;s calendar</span>
+                <span className="text-muted-foreground">
+                  {t("details.ownersCalendar", { name: ownerName })}
+                </span>
               </Row>
             )}
 
             {task && (
               <Row icon={taskDone ? CheckCircle2 : Circle}>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>Task · {TASK_STATUS_LABEL[task.status]}</span>
+                  <span>{t("details.taskStatusLine", { status: t(`taskStatus.${task.status}`) })}</span>
                   {task.dueDate != null && (
                     <span className="text-muted-foreground tabular-nums">
-                      Due {formatDayMonthToken(task.dueDate)}
+                      {t("details.due", { date: formatDayMonthToken(task.dueDate, locale) })}
                     </span>
                   )}
                   {isOwn && onToggleTaskDone && (
@@ -195,7 +198,7 @@ export function EventDetails({
                       className="h-7"
                       onClick={onToggleTaskDone}
                     >
-                      {taskDone ? "Mark not done" : "Mark done"}
+                      {taskDone ? t("details.markNotDone") : t("details.markDone")}
                     </Button>
                   )}
                 </div>
@@ -219,7 +222,7 @@ export function EventDetails({
                 className="text-destructive"
               >
                 <Trash2 data-icon="inline-start" />
-                Delete
+                {tc("delete")}
               </Button>
               <div className="flex gap-2">
                 {!isContext && !sharedContext && (
@@ -227,19 +230,19 @@ export function EventDetails({
                     {occurrence.isShared ? (
                       <>
                         <User data-icon="inline-start" />
-                        Make personal
+                        {t("details.makePersonal")}
                       </>
                     ) : (
                       <>
                         <Users data-icon="inline-start" />
-                        Share
+                        {t("details.share")}
                       </>
                     )}
                   </Button>
                 )}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="icon" aria-label="Change color">
+                    <Button variant="outline" size="icon" aria-label={t("details.changeColor")}>
                       <Palette />
                     </Button>
                   </PopoverTrigger>
@@ -249,7 +252,7 @@ export function EventDetails({
                 </Popover>
                 <Button onClick={onEdit}>
                   <Pencil data-icon="inline-start" />
-                  Edit
+                  {tc("edit")}
                 </Button>
               </div>
             </>
@@ -258,11 +261,11 @@ export function EventDetails({
               {occurrence.kind === "event" && onCopyToMine && (
                 <Button variant="outline" onClick={onCopyToMine}>
                   <CopyPlus data-icon="inline-start" />
-                  Copy to my calendar
+                  {t("details.copyToMyCalendar")}
                 </Button>
               )}
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Close
+                {tc("close")}
               </Button>
             </div>
           )}

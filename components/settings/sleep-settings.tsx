@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
+import { useTranslations } from "next-intl";
 
 import {
   Card,
@@ -43,6 +44,7 @@ const hourLabel = (h: number) => `${String(h).padStart(2, "0")}:00`;
  * preference setter — there is no Save step, matching the rest of /settings.
  */
 export function SleepSettings() {
+  const t = useTranslations("settings");
   const {
     sleepCycleLengthMin,
     sleepOnsetLatencyMin,
@@ -102,11 +104,8 @@ export function SleepSettings() {
     // scroll-mt clears the sticky header when arriving via /settings#sleep
     <Card id="sleep" className="scroll-mt-20">
       <CardHeader>
-        <CardTitle>Sleep</CardTitle>
-        <CardDescription>
-          Drives the sleep-cycle calculator and tonight&apos;s bedtime
-          recommendation on the Insights Sleep tab. Private to you.
-        </CardDescription>
+        <CardTitle>{t("sleep.title")}</CardTitle>
+        <CardDescription>{t("sleep.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <form.Field
@@ -117,7 +116,7 @@ export function SleepSettings() {
         >
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="sleep-cycle-length">Sleep cycle length</FieldLabel>
+              <FieldLabel htmlFor="sleep-cycle-length">{t("sleep.cycleLength.label")}</FieldLabel>
               <Select value={field.state.value} onValueChange={field.handleChange}>
                 <SelectTrigger id="sleep-cycle-length" disabled={disabled} className="w-full">
                   <SelectValue />
@@ -125,14 +124,13 @@ export function SleepSettings() {
                 <SelectContent>
                   {range(70, 110, 5).map((v) => (
                     <SelectItem key={v} value={String(v)}>
-                      <span className="tabular-nums">{v} minutes</span>
+                      <span className="tabular-nums">{t("sleep.cycleLength.option", { minutes: v })}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FieldDescription>
-                One light–deep–REM pass — about 90 minutes on average, though it
-                varies night to night, so cycle counts are estimates.
+                {t("sleep.cycleLength.description")}
               </FieldDescription>
             </Field>
           )}
@@ -146,7 +144,7 @@ export function SleepSettings() {
         >
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="sleep-onset-latency">Time to fall asleep</FieldLabel>
+              <FieldLabel htmlFor="sleep-onset-latency">{t("sleep.onsetLatency.label")}</FieldLabel>
               <Select value={field.state.value} onValueChange={field.handleChange}>
                 <SelectTrigger id="sleep-onset-latency" disabled={disabled} className="w-full">
                   <SelectValue />
@@ -154,13 +152,13 @@ export function SleepSettings() {
                 <SelectContent>
                   {range(0, 60, 5).map((v) => (
                     <SelectItem key={v} value={String(v)}>
-                      <span className="tabular-nums">{v} minutes</span>
+                      <span className="tabular-nums">{t("sleep.onsetLatency.option", { minutes: v })}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FieldDescription>
-                Added between getting into bed and the first cycle.
+                {t("sleep.onsetLatency.description")}
               </FieldDescription>
             </Field>
           )}
@@ -174,7 +172,7 @@ export function SleepSettings() {
         >
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="sleep-target-cycles">Nightly target</FieldLabel>
+              <FieldLabel htmlFor="sleep-target-cycles">{t("sleep.targetCycles.label")}</FieldLabel>
               <Select value={field.state.value} onValueChange={field.handleChange}>
                 <SelectTrigger id="sleep-target-cycles" disabled={disabled} className="w-full">
                   <SelectValue />
@@ -182,18 +180,21 @@ export function SleepSettings() {
                 <SelectContent>
                   {range(3, 7, 1).map((v) => (
                     <SelectItem key={v} value={String(v)}>
-                      <span className="tabular-nums">{v} cycles</span>
+                      <span className="tabular-nums">{t("sleep.targetCycles.option", { cycles: v })}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FieldDescription>
-                With your settings that&apos;s {formatDuration(targetMs)} in bed
-                ({formatDuration(asleepMs)} asleep) per night. Adults do best on
-                7–9 hours of sleep (AASM)
-                {asleepMs < SEVEN_HOURS_MS
-                  ? " — your target is on the short side."
-                  : "."}
+                {t(
+                  asleepMs < SEVEN_HOURS_MS
+                    ? "sleep.targetCycles.descriptionShort"
+                    : "sleep.targetCycles.description",
+                  {
+                    inBed: formatDuration(targetMs),
+                    asleep: formatDuration(asleepMs),
+                  },
+                )}
               </FieldDescription>
             </Field>
           )}
@@ -208,14 +209,14 @@ export function SleepSettings() {
         >
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="sleep-category">Sleep category</FieldLabel>
+              <FieldLabel htmlFor="sleep-category">{t("sleep.category.label")}</FieldLabel>
               <Select value={field.state.value} onValueChange={field.handleChange}>
                 <SelectTrigger id="sleep-category" disabled={disabled} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_SLEEP_CATEGORY}>
-                    None — count inactive events as sleep
+                    {t("sleep.category.none")}
                   </SelectItem>
                   {sleepCategoryChoices.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
@@ -225,9 +226,7 @@ export function SleepSettings() {
                 </SelectContent>
               </Select>
               <FieldDescription>
-                When set, only this category&apos;s timed events count as your
-                derived nights — other inactive blocks (focus time, commutes) stop
-                reading as sleep.
+                {t("sleep.category.description")}
               </FieldDescription>
             </Field>
           )}
@@ -242,7 +241,7 @@ export function SleepSettings() {
           >
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="night-window-start">Night starts after</FieldLabel>
+                <FieldLabel htmlFor="night-window-start">{t("sleep.nightWindow.startLabel")}</FieldLabel>
                 <Select value={field.state.value} onValueChange={field.handleChange}>
                   <SelectTrigger
                     id="night-window-start"
@@ -270,7 +269,7 @@ export function SleepSettings() {
           >
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="night-window-end">Night ends by</FieldLabel>
+                <FieldLabel htmlFor="night-window-end">{t("sleep.nightWindow.endLabel")}</FieldLabel>
                 <Select value={field.state.value} onValueChange={field.handleChange}>
                   <SelectTrigger
                     id="night-window-end"
@@ -292,9 +291,7 @@ export function SleepSettings() {
           </form.Field>
         </div>
         <FieldDescription className="-mt-3">
-          Derived nights collect sleep between these wall-clock hours — the
-          start on the evening before, the end on the wake day. Widen it if you
-          sleep past noon or keep unusual hours.
+          {t("sleep.nightWindow.description")}
         </FieldDescription>
       </CardContent>
     </Card>

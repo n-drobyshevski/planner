@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { ListChecks } from "lucide-react";
 import { Bar, BarChart, YAxis } from "recharts";
 import {
@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -51,15 +52,23 @@ import { CHART_H, Reading, SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /** Lead times run to days/weeks — "9d 17h" reads better than "233h". */
-function formatLeadTime(ms: number): string {
+function formatLeadTime(
+  ms: number,
+  t: ReturnType<typeof useTranslations<"insights">>,
+  locale: string,
+): string {
   const DAY = 86_400_000;
-  if (ms < 2 * DAY) return formatDuration(ms);
+  if (ms < 2 * DAY) return formatDuration(ms, locale);
   const days = Math.floor(ms / DAY);
   const hours = Math.round((ms % DAY) / 3_600_000);
-  return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  return hours > 0
+    ? t("tasks.leadDaysHours", { days, hours })
+    : t("tasks.leadDays", { days });
 }
 
 export function TasksTab({ data }: { data: InsightsTabData }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
   const reduced = usePrefersReducedMotion();
   const { period, tasks, timeZone, now } = data;
   const { granularity } = period;
@@ -89,14 +98,14 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
           <EmptyMedia variant="icon">
             <ListChecks />
           </EmptyMedia>
-          <EmptyTitle>No tasks yet</EmptyTitle>
+          <EmptyTitle>{t("tasks.emptyTitle")}</EmptyTitle>
           <EmptyDescription>
-            Create tasks on a board and their throughput shows up here.
+            {t("tasks.emptyDescription")}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks">Open tasks</Link>
+            <Link href="/tasks">{t("tasks.openTasks")}</Link>
           </Button>
         </EmptyContent>
       </Empty>
@@ -105,90 +114,99 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
 
   const velocityRows = velocity.map((v) => ({
     key: String(v.start),
-    full: bucketLabel({ start: v.start, end: v.end }, granularity, timeZone),
+    full: bucketLabel({ start: v.start, end: v.end }, granularity, timeZone, locale),
     created: v.created,
     completed: v.completed,
   }));
   const velocityConfig: ChartConfig = {
-    completed: { label: "Completed", color: "var(--chart-2)" },
-    created: { label: "Created", color: COMPARISON_COLOR },
+    completed: { label: t("tasks.seriesCompleted"), color: "var(--chart-2)" },
+    created: { label: t("tasks.seriesCreated"), color: COMPARISON_COLOR },
   };
   const boardName = (id: string | null) =>
-    id === null ? "No board" : (data.boards.find((b) => b.id === id)?.name ?? "Unknown");
+    id === null
+      ? t("tasks.noBoard")
+      : (data.boards.find((b) => b.id === id)?.name ?? t("tasks.unknownBoard"));
 
   const hasBoardBreakdown = boards.length > 1;
 
-  const lede = deriveTasksLede({ stats, prevStats, preset: data.preset });
+  const lede = deriveTasksLede({ stats, prevStats, preset: data.preset, t, locale });
 
   const leadFigures = [
-    { label: "Completed", value: String(stats.completedCount) },
-    { label: "Created", value: String(stats.createdCount) },
+    { label: t("tasks.leadCompleted"), value: String(stats.completedCount) },
+    { label: t("tasks.leadCreated"), value: String(stats.createdCount) },
     {
-      label: "On time",
+      label: t("tasks.leadOnTime"),
       value:
         stats.adherenceRate === null
           ? "—"
           : `${Math.round(stats.adherenceRate * 100)}%`,
-      hint: stats.dueCount > 0 ? `of ${stats.dueCount} due` : "nothing due",
+      hint:
+        stats.dueCount > 0
+          ? t("tasks.onTimeDue", { count: stats.dueCount })
+          : t("tasks.onTimeNothing"),
     },
   ];
 
   return (
     <Reading>
       <p className="sr-only">
-        {stats.completedCount} tasks completed and {stats.createdCount} created in{" "}
-        {period.label}. {stats.overdueOpenCount} open tasks are overdue.
+        {t("tasks.srSummary", {
+          completed: stats.completedCount,
+          created: stats.createdCount,
+          label: period.label,
+          overdue: stats.overdueOpenCount,
+        })}
       </p>
 
       <InsightLede lede={lede} figures={leadFigures} />
 
       <TabGrid>
-      <div className="space-y-2 xl:col-span-2">
+      <div className="space-y-2 lg:col-span-2">
         <StatGrid>
           <StatCard
             flat
-            label="Overdue"
+            label={t("tasks.overdue")}
             value={String(stats.overdueOpenCount)}
             warning={stats.overdueOpenCount > 0}
-            hint="open past their due day"
+            hint={t("tasks.overdueHint")}
           />
           <StatCard
             flat
-            label="Done of created"
+            label={t("tasks.doneOfCreated")}
             value={
               stats.completionRate === null
                 ? "—"
                 : `${Math.round(stats.completionRate * 100)}%`
             }
-            hint="created this period"
+            hint={t("tasks.doneOfCreatedHint")}
           />
           <StatCard
             flat
-            label="Lead time"
+            label={t("tasks.leadTime")}
             value={
               stats.medianLeadTimeMs !== null
-                ? formatLeadTime(stats.medianLeadTimeMs)
+                ? formatLeadTime(stats.medianLeadTimeMs, t, locale)
                 : "—"
             }
-            hint="median, created to done"
+            hint={t("tasks.leadTimeHint")}
           />
         </StatGrid>
         <p className="text-[11px] text-muted-foreground">
-          Top-level tasks only; subtasks count toward their parent.
+          {t("tasks.topLevelNote")}
         </p>
       </div>
 
-      <section className={hasBoardBreakdown ? "space-y-1.5" : "space-y-1.5 xl:col-span-2"}>
-        <SectionLabel>Velocity per {granularity}</SectionLabel>
+      <section className={hasBoardBreakdown ? "space-y-1.5" : "space-y-1.5 lg:col-span-2"}>
+        <SectionLabel>{t("tasks.velocity", { granularity })}</SectionLabel>
         <ChartContainer
           config={velocityConfig}
           className={`aspect-auto ${CHART_H.compact} w-full`}
-          aria-label={`Tasks created vs completed per ${granularity}, ${period.label}`}
+          aria-label={t("tasks.velocityAria", { granularity, label: period.label })}
         >
           <BarChart data={velocityRows} margin={INSIGHTS_CHART_MARGIN}>
             {insightsGrid()}
             {insightsXAxis({
-              tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+              tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone, locale),
             })}
             <YAxis hide domain={[0, "dataMax"]} allowDecimals={false} tickCount={3} />
             <ChartTooltip
@@ -221,27 +239,27 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
 
       {hasBoardBreakdown && (
         <section className="space-y-1.5">
-          <SectionLabel>By board</SectionLabel>
+          <SectionLabel>{t("tasks.byBoard")}</SectionLabel>
           <Table className="text-xs">
             <TableCaption className="sr-only">
-              Task throughput per board, {period.label}
+              {t("tasks.byBoardCaption", { label: period.label })}
             </TableCaption>
             <TableHeader>
               <TableRow className="text-muted-foreground hover:bg-transparent">
                 <TableHead scope="col" className="h-auto px-0 py-1.5 text-muted-foreground">
-                  Board
+                  {t("tasks.colBoard")}
                 </TableHead>
                 <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                  Done
+                  {t("tasks.colDone")}
                 </TableHead>
                 <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                  Created
+                  {t("tasks.colCreated")}
                 </TableHead>
                 <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                  Due
+                  {t("tasks.colDue")}
                 </TableHead>
                 <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                  Overdue
+                  {t("tasks.colOverdue")}
                 </TableHead>
               </TableRow>
             </TableHeader>

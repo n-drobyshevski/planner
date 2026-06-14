@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { allDayDateKey, dateKeyInZone } from "@/lib/datetime/local";
 import {
   useViewerTimeZone,
@@ -178,6 +180,9 @@ export function TimeGrid({
   labelStyle = "bar",
   twoCalendars,
 }: Props) {
+  const t = useTranslations("calendar");
+  const locale = useLocale();
+  const dfLocale = dateFnsLocale(locale);
   const colsRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const hourPx = useUiStore((s) => s.hourPx);
@@ -640,7 +645,7 @@ export function TimeGrid({
         dayIndex: g.dayIndex,
         topMin: newStart,
         heightMin: dur,
-        label: copy ? `Copy of ${title}` : title,
+        label: copy ? t("preview.copyOf", { title }) : title,
         copy,
         series,
       });
@@ -861,7 +866,7 @@ export function TimeGrid({
                 d === today ? "text-primary" : "text-muted-foreground",
               )}
             >
-              {format(d, "EEE", { in: tz(timeZone) })}
+              {format(d, "EEE", { in: tz(timeZone), locale: dfLocale })}
             </div>
             <div
               className={cn(
@@ -880,7 +885,7 @@ export function TimeGrid({
         <div className="flex border-b bg-muted/30 pr-3">
           {secondaryTimeZone && <div className="w-12 shrink-0" />}
           <div className="flex w-14 shrink-0 items-start justify-end p-1 text-[10px] uppercase text-muted-foreground">
-            All-day
+            {t("labels.allDayHeader")}
           </div>
           {days.map((d) => {
             // All-day events are floating dates: match by calendar date (UTC
@@ -909,19 +914,19 @@ export function TimeGrid({
                     actions={
                       canEdit(o)
                         ? [
-                            { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                            { label: t("menu.edit"), icon: Pencil, onSelect: () => onSelect(o) },
                             ...(eventShareAction && eventShareAction(o)
                               ? [eventShareAction(o)!]
                               : []),
                             {
-                              label: "Delete",
+                              label: t("menu.delete"),
                               icon: Trash2,
                               destructive: true,
                               onSelect: () => onDeleteEvent(o),
                             },
                           ]
                         : [
-                            { label: "Open", icon: Eye, onSelect: () => onSelect(o) },
+                            { label: t("menu.open"), icon: Eye, onSelect: () => onSelect(o) },
                             ...(eventCopyAction && eventCopyAction(o)
                               ? [eventCopyAction(o)!]
                               : []),
@@ -980,7 +985,7 @@ export function TimeGrid({
             // the arrow keys rove between blocks (see onGridFocus/onGridKeyDown).
             // outline-none because focus visibly lands on a block, not here.
             tabIndex={0}
-            aria-label="Events. Use the arrow keys to move between events, Enter to open."
+            aria-label={t("grid.ariaLabel")}
             className={cn(
               "relative flex flex-1 outline-none",
               armed ? "touch-none" : "touch-pan-y",
@@ -1072,7 +1077,7 @@ export function TimeGrid({
                     className="mt-px flex shrink-0 items-center gap-0.5 rounded bg-primary px-1 py-0.5 text-[10px] font-medium leading-tight text-primary-foreground"
                   >
                     <Repeat className="size-2.5" />
-                    Series
+                    {t("labels.series")}
                   </span>
                 )}
                 <span className="truncate text-xs font-medium text-primary">

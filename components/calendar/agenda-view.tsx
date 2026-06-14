@@ -1,11 +1,13 @@
 "use client";
 
 import { forwardRef, useMemo } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { m, AnimatePresence } from "motion/react";
 import { tween, tweenFast } from "@/lib/motion";
 import { format, isSameDay } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { CalendarDays, Lock, Pencil, Trash2, Eye, Users } from "lucide-react";
 import { groupByDay } from "@/lib/calendar/agenda";
@@ -64,6 +66,9 @@ export function AgendaView({
   canEdit,
   loading,
 }: Props) {
+  const t = useTranslations("calendar");
+  const locale = useLocale();
+  const dfLocale = dateFnsLocale(locale);
   const timeZone = useViewerTimeZone();
   const groups = useMemo(() => groupByDay(occurrences, timeZone), [occurrences, timeZone]);
 
@@ -92,9 +97,9 @@ export function AgendaView({
                 <EmptyMedia variant="icon">
                   <CalendarDays />
                 </EmptyMedia>
-                <EmptyTitle>Nothing scheduled</EmptyTitle>
+                <EmptyTitle>{t("agenda.emptyTitle")}</EmptyTitle>
                 <EmptyDescription>
-                  Add an event with the New button, or jump to another date.
+                  {t("agenda.emptyDescription")}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -113,7 +118,7 @@ export function AgendaView({
                     isToday ? "text-primary" : "text-muted-foreground",
                   )}
                 >
-                  {format(g.dayMs, "EEE", { in: tz(timeZone) })}
+                  {format(g.dayMs, "EEE", { in: tz(timeZone), locale: dfLocale })}
                 </span>
                 <span
                   className={cn(
@@ -124,7 +129,7 @@ export function AgendaView({
                   {format(g.dayMs, "d", { in: tz(timeZone) })}
                 </span>
                 <span className="mt-0.5 text-[10px] text-muted-foreground">
-                  {format(g.dayMs, "MMM", { in: tz(timeZone) })}
+                  {format(g.dayMs, "MMM", { in: tz(timeZone), locale: dfLocale })}
                 </span>
               </div>
 
@@ -138,19 +143,19 @@ export function AgendaView({
                       actions={
                         canEdit(o)
                           ? [
-                              { label: "Edit", icon: Pencil, onSelect: () => onSelect(o) },
+                              { label: t("menu.edit"), icon: Pencil, onSelect: () => onSelect(o) },
                               ...(eventShareAction && eventShareAction(o)
                                 ? [eventShareAction(o)!]
                                 : []),
                               {
-                                label: "Delete",
+                                label: t("menu.delete"),
                                 icon: Trash2,
                                 destructive: true,
                                 onSelect: () => onDeleteEvent(o),
                               },
                             ]
                           : [
-                              { label: "Open", icon: Eye, onSelect: () => onSelect(o) },
+                              { label: t("menu.open"), icon: Eye, onSelect: () => onSelect(o) },
                               ...(eventCopyAction && eventCopyAction(o)
                                 ? [eventCopyAction(o)!]
                                 : []),
@@ -193,6 +198,7 @@ const AgendaRow = forwardRef<
   } & MenuableProps &
     Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect">
 >(function AgendaRow({ occ, color, selected, onSelect, onMenu, className, ...rest }, ref) {
+  const t = useTranslations("calendar");
   const timeZone = useViewerTimeZone();
   const maskTitles = useUiStore((s) => s.maskTitles);
   return (
@@ -236,14 +242,14 @@ const AgendaRow = forwardRef<
           </span>
           {/* Privacy / sharing as glyphs, not colour alone (matches the grid). */}
           {occ.isPrivate && (
-            <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label="Private" />
+            <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("labels.private")} />
           )}
           {occ.isShared && (
-            <Users className="size-3.5 shrink-0 text-muted-foreground" aria-label="Shared" />
+            <Users className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("labels.shared")} />
           )}
           {occ.kind === "context" && (
             <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Context
+              {t("labels.context")}
             </span>
           )}
         </span>
@@ -254,7 +260,7 @@ const AgendaRow = forwardRef<
         )}
       </span>
       <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-        {occ.allDay ? "All day" : formatTime(occ.start, timeZone)}
+        {occ.allDay ? t("labels.allDay") : formatTime(occ.start, timeZone)}
       </span>
       {onMenu && (
         <ItemMenuButton onMenu={onMenu} className="-mr-1 text-muted-foreground" />

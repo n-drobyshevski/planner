@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import { notFound } from "next/navigation";
+import { NextIntlClientProvider, hasLocale } from "next-intl";
+import { setRequestLocale } from "next-intl/server";
+import "../globals.css";
 import { Providers } from "./providers";
 import {
   DEFAULT_ACCENT,
@@ -8,9 +11,13 @@ import {
   DEFAULT_PALETTE,
 } from "@/lib/theme/appearance";
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/theme/appearance-cookie";
+import { routing } from "@/i18n/routing";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
+  // Plus Jakarta Sans has no basic-Cyrillic glyphs (only `cyrillic-ext`, which
+  // omits U+0410–044F), so Russian text falls through to the Cyrillic-capable
+  // companion below via the `--font-sans` stack — Latin stays Jakarta.
   subsets: ["latin"],
 });
 
@@ -40,22 +47,34 @@ export const viewport: Viewport = {
   ],
 };
 
+/** Prerender a static shell for every supported locale. */
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
 /**
- * The root layout is intentionally static (no cookies/auth/DB) so Cache
- * Components can prerender it into the shared shell. Per-user appearance is
- * applied client-side before paint by `APPEARANCE_INIT_SCRIPT`, which reads the
- * appearance cookie and overrides the default <html> data attributes below —
- * no color flash, no request-time work on the document. (The `.dark` class is
- * still owned by next-themes' own pre-paint script.)
+ * The root layout stays statically renderable per locale (no cookies/auth/DB):
+ * `setRequestLocale` pins the locale so Cache Components can prerender the shell,
+ * and `<html lang>` comes straight from the route segment. Per-user appearance is
+ * still applied client-side before paint by `APPEARANCE_INIT_SCRIPT` (no color
+ * flash, no request-time work on the document); the `.dark` class stays owned by
+ * next-themes' own pre-paint script. `NextIntlClientProvider` (no props) forwards
+ * the request's locale + messages to Client Components.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
-}: Readonly<{
+  params,
+}: {
   children: React.ReactNode;
-}>) {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
+  setRequestLocale(locale);
+
   return (
     <html
-      lang="en"
+      lang={locale}
       suppressHydrationWarning
       data-accent={DEFAULT_ACCENT}
       data-tone={DEFAULT_TONE}
@@ -66,7 +85,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full bg-background text-foreground">
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider>
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

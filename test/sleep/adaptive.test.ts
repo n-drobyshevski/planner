@@ -90,7 +90,8 @@ describe("computeSleepHints", () => {
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe("duration");
     expect(out[0].severity).toBe("attention");
-    expect(out[0].body).toMatch(/8 logged mornings/);
+    expect(out[0].bodyKey).toBe("durationShortBody");
+    expect(out[0].vars.count).toBe(8);
   });
 
   it("also reports the opposite correlation direction", () => {
@@ -202,7 +203,7 @@ describe("computeSleepHints", () => {
     const out = computeSleepHints(input({ logs, nights }));
     const alignment = out.find((h) => h.kind === "cycle-alignment");
     expect(alignment).toBeDefined();
-    expect(alignment?.title).toBe("Whole cycles agree with you");
+    expect(alignment?.titleKey).toBe("cycleAlignedTitle");
   });
 
   it("falls back to derived nights for duration when times are not logged", () => {
@@ -239,7 +240,11 @@ describe("computeSleepHints", () => {
       "regularity",
       "cycle-alignment",
     ]);
-    for (const h of out) expect(h.body).toMatch(/logged mornings/);
+    for (const h of out) {
+      expect(h.bodyKey).toBeTruthy();
+      expect(h.titleKey).toBeTruthy();
+      expect(h.vars.count).toBeGreaterThan(0);
+    }
     expect(new Set(out.map((h) => h.id)).size).toBe(out.length);
   });
 });

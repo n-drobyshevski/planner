@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Table2,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -51,7 +52,7 @@ interface StoredSettings {
 
 const CHART_TYPES: ChartType[] = ["bar", "line", "area"];
 const TYPE_ICONS = { bar: ChartColumn, line: ChartLine, area: ChartArea } as const;
-const TYPE_LABELS = { bar: "Bar", line: "Line", area: "Area" } as const;
+const TYPE_LABEL_KEYS = { bar: "typeBar", line: "typeLine", area: "typeArea" } as const;
 
 function readStored(storageKey: string): StoredSettings {
   try {
@@ -137,11 +138,11 @@ export function ChartCard({
   headline,
   chartTypes,
   comparison = false,
-  comparisonLabel = "Compare with previous period",
+  comparisonLabel,
   defaultChartType,
   series,
   table,
-  tableLabel = "View as table",
+  tableLabel,
   footnote,
   className,
   children,
@@ -168,6 +169,7 @@ export function ChartCard({
   className?: string;
   children: (settings: ChartSettings) => React.ReactNode;
 }) {
+  const t = useTranslations("insights");
   const { settings, setChartType, setShowComparison, toggleSeries } =
     useChartSettings(viewerId, id, {
       chartType: defaultChartType ?? chartTypes?.[0],
@@ -191,7 +193,7 @@ export function ChartCard({
                 variant="ghost"
                 size="icon"
                 className="-mt-1 size-11 shrink-0 text-muted-foreground sm:size-8"
-                aria-label={`Chart options: ${title}`}
+                aria-label={t("chartCard.chartOptions", { title })}
               >
                 <SlidersHorizontal />
               </Button>
@@ -199,7 +201,7 @@ export function ChartCard({
             <PopoverContent align="end" className="w-64 space-y-3 p-3">
               {typeChoices && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Chart type</Label>
+                  <Label className="text-xs text-muted-foreground">{t("chartCard.chartType")}</Label>
                   <ToggleGroup
                     type="single"
                     variant="outline"
@@ -207,17 +209,18 @@ export function ChartCard({
                     onValueChange={(v) => v && setChartType(v as ChartType)}
                     className="w-full"
                   >
-                    {typeChoices.map((t) => {
-                      const Icon = TYPE_ICONS[t];
+                    {typeChoices.map((ct) => {
+                      const Icon = TYPE_ICONS[ct];
+                      const typeLabel = t(`chartCard.${TYPE_LABEL_KEYS[ct]}`);
                       return (
                         <ToggleGroupItem
-                          key={t}
-                          value={t}
-                          aria-label={`${TYPE_LABELS[t]} chart`}
+                          key={ct}
+                          value={ct}
+                          aria-label={t("chartCard.barChart", { type: typeLabel })}
                           className="min-h-9 flex-1 gap-1.5"
                         >
                           <Icon aria-hidden className="size-3.5" />
-                          {TYPE_LABELS[t]}
+                          {typeLabel}
                         </ToggleGroupItem>
                       );
                     })}
@@ -227,7 +230,7 @@ export function ChartCard({
               {comparison && (
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor={`${id}-compare`} className="text-xs">
-                    {comparisonLabel}
+                    {comparisonLabel ?? t("chartCard.comparisonLabel")}
                   </Label>
                   <Switch
                     id={`${id}-compare`}
@@ -242,7 +245,7 @@ export function ChartCard({
       </div>
 
       {series && series.length > 1 && (
-        <ul className="flex flex-wrap gap-1" aria-label="Toggle series">
+        <ul className="flex flex-wrap gap-1" aria-label={t("chartCard.toggleSeries")}>
           {series.map((s) => {
             const hidden = settings.hiddenSeries.has(s.key);
             return (
@@ -264,7 +267,7 @@ export function ChartCard({
                   <span className={cn("max-w-32 truncate", hidden && "line-through")}>
                     {s.label}
                   </span>
-                  <span className="sr-only">{hidden ? "(hidden)" : "(shown)"}</span>
+                  <span className="sr-only">{hidden ? t("chartCard.hidden") : t("chartCard.shown")}</span>
                 </button>
               </li>
             );
@@ -285,7 +288,7 @@ export function ChartCard({
               className="min-h-11 gap-1.5 px-1.5 text-xs text-muted-foreground sm:min-h-7"
             >
               <Table2 aria-hidden className="size-3.5" />
-              {tableLabel}
+              {tableLabel ?? t("chartCard.tableLabel")}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>{table}</CollapsibleContent>

@@ -1,0 +1,10 @@
+{
+  "nameRequired": "Please enter your name.",
+  "pinLength": "Your PIN is 8 digits.",
+  "enterName": "Enter your name.",
+  "enterPin": "Enter your PIN.",
+  "incorrectPin": "Incorrect PIN.",
+  "memberNotFound": "We couldn't find anyone with that name.",
+  "profileNotLinked": "This profile isn't linked to a login yet.",
+  "loginNotConfigured": "Login isn't configured for this profile."
+}

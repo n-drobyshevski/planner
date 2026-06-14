@@ -1,0 +1,52 @@
+{
+  "surface": {
+    "calendar": "Calendar",
+    "tasks": "Tasks",
+    "insights": "Insights"
+  },
+  "switcher": {
+    "ariaLabel": "Current surface: {surface}. Switch surface"
+  },
+  "userMenu": {
+    "ariaLabel": "Profile menu",
+    "signedInAs": "Signed in as {name}",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "itemMenu": {
+    "color": "Color",
+    "options": "Options",
+    "moreOptions": "More options"
+  },
+  "loadError": {
+    "title": "We couldn't load your {subject, select, calendar {calendar} tasks {tasks} insights {insights} other {data}}.",
+    "body": "Check your connection and try again.",
+    "retry": "Try again"
+  },
+  "createContext": {
+    "title": "New context",
+    "description": "Group related events under a shared or personal context.",
+    "namePlaceholder": "Context name",
+    "nameLabel": "Context name",
+    "colorAriaLabel": "Color {color}",
+    "shared": "Shared",
+    "personal": "Personal",
+    "sharedSwitchAriaLabel": "Shared context — you both attend and can edit",
+    "sharedHint": "You both attend and can edit every event in it.",
+    "personalHint": "Only on your calendar; only you can edit its events.",
+    "submit": "Add context"
+  },
+  "colorField": {
+    "ariaLabel": "Color: {label}",
+    "custom": "Custom",
+    "default": "Default"
+  },
+  "colorPicker": {
+    "defaultAriaLabel": "Default color",
+    "default": "Default"
+  },
+  "attributes": {
+    "clearHint": "All optional — tap a selected option again to clear it.",
+    "satisfactionAriaLabel": "Satisfaction {label} of 5"
+  }
+}

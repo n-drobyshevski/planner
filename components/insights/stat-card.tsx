@@ -1,6 +1,7 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { Delta } from "@/lib/analytics/trends";
 
@@ -11,6 +12,7 @@ import type { Delta } from "@/lib/analytics/trends";
  * with movement means the previous period was empty → "new".
  */
 export function DeltaBadge({ delta, className }: { delta: Delta; className?: string }) {
+  const t = useTranslations("insights");
   let glyph: string;
   let text: string;
   let srText: string;
@@ -18,11 +20,11 @@ export function DeltaBadge({ delta, className }: { delta: Delta; className?: str
     if (delta.delta === 0) {
       glyph = "–";
       text = "";
-      srText = "no change vs previous period";
+      srText = t("delta.noChange");
     } else {
       glyph = "▲";
-      text = "new";
-      srText = "new — nothing in the previous period";
+      text = t("delta.new");
+      srText = t("delta.newSr");
     }
   } else {
     const pct = Math.round(Math.abs(delta.deltaPct) * 100);
@@ -30,8 +32,10 @@ export function DeltaBadge({ delta, className }: { delta: Delta; className?: str
     text = `${pct}%`;
     srText =
       delta.deltaPct === 0
-        ? "no change vs previous period"
-        : `${delta.deltaPct > 0 ? "up" : "down"} ${pct}% vs previous period`;
+        ? t("delta.noChange")
+        : delta.deltaPct > 0
+          ? t("delta.up", { pct })
+          : t("delta.down", { pct });
   }
   return (
     <span
@@ -74,6 +78,7 @@ export function StatCard({
   flat?: boolean;
   className?: string;
 }) {
+  const t = useTranslations("insights");
   return (
     <div
       className={cn(
@@ -98,7 +103,7 @@ export function StatCard({
                 aria-hidden
                 className="mr-1 inline size-3.5 align-[-0.125em]"
               />
-              <span className="sr-only">needs attention: </span>
+              <span className="sr-only">{t("stat.needsAttention")}</span>
             </>
           )}
           {value}

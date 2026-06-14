@@ -1,0 +1,186 @@
+{
+  "metaTitle": "Settings · Planner",
+  "title": "Settings",
+  "backToCalendar": "Back to calendar",
+  "profile": {
+    "title": "Profile",
+    "description": "Your name and the PIN used when switching to your profile.",
+    "displayName": {
+      "legend": "Display name",
+      "description": "Shown on your calendar, your avatar, and when switching profiles.",
+      "placeholder": "Your name",
+      "ariaLabel": "Display name"
+    },
+    "color": {
+      "legend": "Profile color",
+      "description": "Tints your avatar and your events on the calendar (unless an event sets its own color).",
+      "ariaLabel": "Profile color"
+    },
+    "pin": {
+      "legend": "PIN",
+      "descriptionSet": "An 8-digit PIN is required when switching to your profile.",
+      "descriptionUnset": "No PIN set — add one to lock your profile when switching.",
+      "set": "Set PIN",
+      "change": "Change PIN",
+      "remove": "Remove PIN",
+      "dialog": {
+        "set": {
+          "title": "Set PIN",
+          "description": "Choose an 8-digit PIN to require when switching to your profile.",
+          "submit": "Set PIN"
+        },
+        "change": {
+          "title": "Change PIN",
+          "description": "Enter your current PIN, then choose a new one.",
+          "submit": "Change PIN"
+        },
+        "remove": {
+          "title": "Remove PIN",
+          "description": "Enter your current PIN to remove it. Your profile won't be locked.",
+          "submit": "Remove PIN"
+        }
+      },
+      "currentLabel": "Current PIN",
+      "newLabel": "New PIN",
+      "newLabelLong": "New 8-digit PIN",
+      "confirmLabel": "Confirm PIN",
+      "showLabel": "Show {label}",
+      "hideLabel": "Hide {label}",
+      "mismatch": "PINs don't match.",
+      "incorrect": "Incorrect PIN."
+    }
+  },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Personalize how Planner looks. Changes save to your profile and follow you across devices.",
+    "language": {
+      "legend": "Language",
+      "description": "The interface language. Saved to your profile and applied across your devices.",
+      "ariaLabel": "Language"
+    },
+    "palette": {
+      "legend": "Color palette",
+      "description": "Pick the warm default or a Catppuccin flavor. A flavor restyles the whole app and sets its own light or dark mode.",
+      "ariaLabel": "Color palette",
+      "labels": {
+        "default": "Default"
+      },
+      "descriptions": {
+        "default": "Warm paper & stone",
+        "catppuccin-latte": "Catppuccin · light",
+        "catppuccin-frappe": "Catppuccin · dark",
+        "catppuccin-macchiato": "Catppuccin · dark",
+        "catppuccin-mocha": "Catppuccin · dark"
+      }
+    },
+    "theme": {
+      "legend": "Theme",
+      "descriptionLocked": "The Catppuccin flavor sets light or dark.",
+      "description": "Match your system, or always use light or dark.",
+      "ariaLabel": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "accent": {
+      "legend": "Accent color",
+      "descriptionLocked": "Used for buttons, highlights, and focus rings — shown in the active flavor's palette.",
+      "description": "Used for buttons, highlights, links, and focus rings.",
+      "ariaLabel": "Accent color"
+    },
+    "tone": {
+      "legend": "Surface tone",
+      "descriptionLocked": "Catppuccin defines its own surfaces.",
+      "description": "The temperature of backgrounds and borders behind your content.",
+      "ariaLabel": "Surface tone",
+      "labels": {
+        "warm": "Warm",
+        "neutral": "Neutral",
+        "cool": "Cool"
+      }
+    }
+  },
+  "calendarDisplay": {
+    "title": "Calendar",
+    "description": "How your calendar reads. These also follow you across devices.",
+    "showInactive": {
+      "label": "Show inactive events in month view",
+      "description": "Inactive events (like sleep) show grayed out. Turn off to hide them in the cramped month grid — week and day always show them."
+    },
+    "contextLabel": {
+      "legend": "Context label",
+      "description": "How a context block is labelled in the week and day grids: a title bar across the top, or a vertical label down the right edge.",
+      "ariaLabel": "Context label",
+      "bar": "Title bar",
+      "side": "Side label"
+    },
+    "successToasts": {
+      "label": "Show success notifications",
+      "description": "Brief confirmations after an action (like “Task created”). Turn off to mute them — errors and warnings always show."
+    }
+  },
+  "preview": {
+    "title": "Preview",
+    "heading": "The quick brown fox",
+    "secondary": "Secondary text sits on the current surface tone.",
+    "primaryAction": "Primary action",
+    "outline": "Outline",
+    "accentChip": "Accent chip"
+  },
+  "timezone": {
+    "title": "Time zone",
+    "description": "The whole calendar shows times in your zone. A shared event stays anchored to the same moment, so each person sees it in their own time.",
+    "primary": {
+      "legend": "Your time zone",
+      "description": "Event times, day boundaries, and the “now” line all render in this zone — even when you travel and your device clock changes.",
+      "ariaLabel": "Your time zone"
+    },
+    "secondary": {
+      "legend": "Secondary time zone",
+      "description": "Show a second clock alongside the primary in the week and day views — handy for a partner in another zone.",
+      "ariaLabel": "Secondary time zone",
+      "switchAriaLabel": "Show a secondary time zone"
+    },
+    "combobox": {
+      "defaultGroup": "Default",
+      "useDevice": "Use device time zone",
+      "workspaceGroup": "In your workspace",
+      "allGroup": "All time zones",
+      "deviceTrigger": "Device time zone ({zone})",
+      "deviceTriggerBare": "Device time zone",
+      "searchPlaceholder": "Search time zones…",
+      "empty": "No time zone found."
+    },
+    "currently": "Currently {time} in {zone}"
+  },
+  "sleep": {
+    "title": "Sleep",
+    "description": "Drives the sleep-cycle calculator and tonight's bedtime recommendation on the Insights Sleep tab. Private to you.",
+    "cycleLength": {
+      "label": "Sleep cycle length",
+      "option": "{minutes} minutes",
+      "description": "One light–deep–REM pass — about 90 minutes on average, though it varies night to night, so cycle counts are estimates."
+    },
+    "onsetLatency": {
+      "label": "Time to fall asleep",
+      "option": "{minutes} minutes",
+      "description": "Added between getting into bed and the first cycle."
+    },
+    "targetCycles": {
+      "label": "Nightly target",
+      "option": "{cycles} cycles",
+      "descriptionShort": "With your settings that's {inBed} in bed ({asleep} asleep) per night. Adults do best on 7–9 hours of sleep (AASM) — your target is on the short side.",
+      "description": "With your settings that's {inBed} in bed ({asleep} asleep) per night. Adults do best on 7–9 hours of sleep (AASM)."
+    },
+    "category": {
+      "label": "Sleep category",
+      "none": "None — count inactive events as sleep",
+      "description": "When set, only this category's timed events count as your derived nights — other inactive blocks (focus time, commutes) stop reading as sleep."
+    },
+    "nightWindow": {
+      "startLabel": "Night starts after",
+      "endLabel": "Night ends by",
+      "description": "Derived nights collect sleep between these wall-clock hours — the start on the evening before, the end on the wake day. Widen it if you sleep past noon or keep unusual hours."
+    }
+  }
+}

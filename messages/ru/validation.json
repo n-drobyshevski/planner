@@ -1,0 +1,10 @@
+{
+  "nameRequired": "Введи своё имя.",
+  "pinLength": "PIN-код состоит из 8 цифр.",
+  "enterName": "Введи своё имя.",
+  "enterPin": "Введи свой PIN-код.",
+  "incorrectPin": "Неверный PIN-код.",
+  "memberNotFound": "Не нашли никого с таким именем.",
+  "profileNotLinked": "Этот профиль ещё не привязан к входу.",
+  "loginNotConfigured": "Для этого профиля вход не настроен."
+}

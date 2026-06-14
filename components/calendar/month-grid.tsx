@@ -1,9 +1,11 @@
 "use client";
 
 import { forwardRef, useMemo } from "react";
-import { format, isSameMonth } from "date-fns";
+import { useTranslations, useLocale } from "next-intl";
+import { format, isSameMonth, addDays, startOfWeek } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { formatTime } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { Pencil, Trash2, Eye } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -14,7 +16,6 @@ import { packMonthWeek, occurrencesOnDay, type MonthItem } from "@/lib/layout/pa
 import { useUiStore } from "@/stores/ui-store";
 import type { Occurrence } from "@/lib/types";
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_LANES = 3;
 const DAY_HEADER_PX = 28;
 const LANE_PX = 20;
@@ -43,18 +44,28 @@ export function MonthGrid({
   days,
   ...rest
 }: CommonProps & { days: number[] }) {
+  const locale = useLocale();
   const weeks = useMemo(() => {
     const w: number[][] = [];
     for (let i = 0; i < days.length; i += 7) w.push(days.slice(i, i + 7));
     return w;
   }, [days]);
+  // Locale-aware Mon–Sun column headers, derived from a reference week so the
+  // names follow the active locale instead of being hardcoded English.
+  const weekdayLabels = useMemo(() => {
+    const dfLocale = dateFnsLocale(locale);
+    const monday = startOfWeek(new Date(2024, 0, 1), { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) =>
+      format(addDays(monday, i), "EEE", { locale: dfLocale }),
+    );
+  }, [locale]);
 
   return (
     <div className="flex h-full flex-col">
       <div className="grid grid-cols-7 border-b">
-        {WEEKDAYS.map((d) => (
+        {weekdayLabels.map((d, i) => (
           <div
-            key={d}
+            key={i}
             className="px-2 py-1.5 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
             {d}
@@ -86,6 +97,9 @@ function WeekRow({
   eventCopyAction,
   canEdit,
 }: CommonProps & { dayStarts: number[] }) {
+  const t = useTranslations("calendar");
+  const locale = useLocale();
+  const dfLocale = dateFnsLocale(locale);
   const timeZone = useViewerTimeZone();
   const layout = useMemo(
     () => packMonthWeek(occurrences, dayStarts, MAX_LANES, timeZone),
@@ -104,7 +118,9 @@ function WeekRow({
               key={d}
               role="button"
               tabIndex={0}
-              aria-label={`Create event on ${format(d, "d MMMM", { in: tz(timeZone) })}`}
+              aria-label={t("month.createEventOn", {
+                date: format(d, "d MMMM", { in: tz(timeZone), locale: dfLocale }),
+              })}
               onClick={() => onCreateDay(d)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -119,7 +135,9 @@ function WeekRow({
             >
               <button
                 type="button"
-                aria-label={`Go to ${format(d, "d MMMM", { in: tz(timeZone) })}`}
+                aria-label={t("month.goTo", {
+                  date: format(d, "d MMMM", { in: tz(timeZone), locale: dfLocale }),
+                })}
                 onClick={(e) => {
                   // The day number navigates to Day view; don't also create.
                   e.stopPropagation();
@@ -158,19 +176,19 @@ function WeekRow({
                   actions={
                     canEdit(it.occ)
                       ? [
-                          { label: "Edit", icon: Pencil, onSelect: () => onSelect(it.occ) },
+                          { label: t("menu.edit"), icon: Pencil, onSelect: () => onSelect(it.occ) },
                           ...(eventShareAction && eventShareAction(it.occ)
                             ? [eventShareAction(it.occ)!]
                             : []),
                           {
-                            label: "Delete",
+                            label: t("menu.delete"),
                             icon: Trash2,
                             destructive: true,
                             onSelect: () => onDeleteEvent(it.occ),
                           },
                         ]
                       : [
-                          { label: "Open", icon: Eye, onSelect: () => onSelect(it.occ) },
+                          { label: t("menu.open"), icon: Eye, onSelect: () => onSelect(it.occ) },
                           ...(eventCopyAction && eventCopyAction(it.occ)
                             ? [eventCopyAction(it.occ)!]
                             : []),
@@ -285,6 +303,8 @@ function MoreButton({
   colorOf: (o: Occurrence) => string;
   onSelect: (o: Occurrence) => void;
 }) {
+  const t = useTranslations("calendar");
+  const locale = useLocale();
   const timeZone = useViewerTimeZone();
   const maskTitles = useUiStore((s) => s.maskTitles);
   const items = occurrencesOnDay(occurrences, day, timeZone);
@@ -295,12 +315,12 @@ function MoreButton({
           type="button"
           className="pointer-events-auto w-full truncate rounded px-1 text-left text-xs font-medium text-muted-foreground hover:bg-accent"
         >
-          +{count} more
+          {t("month.moreCount", { count })}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-2">
         <div className="mb-1 px-1 text-xs font-medium text-muted-foreground">
-          {format(day, "EEEE, d MMM", { in: tz(timeZone) })}
+          {format(day, "EEEE, d MMM", { in: tz(timeZone), locale: dateFnsLocale(locale) })}
         </div>
         <div className="flex flex-col gap-0.5">
           {items.map((o) => (

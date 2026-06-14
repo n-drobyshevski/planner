@@ -1,13 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { LogOut, Settings } from "lucide-react";
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { signOutAction } from "@/app/login/actions";
+import { signOutAction } from "@/app/[locale]/login/actions";
 import type { Member } from "@/lib/types";
 
 /**
@@ -16,18 +17,19 @@ import type { Member } from "@/lib/types";
  * into any DropdownMenuContent after the surface-specific entries.
  */
 export function MobileAccountSection({ current }: { current: Member | null }) {
+  const t = useTranslations("nav");
   return (
     <>
       <DropdownMenuSeparator />
       {current && (
         <DropdownMenuLabel className="font-normal text-muted-foreground">
-          Signed in as {current.name}
+          {t("userMenu.signedInAs", { name: current.name })}
         </DropdownMenuLabel>
       )}
       <DropdownMenuItem asChild>
         <Link href="/settings">
           <Settings data-icon="inline-start" />
-          Settings
+          {t("userMenu.settings")}
         </Link>
       </DropdownMenuItem>
       <DropdownMenuItem
@@ -36,7 +38,7 @@ export function MobileAccountSection({ current }: { current: Member | null }) {
         }}
       >
         <LogOut data-icon="inline-start" />
-        Sign out
+        {t("userMenu.signOut")}
       </DropdownMenuItem>
     </>
   );

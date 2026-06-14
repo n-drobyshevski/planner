@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Sunrise, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ export function CheckinCard({
   derivedToday: DerivedNight | null;
   onSave: (input: Omit<SleepLogInput, "workspaceId" | "memberId">) => Promise<void>;
 }) {
+  const t = useTranslations("sleep");
   const storageKey = `${STORAGE_PREFIX}${viewerId}`;
   const [dismissed, setDismissed] = useState(
     () => readLastDismissed(storageKey) === todayKey,
@@ -87,7 +89,7 @@ export function CheckinCard({
       });
       // The card unmounts on success; the toast carries the confirmation
       // (sonner announces it politely to screen readers too).
-      notify.success("Check-in saved");
+      notify.success(t("checkin.savedToast"));
     } catch {
       /* the mutation hook already toasted; keep the card open to retry */
     } finally {
@@ -97,16 +99,15 @@ export function CheckinCard({
 
   return (
     <section
-      aria-label="Morning check-in"
+      aria-label={t("checkin.ariaLabel")}
       className="rounded-lg border bg-card p-3 shadow-soft"
     >
       <div className="flex items-start gap-3">
         <Sunrise aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-medium">Good morning — how did you sleep?</h3>
+          <h3 className="text-sm font-medium">{t("checkin.title")}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            A few seconds now sharpens your sleep hints. Everything is optional
-            and stays private to you.
+            {t("checkin.subtitle")}
           </p>
         </div>
         <Button
@@ -114,7 +115,7 @@ export function CheckinCard({
           size="icon"
           className="-mt-1 -mr-1 size-11 shrink-0 text-muted-foreground pointer-fine:size-8"
           onClick={dismiss}
-          aria-label="Dismiss the morning check-in for today"
+          aria-label={t("checkin.dismiss")}
         >
           <X />
         </Button>
@@ -125,14 +126,14 @@ export function CheckinCard({
       <div className="mt-3 flex justify-end">
         {/* The button text swap isn't announced; this region is. */}
         <span aria-live="polite" className="sr-only">
-          {saving ? "Saving your check-in" : ""}
+          {saving ? t("checkin.savingSr") : ""}
         </span>
         <Button
           size="sm"
           onClick={() => void save()}
           disabled={saving || !draftHasContent(draft)}
         >
-          {saving ? "Saving…" : "Save check-in"}
+          {saving ? t("checkin.saving") : t("checkin.save")}
         </Button>
       </div>
     </section>

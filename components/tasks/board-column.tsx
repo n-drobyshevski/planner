@@ -4,6 +4,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TaskContextMenu } from "./task-context-menu";
 import { TaskCard } from "./task-card";
@@ -22,6 +23,7 @@ export function Column({
   onNew: () => void;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("tasks");
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const headingId = `board-col-${status}`;
   return (
@@ -37,7 +39,7 @@ export function Column({
           variant="ghost"
           size="icon"
           className="size-7"
-          aria-label={`Add task to ${title}`}
+          aria-label={t("board.addTaskTo", { title })}
           onClick={onNew}
         >
           <Plus />
@@ -95,9 +97,10 @@ export function SortableCard(props: {
 }
 
 export function EmptyColumn() {
+  const t = useTranslations("tasks");
   return (
     <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-      Drop tasks here
+      {t("board.dropTasksHere")}
     </div>
   );
 }

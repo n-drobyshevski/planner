@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, MoreVertical } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -43,6 +44,7 @@ export function TasksToolbar({
   onBoardChange: (boardId: string) => void;
   taskCountByBoard: Map<string, number>;
 }) {
+  const t = useTranslations("tasks");
   return (
     <>
       <ToolbarSlot name="center">
@@ -61,19 +63,19 @@ export function TasksToolbar({
           size="sm"
           className="hidden md:flex"
         >
-          <ToggleGroupItem value="board">Board</ToggleGroupItem>
-          <ToggleGroupItem value="list">List</ToggleGroupItem>
+          <ToggleGroupItem value="board">{t("toolbar.board")}</ToggleGroupItem>
+          <ToggleGroupItem value="list">{t("toolbar.list")}</ToggleGroupItem>
         </ToggleGroup>
         {/* New task: a labelled button on desktop, a square icon button below md.
             An icon-only button needs its own aria-label — a CSS-hidden label is
             dropped from the accessible name. Mirrors the calendar toolbar. */}
         <Button size="sm" onClick={onNewTask} className="hidden md:inline-flex">
           <Plus data-icon="inline-start" />
-          New task
+          {t("toolbar.newTask")}
         </Button>
         <Button
           size="icon"
-          aria-label="New task"
+          aria-label={t("toolbar.newTask")}
           onClick={onNewTask}
           className="md:hidden"
         >
@@ -99,26 +101,27 @@ function TasksMobileMenu({
   onViewChange: (v: TasksView) => void;
   current: Member | null;
 }) {
+  const t = useTranslations("tasks");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          aria-label="More options"
+          aria-label={t("toolbar.moreOptions")}
           className="md:hidden"
         >
           <MoreVertical />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>View</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("toolbar.view")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={view}
           onValueChange={(v) => v && onViewChange(v as TasksView)}
         >
-          <DropdownMenuRadioItem value="board">Board</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="list">List</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="board">{t("toolbar.board")}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="list">{t("toolbar.list")}</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <MobileAccountSection current={current} />
       </DropdownMenuContent>

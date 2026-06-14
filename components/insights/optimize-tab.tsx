@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import {
@@ -63,7 +63,9 @@ import {
 } from "@/lib/hooks/use-insights-prefs";
 import { useSleepLogs } from "@/lib/hooks/use-sleep-logs";
 import { formatDuration } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { dateInputToMs, dateKeyInZone } from "@/lib/datetime/local";
+import { Link } from "@/i18n/navigation";
 import { DigestCard } from "./digest-card";
 import { InsightsEmpty } from "./insights-empty";
 import { StatCard, StatGrid } from "./stat-card";
@@ -123,24 +125,36 @@ const KIND_ICONS: Record<SuggestionKind, LucideIcon> = {
   "correlation-insight": Meh,
 };
 
-/** Human names for the mute list ("Muted: heavy-day tips"). */
-const KIND_LABELS: Record<SuggestionKind, string> = {
-  "unscheduled-task": "due-task tips",
-  "overloaded-day": "heavy-day tips",
-  "late-night": "short-night tips",
-  "stranded-flexible": "movable-item tips",
-  fragmentation: "fragmentation tips",
-  "category-drift": "share-shift tips",
-  "goal-over-budget": "over-budget tips",
-  "goal-under-budget": "behind-pace tips",
-  "streak-broken": "streak tips",
-  anomaly: "out-of-pattern tips",
-  "forecast-overload": "outlook tips",
-  "sleep-debt": "sleep tips",
-  "correlation-insight": "satisfaction tips",
+/** Translation keys for the mute list ("Muted: heavy-day tips"). */
+const KIND_LABEL_KEYS: Record<SuggestionKind, string> = {
+  "unscheduled-task": "optimize.kind.unscheduledTask",
+  "overloaded-day": "optimize.kind.overloadedDay",
+  "late-night": "optimize.kind.lateNight",
+  "stranded-flexible": "optimize.kind.strandedFlexible",
+  fragmentation: "optimize.kind.fragmentation",
+  "category-drift": "optimize.kind.categoryDrift",
+  "goal-over-budget": "optimize.kind.goalOverBudget",
+  "goal-under-budget": "optimize.kind.goalUnderBudget",
+  "streak-broken": "optimize.kind.streakBroken",
+  anomaly: "optimize.kind.anomaly",
+  "forecast-overload": "optimize.kind.forecastOverload",
+  "sleep-debt": "optimize.kind.sleepDebt",
+  "correlation-insight": "optimize.kind.correlationInsight",
 };
 
+/** Look up a kind label, tolerating an unknown stored kind (renders the raw id). */
+function kindLabel(
+  t: ReturnType<typeof useTranslations<"insights">>,
+  kind: string,
+): string {
+  const key = KIND_LABEL_KEYS[kind as SuggestionKind];
+  return key ? t(key) : kind;
+}
+
 export function OptimizeTab({ data }: { data: InsightsTabData }) {
+  const t = useTranslations("insights");
+  const tc = useTranslations("common");
+  const locale = useLocale();
   const {
     period,
     occurrences,
@@ -328,10 +342,10 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     if (suppressedKinds.includes(kind)) return;
     const restored = suppressedKinds;
     void updatePrefs({ suppressedKinds: [...suppressedKinds, kind] }).catch(() => {});
-    toast(`Muted ${KIND_LABELS[kind]}`, {
-      description: "You won't see this kind of tip again, on any device.",
+    toast(t("optimize.muted", { label: kindLabel(t, kind) }), {
+      description: t("optimize.mutedDescription"),
       action: {
-        label: "Undo",
+        label: tc("undo"),
         onClick: () => void updatePrefs({ suppressedKinds: restored }).catch(() => {}),
       },
     });
@@ -349,8 +363,8 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     <div className="flex flex-col gap-4">
       <p className="sr-only">
         {suggestions.length === 0
-          ? "No suggestions for this period."
-          : `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"} for this period.`}
+          ? t("optimize.srNoSuggestions")
+          : t("optimize.srSuggestions", { count: suggestions.length })}
       </p>
       <DigestCard payload={digestPayload} />
       {/* Outlook and coverage pair two-up on desktop; the digest above and the
@@ -377,7 +391,7 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
       />
       {suppressedKinds.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
-          <span>Muted:</span>
+          <span>{t("optimize.mutedLabel")}</span>
           {suppressedKinds.map((kind) => (
             <Button
               key={kind}
@@ -385,9 +399,9 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
               size="sm"
               className="min-h-11 px-1.5 text-xs sm:min-h-7"
               onClick={() => unmuteKind(kind)}
-              aria-label={`Unmute ${KIND_LABELS[kind as SuggestionKind] ?? kind}`}
+              aria-label={t("optimize.unmute", { label: kindLabel(t, kind) })}
             >
-              {KIND_LABELS[kind as SuggestionKind] ?? kind}
+              {kindLabel(t, kind)}
               <X data-icon="inline-end" />
             </Button>
           ))}
@@ -415,17 +429,20 @@ function OutlookSection({
   loading: boolean;
   timeZone: string;
 }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
   const ctx = tz(timeZone);
-  const rangeLabel = `${format(futureWindow.start, "d MMM", { in: ctx })} – ${format(
+  const dfLocale = dateFnsLocale(locale);
+  const rangeLabel = `${format(futureWindow.start, "d MMM", { in: ctx, locale: dfLocale })} – ${format(
     futureWindow.end - 1,
     "d MMM",
-    { in: ctx },
+    { in: ctx, locale: dfLocale },
   )}`;
 
   if (loading) {
     return (
       <section className="space-y-1.5" aria-busy>
-        <SectionLabel>Outlook · {rangeLabel}</SectionLabel>
+        <SectionLabel>{t("optimize.outlook", { range: rangeLabel })}</SectionLabel>
         <Skeleton className="h-20 w-full rounded-lg" />
       </section>
     );
@@ -437,46 +454,46 @@ function OutlookSection({
 
   return (
     <section className="space-y-1.5">
-      <SectionLabel>Outlook · {rangeLabel}</SectionLabel>
+      <SectionLabel>{t("optimize.outlook", { range: rangeLabel })}</SectionLabel>
       <StatGrid>
         <StatCard
-          label="Committed"
-          value={formatDuration(committedMs)}
-          hint="already scheduled"
+          label={t("optimize.committed")}
+          value={formatDuration(committedMs, locale)}
+          hint={t("optimize.committedHint")}
         />
         <StatCard
-          label="Of typical pace"
+          label={t("optimize.ofTypicalPace")}
           value={pacePct === null ? "—" : `${pacePct}%`}
           warning={pacePct !== null && pacePct > 110}
           hint={
             pacePct === null
-              ? "no baseline yet"
-              : `typical day ${formatDuration(forecast.typicalDayMs)}`
+              ? t("optimize.noBaseline")
+              : t("optimize.typicalDay", { ms: formatDuration(forecast.typicalDayMs, locale) })
           }
         />
         <StatCard
-          label="Busiest day"
-          value={forecast.busiestDay ? formatDuration(forecast.busiestDay.ms) : "—"}
+          label={t("optimize.busiestDay")}
+          value={forecast.busiestDay ? formatDuration(forecast.busiestDay.ms, locale) : "—"}
           hint={
             forecast.busiestDay
-              ? format(forecast.busiestDay.dayMs, "EEE d MMM", { in: ctx })
-              : "nothing scheduled"
+              ? format(forecast.busiestDay.dayMs, "EEE d MMM", { in: ctx, locale: dfLocale })
+              : t("optimize.nothingScheduled")
           }
         />
       </StatGrid>
       {forecast.dueUnscheduled.length > 0 && (
         <ul className="space-y-1 pt-1" role="list">
-          {forecast.dueUnscheduled.slice(0, 4).map((t) => (
+          {forecast.dueUnscheduled.slice(0, 4).map((task) => (
             <li
-              key={t.taskId}
+              key={task.taskId}
               className="flex items-baseline justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-xs"
             >
               <span className="min-w-0 truncate">
-                {t.title}
-                <span className="text-muted-foreground"> — due, no time blocked</span>
+                {task.title}
+                <span className="text-muted-foreground">{t("optimize.dueNoTime")}</span>
               </span>
               <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
-                {format(dateInputToMs(t.dueDate, timeZone), "EEE d MMM", { in: ctx })}
+                {format(dateInputToMs(task.dueDate, timeZone), "EEE d MMM", { in: ctx, locale: dfLocale })}
               </span>
             </li>
           ))}
@@ -491,20 +508,22 @@ function CoverageCard({
 }: {
   coverage: ReturnType<typeof attributeCoverage>;
 }) {
+  const t = useTranslations("insights");
   if (coverage.share === null) return null;
   const pct = Math.round(coverage.share * 100);
   return (
     <div className="rounded-lg border bg-card p-3 shadow-soft">
       <div className="text-xs font-medium text-muted-foreground">
-        Optimization details
+        {t("optimize.optimizationDetails")}
       </div>
       <div className="mt-0.5 text-base leading-tight font-semibold tabular-nums">
         {pct}%
       </div>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        of timed events in this period carry details ({coverage.withAttributes} of{" "}
-        {coverage.tracked}). Set energy, flexibility, focus or satisfaction in any
-        event or task dialog — suggestions get sharper as coverage grows.
+        {t("optimize.coverageBody", {
+          withAttributes: coverage.withAttributes,
+          tracked: coverage.tracked,
+        })}
       </p>
     </div>
   );
@@ -521,6 +540,7 @@ function SuggestionList({
   suggestions: Suggestion[];
   onMute: (kind: SuggestionKind) => void;
 }) {
+  const t = useTranslations("insights");
   // Component is inside an ssr:false chunk, so reading localStorage in the
   // lazy initializer is hydration-safe.
   const [dismissed, setDismissed] = useState<string[]>(
@@ -541,10 +561,9 @@ function SuggestionList({
           <EmptyMedia variant="icon">
             <Sparkles />
           </EmptyMedia>
-          <EmptyTitle>Nothing to optimize</EmptyTitle>
+          <EmptyTitle>{t("optimize.nothingToOptimize")}</EmptyTitle>
           <EmptyDescription>
-            This period looks balanced — no heavy days, short nights or stranded
-            tasks stood out.
+            {t("optimize.nothingToOptimizeDescription")}
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -566,13 +585,13 @@ function SuggestionList({
         </ul>
       ) : (
         <p className="px-1 py-6 text-center text-sm text-muted-foreground">
-          All suggestions for this period are dismissed.
+          {t("optimize.allDismissed")}
         </p>
       )}
       {dismissedCount > 0 && (
         <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
           <span className="tabular-nums">
-            {dismissedCount} dismissed
+            {t("optimize.dismissedCount", { count: dismissedCount })}
           </span>
           <Button
             variant="ghost"
@@ -580,7 +599,7 @@ function SuggestionList({
             className="min-h-11 sm:min-h-7"
             onClick={() => persist([])}
           >
-            Restore dismissed
+            {t("optimize.restoreDismissed")}
           </Button>
         </div>
       )}
@@ -597,6 +616,7 @@ function SuggestionCard({
   onDismiss: () => void;
   onMute: () => void;
 }) {
+  const t = useTranslations("insights");
   const KindIcon = KIND_ICONS[suggestion.kind];
   const SeverityIcon = suggestion.severity === "attention" ? CircleAlert : Info;
   // "Useful" is a thank-you, not a database row — it acknowledges and stops.
@@ -610,7 +630,7 @@ function SuggestionCard({
           <span className="text-sm font-medium">{suggestion.title}</span>
           <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
             <SeverityIcon aria-hidden className="size-3" />
-            {suggestion.severity === "attention" ? "Worth a look" : "FYI"}
+            {suggestion.severity === "attention" ? t("optimize.worthALook") : t("optimize.fyi")}
           </span>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">{suggestion.body}</p>
@@ -627,7 +647,7 @@ function SuggestionCard({
               size="sm"
               className="group -ml-1.5 mt-1 min-h-11 px-1.5 text-xs text-muted-foreground sm:min-h-7"
             >
-              Why am I seeing this?
+              {t("optimize.whyAmISeeing")}
               <ChevronDown
                 data-icon="inline-end"
                 className="transition-transform group-data-[state=open]:rotate-180"
@@ -637,20 +657,22 @@ function SuggestionCard({
           <CollapsibleContent>
             <dl className="mt-1 space-y-1 rounded-md bg-muted/50 p-2.5 text-xs text-muted-foreground">
               <div>
-                <dt className="sr-only">The data behind this</dt>
+                <dt className="sr-only">{t("optimize.dataBehind")}</dt>
                 <dd>{suggestion.evidence.summary}</dd>
               </div>
               <div>
-                <dt className="sr-only">When this fires</dt>
+                <dt className="sr-only">{t("optimize.whenThisFires")}</dt>
                 <dd>{suggestion.evidence.threshold}</dd>
               </div>
               <div className="tabular-nums">
-                <dt className="sr-only">Data window</dt>
+                <dt className="sr-only">{t("optimize.dataWindow")}</dt>
                 <dd>
-                  Window: {suggestion.evidence.windowLabel}
                   {suggestion.evidence.n !== undefined
-                    ? ` · n ${suggestion.evidence.n}`
-                    : ""}
+                    ? t("optimize.windowLabelN", {
+                        label: suggestion.evidence.windowLabel,
+                        n: suggestion.evidence.n,
+                      })
+                    : t("optimize.windowLabel", { label: suggestion.evidence.windowLabel })}
                 </dd>
               </div>
             </dl>
@@ -673,7 +695,7 @@ function SuggestionCard({
             variant="ghost"
             size="icon"
             className="size-11 text-muted-foreground sm:size-7"
-            aria-label={thanked ? "Marked useful" : "Useful"}
+            aria-label={thanked ? t("optimize.markedUseful") : t("optimize.useful")}
             aria-pressed={thanked}
             disabled={thanked}
             onClick={() => setThanked(true)}
@@ -684,7 +706,7 @@ function SuggestionCard({
             variant="ghost"
             size="icon"
             className="size-11 text-muted-foreground sm:size-7"
-            aria-label="Not useful — mute this kind of tip"
+            aria-label={t("optimize.notUseful")}
             onClick={onMute}
           >
             <ThumbsDown />
@@ -696,7 +718,7 @@ function SuggestionCard({
         size="icon"
         className="-mt-1 -mr-1 size-11 shrink-0 text-muted-foreground sm:size-8"
         onClick={onDismiss}
-        aria-label={`Dismiss: ${suggestion.title}`}
+        aria-label={t("optimize.dismiss", { title: suggestion.title })}
       >
         <X />
       </Button>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,6 +41,7 @@ export function CustomizeDashboardSheet({
   lockedIds?: DashboardCardId[];
   onChange: (next: { order: string[]; hidden: string[] }) => void;
 }) {
+  const t = useTranslations("insights");
   const [open, setOpen] = useState(false);
   const locked = new Set(lockedIds ?? []);
   const rows = layout.order.filter((id) => !locked.has(id));
@@ -57,21 +59,20 @@ export function CustomizeDashboardSheet({
         onClick={() => setOpen(true)}
       >
         <SlidersHorizontal data-icon="inline-start" />
-        Customize
+        {t("customize.trigger")}
       </Button>
       <ResponsiveDialog open={open} onOpenChange={setOpen}>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>Customize overview</ResponsiveDialogTitle>
+            <ResponsiveDialogTitle>{t("customize.title")}</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
-              Pick which cards show and in what order. This is your layout —
-              your partner keeps theirs.
+              {t("customize.description")}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogBody className="space-y-3">
             {locked.size > 0 && (
               <p className="text-xs text-muted-foreground">
-                Total, daily average, and active days always lead the overview.
+                {t("customize.lockedNote")}
               </p>
             )}
             <ul className="space-y-1" role="list">
@@ -100,7 +101,7 @@ export function CustomizeDashboardSheet({
                       size="icon"
                       className="size-11 text-muted-foreground sm:size-8"
                       disabled={i === 0}
-                      aria-label={`Move ${LABEL_BY_ID.get(id) ?? id} up`}
+                      aria-label={t("customize.moveUp", { label: LABEL_BY_ID.get(id) ?? id })}
                       onClick={() =>
                         write(moveCard(layout.order, id, "up"), layout.hidden)
                       }
@@ -112,7 +113,7 @@ export function CustomizeDashboardSheet({
                       size="icon"
                       className="size-11 text-muted-foreground sm:size-8"
                       disabled={i === rows.length - 1}
-                      aria-label={`Move ${LABEL_BY_ID.get(id) ?? id} down`}
+                      aria-label={t("customize.moveDown", { label: LABEL_BY_ID.get(id) ?? id })}
                       onClick={() =>
                         write(moveCard(layout.order, id, "down"), layout.hidden)
                       }
@@ -132,7 +133,7 @@ export function CustomizeDashboardSheet({
                   onClick={() => onChange({ order: [], hidden: [] })}
                 >
                   <RotateCcw data-icon="inline-start" />
-                  Reset to default
+                  {t("customize.reset")}
                 </Button>
               </div>
             )}

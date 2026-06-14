@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { Users, User } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import {
   ResponsiveDialog,
@@ -58,6 +59,8 @@ export function BoardDialog({
   /** Called with the new board id once it's created (create mode). */
   onCreated?: (boardId: string) => void;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const mutations = useBoardMutations();
 
   const form = useForm({
@@ -109,10 +112,10 @@ export function BoardDialog({
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>
-            {mode === "create" ? "New board" : "Edit board"}
+            {mode === "create" ? t("boardDialog.createTitle") : t("boardDialog.editTitle")}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            A board is a collection of tasks. Keep it to yourself or share it.
+            {t("boardDialog.description")}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -128,9 +131,9 @@ export function BoardDialog({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
-                    placeholder="Board name"
+                    placeholder={t("boardDialog.namePlaceholder")}
                     onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
-                    aria-label="Board name"
+                    aria-label={t("boardDialog.nameLabel")}
                     aria-invalid={isInvalid || undefined}
                     autoFocus
                   />
@@ -147,7 +150,7 @@ export function BoardDialog({
                   <button
                     key={c}
                     type="button"
-                    aria-label={`Color ${c}`}
+                    aria-label={t("boardDialog.colorLabel", { color: c })}
                     aria-pressed={field.state.value === c}
                     onClick={() => field.handleChange(c)}
                     className={cn(
@@ -171,18 +174,18 @@ export function BoardDialog({
                     ) : (
                       <User className="size-4 text-muted-foreground" />
                     )}
-                    <span>{field.state.value ? "Shared" : "Personal"}</span>
+                    <span>{field.state.value ? t("boardDialog.shared") : t("boardDialog.personal")}</span>
                   </span>
                   <Switch
                     checked={field.state.value}
                     onCheckedChange={field.handleChange}
-                    aria-label="Shared board — you both see and edit it"
+                    aria-label={t("boardDialog.sharedToggleLabel")}
                   />
                 </label>
                 <p className="text-xs text-muted-foreground">
                   {field.state.value
-                    ? "You both see it and can edit its tasks."
-                    : "Only you can see this board and its tasks."}
+                    ? t("boardDialog.sharedHint")
+                    : t("boardDialog.personalHint")}
                 </p>
               </div>
             )}
@@ -200,7 +203,7 @@ export function BoardDialog({
                   onClick={() => onOpenChange(false)}
                   disabled={isSubmitting}
                 >
-                  Cancel
+                  {tc("cancel")}
                 </Button>
                 <Button
                   onClick={() => void form.handleSubmit()}
@@ -209,7 +212,7 @@ export function BoardDialog({
                   {isSubmitting && (
                     <Spinner data-icon="inline-start" />
                   )}
-                  {mode === "create" ? "Add board" : "Save"}
+                  {mode === "create" ? t("boardDialog.addBoard") : tc("save")}
                 </Button>
               </>
             )}

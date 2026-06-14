@@ -1,8 +1,8 @@
 // Map a recurrence form <-> RFC5545 RRULE string (NO DTSTART line).
 // Times are epoch milliseconds (UTC). byWeekday uses 0=Mon..6=Sun.
 
-import { format } from "date-fns";
 import { RRule, type Options, Weekday } from "rrule";
+import { formatDayMonthYear } from "@/lib/datetime/format";
 
 export type Freq = "DAILY" | "WEEKLY" | "MONTHLY";
 
@@ -143,41 +143,60 @@ export function parseRRule(rrule: string | null): RecurrenceForm | null {
   return { freq, interval, byWeekday, end };
 }
 
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const FREQ_ADVERB: Record<Freq, string> = {
-  DAILY: "daily",
-  WEEKLY: "weekly",
-  MONTHLY: "monthly",
-};
-const FREQ_UNIT: Record<Freq, string> = {
-  DAILY: "day",
-  WEEKLY: "week",
-  MONTHLY: "month",
-};
+const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
-/** Short human sentence for a recurrence form, e.g. "Repeats weekly on Mon, Wed, until 30 Jun 2026". */
-export function summarizeRecurrence(form: RecurrenceForm): string {
+/**
+ * Minimal structural shape of a next-intl translator scoped to the
+ * "recurrence" namespace. Kept local so this module doesn't depend on
+ * next-intl directly (and so tests can pass a plain stub).
+ */
+export type RecurrenceTranslator = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
+/**
+ * Short human sentence for a recurrence form, e.g.
+ * "Repeats weekly on Mon, Wed, until 30 Jun 2026".
+ *
+ * The sentence is assembled from the "recurrence" namespace via ICU so it
+ * localizes (frequency adverb/unit, weekday names, interval/count plurals,
+ * and a locale-formatted until-date). Branching mirrors buildRRule exactly.
+ */
+export function summarizeRecurrence(
+  form: RecurrenceForm,
+  t: RecurrenceTranslator,
+  locale: string,
+): string {
   const hasDays =
     (form.freq === "WEEKLY" || form.freq === "DAILY") && form.byWeekday.length > 0;
   // Daily-with-days has no meaningful interval (see buildRRule): render it plain.
   const showInterval = form.interval > 1 && !(form.freq === "DAILY" && hasDays);
 
   let out = showInterval
-    ? `Repeats every ${form.interval} ${FREQ_UNIT[form.freq]}s`
-    : `Repeats ${FREQ_ADVERB[form.freq]}`;
+    ? t("summaryEvery", {
+        interval: form.interval,
+        freq: form.freq,
+        unit: t("unit", { freq: form.freq }),
+      })
+    : t("summaryAdverb", { freq: form.freq });
 
   if (hasDays) {
+    const sep = t("daySeparator");
     const days = [...form.byWeekday]
       .sort((a, b) => a - b)
-      .map((i) => WEEKDAY_LABELS[i])
-      .join(", ");
-    out += ` on ${days}`;
+      .map((i) => t(`weekday.${WEEKDAY_KEYS[i]}`))
+      .join(sep);
+    out = t("onDays", { base: out, days });
   }
 
   if (form.end.type === "until") {
-    out += `, until ${format(form.end.dateMs, "d MMM yyyy")}`;
+    out = t("untilDate", {
+      base: out,
+      date: formatDayMonthYear(form.end.dateMs, undefined, locale),
+    });
   } else if (form.end.type === "count") {
-    out += `, ${form.end.count} times`;
+    out = t("timesCount", { base: out, count: form.end.count });
   }
 
   return out;

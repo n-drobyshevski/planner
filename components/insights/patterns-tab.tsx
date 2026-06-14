@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
@@ -26,30 +27,25 @@ import { HourHeatmap } from "./hour-heatmap";
 import { Figure, Reading, SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
-const DAYPART_LABELS: Record<Daypart, string> = {
-  morning: "Morning (5–12)",
-  midday: "Midday (12–17)",
-  evening: "Evening (17–22)",
-  night: "Night (22–5)",
+const DAYPART_KEYS: Record<Daypart, string> = {
+  morning: "patterns.morning",
+  midday: "patterns.midday",
+  evening: "patterns.evening",
+  night: "patterns.night",
 };
 
 /** Minimum rated occurrences before a daypart verdict is worth showing. */
 const MIN_DAYPART_RATINGS = 5;
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEKDAYS_FULL = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
+const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 export function PatternsTab({ data }: { data: InsightsTabData }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
   const reduced = usePrefersReducedMotion();
   const { period, occurrences, timeZone } = data;
+  const weekdaysShort = WEEKDAY_KEYS.map((k) => t(`heatmap.weekdays.${k}`));
+  const weekdaysFull = WEEKDAY_KEYS.map((k) => t(`heatmap.weekdaysFull.${k}`));
 
   const weekdays = useMemo(
     () => byWeekday(occurrences, period.days, period.window, timeZone),
@@ -82,14 +78,14 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
   if (total === 0)
     return (
       <InsightsEmpty
-        title="No patterns yet"
-        description="Weekday and hour-of-day patterns need at least one timed event in this period."
+        title={t("patterns.emptyTitle")}
+        description={t("patterns.emptyDescription")}
       />
     );
 
   const rows = weekdays.map((w) => ({
-    name: WEEKDAYS[w.weekday],
-    full: WEEKDAYS_FULL[w.weekday],
+    name: weekdaysShort[w.weekday],
+    full: weekdaysFull[w.weekday],
     avg: w.avgMs,
     total: w.totalMs,
     days: w.dayCount,
@@ -102,27 +98,32 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
     : null;
   const lede = derivePatternsLede({
     topWeekday: { full: top.full, avgMs: top.avg },
-    bestDaypart: bestPart ? DAYPART_LABELS[bestPart.daypart].split(" ")[0] : null,
+    bestDaypart: bestPart ? t(DAYPART_KEYS[bestPart.daypart]).split(" ")[0] : null,
     frag,
+    t,
+    locale,
   });
 
   const leadFigures = [
-    { label: "Heaviest weekday", value: formatDuration(top.avg), hint: top.full },
+    { label: t("patterns.heaviestWeekday"), value: formatDuration(top.avg, locale), hint: top.full },
     ...(frag.medianBlockMs !== null
-      ? [{ label: "Typical block", value: formatDuration(frag.medianBlockMs) }]
+      ? [{ label: t("patterns.typicalBlock"), value: formatDuration(frag.medianBlockMs, locale) }]
       : []),
   ];
 
   const config: ChartConfig = {
-    avg: { label: "Avg per day", color: "var(--chart-1)" },
+    avg: { label: t("patterns.avgPerDay"), color: "var(--chart-1)" },
   };
 
   return (
     <Reading>
       <p className="sr-only">
-        Average tracked time peaks on {top.full} at {formatDuration(top.avg)} per day.
+        {t("patterns.srPeak", { day: top.full, ms: formatDuration(top.avg, locale) })}
         {frag.blockCount > 0
-          ? ` The period splits into ${frag.blockCount} busy blocks, typically ${formatDuration(frag.medianBlockMs ?? 0)} long.`
+          ? t("patterns.srBlocks", {
+              count: frag.blockCount,
+              ms: formatDuration(frag.medianBlockMs ?? 0, locale),
+            })
           : ""}
       </p>
 
@@ -130,12 +131,12 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
 
       <TabGrid>
       <section className="space-y-1.5">
-        <SectionLabel>By weekday</SectionLabel>
+        <SectionLabel>{t("patterns.byWeekday")}</SectionLabel>
         <ChartContainer
           config={config}
           className="aspect-auto w-full"
           style={{ height: 7 * 30 + 8 }}
-          aria-label={`Average tracked time per weekday, ${period.label}`}
+          aria-label={t("patterns.byWeekdayAria", { label: period.label })}
         >
           <BarChart
             data={rows}
@@ -164,11 +165,13 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
                     return (
                       <div className="flex w-full flex-col gap-0.5">
                         <span className="font-mono font-medium tabular-nums">
-                          {formatDuration(Number(value))} avg per day
+                          {t("patterns.tooltipAvgPerDay", { ms: formatDuration(Number(value), locale) })}
                         </span>
                         <span className="text-muted-foreground">
-                          {formatDuration(p.total)} total over {p.days}{" "}
-                          {p.days === 1 ? "day" : "days"}
+                          {t("patterns.tooltipTotal", {
+                            total: formatDuration(p.total, locale),
+                            count: p.days,
+                          })}
                         </span>
                       </div>
                     );
@@ -192,8 +195,8 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
         energyDays={energyDays}
       />
 
-      <section className="space-y-1.5 xl:col-span-2">
-        <SectionLabel>By hour of day</SectionLabel>
+      <section className="space-y-1.5 lg:col-span-2">
+        <SectionLabel>{t("patterns.byHour")}</SectionLabel>
         <HourHeatmap
           occurrences={occurrences}
           window={period.window}
@@ -201,20 +204,20 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
         />
       </section>
 
-      <section className="space-y-1.5 xl:col-span-2">
-        <SectionLabel>Fragmentation</SectionLabel>
+      <section className="space-y-1.5 lg:col-span-2">
+        <SectionLabel>{t("patterns.fragmentation")}</SectionLabel>
         <dl className="flex flex-wrap gap-x-6 gap-y-2">
-          <Figure label="Busy blocks" value={String(frag.blockCount)} />
+          <Figure label={t("patterns.busyBlocks")} value={String(frag.blockCount)} />
           <Figure
-            label="Typical block"
-            value={frag.medianBlockMs !== null ? formatDuration(frag.medianBlockMs) : "—"}
+            label={t("patterns.typicalBlock")}
+            value={frag.medianBlockMs !== null ? formatDuration(frag.medianBlockMs, locale) : "—"}
           />
           <Figure
-            label="Longest block"
-            value={frag.longestBlockMs !== null ? formatDuration(frag.longestBlockMs) : "—"}
+            label={t("patterns.longestBlock")}
+            value={frag.longestBlockMs !== null ? formatDuration(frag.longestBlockMs, locale) : "—"}
           />
           <Figure
-            label="Short blocks"
+            label={t("patterns.shortBlocks")}
             value={
               frag.shortBlockShare !== null
                 ? `${Math.round(frag.shortBlockShare * 100)}%`
@@ -222,15 +225,15 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
             }
           />
           <Figure
-            label="Typical gap"
-            value={frag.avgGapMs !== null ? formatDuration(frag.avgGapMs) : "—"}
+            label={t("patterns.typicalGap")}
+            value={frag.avgGapMs !== null ? formatDuration(frag.avgGapMs, locale) : "—"}
           />
         </dl>
       </section>
 
       {/* Second half: how that time splits across contexts and the two of you
           (folded in from the former Balance tab). */}
-      <div className="border-t border-border/60 xl:col-span-2" aria-hidden />
+      <div className="border-t border-border/60 lg:col-span-2" aria-hidden />
       <BalanceSections data={data} />
       </TabGrid>
     </Reading>
@@ -246,6 +249,8 @@ function AttributesSection({
   dayparts: ReturnType<typeof satisfactionByDaypart>;
   energyDays: ReturnType<typeof energyLoadPerDay>;
 }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
   const ratedParts = dayparts.filter((d) => d.agg.n >= MIN_DAYPART_RATINGS);
   const best = ratedParts.length
     ? ratedParts.reduce((a, b) => (b.agg.mean > a.agg.mean ? b : a))
@@ -266,18 +271,16 @@ function AttributesSection({
 
   return (
     <section className="space-y-1.5">
-      <SectionLabel>Attributes</SectionLabel>
+      <SectionLabel>{t("patterns.attributes")}</SectionLabel>
       {!hasAnything ? (
-        <SectionEmpty actionLabel="Open the calendar" actionHref="/calendar">
-          Set focus, energy or satisfaction on events to unlock attribute
-          patterns — deep-work share, your best time of day, and how demanding
-          your days run.
+        <SectionEmpty actionLabel={t("empty.openCalendar")} actionHref="/calendar">
+          {t("patterns.attributesEmpty")}
         </SectionEmpty>
       ) : (
         <StatGrid>
           <StatCard
             flat
-            label="Deep work"
+            label={t("patterns.deepWork")}
             value={
               focusSplit.share !== null
                 ? `${Math.round(focusSplit.share * 100)}%`
@@ -285,36 +288,40 @@ function AttributesSection({
             }
             hint={
               focusSplit.share !== null
-                ? `of ${formatDuration(focusSplit.deepMs + focusSplit.shallowMs)} focus-rated time`
-                : "rate focus on events to track this"
+                ? t("patterns.deepWorkHint", {
+                    ms: formatDuration(focusSplit.deepMs + focusSplit.shallowMs, locale),
+                  })
+                : t("patterns.deepWorkEmptyHint")
             }
           />
           <StatCard
             flat
-            label="Best time of day"
-            value={best ? DAYPART_LABELS[best.daypart].split(" ")[0] : "—"}
+            label={t("patterns.bestTimeOfDay")}
+            value={best ? t(DAYPART_KEYS[best.daypart]).split(" ")[0] : "—"}
             hint={
               best
-                ? `satisfaction ${best.agg.mean.toFixed(1)}/5 · n ${best.agg.n}`
-                : `needs ${MIN_DAYPART_RATINGS}+ rated items`
+                ? t("patterns.bestTimeHint", { mean: best.agg.mean.toFixed(1), n: best.agg.n })
+                : t("patterns.needsRatings", { min: MIN_DAYPART_RATINGS })
             }
           />
           {worst && worst.daypart !== best?.daypart && (
             <StatCard
               flat
-              label="Toughest time of day"
-              value={DAYPART_LABELS[worst.daypart].split(" ")[0]}
-              hint={`satisfaction ${worst.agg.mean.toFixed(1)}/5 · n ${worst.agg.n}`}
+              label={t("patterns.toughestTimeOfDay")}
+              value={t(DAYPART_KEYS[worst.daypart]).split(" ")[0]}
+              hint={t("patterns.bestTimeHint", { mean: worst.agg.mean.toFixed(1), n: worst.agg.n })}
             />
           )}
           <StatCard
             flat
-            label="Energy level"
+            label={t("patterns.energyLevel")}
             value={meanEnergy !== null ? `${meanEnergy.toFixed(1)}/3` : "—"}
             hint={
               meanEnergy !== null && energyTotalMs > 0
-                ? `rated on ${Math.round((energyRatedMs / energyTotalMs) * 100)}% of tracked time`
-                : "rate energy on events to track this"
+                ? t("patterns.energyHint", {
+                    pct: Math.round((energyRatedMs / energyTotalMs) * 100),
+                  })
+                : t("patterns.energyEmptyHint")
             }
           />
         </StatGrid>

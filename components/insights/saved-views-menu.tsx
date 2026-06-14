@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Bookmark, Plus, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,8 @@ export function SavedViewsMenu({
   current: SavedViewConfig;
   onApply: (config: SavedViewConfig) => void;
 }) {
+  const t = useTranslations("insights");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const { views } = useInsightsViews(workspaceId, memberId);
@@ -57,19 +60,17 @@ export function SavedViewsMenu({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Saved views"
+          aria-label={t("savedViews.trigger")}
           className="size-11 sm:size-8"
         >
           <Bookmark />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-3 p-3">
-        <p className="text-sm font-semibold text-foreground">Saved views</p>
+        <p className="text-sm font-semibold text-foreground">{t("savedViews.title")}</p>
         {views.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Save the period and filters you keep coming back to — &ldquo;Weekly
-            retro&rdquo;, &ldquo;My deep work&rdquo;… Views are yours alone and
-            follow you across devices.
+            {t("savedViews.empty")}
           </p>
         ) : (
           <ul className="space-y-0.5" role="list">
@@ -84,7 +85,7 @@ export function SavedViewsMenu({
                     disabled={config === null}
                     title={
                       config === null
-                        ? "This view was saved by a newer version and can't be applied here."
+                        ? t("savedViews.unreadable")
                         : undefined
                     }
                     onClick={() => {
@@ -99,7 +100,7 @@ export function SavedViewsMenu({
                     variant="ghost"
                     size="icon"
                     className="size-11 shrink-0 text-muted-foreground sm:size-8"
-                    aria-label={`Delete the saved view ${v.name}`}
+                    aria-label={t("savedViews.deleteLabel", { name: v.name })}
                     onClick={() => void remove(v.id).catch(() => {})}
                   >
                     <X />
@@ -117,8 +118,8 @@ export function SavedViewsMenu({
               if (e.key === "Enter") saveCurrent();
             }}
             maxLength={MAX_NAME}
-            placeholder="Name the current view…"
-            aria-label="Name for the current view"
+            placeholder={t("savedViews.namePlaceholder")}
+            aria-label={t("savedViews.nameLabel")}
             className="h-9 flex-1 text-xs"
           />
           <Button
@@ -128,7 +129,7 @@ export function SavedViewsMenu({
             onClick={saveCurrent}
           >
             <Plus data-icon="inline-start" />
-            Save
+            {tc("save")}
           </Button>
         </div>
       </PopoverContent>

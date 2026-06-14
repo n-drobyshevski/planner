@@ -13,6 +13,7 @@ import {
   Minimize2,
   Keyboard,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -35,12 +36,12 @@ import type { CalendarView } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import type { WorkspaceData } from "@/lib/hooks/use-workspace";
 
-const VIEW_OPTIONS: { value: CalendarView; label: string }[] = [
-  { value: "agenda", label: "Agenda" },
-  { value: "day", label: "Day" },
-  { value: "3day", label: "3 days" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
+const VIEW_OPTIONS: { value: CalendarView; labelKey: string }[] = [
+  { value: "agenda", labelKey: "views.agenda" },
+  { value: "day", labelKey: "views.day" },
+  { value: "3day", labelKey: "views.threeDay" },
+  { value: "week", labelKey: "views.week" },
+  { value: "month", labelKey: "views.month" },
 ];
 
 /**
@@ -79,6 +80,7 @@ export function CalendarToolbar({
   backlogOpen: boolean;
   workspace: WorkspaceData | null;
 }) {
+  const t = useTranslations("calendar");
   const current = workspace?.currentMember ?? null;
   const timeGridView = view === "day" || view === "week" || view === "3day";
   const hourPx = useUiStore((s) => s.hourPx);
@@ -93,8 +95,8 @@ export function CalendarToolbar({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Toggle sidebar"
-          title="Toggle sidebar (Ctrl+Alt+←)"
+          aria-label={t("toolbar.toggleSidebar")}
+          title={t("toolbar.toggleSidebarTitle")}
           onClick={onToggleSidebar}
           className="hidden md:inline-flex"
         >
@@ -111,7 +113,7 @@ export function CalendarToolbar({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Filters"
+          aria-label={t("toolbar.filters")}
           onClick={onOpenFilters}
           className="md:hidden"
         >
@@ -126,13 +128,13 @@ export function CalendarToolbar({
           onClick={onToday}
           className="hidden md:inline-flex"
         >
-          Today
+          {t("toolbar.today")}
         </Button>
         <div className="hidden items-center md:flex">
-          <Button variant="ghost" size="icon" aria-label="Previous" onClick={onPrev}>
+          <Button variant="ghost" size="icon" aria-label={t("toolbar.previous")} onClick={onPrev}>
             <ChevronLeft />
           </Button>
-          <Button variant="ghost" size="icon" aria-label="Next" onClick={onNext}>
+          <Button variant="ghost" size="icon" aria-label={t("toolbar.next")} onClick={onNext}>
             <ChevronRight />
           </Button>
         </div>
@@ -146,8 +148,8 @@ export function CalendarToolbar({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Reset zoom"
-            title="Reset zoom (Ctrl+0)"
+            aria-label={t("toolbar.resetZoom")}
+            title={t("toolbar.resetZoomTitle")}
             onClick={() => setHourPx(DEFAULT_HOUR_PX)}
             className="hidden md:inline-flex"
           >
@@ -159,11 +161,11 @@ export function CalendarToolbar({
         </div>
         <Button size="sm" onClick={onNewEvent} className="hidden md:inline-flex">
           <Plus data-icon="inline-start" />
-          New
+          {t("toolbar.new")}
         </Button>
         <Button
           size="icon"
-          aria-label="New event"
+          aria-label={t("toolbar.newEvent")}
           onClick={onNewEvent}
           className="md:hidden"
         >
@@ -172,8 +174,8 @@ export function CalendarToolbar({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Toggle tasks panel"
-          title="Toggle tasks panel (Ctrl+Alt+→)"
+          aria-label={t("toolbar.toggleTasksPanel")}
+          title={t("toolbar.toggleTasksPanelTitle")}
           aria-pressed={backlogOpen}
           onClick={onToggleBacklog}
           className={cn(
@@ -186,8 +188,8 @@ export function CalendarToolbar({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts (?)"
+          aria-label={t("toolbar.keyboardShortcuts")}
+          title={t("toolbar.keyboardShortcutsTitle")}
           onClick={onOpenShortcuts}
           className="hidden md:inline-flex"
         >
@@ -227,6 +229,7 @@ function CalendarMobileMenu({
   backlogOpen: boolean;
   current: Member | null;
 }) {
+  const t = useTranslations("calendar");
   const timeGridView = view === "day" || view === "week" || view === "3day";
   const hourPx = useUiStore((s) => s.hourPx);
   const setHourPx = useUiStore((s) => s.setHourPx);
@@ -238,7 +241,7 @@ function CalendarMobileMenu({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="More options"
+          aria-label={t("toolbar.moreOptions")}
           className="md:hidden"
         >
           <MoreVertical />
@@ -247,19 +250,19 @@ function CalendarMobileMenu({
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem onClick={onToday}>
           <CalendarCheck data-icon="inline-start" />
-          Today
+          {t("toolbar.today")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onPrev}>
           <ChevronLeft data-icon="inline-start" />
-          Previous
+          {t("toolbar.previous")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onNext}>
           <ChevronRight data-icon="inline-start" />
-          Next
+          {t("toolbar.next")}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>View</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("toolbar.viewLabel")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={view}
           onValueChange={(v) => onViewChange(v as CalendarView)}
@@ -268,7 +271,7 @@ function CalendarMobileMenu({
               to 3-day there, so it isn't offered in the mobile menu. */}
           {VIEW_OPTIONS.filter((o) => o.value !== "week").map((o) => (
             <DropdownMenuRadioItem key={o.value} value={o.value}>
-              {o.label}
+              {t(o.labelKey)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -278,13 +281,13 @@ function CalendarMobileMenu({
           checked={backlogOpen}
           onCheckedChange={() => onToggleBacklog()}
         >
-          Tasks panel
+          {t("toolbar.tasksPanel")}
         </DropdownMenuCheckboxItem>
 
         {zoomed && (
           <DropdownMenuItem onClick={() => setHourPx(DEFAULT_HOUR_PX)}>
             <Minimize2 data-icon="inline-start" />
-            Reset zoom
+            {t("toolbar.resetZoom")}
           </DropdownMenuItem>
         )}
 

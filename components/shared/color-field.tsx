@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -29,11 +30,13 @@ export function ColorField({
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
   const swatch = value
     ? SWATCHES.find((s) => s.value.toLowerCase() === value.toLowerCase())
     : undefined;
-  const label = swatch?.label ?? (value ? "Custom" : "Default");
+  const label =
+    swatch?.label ?? (value ? t("colorField.custom") : t("colorField.default"));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -43,7 +46,7 @@ export function ColorField({
           type="button"
           variant="outline"
           disabled={disabled}
-          aria-label={`Color: ${label}`}
+          aria-label={t("colorField.ariaLabel", { label })}
           className={cn("w-full justify-between font-normal", className)}
         >
           <span className="flex items-center gap-2">

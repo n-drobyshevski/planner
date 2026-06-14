@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Bar, BarChart } from "recharts";
 import {
   ChartContainer,
@@ -33,7 +34,7 @@ import {
 } from "./chart-frame";
 import { GoalsSection } from "./goals/goals-section";
 import { SectionEmpty } from "./insights-empty";
-import { NEUTRAL, bucketLabel, bucketTick, seriesMeta } from "./series";
+import { NEUTRAL, bucketLabel, bucketTick, seriesFallbackLabels, seriesMeta } from "./series";
 import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
@@ -44,6 +45,9 @@ import type { InsightsTabData } from "./insights-shell";
  * section becomes a direct grid child (the col-span classes still apply).
  */
 export function BalanceSections({ data }: { data: InsightsTabData }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
+  const seriesLabels = seriesFallbackLabels(t);
   const reduced = usePrefersReducedMotion();
   const { period, occurrences, prevOccurrences, timeZone, memberFilter } = data;
   const { granularity } = period;
@@ -83,12 +87,12 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
 
   const stackedRows = stacked.rows.map((r) => ({
     key: String(r.start),
-    full: bucketLabel({ start: r.start, end: r.end }, granularity, timeZone),
+    full: bucketLabel({ start: r.start, end: r.end }, granularity, timeZone, locale),
     ...r.byKey,
   }));
   const stackedConfig: ChartConfig = Object.fromEntries(
     stacked.seriesKeys.map((k) => {
-      const meta = seriesMeta(k, data.categories);
+      const meta = seriesMeta(k, data.categories, seriesLabels);
       return [k, { label: meta.name, color: meta.color }];
     }),
   );
@@ -96,7 +100,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
   const showMembers = data.members.size > 1 && memberFilter === "both";
   const memberRows = memberSplit.rows.map((r) => ({
     key: String(r.start),
-    full: bucketLabel({ start: r.start, end: r.end }, granularity, timeZone),
+    full: bucketLabel({ start: r.start, end: r.end }, granularity, timeZone, locale),
     ...r.byMember,
   }));
   const memberConfig: ChartConfig = Object.fromEntries(
@@ -105,7 +109,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
       return [
         id,
         {
-          label: m?.name ?? "Unknown",
+          label: m?.name ?? t("balance.unknownMember"),
           color: m ? (toPaletteColor(m.color) ?? NEUTRAL) : NEUTRAL,
         },
       ];
@@ -121,7 +125,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
         <TooltipRow
           color={item.color}
           label={config[name as string]?.label ?? name}
-          value={formatDuration(Number(value))}
+          value={formatDuration(Number(value), locale)}
         />
       )}
     />
@@ -140,17 +144,17 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
 
   return (
     <>
-      <section className="space-y-1.5 xl:col-span-2">
-        <SectionLabel>Context mix per {granularity}</SectionLabel>
+      <section className="space-y-1.5 lg:col-span-2">
+        <SectionLabel>{t("balance.contextMix", { granularity })}</SectionLabel>
         <ChartContainer
           config={stackedConfig}
           className={`aspect-auto ${CHART_H.standard} w-full`}
-          aria-label={`Stacked tracked time per context per ${granularity}, ${period.label}`}
+          aria-label={t("balance.contextMixAria", { granularity, label: period.label })}
         >
           <BarChart data={stackedRows} margin={INSIGHTS_CHART_MARGIN}>
             {insightsGrid()}
             {insightsXAxis({
-              tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+              tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone, locale),
             })}
             {insightsYAxis({ tickCount: 3 })}
             <ChartTooltip cursor={false} content={tooltipContent(stackedConfig)} />
@@ -170,30 +174,30 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
       </section>
 
       <section className="space-y-1.5">
-        <SectionLabel>Share shifts vs previous period</SectionLabel>
+        <SectionLabel>{t("balance.shareShifts")}</SectionLabel>
         <Table className="text-xs">
           <TableCaption className="sr-only">
-            Context shares of tracked time, this period vs the previous one
+            {t("balance.shareShiftsCaption")}
           </TableCaption>
           <TableHeader>
             <TableRow className="text-muted-foreground hover:bg-transparent">
               <TableHead scope="col" className="h-auto px-0 py-1.5 text-muted-foreground">
-                Context
+                {t("balance.colContext")}
               </TableHead>
               <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                Time
+                {t("balance.colTime")}
               </TableHead>
               <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                Share
+                {t("balance.colShare")}
               </TableHead>
               <TableHead
                 scope="col"
                 className="hidden h-auto px-0 py-1.5 text-right text-muted-foreground sm:table-cell"
               >
-                Prev
+                {t("balance.colPrev")}
               </TableHead>
               <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                Δ
+                {t("balance.colDelta")}
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -202,6 +206,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
               const meta = seriesMeta(
                 s.categoryId ?? "__uncategorized__",
                 data.categories,
+                seriesLabels,
               );
               const pts = Math.round(s.deltaShare * 100);
               return (
@@ -215,7 +220,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
                     <span className="truncate">{meta.name}</span>
                   </TableCell>
                   <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
-                    {formatDuration(s.ms)}
+                    {formatDuration(s.ms, locale)}
                   </TableCell>
                   <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
                     {Math.round(s.share * 100)}%
@@ -227,13 +232,16 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
                     className="px-0 py-1.5 text-right font-mono tabular-nums text-muted-foreground"
                     aria-label={
                       pts === 0
-                        ? "no change"
-                        : `${pts > 0 ? "up" : "down"} ${Math.abs(pts)} share points`
+                        ? t("balance.deltaNoChange")
+                        : t("balance.deltaPoints", {
+                            direction: pts > 0 ? "up" : "down",
+                            points: Math.abs(pts),
+                          })
                     }
                   >
                     <span aria-hidden>
                       {pts > 0 ? "▲" : pts < 0 ? "▼" : "–"}{" "}
-                      {pts === 0 ? "" : `${Math.abs(pts)} pts`}
+                      {pts === 0 ? "" : t("balance.pts", { points: Math.abs(pts) })}
                     </span>
                   </TableCell>
                 </TableRow>
@@ -248,16 +256,15 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
       )}
 
       <section className="space-y-1.5">
-        <SectionLabel>Satisfaction by context</SectionLabel>
+        <SectionLabel>{t("balance.satisfactionByContext")}</SectionLabel>
         {satisfaction.length === 0 ? (
-          <SectionEmpty actionLabel="Open the calendar" actionHref="/calendar">
-            Rate satisfaction on at least {MIN_CATEGORY_RATINGS} events in a
-            context to see which parts of your time feel best, looking back.
+          <SectionEmpty actionLabel={t("empty.openCalendar")} actionHref="/calendar">
+            {t("balance.satisfactionEmpty", { min: MIN_CATEGORY_RATINGS })}
           </SectionEmpty>
         ) : (
           <ul className="space-y-1.5" role="list">
             {satisfaction.map(({ categoryId, agg }) => {
-              const meta = seriesMeta(categoryId ?? "__uncategorized__", data.categories);
+              const meta = seriesMeta(categoryId ?? "__uncategorized__", data.categories, seriesLabels);
               const pct = (agg.mean / 5) * 100;
               return (
                 <li key={categoryId ?? "uncategorized"} className="flex items-center gap-2 text-xs">
@@ -270,7 +277,11 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
                   <span
                     className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
                     role="img"
-                    aria-label={`${meta.name}: mean satisfaction ${agg.mean.toFixed(1)} of 5, from ${agg.n} rated items`}
+                    aria-label={t("balance.satisfactionAria", {
+                      name: meta.name,
+                      mean: agg.mean.toFixed(1),
+                      n: agg.n,
+                    })}
                   >
                     <span
                       className="block h-full rounded-full"
@@ -291,15 +302,15 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
       </section>
 
       {showMembers && memberSplit.memberIds.length > 1 && (
-        <section className="space-y-2 xl:col-span-2">
-          <SectionLabel>The two of you, per {granularity}</SectionLabel>
+        <section className="space-y-2 lg:col-span-2">
+          <SectionLabel>{t("balance.twoOfYou", { granularity })}</SectionLabel>
           {memberTotalMs > 0 && (
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               {memberTotals.map((m) => {
                 const label =
                   m.id === data.viewerId
-                    ? "You"
-                    : (data.members.get(m.id)?.name ?? "Partner");
+                    ? t("balance.you")
+                    : (data.members.get(m.id)?.name ?? t("balance.partner"));
                 const color = (memberConfig[m.id]?.color as string) ?? NEUTRAL;
                 return (
                   <span key={m.id} className="flex items-center gap-1.5">
@@ -310,7 +321,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
                     />
                     <span className="font-medium">{label}</span>
                     <span className="font-mono tabular-nums text-muted-foreground">
-                      {srPercent(m.ms, memberTotalMs)} · {formatDuration(m.ms)}
+                      {srPercent(m.ms, memberTotalMs)} · {formatDuration(m.ms, locale)}
                     </span>
                   </span>
                 );
@@ -320,12 +331,12 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
           <ChartContainer
             config={memberConfig}
             className={`aspect-auto ${CHART_H.compact} w-full`}
-            aria-label={`Tracked time per member per ${granularity}`}
+            aria-label={t("balance.twoOfYouAria", { granularity })}
           >
             <BarChart data={memberRows} margin={INSIGHTS_CHART_MARGIN}>
               {insightsGrid()}
               {insightsXAxis({
-                tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+                tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone, locale),
               })}
               {insightsYAxis({ tickCount: 3 })}
               <ChartTooltip cursor={false} content={tooltipContent(memberConfig)} />
@@ -342,8 +353,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
             </BarChart>
           </ChartContainer>
           <p className="text-[11px] text-muted-foreground">
-            Shared and visible time only; private time stays private. Joint events
-            count for their owner&apos;s calendar.
+            {t("balance.privacyNote")}
           </p>
         </section>
       )}

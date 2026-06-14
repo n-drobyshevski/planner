@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, type CSSProperties } from "react";
+import { useTranslations } from "next-intl";
 import { FolderPlus, FolderMinus, Pencil, Trash2, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { packDay } from "@/lib/layout/pack-day";
@@ -86,6 +87,7 @@ export function DayColumn({
    *  once (see SETTLE_TRANSITION). Empty/undefined at rest. */
   settleKeys?: ReadonlySet<string>;
 }) {
+  const t = useTranslations("calendar");
   const dayEnd = dayStart + DAY_MS;
 
   // Timed context backdrops — drawn behind the children, NOT packed.
@@ -141,17 +143,17 @@ export function DayColumn({
     const targets = (categoryChoices ?? []).filter((c) => c.id !== occ.categoryId);
     if (targets.length > 0) {
       actions.push({
-        label: "Assign to context",
+        label: t("menu.assignToContext"),
         icon: FolderPlus,
         submenu: targets.map((c) => ({
-          label: c.name || "Untitled",
+          label: c.name || t("menu.untitled"),
           onSelect: () => onAssignCategory(occ, c.id),
         })),
       });
     }
     if (occ.categoryId) {
       actions.push({
-        label: "Clear context",
+        label: t("menu.clearContext"),
         icon: FolderMinus,
         onSelect: () => onAssignCategory(occ, null),
       });
@@ -186,16 +188,16 @@ export function DayColumn({
             actions={
               editable
                 ? [
-                    { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
+                    { label: t("menu.edit"), icon: Pencil, onSelect: () => onSelect(seg.occ) },
                     {
-                      label: "Delete",
+                      label: t("menu.delete"),
                       icon: Trash2,
                       destructive: true,
                       onSelect: () => onDeleteEvent(seg.occ),
                     },
                   ]
                 : [
-                    { label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) },
+                    { label: t("menu.open"), icon: Eye, onSelect: () => onSelect(seg.occ) },
                     ...(eventCopyAction && eventCopyAction(seg.occ)
                       ? [eventCopyAction(seg.occ)!]
                       : []),
@@ -260,20 +262,20 @@ export function DayColumn({
             actions={
               editable
                 ? [
-                    { label: "Edit", icon: Pencil, onSelect: () => onSelect(seg.occ) },
+                    { label: t("menu.edit"), icon: Pencil, onSelect: () => onSelect(seg.occ) },
                     ...contextActions(seg.occ),
                     ...(eventShareAction && eventShareAction(seg.occ)
                       ? [eventShareAction(seg.occ)!]
                       : []),
                     {
-                      label: "Delete",
+                      label: t("menu.delete"),
                       icon: Trash2,
                       destructive: true,
                       onSelect: () => onDeleteEvent(seg.occ),
                     },
                   ]
                 : [
-                    { label: "Open", icon: Eye, onSelect: () => onSelect(seg.occ) },
+                    { label: t("menu.open"), icon: Eye, onSelect: () => onSelect(seg.occ) },
                     ...(eventCopyAction && eventCopyAction(seg.occ)
                       ? [eventCopyAction(seg.occ)!]
                       : []),

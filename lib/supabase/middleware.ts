@@ -2,12 +2,27 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig, isSupabaseConfigured } from "./env";
 
+/** Active locale from the pathname (only `ru` carries a prefix; `as-needed`). */
+function localeOf(path: string): "en" | "ru" {
+  return path === "/ru" || path.startsWith("/ru/") ? "ru" : "en";
+}
+
 /**
  * Refresh the Supabase session cookie on each request and gate routes:
- * unauthenticated -> /login; authenticated on "/" or /login -> /calendar.
+ * unauthenticated -> /login; authenticated on "/" or /login -> /calendar — all
+ * locale-aware (Russian keeps its `/ru` prefix).
+ *
+ * Composed on top of next-intl: `i18nResponse` is the locale middleware's
+ * response (carrying the NEXT_LOCALE cookie and the internal `[locale]` rewrite).
+ * We set the refreshed auth cookies onto it and return it on the happy path, so
+ * locale routing and the auth session survive together. Auth redirects copy the
+ * pending cookies across so the session refresh isn't lost.
  */
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+export async function updateSession(
+  request: NextRequest,
+  i18nResponse: NextResponse,
+) {
+  const response = i18nResponse;
 
   // If Supabase isn't configured for this environment (e.g. env vars set only
   // for Production on Vercel, so Preview deploys have none), don't 500 every
@@ -23,46 +38,52 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
+  // Auth cookies refreshed by Supabase, captured so an auth redirect can carry
+  // them too (a fresh NextResponse.redirect would otherwise drop the refresh).
+  const pending: { name: string; value: string; options: object }[] = [];
+
   const { url: supabaseUrl, anonKey } = getSupabaseConfig();
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    anonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
+  const supabase = createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+          pending.push({ name, value, options: options ?? {} });
+        });
       },
     },
-  );
+  });
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const onAuthRoute = path === "/login";
+  const prefix = localeOf(path) === "ru" ? "/ru" : "";
+  const loginPath = `${prefix}/login`;
+  const calendarPath = `${prefix}/calendar`;
+  const onAuthRoute = path === loginPath;
+  const isHome = path === "/" || path === "/ru";
 
-  if (!user && !onAuthRoute) {
+  const redirectTo = (pathname: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-  if (user && (onAuthRoute || path === "/")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/calendar";
-    return NextResponse.redirect(url);
-  }
+    url.pathname = pathname;
+    const redirect = NextResponse.redirect(url);
+    pending.forEach(({ name, value, options }) =>
+      redirect.cookies.set(name, value, options),
+    );
+    return redirect;
+  };
+
+  if (!user && !onAuthRoute) return redirectTo(loginPath);
+  if (user && (onAuthRoute || isHome)) return redirectTo(calendarPath);
 
   return response;
 }

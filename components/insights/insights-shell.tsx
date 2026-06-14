@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import dynamic from "next/dynamic";
 import { m } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,14 +45,6 @@ const emptySubscribe = () => () => {};
 // the product bans). Reading a module flag during render is pure-enough and is the
 // same pattern Crossfade uses; a ref read during render is disallowed by lint.
 let insightsPainted = false;
-
-const TAB_LABELS: Record<InsightsTab, string> = {
-  overview: "Overview",
-  trends: "Trends",
-  patterns: "Patterns",
-  tasks: "Tasks",
-  sleep: "Sleep",
-};
 
 // Each tab is its own lazy chunk (recharts stays out of the route JS); warmed
 // during idle so switching tabs never shows the skeleton in practice. After
@@ -129,6 +122,7 @@ function InsightsShellInner({
   initialState: PeriodState;
   initialTab: InsightsTab;
 }) {
+  const t = useTranslations("insights");
   const router = useRouter();
   const timeZone = useViewerTimeZone();
   const [state, setState] = useState<PeriodState>(initialState);
@@ -373,13 +367,13 @@ function InsightsShellInner({
                 width from sm up. h override mirrors the base's group-data
                 variant to out-cascade its h-8. */}
             <TabsList className="w-full bg-transparent p-0 group-data-horizontal/tabs:h-11 sm:w-max sm:group-data-horizontal/tabs:h-10">
-              {INSIGHTS_TABS.map((t) => (
+              {INSIGHTS_TABS.map((tabId) => (
                 <TabsTrigger
-                  key={t}
-                  value={t}
+                  key={tabId}
+                  value={tabId}
                   className="flex-1 rounded-none border-0 border-b-2 border-transparent px-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:flex-none sm:px-3 sm:text-sm"
                 >
-                  {TAB_LABELS[t]}
+                  {t(`tabs.${tabId}`)}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -390,7 +384,7 @@ function InsightsShellInner({
       {period.clamped && (
         <p className="border-b bg-muted/50 py-1.5 text-xs text-muted-foreground">
           <span className="mx-auto block w-full max-w-[1600px] px-4 xl:px-6">
-            Showing the most recent 366 days of the selected range.
+            {t("shell.clamped")}
           </span>
         </p>
       )}

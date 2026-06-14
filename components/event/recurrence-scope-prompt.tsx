@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -24,19 +25,21 @@ export function RecurrenceScopePrompt({
   mode: "edit" | "delete" | "copy";
   onChoose: (scope: RecurrenceScope) => void;
 }) {
+  const t = useTranslations("events");
+  const tc = useTranslations("common");
   const title =
     mode === "delete"
-      ? "Delete recurring event"
+      ? t("scope.titleDelete")
       : mode === "copy"
-        ? "Copy recurring event"
-        : "Edit recurring event";
+        ? t("scope.titleCopy")
+        : t("scope.titleEdit");
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            {mode === "copy" ? "Copy which events?" : "Apply to which events?"}
+            {mode === "copy" ? t("scope.copyWhich") : t("scope.applyWhich")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {/* Copy offers just this-occurrence vs the whole series; "this and
@@ -44,28 +47,28 @@ export function RecurrenceScopePrompt({
         {mode === "copy" ? (
           <div className="flex flex-col gap-2">
             <Button variant="outline" onClick={() => onChoose("this")}>
-              This event
+              {t("scope.thisEvent")}
             </Button>
-            <Button onClick={() => onChoose("all")}>Whole series</Button>
+            <Button onClick={() => onChoose("all")}>{t("scope.wholeSeries")}</Button>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
             <Button variant="outline" onClick={() => onChoose("this")}>
-              This event
+              {t("scope.thisEvent")}
             </Button>
             <Button variant="outline" onClick={() => onChoose("future")}>
-              This and following events
+              {t("scope.thisAndFollowing")}
             </Button>
             <Button
               variant={mode === "delete" ? "destructive" : "default"}
               onClick={() => onChoose("all")}
             >
-              All events
+              {t("scope.allEvents")}
             </Button>
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

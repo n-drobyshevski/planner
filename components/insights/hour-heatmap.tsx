@@ -1,21 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { hourHeatmap } from "@/lib/analytics/patterns";
 import { formatDuration } from "@/lib/datetime/format";
 import { cn } from "@/lib/utils";
 import type { Occurrence, TimeWindow } from "@/lib/types";
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const WEEKDAYS_FULL = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
+const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 /** Quantize a cell to one of 5 steps: 0 · <30m · <1h · <2h · 2h+. */
 function stepOf(ms: number): number {
@@ -51,6 +43,10 @@ export function HourHeatmap({
   window: TimeWindow;
   timeZone: string;
 }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
+  const weekdaysShort = WEEKDAY_KEYS.map((k) => t(`heatmap.weekdays.${k}`));
+  const weekdaysFull = WEEKDAY_KEYS.map((k) => t(`heatmap.weekdaysFull.${k}`));
   const { cells } = useMemo(
     () => hourHeatmap(occurrences, window, timeZone),
     [occurrences, window, timeZone],
@@ -69,11 +65,11 @@ export function HourHeatmap({
       {/* Full 24-column grid (≥ sm). */}
       <table className="hidden w-full table-fixed border-separate border-spacing-px sm:table">
         <caption className="sr-only">
-          Tracked time by weekday and hour of day
+          {t("heatmap.caption24")}
         </caption>
         <thead>
           <tr>
-            <th scope="col" className="w-8" aria-label="Weekday" />
+            <th scope="col" className="w-8" aria-label={t("heatmap.weekday")} />
             {Array.from({ length: 24 }, (_, h) => (
               <th
                 key={h}
@@ -86,7 +82,7 @@ export function HourHeatmap({
           </tr>
         </thead>
         <tbody>
-          {WEEKDAYS.map((day, w) => (
+          {weekdaysShort.map((day, w) => (
             <tr key={day}>
               <th
                 scope="row"
@@ -99,8 +95,16 @@ export function HourHeatmap({
                 return (
                   <td
                     key={h}
-                    aria-label={`${WEEKDAYS_FULL[w]} ${String(h).padStart(2, "0")}:00 — ${ms > 0 ? formatDuration(ms) : "nothing"}`}
-                    title={`${WEEKDAYS_FULL[w]} ${String(h).padStart(2, "0")}:00 — ${formatDuration(ms)}`}
+                    aria-label={t("heatmap.cellLabel", {
+                      day: weekdaysFull[w],
+                      hour: String(h).padStart(2, "0"),
+                      value: ms > 0 ? formatDuration(ms, locale) : t("heatmap.nothing"),
+                    })}
+                    title={t("heatmap.cellLabel", {
+                      day: weekdaysFull[w],
+                      hour: String(h).padStart(2, "0"),
+                      value: formatDuration(ms, locale),
+                    })}
                     className={cn(
                       "h-4 rounded-[2px]",
                       stepOf(ms) === 0 && "bg-muted/50",
@@ -120,11 +124,11 @@ export function HourHeatmap({
       {/* 4-hour bands (< sm). */}
       <table className="w-full table-fixed border-separate border-spacing-px sm:hidden">
         <caption className="sr-only">
-          Tracked time by weekday in 4-hour bands
+          {t("heatmap.captionBands")}
         </caption>
         <thead>
           <tr>
-            <th scope="col" className="w-8" aria-label="Weekday" />
+            <th scope="col" className="w-8" aria-label={t("heatmap.weekday")} />
             {Array.from({ length: 6 }, (_, b) => (
               <th
                 key={b}
@@ -137,7 +141,7 @@ export function HourHeatmap({
           </tr>
         </thead>
         <tbody>
-          {WEEKDAYS.map((day, w) => (
+          {weekdaysShort.map((day, w) => (
             <tr key={day}>
               <th
                 scope="row"
@@ -150,7 +154,12 @@ export function HourHeatmap({
                 return (
                   <td
                     key={b}
-                    aria-label={`${WEEKDAYS_FULL[w]} ${b * 4}:00–${b * 4 + 4}:00 — ${ms > 0 ? formatDuration(ms) : "nothing"}`}
+                    aria-label={t("heatmap.bandLabel", {
+                      day: weekdaysFull[w],
+                      from: b * 4,
+                      to: b * 4 + 4,
+                      value: ms > 0 ? formatDuration(ms, locale) : t("heatmap.nothing"),
+                    })}
                     className={cn("h-6 rounded-[2px]", stepOf(ms) === 0 && "bg-muted/50")}
                     style={cellStyle(stepOf(ms))}
                   />

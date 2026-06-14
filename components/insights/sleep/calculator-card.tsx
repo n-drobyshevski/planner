@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { Calculator } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { TimeField } from "@/components/ui/time-field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -25,6 +26,8 @@ type Mode = "wake" | "bed";
  * 7.5 hours".
  */
 export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
+  const t = useTranslations("sleep");
+  const locale = useLocale();
   const [mode, setMode] = useState<Mode>("wake");
   const [time, setTime] = useState("07:00");
 
@@ -47,43 +50,43 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
 
   return (
     <section
-      aria-label="Sleep cycle calculator"
+      aria-label={t("calculator.ariaLabel")}
       className="rounded-lg border bg-card p-3 shadow-soft"
     >
       <div className="flex items-center gap-2">
         <Calculator aria-hidden className="size-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium">Cycle calculator</h3>
+        <h3 className="text-sm font-medium">{t("calculator.title")}</h3>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-3">
         <Field className="min-w-0">
-          <FieldLabel htmlFor="sleep-calc-mode">I know my…</FieldLabel>
+          <FieldLabel htmlFor="sleep-calc-mode">{t("calculator.iKnowMy")}</FieldLabel>
           <ToggleGroup
             id="sleep-calc-mode"
             type="single"
             variant="outline"
-            aria-label="Calculator direction"
+            aria-label={t("calculator.directionAriaLabel")}
             value={mode}
             onValueChange={(v) => {
               if (v === "wake" || v === "bed") setMode(v);
             }}
           >
             <ToggleGroupItem value="wake" className="min-h-11 px-3 pointer-fine:min-h-9">
-              Wake time
+              {t("calculator.wakeTime")}
             </ToggleGroupItem>
             <ToggleGroupItem value="bed" className="min-h-11 px-3 pointer-fine:min-h-9">
-              Bedtime
+              {t("calculator.bedtime")}
             </ToggleGroupItem>
           </ToggleGroup>
         </Field>
         <Field className="w-28">
           <FieldLabel htmlFor="sleep-calc-time">
-            {mode === "wake" ? "Wake at" : "In bed at"}
+            {mode === "wake" ? t("calculator.wakeAt") : t("calculator.inBedAt")}
           </FieldLabel>
           <TimeField
             id="sleep-calc-time"
             value={time}
             onChange={setTime}
-            aria-label={mode === "wake" ? "Wake time" : "Bedtime"}
+            aria-label={mode === "wake" ? t("calculator.wakeTime") : t("calculator.bedtime")}
           />
         </Field>
       </div>
@@ -98,23 +101,28 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
               {formatTime(r.ms, "UTC")}
             </span>
             <span className="text-xs text-muted-foreground tabular-nums">
-              {mode === "wake" ? "go to bed" : "wake up"} ·{" "}
-              {formatDuration(r.durationMs)} asleep · ≈ {r.cycles} cycles
+              {mode === "wake" ? t("calculator.goToBed") : t("calculator.wakeUp")} ·{" "}
+              {t("calculator.rowDetail", {
+                duration: formatDuration(r.durationMs, locale),
+                cycles: r.cycles,
+              })}
             </span>
           </li>
         ))}
       </ul>
       <FieldDescription className="mt-2">
-        Sleep-cycle length varies night to night, so these are estimates — not
-        exact wake moments. Uses your {prefs.cycleLengthMin}-minute cycles and{" "}
-        {prefs.onsetLatencyMin} minutes to fall asleep —{" "}
-        <Link
-          href="/settings#sleep"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          adjust in Settings
-        </Link>
-        .
+        {t.rich("calculator.description", {
+          cycle: prefs.cycleLengthMin,
+          onset: prefs.onsetLatencyMin,
+          link: (chunks) => (
+            <Link
+              href="/settings#sleep"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              {chunks}
+            </Link>
+          ),
+        })}
       </FieldDescription>
     </section>
   );

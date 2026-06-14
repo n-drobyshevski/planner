@@ -1,0 +1,18 @@
+{
+  "summaryEvery": "Повторяется каждые {interval, plural, one {# {freq, select, DAILY {день} WEEKLY {неделю} MONTHLY {месяц} other {раз}}} few {# {freq, select, DAILY {дня} WEEKLY {недели} MONTHLY {месяца} other {раза}}} many {# {freq, select, DAILY {дней} WEEKLY {недель} MONTHLY {месяцев} other {раз}}} other {# {freq, select, DAILY {дня} WEEKLY {недели} MONTHLY {месяца} other {раза}}}}",
+  "summaryAdverb": "Повторяется {freq, select, DAILY {ежедневно} WEEKLY {еженедельно} MONTHLY {ежемесячно} other {регулярно}}",
+  "unit": "{freq, select, DAILY {день} WEEKLY {неделя} MONTHLY {месяц} other {раз}}",
+  "onDays": "{base} по {days}",
+  "untilDate": "{base}, до {date}",
+  "timesCount": "{base}, {count, plural, one {# раз} few {# раза} many {# раз} other {# раза}}",
+  "daySeparator": ", ",
+  "weekday": {
+    "mon": "Пн",
+    "tue": "Вт",
+    "wed": "Ср",
+    "thu": "Чт",
+    "fri": "Пт",
+    "sat": "Сб",
+    "sun": "Вс"
+  }
+}

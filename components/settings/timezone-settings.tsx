@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "@tanstack/react-form";
+import { useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { Globe } from "lucide-react";
@@ -95,15 +96,16 @@ function ZoneCombobox({
   disabled?: boolean;
   ariaLabel: string;
 }) {
+  const t = useTranslations("settings");
   const groups = useMemo(() => {
     const out: { label: string; items: ZoneItem[] }[] = [];
     if (allowDevice) {
       out.push({
-        label: "Default",
+        label: t("timezone.combobox.defaultGroup"),
         items: [
           {
             value: DEVICE_VALUE,
-            label: "Use device time zone",
+            label: t("timezone.combobox.useDevice"),
             hint: deviceZone ? friendly(deviceZone) : undefined,
           },
         ],
@@ -111,7 +113,7 @@ function ZoneCombobox({
     }
     if (suggestions.length > 0) {
       out.push({
-        label: "In your workspace",
+        label: t("timezone.combobox.workspaceGroup"),
         items: suggestions.map((s) => ({
           value: s.zone,
           label: s.label,
@@ -120,24 +122,24 @@ function ZoneCombobox({
       });
     }
     out.push({
-      label: "All time zones",
+      label: t("timezone.combobox.allGroup"),
       items: ALL_ZONES.map((z) => ({ value: z, label: friendly(z) })),
     });
     return out;
-  }, [allowDevice, deviceZone, suggestions]);
+  }, [allowDevice, deviceZone, suggestions, t]);
 
   // isItemEqualToValue compares by .value, so a synthesized item is fine here.
   const selected: ZoneItem =
     value != null
       ? { value, label: friendly(value) }
-      : { value: DEVICE_VALUE, label: "Use device time zone" };
+      : { value: DEVICE_VALUE, label: t("timezone.combobox.useDevice") };
 
   const triggerLabel =
     value != null
       ? friendly(value)
       : deviceZone
-        ? `Device time zone (${friendly(deviceZone)})`
-        : "Device time zone";
+        ? t("timezone.combobox.deviceTrigger", { zone: friendly(deviceZone) })
+        : t("timezone.combobox.deviceTriggerBare");
 
   return (
     <Combobox
@@ -164,11 +166,11 @@ function ZoneCombobox({
       </ComboboxTrigger>
       <ComboboxContent>
         <ComboboxInput
-          placeholder="Search time zones…"
+          placeholder={t("timezone.combobox.searchPlaceholder")}
           showTrigger={false}
           className="w-full"
         />
-        <ComboboxEmpty>No time zone found.</ComboboxEmpty>
+        <ComboboxEmpty>{t("timezone.combobox.empty")}</ComboboxEmpty>
         <ComboboxList>
           {(group: { label: string; items: ZoneItem[] }) => (
             <ComboboxGroup key={group.label} items={group.items}>
@@ -192,6 +194,7 @@ function ZoneCombobox({
 }
 
 export function TimezoneSettings() {
+  const t = useTranslations("settings");
   const {
     rawTimezone,
     timeZone,
@@ -233,19 +236,15 @@ export function TimezoneSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Time zone</CardTitle>
-        <CardDescription>
-          The whole calendar shows times in your zone. A shared event stays
-          anchored to the same moment, so each person sees it in their own time.
-        </CardDescription>
+        <CardTitle>{t("timezone.title")}</CardTitle>
+        <CardDescription>{t("timezone.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
         {/* Primary zone */}
         <FieldSet>
-          <FieldLegend variant="label">Your time zone</FieldLegend>
+          <FieldLegend variant="label">{t("timezone.primary.legend")}</FieldLegend>
           <FieldDescription>
-            Event times, day boundaries, and the “now” line all render in this
-            zone — even when you travel and your device clock changes.
+            {t("timezone.primary.description")}
           </FieldDescription>
           <form.Field
             name="primary"
@@ -258,13 +257,16 @@ export function TimezoneSettings() {
                 deviceZone={deviceZone}
                 allowDevice
                 disabled={disabled}
-                ariaLabel="Your time zone"
+                ariaLabel={t("timezone.primary.ariaLabel")}
               />
             )}
           </form.Field>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Globe className="size-3.5" />
-            Currently <LiveZoneTime zone={timeZone} /> in {friendly(timeZone)}
+            {t.rich("timezone.currently", {
+              time: () => <LiveZoneTime zone={timeZone} />,
+              zone: friendly(timeZone),
+            })}
           </p>
         </FieldSet>
 
@@ -278,16 +280,15 @@ export function TimezoneSettings() {
               <>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <FieldLegend variant="label">Secondary time zone</FieldLegend>
+                    <FieldLegend variant="label">{t("timezone.secondary.legend")}</FieldLegend>
                     <FieldDescription>
-                      Show a second clock alongside the primary in the week and day
-                      views — handy for a partner in another zone.
+                      {t("timezone.secondary.description")}
                     </FieldDescription>
                   </div>
                   <Switch
                     checked={field.state.value != null}
                     disabled={disabled}
-                    aria-label="Show a secondary time zone"
+                    aria-label={t("timezone.secondary.switchAriaLabel")}
                     onCheckedChange={(on) =>
                       field.handleChange(
                         on ? (suggestions[0]?.zone ?? deviceZone ?? "UTC") : null,
@@ -303,12 +304,14 @@ export function TimezoneSettings() {
                       deviceZone={deviceZone}
                       suggestions={suggestions}
                       disabled={disabled}
-                      ariaLabel="Secondary time zone"
+                      ariaLabel={t("timezone.secondary.ariaLabel")}
                     />
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Globe className="size-3.5" />
-                      Currently <LiveZoneTime zone={field.state.value} /> in{" "}
-                      {friendly(field.state.value)}
+                      {t.rich("timezone.currently", {
+                        time: () => <LiveZoneTime zone={field.state.value!} />,
+                        zone: friendly(field.state.value),
+                      })}
                     </p>
                   </>
                 )}

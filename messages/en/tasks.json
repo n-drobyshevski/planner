@@ -1,0 +1,134 @@
+{
+  "status": {
+    "todo": "To Do",
+    "inProgress": "In Progress",
+    "done": "Done"
+  },
+  "priority": {
+    "none": "None",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High"
+  },
+  "toolbar": {
+    "view": "View",
+    "board": "Board",
+    "list": "List",
+    "newTask": "New task",
+    "moreOptions": "More options"
+  },
+  "board": {
+    "addTaskTo": "Add task to {title}",
+    "dropTasksHere": "Drop tasks here",
+    "emptyTitle": "No tasks yet",
+    "emptyDescription": "Create your first task to get started.",
+    "noBoardsYet": "You don’t have any boards yet. Use the “New board” button up top to create your first one."
+  },
+  "list": {
+    "nothingHere": "Nothing here."
+  },
+  "loadErrorSubject": "tasks",
+  "switcher": {
+    "boards": "Boards",
+    "newBoard": "New board",
+    "edit": "Edit “{name}”",
+    "delete": "Delete “{name}”",
+    "deleteTitle": "Delete “{name}”?",
+    "notEmptyTitle": "Board isn’t empty",
+    "notEmptyDescription": "This board still has {count, plural, one {# task} other {# tasks}}. Move or delete {count, plural, one {it} other {them}} first, then you can remove the board.",
+    "deleteDescription": "This removes the board. Its tasks are already gone. You can undo this right after."
+  },
+  "boardDialog": {
+    "createTitle": "New board",
+    "editTitle": "Edit board",
+    "description": "A board is a collection of tasks. Keep it to yourself or share it.",
+    "namePlaceholder": "Board name",
+    "nameLabel": "Board name",
+    "colorLabel": "Color {color}",
+    "shared": "Shared",
+    "personal": "Personal",
+    "sharedToggleLabel": "Shared board — you both see and edit it",
+    "sharedHint": "You both see it and can edit its tasks.",
+    "personalHint": "Only you can see this board and its tasks.",
+    "addBoard": "Add board"
+  },
+  "taskDialog": {
+    "createTitle": "New task",
+    "editTitle": "Edit task",
+    "titleLabel": "Title",
+    "titlePlaceholder": "What needs doing?",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Add details",
+    "assigneeLabel": "Assignee",
+    "unassigned": "Unassigned",
+    "contextLabel": "Context",
+    "noContext": "No context",
+    "priorityLabel": "Priority",
+    "dueDateLabel": "Due date",
+    "statusLabel": "Status",
+    "privateLabel": "Private (only you can see this)",
+    "optimizationDetails": "Optimization details",
+    "deleteTitle": "Delete this task?",
+    "deleteDescription": "This removes the task, its subtasks, and any blocks it placed on the calendar."
+  },
+  "card": {
+    "markDone": "Mark as done",
+    "markNotDone": "Mark as not done",
+    "blocked": "Blocked",
+    "private": "Private",
+    "overdue": "Overdue",
+    "overdueSuffix": " (overdue)"
+  },
+  "subtasks": {
+    "title": "Subtasks",
+    "doInOrder": "Do in order",
+    "completeInOrder": "Complete subtasks in order",
+    "progressLabel": "{done} of {total} subtasks done",
+    "sequentialHint": "Each subtask unlocks when the one before it is done.",
+    "emptyHint": "No subtasks yet — break this task into steps.",
+    "addPlaceholder": "Add a subtask",
+    "reorder": "Reorder subtask",
+    "markDone": "Mark subtask done",
+    "markNotDone": "Mark subtask not done",
+    "blocked": "Blocked",
+    "blockedHint": "Finish the previous subtask first",
+    "delete": "Delete subtask"
+  },
+  "contextMenu": {
+    "open": "Open",
+    "markDone": "Mark done",
+    "markNotDone": "Mark not done",
+    "schedule": "Schedule…"
+  },
+  "backlog": {
+    "tasks": "Tasks",
+    "insights": "Insights",
+    "scheduleHint": "Drag onto the week or day grid to schedule, or use Schedule for options.",
+    "empty": "No open tasks. Everything’s scheduled or done. 🎉",
+    "schedule": "Schedule {title}",
+    "sheetDescription": "Tap Schedule to place a task on your calendar."
+  },
+  "schedule": {
+    "title": "Add to calendar",
+    "dateLabel": "Date",
+    "startLabel": "Start",
+    "howLabel": "How",
+    "oneBlock": "One block",
+    "split": "Split",
+    "subtasks": "Subtasks",
+    "durationLabel": "Duration",
+    "totalDurationLabel": "Total duration",
+    "blocksLabel": "Blocks",
+    "eachSubtaskLabel": "Each subtask",
+    "subtasksHintInOrder": "{count, plural, one {# subtask} other {# subtasks}} scheduled back-to-back, in order.",
+    "subtasksHint": "{count, plural, one {# subtask} other {# subtasks}} scheduled back-to-back.",
+    "durations": {
+      "15min": "15 min",
+      "30min": "30 min",
+      "45min": "45 min",
+      "1hour": "1 hour",
+      "1andHalfHours": "1.5 hours",
+      "2hours": "2 hours"
+    }
+  }
+}

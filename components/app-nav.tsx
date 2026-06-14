@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
   CalendarDays,
   ListChecks,
@@ -20,18 +20,20 @@ import { cn } from "@/lib/utils";
 import { SURFACE_PATHS } from "@/lib/surfaces";
 
 const SURFACE_META = {
-  "/calendar": { label: "Calendar", icon: CalendarDays },
-  "/tasks": { label: "Tasks", icon: ListChecks },
-  "/insights": { label: "Insights", icon: ChartColumnBig },
+  "/calendar": { labelKey: "calendar", icon: CalendarDays },
+  "/tasks": { labelKey: "tasks", icon: ListChecks },
+  "/insights": { labelKey: "insights", icon: ChartColumnBig },
 } as const;
 
 const items = SURFACE_PATHS.map((href) => ({ href, ...SURFACE_META[href] }));
 
 /** Top-level switch between the Calendar, Tasks, and Insights surfaces. */
 export function AppNav() {
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const active = items.find(({ href }) => pathname.startsWith(href)) ?? items[0];
   const ActiveIcon = active.icon;
+  const activeLabel = t(`surface.${active.labelKey}`);
 
   return (
     <DropdownMenu>
@@ -39,7 +41,7 @@ export function AppNav() {
         <Button
           variant="outline"
           data-app-nav
-          aria-label={`Current surface: ${active.label}. Switch surface`}
+          aria-label={t("switcher.ariaLabel", { surface: activeLabel })}
           className="h-8 gap-2 pl-1 pr-2.5"
         >
           {/* The brand tile now lives inside the surface switcher, so the logo
@@ -50,12 +52,12 @@ export function AppNav() {
           </span>
           {/* Phones: brand tile + chevron only — the header row is tight and the
               aria-label already names the active surface. */}
-          <span className="hidden sm:inline">{active.label}</span>
+          <span className="hidden sm:inline">{activeLabel}</span>
           <ChevronDown className="size-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-40">
-        {items.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, labelKey, icon: Icon }) => {
           const isActive = active.href === href;
           return (
             <DropdownMenuItem key={href} asChild>
@@ -65,7 +67,7 @@ export function AppNav() {
                 className={cn("gap-1.5", isActive && "font-medium")}
               >
                 <Icon className="size-4" />
-                <span className="flex-1">{label}</span>
+                <span className="flex-1">{t(`surface.${labelKey}`)}</span>
                 {isActive ? <Check className="size-4" /> : null}
               </Link>
             </DropdownMenuItem>

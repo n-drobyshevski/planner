@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,6 +43,7 @@ interface FiltersProps {
  * desktop, bottom sheet on phones.
  */
 export function InsightsFiltersPopover(props: FiltersProps) {
+  const t = useTranslations("insights");
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const activeCount =
@@ -53,11 +55,11 @@ export function InsightsFiltersPopover(props: FiltersProps) {
     <Button
       variant="outline"
       size="sm"
-      aria-label="Filters"
+      aria-label={t("filters.trigger")}
       className="min-h-11 sm:min-h-7"
     >
       <SlidersHorizontal data-icon="inline-start" />
-      <span className="hidden sm:inline">Filters</span>
+      <span className="hidden sm:inline">{t("filters.trigger")}</span>
       {activeCount > 0 && (
         <Badge
           variant={props.filtersInert ? "outline" : "secondary"}
@@ -75,9 +77,9 @@ export function InsightsFiltersPopover(props: FiltersProps) {
         <ResponsiveDialogTrigger asChild>{trigger}</ResponsiveDialogTrigger>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>Filters</ResponsiveDialogTitle>
+            <ResponsiveDialogTitle>{t("filters.title")}</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
-              What counts toward these numbers.
+              {t("filters.description")}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogBody className="pb-safe space-y-4 pt-1 pb-4">
@@ -109,6 +111,7 @@ function FiltersForm({
   onIncludeInactiveChange,
   filtersInert = false,
 }: FiltersProps) {
+  const t = useTranslations("insights");
   function toggleCategory(id: string, visible: boolean) {
     const next = new Set(hiddenCategoryIds);
     if (visible) next.delete(id);
@@ -120,14 +123,13 @@ function FiltersForm({
     <div className="space-y-4">
       {filtersInert && (
         <p className="rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">
-          The You tab shows only your own nights, so these filters don&apos;t
-          apply there. They still shape the other tabs.
+          {t("filters.inertNote")}
         </p>
       )}
       {members.length > 1 && (
         <fieldset className="space-y-1.5">
           <legend className="text-xs font-medium text-muted-foreground">
-            Whose time
+            {t("filters.whoseTime")}
           </legend>
           <ToggleGroup
             type="single"
@@ -139,13 +141,13 @@ function FiltersForm({
             disabled={filtersInert}
           >
             <ToggleGroupItem value="me" className="flex-1">
-              Me
+              {t("filters.me")}
             </ToggleGroupItem>
             <ToggleGroupItem value="partner" className="flex-1">
-              Partner
+              {t("filters.partner")}
             </ToggleGroupItem>
             <ToggleGroupItem value="both" className="flex-1">
-              Both
+              {t("filters.both")}
             </ToggleGroupItem>
           </ToggleGroup>
         </fieldset>
@@ -154,7 +156,7 @@ function FiltersForm({
       {categories.length > 0 && (
         <fieldset className="space-y-1.5">
           <legend className="text-xs font-medium text-muted-foreground">
-            Categories
+            {t("filters.categories")}
           </legend>
           <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
             {categories.map((c) => (
@@ -180,9 +182,9 @@ function FiltersForm({
 
       <Label className="flex items-center justify-between gap-3 font-normal">
         <span>
-          Include inactive blocks
+          {t("filters.includeInactive")}
           <span className="block text-xs text-muted-foreground">
-            Count grayed-out time such as sleep
+            {t("filters.includeInactiveHint")}
           </span>
         </span>
         <Switch checked={includeInactive} onCheckedChange={onIncludeInactiveChange} />

@@ -11,6 +11,7 @@ import {
   ListTodo,
   ChartColumnBig,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -86,6 +87,7 @@ const BacklogCard = React.forwardRef<
   { task, color, assignee, draggable, onSchedule, onMenu, className, ...rest },
   ref,
 ) {
+  const t = useTranslations("tasks");
   return (
     <div
       ref={ref}
@@ -125,7 +127,7 @@ const BacklogCard = React.forwardRef<
         variant="ghost"
         size="icon"
         className="size-8 shrink-0"
-        aria-label={`Schedule ${task.title}`}
+        aria-label={t("backlog.schedule", { title: task.title })}
         onClick={onSchedule}
       >
         <CalendarPlus className="size-4" />
@@ -159,40 +161,42 @@ function BacklogList({
   onDelete,
   draggable,
 }: BacklogProps & { draggable: boolean }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   if (tasks.length === 0) {
     return (
       <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-        No open tasks. Everything&apos;s scheduled or done. 🎉
+        {t("backlog.empty")}
       </p>
     );
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-2">
-      {tasks.map((t) => {
-        const assignee = t.assigneeId ? members.get(t.assigneeId) ?? null : null;
-        const done = t.status === "done";
+      {tasks.map((task) => {
+        const assignee = task.assigneeId ? members.get(task.assigneeId) ?? null : null;
+        const done = task.status === "done";
         return (
           <ItemContextMenu
-            key={t.id}
-            title={t.title}
-            color={t.color}
-            onColorChange={(c) => onChangeColor(t, c)}
+            key={task.id}
+            title={task.title}
+            color={task.color}
+            onColorChange={(c) => onChangeColor(task, c)}
             actions={[
-              { label: "Schedule…", icon: CalendarPlus, onSelect: () => onSchedule(t) },
+              { label: t("contextMenu.schedule"), icon: CalendarPlus, onSelect: () => onSchedule(task) },
               {
-                label: done ? "Mark not done" : "Mark done",
+                label: done ? t("contextMenu.markNotDone") : t("contextMenu.markDone"),
                 icon: done ? Circle : CheckCircle2,
-                onSelect: () => onToggleDone(t),
+                onSelect: () => onToggleDone(task),
               },
-              { label: "Delete", icon: Trash2, destructive: true, onSelect: () => onDelete(t) },
+              { label: tc("delete"), icon: Trash2, destructive: true, onSelect: () => onDelete(task) },
             ]}
           >
             <BacklogCard
-              task={t}
-              color={colorOf(t)}
+              task={task}
+              color={colorOf(task)}
               assignee={assignee}
               draggable={draggable}
-              onSchedule={() => onSchedule(t)}
+              onSchedule={() => onSchedule(task)}
             />
           </ItemContextMenu>
         );
@@ -214,6 +218,7 @@ export function TaskBacklogRail({
   analytics,
   ...props
 }: BacklogProps & { userKey: string | undefined; analytics: UsageTabProps }) {
+  const t = useTranslations("tasks");
   const { width, beginResize } = useSidebarWidth("right", userKey);
   const [tab, setTab] = React.useState<"tasks" | "insights">("tasks");
   return (
@@ -230,17 +235,17 @@ export function TaskBacklogRail({
           <TabsList className="w-full">
             <TabsTrigger value="tasks">
               <ListTodo />
-              Tasks
+              {t("backlog.tasks")}
             </TabsTrigger>
             <TabsTrigger value="insights">
               <ChartColumnBig />
-              Insights
+              {t("backlog.insights")}
             </TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="tasks" className="flex min-h-0 flex-1 flex-col">
           <p className="px-3 pt-2 text-xs text-muted-foreground">
-            Drag onto the week or day grid to schedule, or use Schedule for options.
+            {t("backlog.scheduleHint")}
           </p>
           <BacklogList {...props} draggable />
         </TabsContent>
@@ -259,13 +264,14 @@ export function TaskBacklogSheet({
   onOpenChange,
   ...props
 }: BacklogProps & { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const t = useTranslations("tasks");
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[80dvh]">
         <SheetHeader>
-          <SheetTitle>Tasks</SheetTitle>
+          <SheetTitle>{t("backlog.tasks")}</SheetTitle>
           <SheetDescription>
-            Tap Schedule to place a task on your calendar.
+            {t("backlog.sheetDescription")}
           </SheetDescription>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-safe">

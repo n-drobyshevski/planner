@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { Plus, Target, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ import {
   useUpsertCategoryGoal,
 } from "@/lib/hooks/use-category-goals";
 import type { Category, CategoryGoal } from "@/lib/types";
-import { seriesMeta } from "../series";
+import { seriesFallbackLabels, seriesMeta } from "../series";
 
 const HOUR = 3_600_000;
 /** DB CHECK bounds, in hours (15 min .. 7 days per week). */
@@ -59,6 +60,7 @@ export function ManageGoalsDialog({
   viewerId: string;
   categories: Map<string, Category>;
 }) {
+  const t = useTranslations("insights");
   const [open, setOpen] = useState(false);
   // Same query key the goals section uses — one fetch feeds both.
   const { goals } = useCategoryGoals(workspaceId);
@@ -77,22 +79,20 @@ export function ManageGoalsDialog({
         onClick={() => setOpen(true)}
       >
         <Target data-icon="inline-start" />
-        Manage goals
+        {t("goals.manage")}
       </Button>
       <ResponsiveDialog open={open} onOpenChange={setOpen}>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>Weekly time goals</ResponsiveDialogTitle>
+            <ResponsiveDialogTitle>{t("goals.weeklyTitle")}</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
-              Hours per week per context — a target to reach, or a budget to
-              stay under. Goals are shared: you and your partner plan against
-              the same numbers.
+              {t("goals.weeklyDescription")}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogBody className="space-y-4">
             {goals.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No goals yet — add one below.
+                {t("goals.noGoals")}
               </p>
             ) : (
               <ul className="space-y-2" role="list">
@@ -151,7 +151,8 @@ function GoalRow({
   }) => void;
   onRemove: () => void;
 }) {
-  const meta = seriesMeta(goal.categoryId, categories);
+  const t = useTranslations("insights");
+  const meta = seriesMeta(goal.categoryId, categories, seriesFallbackLabels(t));
   // The row is its own tiny form so partial input ("2.") doesn't write through;
   // the value commits (submits) on blur/Enter, clamped to the DB CHECK range.
   const form = useForm({
@@ -192,11 +193,11 @@ function GoalRow({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
             className="h-9 w-16 text-right font-mono tabular-nums"
-            aria-label={`${meta.name}: hours per week`}
+            aria-label={t("goals.hoursPerWeek", { name: meta.name })}
           />
         )}
       </form.Field>
-      <span className="text-xs text-muted-foreground">h/wk</span>
+      <span className="text-xs text-muted-foreground">{t("goals.hoursUnit")}</span>
       <Select
         value={goal.direction}
         onValueChange={(v) =>
@@ -208,13 +209,13 @@ function GoalRow({
       >
         <SelectTrigger
           className="h-9 w-28"
-          aria-label={`${meta.name}: goal direction`}
+          aria-label={t("goals.goalDirection", { name: meta.name })}
         >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="at-least">At least</SelectItem>
-          <SelectItem value="at-most">At most</SelectItem>
+          <SelectItem value="at-least">{t("goals.atLeast")}</SelectItem>
+          <SelectItem value="at-most">{t("goals.atMost")}</SelectItem>
         </SelectContent>
       </Select>
       <Button
@@ -222,7 +223,7 @@ function GoalRow({
         size="icon"
         className="size-11 shrink-0 text-muted-foreground sm:size-8"
         onClick={onRemove}
-        aria-label={`Remove the ${meta.name} goal`}
+        aria-label={t("goals.removeGoal", { name: meta.name })}
       >
         <X />
       </Button>
@@ -237,6 +238,7 @@ function AddGoalRow({
   addable: Category[];
   onAdd: (categoryId: string) => void;
 }) {
+  const t = useTranslations("insights");
   const form = useForm({
     defaultValues: { categoryId: "" },
     onSubmit: ({ value }) => {
@@ -251,8 +253,8 @@ function AddGoalRow({
       <form.Field name="categoryId">
         {(field) => (
           <Select value={field.state.value} onValueChange={field.handleChange}>
-            <SelectTrigger className="h-9 flex-1" aria-label="Context to add a goal for">
-              <SelectValue placeholder="Pick a context…" />
+            <SelectTrigger className="h-9 flex-1" aria-label={t("goals.pickContext")}>
+              <SelectValue placeholder={t("goals.pickContextPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
               {addable
@@ -276,7 +278,7 @@ function AddGoalRow({
             onClick={() => void form.handleSubmit()}
           >
             <Plus data-icon="inline-start" />
-            Add goal
+            {t("goals.addGoal")}
           </Button>
         )}
       </form.Subscribe>

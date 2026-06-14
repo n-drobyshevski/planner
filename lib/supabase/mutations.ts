@@ -6,6 +6,7 @@ import type {
   InsightsView,
   SleepLog,
   TaskRow,
+  AppLocale,
   ThemePreference,
   AccentId,
   SurfaceTone,
@@ -642,6 +643,8 @@ export async function restoreBoard(
 // --- Member preferences ----------------------------------------------------
 
 export interface MemberPreferencesPatch {
+  /** UI language. Mirrors the DB CHECK ('en' | 'ru'). */
+  locale?: AppLocale;
   themePreference?: ThemePreference;
   accent?: AccentId;
   surfaceTone?: SurfaceTone;
@@ -708,6 +711,7 @@ export async function updateMemberPreferences(
   patch: MemberPreferencesPatch,
 ): Promise<void> {
   const row: Record<string, unknown> = {};
+  if (patch.locale != null) row.locale = patch.locale;
   if (patch.themePreference != null) row.theme_preference = patch.themePreference;
   if (patch.accent != null) row.accent = patch.accent;
   if (patch.surfaceTone != null) row.surface_tone = patch.surfaceTone;

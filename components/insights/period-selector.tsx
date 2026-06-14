@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Select,
   SelectContent,
@@ -11,13 +12,13 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { msToDateInput, dateInputToMs } from "@/lib/datetime/local";
 import type { PeriodPreset, PeriodState, ResolvedPeriod } from "@/lib/insights/period";
 
-const PRESETS: { value: PeriodPreset; label: string }[] = [
-  { value: "this-week", label: "This week" },
-  { value: "last-week", label: "Last week" },
-  { value: "this-month", label: "This month" },
-  { value: "last-30d", label: "Last 30 days" },
-  { value: "last-90d", label: "Last 90 days" },
-  { value: "custom", label: "Custom range" },
+const PRESETS: { value: PeriodPreset; key: string }[] = [
+  { value: "this-week", key: "thisWeek" },
+  { value: "last-week", key: "lastWeek" },
+  { value: "this-month", key: "thisMonth" },
+  { value: "last-30d", key: "last30d" },
+  { value: "last-90d", key: "last90d" },
+  { value: "custom", key: "custom" },
 ];
 
 /**
@@ -36,6 +37,7 @@ export function PeriodSelector({
   timeZone: string;
   onChange: (next: PeriodState) => void;
 }) {
+  const t = useTranslations("insights");
   function changePreset(preset: PeriodPreset) {
     if (preset === "custom") {
       onChange({
@@ -55,13 +57,13 @@ export function PeriodSelector({
   return (
     <>
       <Select value={state.preset} onValueChange={(v) => changePreset(v as PeriodPreset)}>
-        <SelectTrigger size="sm" aria-label="Period" className="w-[8.5rem] shrink-0">
+        <SelectTrigger size="sm" aria-label={t("period.label")} className="w-[8.5rem] shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {PRESETS.map((p) => (
             <SelectItem key={p.value} value={p.value}>
-              {p.label}
+              {t(`period.${p.key}`)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -70,7 +72,7 @@ export function PeriodSelector({
       {state.preset === "custom" ? (
         <div className="flex items-center gap-1 max-sm:order-last max-sm:basis-full">
           <DatePicker
-            aria-label="From"
+            aria-label={t("period.from")}
             value={state.customFrom != null ? msToDateInput(state.customFrom, timeZone) : ""}
             onChange={(v) =>
               v && onChange({ ...state, customFrom: dateInputToMs(v, timeZone) })
@@ -81,7 +83,7 @@ export function PeriodSelector({
             –
           </span>
           <DatePicker
-            aria-label="To"
+            aria-label={t("period.to")}
             value={state.customTo != null ? msToDateInput(state.customTo, timeZone) : ""}
             onChange={(v) =>
               v && onChange({ ...state, customTo: dateInputToMs(v, timeZone) })

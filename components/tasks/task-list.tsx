@@ -4,15 +4,16 @@
 // stays board-only on purpose — a second drag surface would duplicate the dnd
 // machinery for little gain when the board already owns ordering.
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { TaskCard } from "./task-card";
 import { TaskContextMenu } from "./task-context-menu";
 import type { TaskActions } from "./task-actions";
 import type { Member, TaskRow, TaskStatus } from "@/lib/types";
 
-const SECTIONS: { status: TaskStatus; title: string }[] = [
-  { status: "todo", title: "To Do" },
-  { status: "in_progress", title: "In Progress" },
-  { status: "done", title: "Done" },
+const SECTIONS: { status: TaskStatus; statusKey: string }[] = [
+  { status: "todo", statusKey: "status.todo" },
+  { status: "in_progress", statusKey: "status.inProgress" },
+  { status: "done", statusKey: "status.done" },
 ];
 
 export interface TaskListProps {
@@ -24,6 +25,7 @@ export interface TaskListProps {
 }
 
 export function TaskList({ tasks, colorOf, members, progressOf, actions }: TaskListProps) {
+  const t = useTranslations("tasks");
   const groups = useMemo(
     () =>
       SECTIONS.map((s) => ({
@@ -43,13 +45,13 @@ export function TaskList({ tasks, colorOf, members, progressOf, actions }: TaskL
             id={`list-col-${g.status}`}
             className="flex items-center gap-2 px-1 text-sm font-semibold"
           >
-            {g.title}
+            {t(g.statusKey)}
             <span className="rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
               {g.items.length}
             </span>
           </h3>
           {g.items.length === 0 ? (
-            <p className="px-1 text-sm text-muted-foreground">Nothing here.</p>
+            <p className="px-1 text-sm text-muted-foreground">{t("list.nothingHere")}</p>
           ) : (
             <ul className="flex list-none flex-col gap-2">
               {g.items.map((t) => (

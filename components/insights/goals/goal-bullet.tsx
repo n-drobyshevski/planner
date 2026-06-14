@@ -1,16 +1,17 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { Progress } from "@/components/ui/progress";
 import { formatDuration } from "@/lib/datetime/format";
 import type { GoalProgress } from "@/lib/insights/goals";
 import { cn } from "@/lib/utils";
 
-/** Calm wording per judgment; never color alone (the label always renders). */
-const JUDGMENT_LABEL: Record<GoalProgress["judgment"], string> = {
-  met: "met",
-  "on-track": "on track",
-  behind: "behind pace",
-  over: "over budget",
+/** Translation key per judgment; never color alone (the label always renders). */
+const JUDGMENT_KEY: Record<GoalProgress["judgment"], string> = {
+  met: "judgmentMet",
+  "on-track": "judgmentOnTrack",
+  behind: "judgmentBehind",
+  over: "judgmentOver",
 };
 
 /**
@@ -28,6 +29,8 @@ export function GoalBullet({
   name: string;
   color: string;
 }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
   const { goal, targetMs, actualMs, judgment, expected } = progress;
   const spanMs = Math.max(targetMs, actualMs, 1);
   const fillPct = (actualMs / spanMs) * 100;
@@ -37,10 +40,16 @@ export function GoalBullet({
       ? ((expected * targetMs) / spanMs) * 100
       : null;
 
-  const direction = goal.direction === "at-least" ? "target" : "budget";
-  const srLabel =
-    `${name}: ${formatDuration(actualMs)} of the ${formatDuration(targetMs)} ` +
-    `${direction} for this period — ${JUDGMENT_LABEL[judgment]}.`;
+  const judgmentLabel = t(`goals.${JUDGMENT_KEY[judgment]}`);
+  const srLabel = t(
+    goal.direction === "at-least" ? "goals.srTarget" : "goals.srBudget",
+    {
+      name,
+      actual: formatDuration(actualMs, locale),
+      target: formatDuration(targetMs, locale),
+      judgment: judgmentLabel,
+    },
+  );
 
   return (
     <li className="flex items-center gap-2 text-xs">
@@ -76,8 +85,8 @@ export function GoalBullet({
         )}
       </span>
       <span className="w-24 text-right font-mono tabular-nums text-muted-foreground sm:w-28">
-        {formatDuration(actualMs)}
-        <span className="text-muted-foreground/60"> / {formatDuration(targetMs)}</span>
+        {formatDuration(actualMs, locale)}
+        <span className="text-muted-foreground/60"> / {formatDuration(targetMs, locale)}</span>
       </span>
       <span
         className={cn(
@@ -88,7 +97,7 @@ export function GoalBullet({
             "text-muted-foreground",
         )}
       >
-        {JUDGMENT_LABEL[judgment]}
+        {judgmentLabel}
       </span>
     </li>
   );

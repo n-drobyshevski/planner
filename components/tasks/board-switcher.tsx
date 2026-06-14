@@ -10,6 +10,7 @@ import {
   Users,
   User,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -62,6 +63,8 @@ export function BoardSwitcher({
   /** Task count (incl. subtasks) per board id — for the delete guard. */
   taskCountByBoard: Map<string, number>;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const ws = useWorkspace();
   const workspaceId = ws.data?.workspaceId;
   const currentMember = ws.data?.currentMember ?? null;
@@ -93,7 +96,7 @@ export function BoardSwitcher({
       <>
         <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
           <Plus data-icon="inline-start" />
-          New board
+          {t("switcher.newBoard")}
         </Button>
         {workspaceId && currentMember && (
           <BoardDialog
@@ -120,13 +123,13 @@ export function BoardSwitcher({
           >
             {active && <Dot color={active.color} />}
             <span className="truncate font-heading font-semibold">
-              {active?.name ?? "Boards"}
+              {active?.name ?? t("switcher.boards")}
             </span>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-60">
-          <DropdownMenuLabel>Boards</DropdownMenuLabel>
+          <DropdownMenuLabel>{t("switcher.boards")}</DropdownMenuLabel>
           {boards.map((b) => (
             <DropdownMenuItem
               key={b.id}
@@ -152,20 +155,20 @@ export function BoardSwitcher({
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
             <Plus data-icon="inline-start" />
-            New board
+            {t("switcher.newBoard")}
           </DropdownMenuItem>
           {active && (
             <>
               <DropdownMenuItem onSelect={() => setEditing(active)}>
                 <Pencil data-icon="inline-start" />
-                Edit “{active.name}”
+                {t("switcher.edit", { name: active.name })}
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
                 onSelect={() => setDeleting(active)}
               >
                 <Trash2 data-icon="inline-start" />
-                Delete “{active.name}”
+                {t("switcher.delete", { name: active.name })}
               </DropdownMenuItem>
             </>
           )}
@@ -197,26 +200,24 @@ export function BoardSwitcher({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {deletingCount > 0 ? "Board isn’t empty" : `Delete “${deleting?.name}”?`}
+              {deletingCount > 0
+                ? t("switcher.notEmptyTitle")
+                : t("switcher.deleteTitle", { name: deleting?.name ?? "" })}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deletingCount > 0
-                ? `This board still has ${deletingCount} ${
-                    deletingCount === 1 ? "task" : "tasks"
-                  }. Move or delete ${
-                    deletingCount === 1 ? "it" : "them"
-                  } first, then you can remove the board.`
-                : "This removes the board. Its tasks are already gone. You can undo this right after."}
+                ? t("switcher.notEmptyDescription", { count: deletingCount })
+                : t("switcher.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{deletingCount > 0 ? "Close" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogCancel>{deletingCount > 0 ? tc("close") : tc("cancel")}</AlertDialogCancel>
             {deletingCount === 0 && (
               <AlertDialogAction
                 onClick={confirmDelete}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Delete
+                {tc("delete")}
               </AlertDialogAction>
             )}
           </AlertDialogFooter>

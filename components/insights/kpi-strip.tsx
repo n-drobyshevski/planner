@@ -6,6 +6,7 @@
 // color alone, and the tone stays calm (no red alarms for personal data).
 
 import { CircleAlert, CircleCheck, Minus, type LucideIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { DeltaBadge } from "./stat-card";
 import type { Delta } from "@/lib/analytics/trends";
@@ -37,6 +38,7 @@ export function JudgmentLine({
   judgment: Judgment;
   className?: string;
 }) {
+  const t = useTranslations("insights");
   const Icon = JUDGMENT_ICONS[judgment.tone];
   return (
     <div
@@ -48,7 +50,7 @@ export function JudgmentLine({
     >
       <Icon aria-hidden className="size-3 shrink-0" />
       <span className="truncate">
-        <span className="sr-only">{judgment.tone === "attention" ? "needs attention: " : ""}</span>
+        <span className="sr-only">{judgment.tone === "attention" ? t("stat.needsAttention") : ""}</span>
         {judgment.text}
       </span>
     </div>

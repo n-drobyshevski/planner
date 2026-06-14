@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Check, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACCENTS } from "@/lib/theme/appearance";
@@ -28,15 +29,16 @@ export function ColorSwatchPicker({
   onSelect: (color: string | null) => void;
   className?: string;
 }) {
+  const t = useTranslations("nav");
   const isDefault = !value;
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
       <button
         type="button"
         onClick={() => onSelect(null)}
-        aria-label="Default color"
+        aria-label={t("colorPicker.defaultAriaLabel")}
         aria-pressed={isDefault}
-        title="Default"
+        title={t("colorPicker.default")}
         className={cn(
           "flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground",
           "transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

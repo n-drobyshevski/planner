@@ -41,6 +41,7 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { Trash2, CalendarPlus, ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import { SubtaskEditor } from "./subtask-editor";
 import { AttributeFields } from "@/components/shared/attribute-fields";
@@ -72,6 +73,8 @@ export interface TaskDialogProps {
 export function TaskDialog(props: TaskDialogProps) {
   const { open, onOpenChange, mode, workspaceId, currentMemberId, members, categories, task } =
     props;
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const mutations = useTaskMutations(workspaceId);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -152,7 +155,7 @@ export function TaskDialog(props: TaskDialogProps) {
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>
-              {mode === "create" ? "New task" : "Edit task"}
+              {mode === "create" ? t("taskDialog.createTitle") : t("taskDialog.editTitle")}
             </ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
 
@@ -164,14 +167,14 @@ export function TaskDialog(props: TaskDialogProps) {
                   field.state.meta.isTouched && !field.state.meta.isValid;
                 return (
                   <Field data-invalid={isInvalid || undefined}>
-                    <FieldLabel htmlFor="task-title">Title</FieldLabel>
+                    <FieldLabel htmlFor="task-title">{t("taskDialog.titleLabel")}</FieldLabel>
                     <Input
                       id="task-title"
                       name={field.name}
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}
                       onBlur={field.handleBlur}
-                      placeholder="What needs doing?"
+                      placeholder={t("taskDialog.titlePlaceholder")}
                       autoFocus
                       aria-invalid={isInvalid || undefined}
                       aria-describedby={isInvalid ? "task-title-error" : undefined}
@@ -187,7 +190,7 @@ export function TaskDialog(props: TaskDialogProps) {
             <form.Field name="description">
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="task-notes">Notes</FieldLabel>
+                  <FieldLabel htmlFor="task-notes">{t("taskDialog.notesLabel")}</FieldLabel>
                   <Textarea
                     id="task-notes"
                     name={field.name}
@@ -195,7 +198,7 @@ export function TaskDialog(props: TaskDialogProps) {
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
                     rows={2}
-                    placeholder="Add details"
+                    placeholder={t("taskDialog.notesPlaceholder")}
                   />
                 </Field>
               )}
@@ -205,14 +208,14 @@ export function TaskDialog(props: TaskDialogProps) {
               <form.Field name="assigneeId">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Assignee</FieldLabel>
+                    <FieldLabel>{t("taskDialog.assigneeLabel")}</FieldLabel>
                     <Select value={field.state.value} onValueChange={field.handleChange}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Unassigned" />
+                        <SelectValue placeholder={t("taskDialog.unassigned")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="none">Unassigned</SelectItem>
+                          <SelectItem value="none">{t("taskDialog.unassigned")}</SelectItem>
                           {members.map((m) => (
                             <SelectItem key={m.id} value={m.id}>
                               {m.name}
@@ -228,14 +231,14 @@ export function TaskDialog(props: TaskDialogProps) {
               <form.Field name="categoryId">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Context</FieldLabel>
+                    <FieldLabel>{t("taskDialog.contextLabel")}</FieldLabel>
                     <Select value={field.state.value} onValueChange={field.handleChange}>
                       <SelectTrigger>
-                        <SelectValue placeholder="No context" />
+                        <SelectValue placeholder={t("taskDialog.noContext")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="none">No context</SelectItem>
+                          <SelectItem value="none">{t("taskDialog.noContext")}</SelectItem>
                           {usableCategories.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name}
@@ -253,7 +256,7 @@ export function TaskDialog(props: TaskDialogProps) {
               <form.Field name="priority">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Priority</FieldLabel>
+                    <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
                     <Select
                       value={field.state.value}
                       onValueChange={(v) =>
@@ -261,14 +264,14 @@ export function TaskDialog(props: TaskDialogProps) {
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder={t("priority.none")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="1">Low</SelectItem>
-                          <SelectItem value="2">Medium</SelectItem>
-                          <SelectItem value="3">High</SelectItem>
+                          <SelectItem value="none">{t("priority.none")}</SelectItem>
+                          <SelectItem value="1">{t("priority.low")}</SelectItem>
+                          <SelectItem value="2">{t("priority.medium")}</SelectItem>
+                          <SelectItem value="3">{t("priority.high")}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -279,13 +282,13 @@ export function TaskDialog(props: TaskDialogProps) {
               <form.Field name="dueDate">
                 {(field) => (
                   <Field>
-                    <FieldLabel htmlFor="task-due">Due date</FieldLabel>
+                    <FieldLabel htmlFor="task-due">{t("taskDialog.dueDateLabel")}</FieldLabel>
                     <DatePicker
                       id="task-due"
                       value={field.state.value}
                       onChange={field.handleChange}
                       clearable
-                      aria-label="Due date"
+                      aria-label={t("taskDialog.dueDateLabel")}
                     />
                   </Field>
                 )}
@@ -296,7 +299,7 @@ export function TaskDialog(props: TaskDialogProps) {
               <form.Field name="status">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Status</FieldLabel>
+                    <FieldLabel>{t("taskDialog.statusLabel")}</FieldLabel>
                     <ToggleGroup
                       type="single"
                       variant="outline"
@@ -304,9 +307,9 @@ export function TaskDialog(props: TaskDialogProps) {
                       onValueChange={(v) => v && field.handleChange(v as TaskStatus)}
                       className="justify-start"
                     >
-                      <ToggleGroupItem value="todo">To Do</ToggleGroupItem>
-                      <ToggleGroupItem value="in_progress">In Progress</ToggleGroupItem>
-                      <ToggleGroupItem value="done">Done</ToggleGroupItem>
+                      <ToggleGroupItem value="todo">{t("status.todo")}</ToggleGroupItem>
+                      <ToggleGroupItem value="in_progress">{t("status.inProgress")}</ToggleGroupItem>
+                      <ToggleGroupItem value="done">{t("status.done")}</ToggleGroupItem>
                     </ToggleGroup>
                   </Field>
                 )}
@@ -321,7 +324,7 @@ export function TaskDialog(props: TaskDialogProps) {
                     checked={field.state.value}
                     onCheckedChange={field.handleChange}
                   />
-                  <FieldLabel htmlFor="task-private">Private (only you can see this)</FieldLabel>
+                  <FieldLabel htmlFor="task-private">{t("taskDialog.privateLabel")}</FieldLabel>
                 </Field>
               )}
             </form.Field>
@@ -336,7 +339,7 @@ export function TaskDialog(props: TaskDialogProps) {
                   size="sm"
                   className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                 >
-                  Optimization details
+                  {t("taskDialog.optimizationDetails")}
                   <ChevronDown
                     className={`size-4 transition-transform ${showOptimization ? "rotate-180" : ""}`}
                   />
@@ -380,7 +383,7 @@ export function TaskDialog(props: TaskDialogProps) {
                         className="text-destructive"
                       >
                         <Trash2 data-icon="inline-start" />
-                        Delete
+                        {tc("delete")}
                       </Button>
                       {props.onSchedule && (
                         <Button
@@ -389,7 +392,7 @@ export function TaskDialog(props: TaskDialogProps) {
                           disabled={isSubmitting}
                         >
                           <CalendarPlus data-icon="inline-start" />
-                          <span className="hidden sm:inline">Add to calendar</span>
+                          <span className="hidden sm:inline">{t("schedule.title")}</span>
                         </Button>
                       )}
                     </div>
@@ -402,14 +405,14 @@ export function TaskDialog(props: TaskDialogProps) {
                       onClick={() => onOpenChange(false)}
                       disabled={isSubmitting}
                     >
-                      Cancel
+                      {tc("cancel")}
                     </Button>
                     {/* handleSubmit is invoked at event time (not render) so the React
                         Compiler doesn't treat the submit body — Date.now() included —
                         as render-scoped. */}
                     <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
                       {isSubmitting && <Spinner data-icon="inline-start" />}
-                      {mode === "create" ? "Create" : "Save"}
+                      {mode === "create" ? tc("create") : tc("save")}
                     </Button>
                   </div>
                 </>
@@ -422,19 +425,18 @@ export function TaskDialog(props: TaskDialogProps) {
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogTitle>{t("taskDialog.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the task, its subtasks, and any blocks it placed on the
-              calendar.
+              {t("taskDialog.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={onDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

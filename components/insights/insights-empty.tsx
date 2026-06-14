@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { ChartColumnBig } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -18,24 +19,25 @@ import {
  * something is the fix in every case.
  */
 export function InsightsEmpty({
-  title = "No tracked time in this period",
-  description = "Insights count timed events from your calendar. Schedule something in this range — or pick a different period — to see where your time goes.",
+  title,
+  description,
 }: {
   title?: string;
   description?: string;
 }) {
+  const t = useTranslations("insights");
   return (
     <Empty className="border-0">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <ChartColumnBig />
         </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{description}</EmptyDescription>
+        <EmptyTitle>{title ?? t("empty.title")}</EmptyTitle>
+        <EmptyDescription>{description ?? t("empty.description")}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/calendar">Open the calendar</Link>
+          <Link href="/calendar">{t("empty.openCalendar")}</Link>
         </Button>
       </EmptyContent>
     </Empty>

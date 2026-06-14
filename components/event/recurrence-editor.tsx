@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Select,
   SelectTrigger,
@@ -16,8 +17,12 @@ import { msToDateInput, dateInputToMs } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import type { Freq, RecurrenceForm } from "@/lib/recurrence/rrule-build";
 
-const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-const UNIT: Record<Freq, string> = { DAILY: "day(s)", WEEKLY: "week(s)", MONTHLY: "month(s)" };
+const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const UNIT_KEY: Record<Freq, string> = {
+  DAILY: "unitDay",
+  WEEKLY: "unitWeek",
+  MONTHLY: "unitMonth",
+};
 
 // Selected day = filled accent chip (follows the active accent/palette via
 // --primary), overriding the toggle's default muted "on" surface.
@@ -37,6 +42,7 @@ export function RecurrenceEditor({
   onChange: (v: RecurrenceForm | null) => void;
   startMs: number;
 }) {
+  const t = useTranslations("events");
   const timeZone = useViewerTimeZone();
   function setFreq(next: string) {
     if (next === "none") return onChange(null);
@@ -57,17 +63,17 @@ export function RecurrenceEditor({
   return (
     <div className="flex flex-col gap-3">
       <Field>
-        <FieldLabel>Repeat</FieldLabel>
+        <FieldLabel>{t("recurrence.repeat")}</FieldLabel>
         <Select value={value?.freq ?? "none"} onValueChange={setFreq}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="none">Does not repeat</SelectItem>
-              <SelectItem value="DAILY">Daily</SelectItem>
-              <SelectItem value="WEEKLY">Weekly</SelectItem>
-              <SelectItem value="MONTHLY">Monthly</SelectItem>
+              <SelectItem value="none">{t("recurrence.doesNotRepeat")}</SelectItem>
+              <SelectItem value="DAILY">{t("recurrence.daily")}</SelectItem>
+              <SelectItem value="WEEKLY">{t("recurrence.weekly")}</SelectItem>
+              <SelectItem value="MONTHLY">{t("recurrence.monthly")}</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -84,7 +90,7 @@ export function RecurrenceEditor({
               {showInterval && (
                 <div className="flex items-end gap-2">
                   <Field className="w-24">
-                    <FieldLabel>Every</FieldLabel>
+                    <FieldLabel>{t("recurrence.every")}</FieldLabel>
                     <Input
                       type="number"
                       min={1}
@@ -94,13 +100,15 @@ export function RecurrenceEditor({
                       }
                     />
                   </Field>
-                  <span className="pb-2.5 text-sm text-muted-foreground">{UNIT[value.freq]}</span>
+                  <span className="pb-2.5 text-sm text-muted-foreground">
+                    {t(`recurrence.${UNIT_KEY[value.freq]}`)}
+                  </span>
                 </div>
               )}
 
               {(value.freq === "WEEKLY" || value.freq === "DAILY") && (
                 <Field>
-                  <FieldLabel>On days</FieldLabel>
+                  <FieldLabel>{t("recurrence.onDays")}</FieldLabel>
                   <ToggleGroup
                     type="multiple"
                     variant="outline"
@@ -111,22 +119,25 @@ export function RecurrenceEditor({
                     }
                     className="justify-start"
                   >
-                    {WEEKDAYS.map((d, i) => (
-                      <ToggleGroupItem
-                        key={d}
-                        value={String(i)}
-                        aria-label={d}
-                        className={SELECTED_DAY}
-                      >
-                        {d}
-                      </ToggleGroupItem>
-                    ))}
+                    {WEEKDAY_KEYS.map((key, i) => {
+                      const label = t(`recurrence.weekday.${key}`);
+                      return (
+                        <ToggleGroupItem
+                          key={key}
+                          value={String(i)}
+                          aria-label={label}
+                          className={SELECTED_DAY}
+                        >
+                          {label}
+                        </ToggleGroupItem>
+                      );
+                    })}
                   </ToggleGroup>
                 </Field>
               )}
 
               <Field>
-                <FieldLabel>Ends</FieldLabel>
+                <FieldLabel>{t("recurrence.ends")}</FieldLabel>
                 <div className="flex items-center gap-2">
                   <Select
                     value={value.end.type}
@@ -147,9 +158,9 @@ export function RecurrenceEditor({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="never">Never</SelectItem>
-                        <SelectItem value="until">On date</SelectItem>
-                        <SelectItem value="count">After…</SelectItem>
+                        <SelectItem value="never">{t("recurrence.endsNever")}</SelectItem>
+                        <SelectItem value="until">{t("recurrence.endsUntil")}</SelectItem>
+                        <SelectItem value="count">{t("recurrence.endsCount")}</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
@@ -163,7 +174,7 @@ export function RecurrenceEditor({
                           end: { type: "until", dateMs: dateInputToMs(v, timeZone) },
                         })
                       }
-                      aria-label="Repeat until date"
+                      aria-label={t("recurrence.repeatUntilDate")}
                       className="w-40"
                     />
                   )}

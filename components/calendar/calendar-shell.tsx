@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 import { useIdlePreload } from "@/lib/lazy";
@@ -13,7 +14,7 @@ import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { TimezoneProvider } from "@/lib/datetime/timezone-context";
 import { filterVisible, canEdit } from "@/lib/scope/visibility";
 import { resolveOccurrenceColor } from "@/lib/calendar/colors";
-import { sharedRemovalNote } from "@/lib/calendar/delete-copy";
+import { sharedRemovalVariant } from "@/lib/calendar/delete-copy";
 import {
   contextOccurrences,
   enclosingContext,
@@ -140,6 +141,10 @@ export function CalendarShell({
   initialDate: number;
   viewFromUrl: boolean;
 }) {
+  const t = useTranslations("calendar");
+  const tc = useTranslations("common");
+  const tToast = useTranslations("toasts");
+  const locale = useLocale();
   const router = useRouter();
   const [view, setView] = useState<CalendarView>(initialView);
   const [focusedDate, setFocusedDate] = useState<number>(initialDate);
@@ -449,8 +454,8 @@ export function CalendarShell({
     const cat = occ.categoryId ? categoryMap.get(occ.categoryId) : null;
     if (cat?.ownerId === null) return null;
     return occ.isShared
-      ? { label: "Make personal", icon: User, onSelect: () => onToggleEventShared(occ) }
-      : { label: "Share", icon: Users, onSelect: () => onToggleEventShared(occ) };
+      ? { label: t("menu.makePersonal"), icon: User, onSelect: () => onToggleEventShared(occ) }
+      : { label: t("menu.share"), icon: Users, onSelect: () => onToggleEventShared(occ) };
   }
   function onDeleteEvent(occ: Occurrence) {
     if (!canEditOcc(occ)) return;
@@ -458,10 +463,12 @@ export function CalendarShell({
     if (!ev) return;
     if (ev.rrule) setPendingDelete({ event: ev, occurrence: occ });
     else if (ev.kind === "context") setDeletingContext(ev);
-    else
+    else {
+      const removal = sharedRemovalVariant(occ.isShared, partnerName);
       void mutations.remove(ev.id, {
-        description: sharedRemovalNote(occ.isShared, partnerName),
+        description: removal ? tToast(removal.key, removal.vars) : undefined,
       });
+    }
   }
   function onDeleteScope(scope: RecurrenceScope) {
     const p = pendingDelete;
@@ -679,7 +686,7 @@ export function CalendarShell({
    *  member's non-joint event (read-only to me). */
   function eventCopyAction(occ: Occurrence): ItemAction | null {
     if (occ.kind !== "event" || canEditOcc(occ)) return null;
-    return { label: "Copy to my calendar", icon: CopyPlus, onSelect: () => onCopyToMine(occ) };
+    return { label: t("menu.copyToMyCalendar"), icon: CopyPlus, onSelect: () => onCopyToMine(occ) };
   }
   /** Delete every selected event in one batch. A lone item keeps the existing
    *  prompt (recurring) / direct delete (single). In a multi-pick, recurring
@@ -808,9 +815,8 @@ export function CalendarShell({
     } catch {
       /* private mode / no storage — just show it this once */
     }
-    toast.info("Multiple events selected", {
-      description:
-        "Drag any one to move them together. Hold Alt for the whole series, Ctrl to duplicate. Press ? for all shortcuts.",
+    toast.info(t("multiSelectHint.title"), {
+      description: t("multiSelectHint.description"),
       duration: 8000,
     });
   }, [selectedKeys.size]);
@@ -837,7 +843,7 @@ export function CalendarShell({
     () => getVisibleDays(view, nextFocus, { timeZone: viewerTimeZone }),
     [view, nextFocus, viewerTimeZone],
   );
-  const label = formatRangeLabel(view, focusedDate, viewerTimeZone);
+  const label = formatRangeLabel(view, focusedDate, viewerTimeZone, locale);
 
   // Swipe left/right to page the period via the carousel; in the time-grid
   // views (day/week/3day) a gesture that begins on an event block is left alone
@@ -1022,7 +1028,7 @@ export function CalendarShell({
               ? categoryMap.get(details.occurrence.categoryId)?.name ?? null
               : null
           }
-          ownerName={memberMap.get(details.occurrence.ownerId)?.name ?? "Unknown"}
+          ownerName={memberMap.get(details.occurrence.ownerId)?.name ?? "—"}
           isOwn={canEditOcc(details.occurrence)}
           task={
             details.occurrence.taskId ? tasksById.get(details.occurrence.taskId) ?? null : null
@@ -1154,14 +1160,13 @@ export function CalendarShell({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove this context window?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteContext.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Items keep their Context — only this time-block is removed from the
-              calendar. The Context itself stays in the sidebar.
+              {t("deleteContext.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deletingContext) void mutations.remove(deletingContext.id);
@@ -1169,7 +1174,7 @@ export function CalendarShell({
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1181,14 +1186,13 @@ export function CalendarShell({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteTask.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the task, its subtasks, and any blocks it placed on the
-              calendar.
+              {t("deleteTask.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deletingTask) void taskMutations.remove(deletingTask.id);
@@ -1196,7 +1200,7 @@ export function CalendarShell({
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

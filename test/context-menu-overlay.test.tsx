@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import { Pencil, Trash2 } from "lucide-react";

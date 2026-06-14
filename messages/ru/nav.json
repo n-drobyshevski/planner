@@ -1,0 +1,52 @@
+{
+  "surface": {
+    "calendar": "Календарь",
+    "tasks": "Задачи",
+    "insights": "Аналитика"
+  },
+  "switcher": {
+    "ariaLabel": "Текущий раздел: {surface}. Сменить раздел"
+  },
+  "userMenu": {
+    "ariaLabel": "Меню профиля",
+    "signedInAs": "Ты вошёл как {name}",
+    "settings": "Настройки",
+    "signOut": "Выйти"
+  },
+  "itemMenu": {
+    "color": "Цвет",
+    "options": "Действия",
+    "moreOptions": "Ещё"
+  },
+  "loadError": {
+    "title": "Не удалось загрузить {subject, select, calendar {календарь} tasks {задачи} insights {аналитику} other {данные}}.",
+    "body": "Проверь соединение и попробуй снова.",
+    "retry": "Повторить"
+  },
+  "createContext": {
+    "title": "Новый контекст",
+    "description": "Объедини связанные события в общий или личный контекст.",
+    "namePlaceholder": "Название контекста",
+    "nameLabel": "Название контекста",
+    "colorAriaLabel": "Цвет {color}",
+    "shared": "Общий",
+    "personal": "Личный",
+    "sharedSwitchAriaLabel": "Общий контекст — вы оба участвуете и можете редактировать",
+    "sharedHint": "Вы оба участвуете и можете редактировать все события в нём.",
+    "personalHint": "Только в твоём календаре; редактировать события можешь только ты.",
+    "submit": "Добавить контекст"
+  },
+  "colorField": {
+    "ariaLabel": "Цвет: {label}",
+    "custom": "Свой",
+    "default": "По умолчанию"
+  },
+  "colorPicker": {
+    "defaultAriaLabel": "Цвет по умолчанию",
+    "default": "По умолчанию"
+  },
+  "attributes": {
+    "clearHint": "Всё необязательно — нажми на выбранный вариант ещё раз, чтобы сбросить.",
+    "satisfactionAriaLabel": "Удовлетворённость {label} из 5"
+  }
+}

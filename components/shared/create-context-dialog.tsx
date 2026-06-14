@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
+import { useTranslations } from "next-intl";
 import { Users, User } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,6 +58,8 @@ export function CreateContextDialog({
   /** Called with the new category id once it's created. */
   onCreated: (categoryId: string) => void;
 }) {
+  const t = useTranslations("nav");
+  const tc = useTranslations("common");
   const qc = useQueryClient();
 
   const form = useForm({
@@ -84,9 +87,9 @@ export function CreateContextDialog({
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>New context</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>{t("createContext.title")}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            Group related events under a shared or personal context.
+            {t("createContext.description")}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -102,9 +105,9 @@ export function CreateContextDialog({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
-                    placeholder="Context name"
+                    placeholder={t("createContext.namePlaceholder")}
                     onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
-                    aria-label="Context name"
+                    aria-label={t("createContext.nameLabel")}
                     aria-invalid={isInvalid || undefined}
                     autoFocus
                   />
@@ -121,7 +124,7 @@ export function CreateContextDialog({
                   <button
                     key={c}
                     type="button"
-                    aria-label={`Color ${c}`}
+                    aria-label={t("createContext.colorAriaLabel", { color: c })}
                     aria-pressed={field.state.value === c}
                     onClick={() => field.handleChange(c)}
                     className={cn(
@@ -145,18 +148,22 @@ export function CreateContextDialog({
                     ) : (
                       <User className="size-4 text-muted-foreground" />
                     )}
-                    <span>{field.state.value ? "Shared" : "Personal"}</span>
+                    <span>
+                      {field.state.value
+                        ? t("createContext.shared")
+                        : t("createContext.personal")}
+                    </span>
                   </span>
                   <Switch
                     checked={field.state.value}
                     onCheckedChange={field.handleChange}
-                    aria-label="Shared context — you both attend and can edit"
+                    aria-label={t("createContext.sharedSwitchAriaLabel")}
                   />
                 </label>
                 <p className="text-xs text-muted-foreground">
                   {field.state.value
-                    ? "You both attend and can edit every event in it."
-                    : "Only on your calendar; only you can edit its events."}
+                    ? t("createContext.sharedHint")
+                    : t("createContext.personalHint")}
                 </p>
               </div>
             )}
@@ -174,7 +181,7 @@ export function CreateContextDialog({
                   onClick={() => onOpenChange(false)}
                   disabled={isSubmitting}
                 >
-                  Cancel
+                  {tc("cancel")}
                 </Button>
                 <Button
                   onClick={() => void form.handleSubmit()}
@@ -183,7 +190,7 @@ export function CreateContextDialog({
                   {isSubmitting && (
                     <Spinner data-icon="inline-start" />
                   )}
-                  Add context
+                  {t("createContext.submit")}
                 </Button>
               </>
             )}

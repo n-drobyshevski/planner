@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -26,10 +27,11 @@ export function AttributeFields({
   /** stable id namespace when both dialogs are mounted ("ev" | "task") */
   idPrefix: string;
 }) {
+  const t = useTranslations("nav");
   return (
     <div className="flex flex-col gap-4">
       <FieldDescription>
-        All optional — tap a selected option again to clear it.
+        {t("attributes.clearHint")}
       </FieldDescription>
       {ATTRIBUTE_META.map((meta) => {
         const current = value[meta.key];
@@ -59,7 +61,7 @@ export function AttributeFields({
                   className="min-h-11 px-3 tabular-nums sm:min-h-9"
                   aria-label={
                     meta.key === "satisfaction"
-                      ? `Satisfaction ${opt.label} of 5`
+                      ? t("attributes.satisfactionAriaLabel", { label: opt.label })
                       : opt.label
                   }
                 >

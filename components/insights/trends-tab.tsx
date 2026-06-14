@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Area,
   Bar,
@@ -40,11 +41,14 @@ import {
 import { InsightLede } from "./insight-lede";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { InsightsEmpty } from "./insights-empty";
-import { bucketLabel, bucketTick, seriesMeta } from "./series";
+import { bucketLabel, bucketTick, seriesFallbackLabels, seriesMeta } from "./series";
 import { CHART_H, Figure, Reading, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function TrendsTab({ data }: { data: InsightsTabData }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
+  const seriesLabels = seriesFallbackLabels(t);
   const reduced = usePrefersReducedMotion();
   const { period, occurrences, timeZone, viewerId } = data;
   const { granularity } = period;
@@ -69,9 +73,9 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
       key: String(b.start),
       ms: b.ms,
       ...(avg ? { avg: avg[i].avgMs } : {}),
-      full: bucketLabel({ start: b.start, end: b.end }, granularity, timeZone),
+      full: bucketLabel({ start: b.start, end: b.end }, granularity, timeZone, locale),
     }));
-  }, [buckets, granularity, timeZone]);
+  }, [buckets, granularity, timeZone, locale]);
 
   // Momentum: direction over the bucket series, plus day-level streaks,
   // consistency, and unusual days (robust z over nonzero days).
@@ -96,10 +100,10 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
     () =>
       catTrend.rows.map((r) => ({
         key: String(r.start),
-        full: bucketLabel({ start: r.start, end: r.end }, granularity, timeZone),
+        full: bucketLabel({ start: r.start, end: r.end }, granularity, timeZone, locale),
         ...r.byKey,
       })),
-    [catTrend, granularity, timeZone],
+    [catTrend, granularity, timeZone, locale],
   );
   const catTotals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -114,36 +118,36 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
   if (total === 0)
     return (
       <InsightsEmpty
-        title="Nothing to chart over time"
-        description="Timed events in this period will appear here as a trend across days, weeks, or months."
+        title={t("trends.emptyTitle")}
+        description={t("trends.emptyDescription")}
       />
     );
 
   const totalConfig: ChartConfig = {
-    ms: { label: "Tracked", color: "var(--chart-1)" },
+    ms: { label: t("trends.seriesTracked"), color: "var(--chart-1)" },
     ...(granularity === "day"
-      ? { avg: { label: "7-day avg", color: "var(--chart-2)" } }
+      ? { avg: { label: t("trends.seriesAvg"), color: "var(--chart-2)" } }
       : {}),
   };
   const catConfig: ChartConfig = Object.fromEntries(
     catTrend.seriesKeys.map((k) => {
-      const meta = seriesMeta(k, data.categories);
+      const meta = seriesMeta(k, data.categories, seriesLabels);
       return [k, { label: meta.name, color: meta.color }];
     }),
   );
   const catSeries = catTrend.seriesKeys.map((k) => {
-    const meta = seriesMeta(k, data.categories);
+    const meta = seriesMeta(k, data.categories, seriesLabels);
     return { key: k, label: meta.name, color: meta.color };
   });
 
   const busiest = rows.reduce((a, b) => (b.ms > a.ms ? b : a), rows[0]);
   const trendClause =
     trend.direction === "up"
-      ? " Trending up across the period."
+      ? t("trends.trendUp")
       : trend.direction === "down"
-        ? " Trending down across the period."
+        ? t("trends.trendDown")
         : trend.direction === "flat"
-          ? " Holding steady across the period."
+          ? t("trends.trendFlat")
           : "";
   const topCat = catSeries.length
     ? catSeries.reduce((a, b) =>
@@ -155,13 +159,15 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
     trend,
     granularity,
     busiest: { full: busiest.full, ms: busiest.ms },
+    t,
+    locale,
   });
 
   const leadFigures = [
-    { label: "Total tracked", value: formatDuration(total) },
+    { label: t("trends.totalTracked"), value: formatDuration(total, locale) },
     {
-      label: `Busiest ${granularity}`,
-      value: formatDuration(busiest.ms),
+      label: t("trends.busiestGranularity", { granularity }),
+      value: formatDuration(busiest.ms, locale),
       hint: busiest.full,
     },
   ];
@@ -169,8 +175,13 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
   return (
     <Reading>
       <p className="sr-only">
-        {formatDuration(total)} tracked across {rows.length} {granularity} buckets.
-        Busiest: {busiest.full} with {formatDuration(busiest.ms)}.
+        {t("trends.srSummary", {
+          total: formatDuration(total, locale),
+          count: rows.length,
+          granularity,
+          busiest: busiest.full,
+          ms: formatDuration(busiest.ms, locale),
+        })}
       </p>
 
       <InsightLede lede={lede} figures={leadFigures} />
@@ -178,17 +189,20 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
       <TabGrid>
       <ChartCard
         id="trends-per-bucket"
-        className="xl:col-span-2"
+        className="lg:col-span-2"
         viewerId={viewerId}
-        title={`Tracked time per ${granularity}`}
-        headline={`Busiest ${granularity}: ${busiest.full} (${formatDuration(busiest.ms)}).${trendClause}`}
+        title={t("trends.perBucketTitle", { granularity })}
+        headline={t("trends.perBucketHeadline", {
+          granularity,
+          busiest: busiest.full,
+          ms: formatDuration(busiest.ms, locale),
+          trend: trendClause,
+        })}
         chartTypes={["bar", "line", "area"]}
         footnote={
           [
-            granularity === "day"
-              ? "Curve: trailing 7-day average · tap a day for detail"
-              : null,
-            anomalies.length > 0 ? "○ unusual day" : null,
+            granularity === "day" ? t("trends.footnoteAvg") : null,
+            anomalies.length > 0 ? t("trends.footnoteUnusual") : null,
           ]
             .filter(Boolean)
             .join(" · ") || undefined
@@ -198,7 +212,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           <ChartContainer
             config={totalConfig}
             className={`aspect-auto ${CHART_H.standard} w-full`}
-            aria-label={`Tracked time per ${granularity}, ${period.label}`}
+            aria-label={t("trends.perBucketAria", { granularity, label: period.label })}
           >
             <ComposedChart
               data={rows}
@@ -211,7 +225,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
             >
               {insightsGrid()}
               {insightsXAxis({
-                tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+                tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone, locale),
               })}
               {insightsYAxis({ tickCount: 3 })}
               <ChartTooltip
@@ -225,7 +239,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                       <TooltipRow
                         color={item.color}
                         label={totalConfig[name as string]?.label ?? name}
-                        value={formatDuration(Number(value))}
+                        value={formatDuration(Number(value), locale)}
                       />
                     )}
                   />
@@ -292,34 +306,35 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           anomalies.length > 0 ||
           trend.direction !== null) && (
         <section className="space-y-1.5">
-          <SectionLabel>Momentum</SectionLabel>
+          <SectionLabel>{t("trends.momentum")}</SectionLabel>
           <dl className="flex flex-wrap gap-x-6 gap-y-2">
             {streak && (
               <Figure
-                label="Current streak"
-                value={`${streak.current} ${streak.current === 1 ? "day" : "days"}`}
+                label={t("trends.currentStreak")}
+                value={t("trends.days", { count: streak.current })}
               />
             )}
             {streak && (
               <Figure
-                label="Longest streak"
-                value={`${streak.longest} ${streak.longest === 1 ? "day" : "days"}`}
+                label={t("trends.longestStreak")}
+                value={t("trends.days", { count: streak.longest })}
               />
             )}
             {steadiness !== null && (
-              <Figure label="Consistency" value={`${Math.round(steadiness * 100)}%`} />
+              <Figure label={t("trends.consistency")} value={`${Math.round(steadiness * 100)}%`} />
             )}
             {/* Theil–Sen slope of the day series — the steady drift behind the
                 "trending up/down" verdict, as a per-day figure. */}
             {trend.direction !== null && trend.slopeMsPerBucket !== null && (
               <Figure
-                label="Trend rate"
+                label={t("trends.trendRate")}
                 value={
                   trend.direction === "flat"
-                    ? "Level"
-                    : `${trend.slopeMsPerBucket > 0 ? "+" : "−"}${formatDuration(
-                        Math.abs(trend.slopeMsPerBucket),
-                      )}/day`
+                    ? t("trends.level")
+                    : t("trends.trendRatePerDay", {
+                        sign: trend.slopeMsPerBucket > 0 ? "+" : "−",
+                        ms: formatDuration(Math.abs(trend.slopeMsPerBucket), locale),
+                      })
                 }
               />
             )}
@@ -332,11 +347,11 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                   className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs"
                 >
                   <span className="text-muted-foreground">
-                    {a.direction === "high" ? "Unusually heavy" : "Unusually light"}:
+                    {a.direction === "high" ? t("trends.unusuallyHeavy") : t("trends.unusuallyLight")}
                   </span>
-                  <span>{formatWeekdayDayMonth(a.dayMs, timeZone)}</span>
+                  <span>{formatWeekdayDayMonth(a.dayMs, timeZone, locale)}</span>
                   <span className="font-mono tabular-nums text-muted-foreground">
-                    {formatDuration(a.ms)}
+                    {formatDuration(a.ms, locale)}
                   </span>
                 </li>
               ))}
@@ -349,34 +364,38 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         <ChartCard
           id="trends-by-context"
           viewerId={viewerId}
-          title="By context over time"
+          title={t("trends.byContextTitle")}
           headline={
             topCat
-              ? `${topCat.label} leads with ${formatDuration(catTotals.get(topCat.key) ?? 0)} (${srPercent(catTotals.get(topCat.key) ?? 0, total)} of tracked time).`
+              ? t("trends.byContextHeadline", {
+                  name: topCat.label,
+                  ms: formatDuration(catTotals.get(topCat.key) ?? 0, locale),
+                  pct: srPercent(catTotals.get(topCat.key) ?? 0, total),
+                })
               : undefined
           }
           series={catSeries}
           table={
             <Table className="text-xs">
               <TableCaption className="sr-only">
-                Total tracked time per context for {period.label}
+                {t("trends.tableCaption", { label: period.label })}
               </TableCaption>
               <TableHeader>
                 <TableRow className="text-muted-foreground hover:bg-transparent">
                   <TableHead scope="col" className="h-auto px-0 py-1.5 text-muted-foreground">
-                    Context
+                    {t("trends.colContext")}
                   </TableHead>
                   <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                    Time
+                    {t("trends.colTime")}
                   </TableHead>
                   <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
-                    Share
+                    {t("trends.colShare")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {catTrend.seriesKeys.map((k) => {
-                  const meta = seriesMeta(k, data.categories);
+                  const meta = seriesMeta(k, data.categories, seriesLabels);
                   const ms = catTotals.get(k) ?? 0;
                   return (
                     <TableRow key={k} className="border-border/60">
@@ -389,7 +408,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                         <span className="truncate">{meta.name}</span>
                       </TableCell>
                       <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
-                        {formatDuration(ms)}
+                        {formatDuration(ms, locale)}
                       </TableCell>
                       <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
                         {srPercent(ms, total)}
@@ -405,12 +424,15 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
             <ChartContainer
               config={catConfig}
               className={`aspect-auto ${CHART_H.standard} w-full`}
-              aria-label={`Tracked time per context per ${granularity}, top ${Math.min(5, catTrend.seriesKeys.length)} contexts`}
+              aria-label={t("trends.byContextAria", {
+                granularity,
+                count: Math.min(5, catTrend.seriesKeys.length),
+              })}
             >
               <LineChart data={catRows} margin={INSIGHTS_CHART_MARGIN}>
                 {insightsGrid()}
                 {insightsXAxis({
-                  tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+                  tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone, locale),
                 })}
                 {insightsYAxis({ tickCount: 3 })}
                 <ChartTooltip
@@ -425,7 +447,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                         <TooltipRow
                           color={item.color}
                           label={catConfig[name as string]?.label ?? name}
-                          value={formatDuration(Number(value))}
+                          value={formatDuration(Number(value), locale)}
                         />
                       )}
                     />

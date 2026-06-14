@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act } from "./test-utils";
 import { useOptimisticOrder } from "@/lib/hooks/use-optimistic-order";
 
 const byJoin = (a: string[], b: string[]) => a.join() === b.join();

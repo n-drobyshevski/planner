@@ -6,10 +6,12 @@
 // a calendar deep link for acting on what's found.
 
 import { useMemo } from "react";
-import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { CalendarDays } from "lucide-react";
+import { Link } from "@/i18n/navigation";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { Button } from "@/components/ui/button";
 import {
   ResponsiveDialog,
@@ -22,7 +24,7 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { ATTRIBUTE_META } from "@/lib/attributes/schema";
 import { formatDuration, formatTime, toDateParam } from "@/lib/datetime/format";
-import { seriesMeta } from "./series";
+import { seriesFallbackLabels, seriesMeta } from "./series";
 import type { InsightsTabData } from "./insights-shell";
 import type { Occurrence } from "@/lib/types";
 
@@ -52,8 +54,12 @@ export function DayDetailSheet({
   onClose: () => void;
   data: InsightsTabData;
 }) {
+  const t = useTranslations("insights");
+  const locale = useLocale();
+  const seriesLabels = seriesFallbackLabels(t);
   const { period, occurrences, categories, timeZone } = data;
   const ctx = tz(timeZone);
+  const dfLocale = dateFnsLocale(locale);
 
   const day = useMemo(() => {
     if (dayMs === null) return null;
@@ -75,18 +81,21 @@ export function DayDetailSheet({
           <>
             <ResponsiveDialogHeader>
               <ResponsiveDialogTitle>
-                {format(dayMs, "EEEE, d MMM yyyy", { in: ctx })}
+                {format(dayMs, "EEEE, d MMM yyyy", { in: ctx, locale: dfLocale })}
               </ResponsiveDialogTitle>
               <ResponsiveDialogDescription>
                 {day.items.length === 0
-                  ? "Nothing scheduled in the current insights filter."
-                  : `${formatDuration(day.totalMs)} tracked across ${day.items.length} item${day.items.length === 1 ? "" : "s"} (current filter).`}
+                  ? t("dayDetail.nothingScheduled")
+                  : t("dayDetail.summary", {
+                      ms: formatDuration(day.totalMs, locale),
+                      count: day.items.length,
+                    })}
               </ResponsiveDialogDescription>
             </ResponsiveDialogHeader>
             <ResponsiveDialogBody>
               <ul className="flex flex-col gap-2" role="list">
                 {day.items.map((o) => {
-                  const meta = seriesMeta(o.categoryId ?? "__uncategorized__", categories);
+                  const meta = seriesMeta(o.categoryId ?? "__uncategorized__", categories, seriesLabels);
                   const chips = attributeChips(o);
                   return (
                     <li
@@ -98,13 +107,13 @@ export function DayDetailSheet({
                           {o.title}
                           {o.inactive && (
                             <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
-                              inactive
+                              {t("dayDetail.inactive")}
                             </span>
                           )}
                         </span>
                         <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
                           {o.allDay
-                            ? "All day"
+                            ? t("dayDetail.allDay")
                             : `${formatTime(o.start, timeZone)} – ${formatTime(o.end, timeZone)}`}
                         </span>
                       </div>
@@ -118,7 +127,7 @@ export function DayDetailSheet({
                           {meta.name}
                         </span>
                         <span className="font-mono tabular-nums">
-                          {formatDuration(clippedMs(o, dayMs, day.dayEnd))}
+                          {formatDuration(clippedMs(o, dayMs, day.dayEnd), locale)}
                         </span>
                         {chips.length > 0 && <span>· {chips.join(" · ")}</span>}
                       </div>
@@ -133,7 +142,7 @@ export function DayDetailSheet({
                   href={`/calendar?date=${toDateParam(dayMs, timeZone)}&view=day`}
                 >
                   <CalendarDays aria-hidden className="size-4" />
-                  Open in calendar
+                  {t("dayDetail.openInCalendar")}
                 </Link>
               </Button>
             </ResponsiveDialogFooter>

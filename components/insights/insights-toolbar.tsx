@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreVertical } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -17,11 +18,7 @@ import { PeriodSelector } from "./period-selector";
 import { granularityChoices, type Granularity, type PeriodState, type ResolvedPeriod } from "@/lib/insights/period";
 import type { Member } from "@/lib/types";
 
-const GRANULARITY_LABELS: Record<Granularity, string> = {
-  day: "Day",
-  week: "Week",
-  month: "Month",
-};
+const GRANULARITIES: Granularity[] = ["day", "week", "month"];
 
 /**
  * Insights controls, portaled into the shared surface header (SurfaceChrome
@@ -51,6 +48,7 @@ export function InsightsToolbar({
   /** the filters trigger (popover/sheet), injected by the shell */
   filtersSlot?: React.ReactNode;
 }) {
+  const t = useTranslations("insights");
   const choices = granularityChoices(period.window);
 
   return (
@@ -71,11 +69,11 @@ export function InsightsToolbar({
           variant="outline"
           size="sm"
           className="hidden md:flex"
-          aria-label="Bucket size"
+          aria-label={t("toolbar.bucketSize")}
         >
-          {(Object.keys(GRANULARITY_LABELS) as Granularity[]).map((g) => (
+          {GRANULARITIES.map((g) => (
             <ToggleGroupItem key={g} value={g} disabled={!choices.includes(g)}>
-              {GRANULARITY_LABELS[g]}
+              {t(`toolbar.granularity.${g}`)}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -104,27 +102,28 @@ function InsightsMobileMenu({
   onGranularityChange: (g: Granularity) => void;
   current: Member | null;
 }) {
+  const t = useTranslations("insights");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          aria-label="More options"
+          aria-label={t("toolbar.moreOptions")}
           className="size-11 sm:size-8 md:hidden"
         >
           <MoreVertical />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Bucket size</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("toolbar.bucketSize")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={granularity}
           onValueChange={(v) => v && onGranularityChange(v as Granularity)}
         >
-          {(Object.keys(GRANULARITY_LABELS) as Granularity[]).map((g) => (
+          {GRANULARITIES.map((g) => (
             <DropdownMenuRadioItem key={g} value={g} disabled={!choices.includes(g)}>
-              {GRANULARITY_LABELS[g]}
+              {t(`toolbar.granularity.${g}`)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

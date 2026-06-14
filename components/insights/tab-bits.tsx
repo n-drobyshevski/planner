@@ -14,12 +14,12 @@ export const CHART_H = {
 } as const;
 
 /**
- * A tab's root layout: a single column up to `lg`, two columns at `xl`+ so the
- * widened desktop surface (insights-shell caps content at 1600px) actually
- * fills out instead of leaving big side margins. `items-start` keeps rows
- * ragged — a short card never stretches to a tall neighbour's height. Items
- * opt into the full width with `xl:col-span-2` (primary charts, stat rows,
- * the hour heatmap); everything else flows two-up. The old per-tab
+ * A tab's root layout: a single column up to `lg`, two columns at `lg`+ so a
+ * laptop (1024px+) already uses the widened desktop surface (insights-shell
+ * caps content at 1600px) instead of running one narrow column. `items-start`
+ * keeps rows ragged — a short card never stretches to a tall neighbour's
+ * height. Items opt into the full width with `lg:col-span-2` (primary charts,
+ * stat rows, the hour heatmap); everything else flows two-up. The old per-tab
  * `space-y-6` rhythm becomes this grid's `gap-4`.
  */
 export function TabGrid({
@@ -30,7 +30,7 @@ export function TabGrid({
   className?: string;
 }) {
   return (
-    <div className={cn("grid grid-cols-1 items-start gap-4 xl:grid-cols-2", className)}>
+    <div className={cn("grid grid-cols-1 items-start gap-4 lg:grid-cols-2", className)}>
       {children}
     </div>
   );
@@ -96,11 +96,20 @@ export function LeadFigures({
  * `<dl className="flex flex-wrap gap-x-6 gap-y-2">` for a quiet figure row that
  * reads differently from the dashboard stat grids.
  */
-export function Figure({ label, value }: { label: string; value: string }) {
+export function Figure({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="text-sm font-semibold tabular-nums">{value}</dd>
+      {hint && <dd className="text-[11px] text-muted-foreground">{hint}</dd>}
     </div>
   );
 }

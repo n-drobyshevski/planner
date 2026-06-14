@@ -1,6 +1,7 @@
 "use client";
 
 import { TZDate } from "@date-fns/tz";
+import { useTranslations } from "next-intl";
 
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -16,24 +17,16 @@ import {
 import { TimeField } from "@/components/ui/time-field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/** Simplified Karolinska Sleepiness Scale labels for the fatigue select. */
-export const KSS_LABELS: Record<number, string> = {
-  1: "Extremely alert",
-  2: "Very alert",
-  3: "Alert",
-  4: "Rather alert",
-  5: "Neither alert nor sleepy",
-  6: "Some signs of sleepiness",
-  7: "Sleepy, staying awake is easy",
-  8: "Sleepy, staying awake takes effort",
-  9: "Very sleepy, fighting sleep",
-};
-
-/** The nine KSS options chunked into three scan-friendly bands. */
-const KSS_BANDS: { label: string; values: number[] }[] = [
-  { label: "Alert", values: [1, 2, 3] },
-  { label: "In between", values: [4, 5, 6] },
-  { label: "Sleepy", values: [7, 8, 9] },
+/**
+ * The nine Karolinska Sleepiness Scale options chunked into three scan-friendly
+ * bands. Labels (band + per-value descriptor) are resolved at render time via
+ * the "sleep" namespace ("kssBand.*", "kss.1".."kss.9"); the numeric values are
+ * the scale and never change.
+ */
+const KSS_BANDS: { labelKey: string; values: number[] }[] = [
+  { labelKey: "kssBand.alert", values: [1, 2, 3] },
+  { labelKey: "kssBand.inBetween", values: [4, 5, 6] },
+  { labelKey: "kssBand.sleepy", values: [7, 8, 9] },
 ];
 
 /** One night's form values; empty string / null = not provided. */
@@ -118,15 +111,17 @@ export function SleepLogFields({
   /** stable id namespace ("checkin" | "backfill") */
   idPrefix: string;
 }) {
+  const t = useTranslations("sleep");
+  const tCommon = useTranslations("common");
   return (
     <div className="flex flex-col gap-4">
       <Field>
-        <FieldLabel htmlFor={`${idPrefix}-quality`}>Sleep quality</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-quality`}>{t("fields.quality")}</FieldLabel>
         <ToggleGroup
           id={`${idPrefix}-quality`}
           type="single"
           variant="outline"
-          aria-label="Sleep quality"
+          aria-label={t("fields.qualityAriaLabel")}
           className="flex-wrap justify-start"
           value={draft.quality !== null ? String(draft.quality) : ""}
           onValueChange={(v) =>
@@ -138,33 +133,33 @@ export function SleepLogFields({
               key={n}
               value={String(n)}
               className="min-h-11 px-3 tabular-nums pointer-fine:min-h-9"
-              aria-label={`Quality ${n} of 5`}
+              aria-label={t("fields.qualityItemAriaLabel", { n })}
             >
               {n}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <FieldDescription>1 = poor, 5 = great — tap again to clear.</FieldDescription>
+        <FieldDescription>{t("fields.qualityDescription")}</FieldDescription>
       </Field>
 
       <Field>
-        <FieldLabel htmlFor={`${idPrefix}-fatigue`}>How awake do you feel?</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-fatigue`}>{t("fields.fatigue")}</FieldLabel>
         <Select
           value={draft.fatigue !== null ? String(draft.fatigue) : ""}
           onValueChange={(v) => onChange({ ...draft, fatigue: Number(v) })}
         >
           <SelectTrigger id={`${idPrefix}-fatigue`} className="w-full">
-            <SelectValue placeholder="Optional" />
+            <SelectValue placeholder={tCommon("optional")} />
           </SelectTrigger>
           {/* popper: nine tall items must drop below the trigger, not blanket
               the form they belong to (one-handed mobile check-in) */}
           <SelectContent position="popper">
             {KSS_BANDS.map((band) => (
-              <SelectGroup key={band.label}>
-                <SelectLabel>{band.label}</SelectLabel>
+              <SelectGroup key={band.labelKey}>
+                <SelectLabel>{t(band.labelKey)}</SelectLabel>
                 {band.values.map((n) => (
                   <SelectItem key={n} value={String(n)}>
-                    <span className="tabular-nums">{n}</span> — {KSS_LABELS[n]}
+                    <span className="tabular-nums">{n}</span> — {t(`kss.${n}`)}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -175,32 +170,32 @@ export function SleepLogFields({
 
       <div className="grid grid-cols-2 gap-3">
         <Field>
-          <FieldLabel htmlFor={`${idPrefix}-bedtime`}>Went to bed</FieldLabel>
+          <FieldLabel htmlFor={`${idPrefix}-bedtime`}>{t("fields.wentToBed")}</FieldLabel>
           <TimeField
             id={`${idPrefix}-bedtime`}
             value={draft.bedtime}
             onChange={(v) => onChange({ ...draft, bedtime: v })}
-            aria-label="Bedtime"
+            aria-label={t("fields.bedtimeAriaLabel")}
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${idPrefix}-wake`}>Woke up</FieldLabel>
+          <FieldLabel htmlFor={`${idPrefix}-wake`}>{t("fields.wokeUp")}</FieldLabel>
           <TimeField
             id={`${idPrefix}-wake`}
             value={draft.wake}
             onChange={(v) => onChange({ ...draft, wake: v })}
-            aria-label="Wake time"
+            aria-label={t("fields.wakeAriaLabel")}
           />
         </Field>
       </div>
 
       <Field>
-        <FieldLabel htmlFor={`${idPrefix}-note`}>Note</FieldLabel>
+        <FieldLabel htmlFor={`${idPrefix}-note`}>{t("fields.note")}</FieldLabel>
         <Input
           id={`${idPrefix}-note`}
           value={draft.note}
           maxLength={200}
-          placeholder="Optional"
+          placeholder={tCommon("optional")}
           onChange={(e) => onChange({ ...draft, note: e.target.value })}
         />
       </Field>

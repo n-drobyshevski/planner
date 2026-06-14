@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { formatDayMonthToken } from "@/lib/datetime/format";
 import { isDateTokenPast } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
@@ -14,10 +15,10 @@ import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-con
 import { useUiStore } from "@/stores/ui-store";
 import type { Member, TaskRow } from "@/lib/types";
 
-const PRIORITY: Record<number, { label: string; variant: "destructive" | "secondary" | "outline" }> = {
-  3: { label: "High", variant: "destructive" },
-  2: { label: "Medium", variant: "secondary" },
-  1: { label: "Low", variant: "outline" },
+const PRIORITY: Record<number, { labelKey: string; variant: "destructive" | "secondary" | "outline" }> = {
+  3: { labelKey: "priority.high", variant: "destructive" },
+  2: { labelKey: "priority.medium", variant: "secondary" },
+  1: { labelKey: "priority.low", variant: "outline" },
 };
 
 export interface TaskCardProps {
@@ -60,6 +61,8 @@ export const TaskCard = forwardRef<
   },
   ref,
 ) {
+  const t = useTranslations("tasks");
+  const locale = useLocale();
   const done = task.status === "done";
   const maskTitles = useUiStore((s) => s.maskTitles);
   const timeZone = useViewerTimeZone();
@@ -96,7 +99,7 @@ export const TaskCard = forwardRef<
         <Checkbox
           checked={done}
           onCheckedChange={onToggleDone}
-          aria-label={done ? "Mark as not done" : "Mark as done"}
+          aria-label={done ? t("card.markNotDone") : t("card.markDone")}
         />
       </span>
 
@@ -115,17 +118,17 @@ export const TaskCard = forwardRef<
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             {blocked && (
               <Badge variant="outline" className="gap-1 text-muted-foreground">
-                <Lock /> Blocked
+                <Lock /> {t("card.blocked")}
               </Badge>
             )}
             {task.isPrivate && (
               <Badge variant="outline" className="gap-1 text-muted-foreground">
-                <Lock /> Private
+                <Lock /> {t("card.private")}
               </Badge>
             )}
             {task.dueDate != null && (
               <span
-                title={overdue ? "Overdue" : undefined}
+                title={overdue ? t("card.overdue") : undefined}
                 className={cn(
                   "inline-flex items-center gap-1 tabular-nums",
                   overdue && "font-medium text-destructive",
@@ -138,13 +141,13 @@ export const TaskCard = forwardRef<
                 ) : (
                   <CalendarClock className="size-3.5" />
                 )}
-                {formatDayMonthToken(task.dueDate)}
-                {overdue && <span className="sr-only"> (overdue)</span>}
+                {formatDayMonthToken(task.dueDate, locale)}
+                {overdue && <span className="sr-only">{t("card.overdueSuffix")}</span>}
               </span>
             )}
             {prio && (
               <Badge variant={prio.variant} className="gap-1">
-                <Flag /> {prio.label}
+                <Flag /> {t(prio.labelKey)}
               </Badge>
             )}
             {progress?.total ? (

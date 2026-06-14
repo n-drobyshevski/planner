@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Lock, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,8 @@ export function SubtaskEditor({
   subtasks: TaskRow[];
   workspaceId: string;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const mutations = useTaskMutations(workspaceId);
   const ordered = useMemo(() => sortByPosition(subtasks), [subtasks]);
   const byId = useMemo(() => new Map(ordered.map((t) => [t.id, t])), [ordered]);
@@ -119,7 +122,7 @@ export function SubtaskEditor({
     <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium">
-          Subtasks
+          {t("subtasks.title")}
           {total > 0 && (
             <span className="text-xs text-muted-foreground tabular-nums">
               {done}/{total}
@@ -128,13 +131,13 @@ export function SubtaskEditor({
         </div>
         {total > 0 && (
           <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-            <span>Do in order</span>
+            <span>{t("subtasks.doInOrder")}</span>
             <Switch
               checked={parent.sequential}
               onCheckedChange={(v) =>
                 void mutations.update(parent.id, { sequential: v })
               }
-              aria-label="Complete subtasks in order"
+              aria-label={t("subtasks.completeInOrder")}
             />
           </label>
         )}
@@ -143,7 +146,7 @@ export function SubtaskEditor({
       {total > 0 && (
         <Progress
           value={(done / total) * 100}
-          aria-label={`${done} of ${total} subtasks done`}
+          aria-label={t("subtasks.progressLabel", { done, total })}
           // Match the previous bar's pacing; collapse for reduced motion.
           className="h-1.5 *:data-[slot=progress-indicator]:duration-300 *:data-[slot=progress-indicator]:motion-reduce:transition-none"
         />
@@ -151,7 +154,7 @@ export function SubtaskEditor({
 
       {parent.sequential && total > 0 && (
         <p className="text-xs text-muted-foreground">
-          Each subtask unlocks when the one before it is done.
+          {t("subtasks.sequentialHint")}
         </p>
       )}
 
@@ -186,7 +189,7 @@ export function SubtaskEditor({
 
       {total === 0 && (
         <p className="text-xs text-muted-foreground">
-          No subtasks yet — break this task into steps.
+          {t("subtasks.emptyHint")}
         </p>
       )}
 
@@ -202,7 +205,7 @@ export function SubtaskEditor({
                   void addForm.handleSubmit();
                 }
               }}
-              placeholder="Add a subtask"
+              placeholder={t("subtasks.addPlaceholder")}
               className="h-8"
             />
           )}
@@ -217,7 +220,7 @@ export function SubtaskEditor({
               disabled={!title.trim()}
             >
               <Plus data-icon="inline-start" />
-              Add
+              {tc("add")}
             </Button>
           )}
         </addForm.Subscribe>
@@ -239,6 +242,7 @@ function SubtaskRow({
   onRename: (title: string) => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("tasks");
   const {
     attributes,
     listeners,
@@ -264,7 +268,7 @@ function SubtaskRow({
         ref={setActivatorNodeRef}
         {...attributes}
         {...listeners}
-        aria-label="Reorder subtask"
+        aria-label={t("subtasks.reorder")}
         className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground"
       >
         <GripVertical className="size-4" />
@@ -274,7 +278,7 @@ function SubtaskRow({
         checked={done}
         disabled={blocked}
         onCheckedChange={onToggleDone}
-        aria-label={done ? "Mark subtask not done" : "Mark subtask done"}
+        aria-label={done ? t("subtasks.markNotDone") : t("subtasks.markDone")}
       />
 
       <input
@@ -297,9 +301,9 @@ function SubtaskRow({
         <Badge
           variant="outline"
           className="gap-1 text-muted-foreground"
-          title="Finish the previous subtask first"
+          title={t("subtasks.blockedHint")}
         >
-          <Lock /> Blocked
+          <Lock /> {t("subtasks.blocked")}
         </Badge>
       )}
 
@@ -308,7 +312,7 @@ function SubtaskRow({
         variant="ghost"
         size="icon"
         className="size-7 text-muted-foreground hover:text-destructive"
-        aria-label="Delete subtask"
+        aria-label={t("subtasks.delete")}
         onClick={onDelete}
       >
         <Trash2 className="size-4" />

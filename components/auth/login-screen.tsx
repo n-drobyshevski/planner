@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -15,13 +16,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { signIn } from "@/app/login/actions";
-
-const loginFormSchema = z.object({
-  name: z.string().trim().min(1, "Please enter your name."),
-  // Blank = no PIN set; otherwise the full 8 digits (verified server-side).
-  pin: z.literal("").or(z.string().length(8, "Your PIN is 8 digits.")),
-});
+import { signIn } from "@/app/[locale]/login/actions";
 
 /**
  * Nickname + PIN sign-in. The member is found by name; their PIN (when set) is
@@ -29,10 +24,23 @@ const loginFormSchema = z.object({
  * redirects, so a returned value only ever signals failure.
  */
 export function LoginScreen() {
+  const t = useTranslations("auth");
+  const tv = useTranslations("validation");
   const [showPin, setShowPin] = useState(false);
   // The transition keeps `pending` true through the post-sign-in redirect,
   // which the form's own isSubmitting wouldn't cover.
   const [pending, startTransition] = useTransition();
+
+  // Built inside the component so validation messages can read the catalog.
+  const loginFormSchema = useMemo(
+    () =>
+      z.object({
+        name: z.string().trim().min(1, tv("nameRequired")),
+        // Blank = no PIN set; otherwise the full 8 digits (verified server-side).
+        pin: z.literal("").or(z.string().length(8, tv("pinLength"))),
+      }),
+    [tv],
+  );
 
   const form = useForm({
     defaultValues: { name: "", pin: "" },
@@ -62,17 +70,17 @@ export function LoginScreen() {
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid || undefined}>
-                  <FieldLabel htmlFor="login-name">Name</FieldLabel>
+                  <FieldLabel htmlFor="login-name">{t("nameLabel")}</FieldLabel>
                   <Input
                     id="login-name"
                     name={field.name}
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
-                    placeholder="Your name"
+                    placeholder={t("namePlaceholder")}
                     autoFocus
                     autoComplete="username"
-                    aria-label="Name"
+                    aria-label={t("nameLabel")}
                     aria-invalid={isInvalid || undefined}
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}
@@ -88,12 +96,12 @@ export function LoginScreen() {
               return (
                 <div className="flex flex-col items-center gap-1.5">
                   <div className="flex w-full items-center justify-between">
-                    <span className="text-sm font-medium">PIN</span>
+                    <span className="text-sm font-medium">{t("pinLabel")}</span>
                     <button
                       type="button"
                       onClick={() => setShowPin((s) => !s)}
                       className="flex items-center gap-1 rounded text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={showPin ? "Hide PIN" : "Show PIN"}
+                      aria-label={showPin ? t("hidePinLabel") : t("showPinLabel")}
                       aria-pressed={showPin}
                     >
                       {showPin ? (
@@ -101,7 +109,7 @@ export function LoginScreen() {
                       ) : (
                         <Eye className="size-4" aria-hidden />
                       )}
-                      {showPin ? "Hide" : "Show"}
+                      {showPin ? t("hidePin") : t("showPin")}
                     </button>
                   </div>
                   <InputOTP
@@ -132,7 +140,7 @@ export function LoginScreen() {
                     />
                   ) : (
                     <span className="self-start text-xs text-muted-foreground">
-                      Leave blank if you haven&apos;t set a PIN.
+                      {t("pinHint")}
                     </span>
                   )}
                 </div>
@@ -143,7 +151,7 @@ export function LoginScreen() {
           <form.Subscribe selector={(s) => s.values.name}>
             {(name) => (
               <Button type="submit" disabled={pending || !name.trim()}>
-                {pending ? "Signing in…" : "Sign in"}
+                {pending ? t("signingIn") : t("signIn")}
               </Button>
             )}
           </form.Subscribe>

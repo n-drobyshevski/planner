@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 import { useIdlePreload } from "@/lib/lazy";
@@ -59,6 +60,8 @@ export function TasksShell({
   viewFromUrl: boolean;
   initialBoardId: string | null;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [view, setView] = useState<TasksView>(initialView);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(initialBoardId);
@@ -198,10 +201,7 @@ export function TasksShell({
             <Spinner className="size-5" />
           </Centered>
         ) : !activeBoard ? (
-          <Centered>
-            You don&apos;t have any boards yet. Use the “New board” button up top to
-            create your first one.
-          </Centered>
+          <Centered>{t("board.noBoardsYet")}</Centered>
         ) : (
           // Crossfade the board/list swap instead of an instant cut. `initial=
           // {false}` paints the first view at once; only the manual switch
@@ -283,14 +283,13 @@ export function TasksShell({
       <AlertDialog open={dialogs.deleting !== null} onOpenChange={(o) => !o && dialogs.closeDelete()}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogTitle>{t("taskDialog.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the task, its subtasks, and any blocks it placed on the
-              calendar.
+              {t("taskDialog.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (dialogs.deleting) void mutations.remove(dialogs.deleting.id);
@@ -298,7 +297,7 @@ export function TasksShell({
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

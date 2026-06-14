@@ -10,15 +10,39 @@ import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { DerivedNight } from "@/lib/sleep/derive";
 import type { SleepLog } from "@/lib/types";
 
+/**
+ * Interpolation values a hint may carry. Raw (unformatted) so the engine stays
+ * pure and locale-free: the view resolves `targetMs` through `formatDuration`
+ * and feeds the rest straight to next-intl (ICU handles the plural counts).
+ */
+export interface SleepHintVars {
+  /** logged mornings the comparison drew on — drives the ICU plural */
+  count: number;
+  /** target in-bed time, ms — formatted at render via formatDuration */
+  targetMs?: number;
+  /** bedtime spread, whole minutes (regularity) */
+  spread?: number;
+  /** cycle length, minutes (cycle-alignment) */
+  cycle?: number;
+}
+
+/** A localized meta chip: a `sleep.hints.*` key plus its interpolation vars. */
+export interface SleepHintMeta {
+  key: string;
+  vars: SleepHintVars;
+}
+
 export interface SleepHint {
   /** stable per data — one hint per kind, so the kind doubles as the id */
   id: string;
   kind: "duration" | "regularity" | "cycle-alignment";
   severity: "attention" | "info";
-  title: string;
-  body: string;
+  /** `sleep.hints.*` keys; resolved in the view with `vars` */
+  titleKey: string;
+  bodyKey: string;
+  vars: SleepHintVars;
   /** fact chips, rendered tabular-nums */
-  meta?: string[];
+  meta?: SleepHintMeta[];
 }
 
 export interface SleepHintsInput {
@@ -65,13 +89,6 @@ interface ScoredNight {
 
 function mean(values: number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
-function formatMinutes(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
-  if (h === 0) return `${m}m`;
-  return m === 0 ? `${h}h` : `${h}h ${m.toString().padStart(2, "0")}m`;
 }
 
 /**
@@ -144,15 +161,18 @@ export function computeSleepHints(input: SleepHintsInput): SleepHint[] {
   if (durationCmp) {
     const n = withDuration.length;
     const shortWorse = durationCmp.betterIsA;
+    const targetMs = targetMin * MIN_MS;
     hints.push({
       id: "duration",
       kind: "duration",
       severity: comparisonSeverity(durationCmp),
-      title: shortWorse ? "Short nights cost you" : "Longer nights aren't scoring better",
-      body: shortWorse
-        ? `Across ${n} logged mornings, nights under your ${formatMinutes(targetMin)} target scored noticeably worse than full ones.`
-        : `Across ${n} logged mornings, nights at or over your ${formatMinutes(targetMin)} target scored worse than shorter ones — the target may not fit.`,
-      meta: [`target ${formatMinutes(targetMin)}`, `${n} nights`],
+      titleKey: shortWorse ? "durationShortTitle" : "durationLongTitle",
+      bodyKey: shortWorse ? "durationShortBody" : "durationLongBody",
+      vars: { count: n, targetMs },
+      meta: [
+        { key: "metaTarget", vars: { count: n, targetMs } },
+        { key: "metaNights", vars: { count: n } },
+      ],
     });
   }
 
@@ -167,13 +187,18 @@ export function computeSleepHints(input: SleepHintsInput): SleepHint[] {
       bedtimes.reduce((s, b) => s + (b - mu) ** 2, 0) / (bedtimes.length - 1),
     );
     if (spread >= SPREAD_INFO_MIN) {
+      const roundedSpread = Math.round(spread);
       hints.push({
         id: "regularity",
         kind: "regularity",
         severity: spread >= SPREAD_ATTENTION_MIN ? "attention" : "info",
-        title: "Bedtime drifts night to night",
-        body: `Your bedtime varies by about ±${Math.round(spread)} minutes across ${bedtimes.length} logged mornings — a steadier bedtime usually beats extra time in bed.`,
-        meta: [`±${Math.round(spread)} min`, `${bedtimes.length} nights`],
+        titleKey: "regularityTitle",
+        bodyKey: "regularityBody",
+        vars: { count: bedtimes.length, spread: roundedSpread },
+        meta: [
+          { key: "metaSpread", vars: { count: bedtimes.length, spread: roundedSpread } },
+          { key: "metaNights", vars: { count: bedtimes.length } },
+        ],
       });
     }
   }
@@ -200,11 +225,13 @@ export function computeSleepHints(input: SleepHintsInput): SleepHint[] {
       id: "cycle-alignment",
       kind: "cycle-alignment",
       severity: comparisonSeverity(cycleCmp),
-      title: alignedBetter ? "Whole cycles agree with you" : "Cycle endings don't seem to matter",
-      body: alignedBetter
-        ? `Across ${n} logged mornings, waking near a whole number of ${prefs.cycleLengthMin}-minute cycles scored better — the calculator's bedtimes should help.`
-        : `Across ${n} logged mornings, cycle-aligned nights didn't score better — duration and regularity matter more for you.`,
-      meta: [`${prefs.cycleLengthMin} min cycles`, `${n} nights`],
+      titleKey: alignedBetter ? "cycleAlignedTitle" : "cycleNeutralTitle",
+      bodyKey: alignedBetter ? "cycleAlignedBody" : "cycleNeutralBody",
+      vars: { count: n, cycle: prefs.cycleLengthMin },
+      meta: [
+        { key: "metaCycles", vars: { count: n, cycle: prefs.cycleLengthMin } },
+        { key: "metaNights", vars: { count: n } },
+      ],
     });
   }
 

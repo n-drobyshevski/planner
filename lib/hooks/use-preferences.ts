@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { useTheme } from "next-themes";
+import { useLocale } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useRouter, usePathname } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   updateMemberPreferences,
@@ -25,6 +27,7 @@ import { withAppearanceTransition } from "@/lib/theme/appearance-transition";
 import { localTimeZone } from "@/lib/datetime/local";
 import type {
   AccentId,
+  AppLocale,
   ContextLabel,
   Member,
   Palette,
@@ -74,6 +77,14 @@ export function usePreferences() {
   const member = workspace.data?.currentMember ?? null;
   const qc = useQueryClient();
 
+  // UI language: the active URL locale vs the member's stored preference. The
+  // profile is the cross-device source of truth — on first load we reconcile the
+  // URL to it (a fresh device may have landed on a browser-detected locale).
+  const urlLocale = useLocale() as AppLocale;
+  const router = useRouter();
+  const pathname = usePathname();
+  const locale: AppLocale = member?.locale ?? "en";
+
   const accent = member?.accent ?? DEFAULT_ACCENT;
   const tone = member?.surfaceTone ?? DEFAULT_TONE;
   const themePreference = member?.themePreference ?? DEFAULT_THEME;
@@ -113,6 +124,18 @@ export function usePreferences() {
     }
   }, [member, theme, setTheme, desiredTheme]);
 
+  // Once the signed-in member resolves, pull the URL onto their saved language
+  // (cross-device: the profile wins over the browser-detected first-touch
+  // locale). Runs once; a manual switch via `setLocale` already aligns the two.
+  const localeReconciled = useRef(false);
+  useEffect(() => {
+    if (!member || localeReconciled.current) return;
+    localeReconciled.current = true;
+    if (member.locale !== urlLocale) {
+      router.replace(pathname, { locale: member.locale });
+    }
+  }, [member, urlLocale, router, pathname]);
+
   const persist = useCallback(
     async (patch: MemberPreferencesPatch) => {
       if (!member) return;
@@ -148,6 +171,17 @@ export function usePreferences() {
       void persist({ surfaceTone: next });
     },
     [persist, accent, palette],
+  );
+
+  // Switch UI language: persist to the member row (so it follows across devices)
+  // and navigate to the same path under the new locale. The navigation re-renders
+  // the tree with the new message catalog; `router.replace` keeps history clean.
+  const setLocale = useCallback(
+    (next: AppLocale) => {
+      void persist({ locale: next });
+      if (next !== urlLocale) router.replace(pathname, { locale: next });
+    },
+    [persist, urlLocale, router, pathname],
   );
 
   const setThemePref = useCallback(
@@ -267,6 +301,9 @@ export function usePreferences() {
   );
 
   return {
+    /** The member's stored UI language ("en" | "ru"); drives the Settings toggle. */
+    locale,
+    setLocale,
     themePreference,
     accent,
     tone,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { AppNav } from "@/components/app-nav";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
 import { SlotTarget, ToolbarSlotsProvider } from "@/components/toolbar-slots";

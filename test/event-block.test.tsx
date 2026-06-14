@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 import { EventBlock } from "@/components/calendar/event-block";
 import { ContextBackdrop } from "@/components/calendar/context-backdrop";

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +17,7 @@ export function LoadError({
   subject: string;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("nav");
   return (
     <div
       role="alert"
@@ -23,16 +25,16 @@ export function LoadError({
     >
       <div className="max-w-xs space-y-1">
         <p className="text-sm font-medium text-foreground">
-          We couldn&apos;t load your {subject}.
+          {t("loadError.title", { subject })}
         </p>
         <p className="text-sm text-muted-foreground">
-          Check your connection and try again.
+          {t("loadError.body")}
         </p>
       </div>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>
           <RotateCw data-icon="inline-start" />
-          Try again
+          {t("loadError.retry")}
         </Button>
       )}
     </div>

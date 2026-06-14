@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 
 import { fromNoon } from "@/lib/sleep/clock";
 import { formatDuration, formatTime } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import type { HabitualPhase } from "@/lib/sleep/circadian";
 import { buildNightViews } from "@/lib/sleep/nights-view";
 import type { DerivedNight } from "@/lib/sleep/derive";
@@ -31,6 +33,7 @@ export function RhythmChart({
   timeZone,
   windowStartHour = 20,
   windowEndHour = 12,
+  action,
 }: {
   nights: DerivedNight[];
   logs: SleepLog[];
@@ -40,7 +43,12 @@ export function RhythmChart({
   windowStartHour?: number;
   /** night-window morning end hour (wall, default 12:00) */
   windowEndHour?: number;
+  /** header-right slot — the backfill entry point lives with the rhythm it edits */
+  action?: React.ReactNode;
 }) {
+  const t = useTranslations("sleep");
+  const locale = useLocale();
+  const dfLocale = dateFnsLocale(locale);
   const views = useMemo(
     () => buildNightViews(nights, logs, timeZone),
     [nights, logs, timeZone],
@@ -72,24 +80,29 @@ export function RhythmChart({
   const ROW = "h-5"; // 20px rows — airy, scannable, and compact over a month
 
   const srSummary = (() => {
-    if (withData.length === 0) return "No nights with times in this period yet.";
+    if (withData.length === 0) return t("rhythm.srNoData");
     const usual =
       habitualPhase && habitualPhase.wakeMinSinceNoon != null
-        ? ` Your usual window is ${fromNoon(habitualPhase.bedtimeMinSinceNoon)} to ${fromNoon(habitualPhase.wakeMinSinceNoon)}.`
+        ? t("rhythm.srUsualWindow", {
+            start: fromNoon(habitualPhase.bedtimeMinSinceNoon),
+            end: fromNoon(habitualPhase.wakeMinSinceNoon),
+          })
         : "";
-    return `Bedtime to wake across ${withData.length} night${withData.length === 1 ? "" : "s"}.${usual}`;
+    return t("rhythm.srSummary", { count: withData.length, usual });
   })();
 
   return (
-    <section className="space-y-3" aria-label="Sleep rhythm">
-      <SectionLabel>Sleep rhythm</SectionLabel>
+    <section className="space-y-3" aria-label={t("rhythm.ariaLabel")}>
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <SectionLabel>{t("rhythm.label")}</SectionLabel>
+        {action}
+      </div>
 
       <p className="sr-only">{srSummary}</p>
 
       {withData.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          Once a night or two has bedtimes and wake times, your rhythm shows
-          here — bed to wake, night over night.
+          {t("rhythm.empty")}
         </p>
       ) : (
         <>
@@ -103,7 +116,7 @@ export function RhythmChart({
                   key={v.dateKey}
                   className={`flex ${ROW} items-center text-[10px] tabular-nums text-muted-foreground`}
                 >
-                  {format(v.dayStartMs, "EEE d", { in: tz(timeZone) })}
+                  {format(v.dayStartMs, "EEE d", { in: tz(timeZone), locale: dfLocale })}
                 </div>
               ))}
               <div className="h-4" />
@@ -137,7 +150,13 @@ export function RhythmChart({
                       className={`relative ${ROW}`}
                       title={
                         has
-                          ? `${format(v.dayStartMs, "EEE d MMM", { in: tz(timeZone) })}: ${formatTime(v.bedAt as number, timeZone)}–${formatTime(v.wakeAt as number, timeZone)}, ${formatDuration(v.durationMs)} (${v.source === "logged" ? "logged" : "from calendar"})`
+                          ? t("rhythm.rowTitle", {
+                              date: format(v.dayStartMs, "EEE d MMM", { in: tz(timeZone), locale: dfLocale }),
+                              bedtime: formatTime(v.bedAt as number, timeZone),
+                              wake: formatTime(v.wakeAt as number, timeZone),
+                              duration: formatDuration(v.durationMs, locale),
+                              source: v.source === "logged" ? t("rhythm.sourceLogged") : t("rhythm.sourceCalendar"),
+                            })
                           : undefined
                       }
                     >
@@ -179,31 +198,31 @@ export function RhythmChart({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Each row is a night, bed to wake. Solid: logged · hatched: derived
-            from your calendar
-            {bandLeft !== null ? " · band: your usual sleep window" : ""}.
+            {t("rhythm.legend", {
+              band: bandLeft !== null ? t("rhythm.legendBand") : "",
+            })}
           </p>
 
           {/* accessible detail */}
           <table className="sr-only">
-            <caption>Sleep times per night</caption>
+            <caption>{t("rhythm.tableCaption")}</caption>
             <thead>
               <tr>
-                <th>Night</th>
-                <th>Bedtime</th>
-                <th>Wake</th>
-                <th>In bed</th>
-                <th>Source</th>
+                <th>{t("rhythm.tableNight")}</th>
+                <th>{t("rhythm.tableBedtime")}</th>
+                <th>{t("rhythm.tableWake")}</th>
+                <th>{t("rhythm.tableInBed")}</th>
+                <th>{t("rhythm.tableSource")}</th>
               </tr>
             </thead>
             <tbody>
               {withData.map((v) => (
                 <tr key={v.dateKey}>
-                  <td>{format(v.dayStartMs, "EEE d MMM", { in: tz(timeZone) })}</td>
+                  <td>{format(v.dayStartMs, "EEE d MMM", { in: tz(timeZone), locale: dfLocale })}</td>
                   <td>{formatTime(v.bedAt as number, timeZone)}</td>
                   <td>{formatTime(v.wakeAt as number, timeZone)}</td>
-                  <td>{formatDuration(v.durationMs)}</td>
-                  <td>{v.source === "logged" ? "logged" : "from calendar"}</td>
+                  <td>{formatDuration(v.durationMs, locale)}</td>
+                  <td>{v.source === "logged" ? t("rhythm.sourceLogged") : t("rhythm.sourceCalendar")}</td>
                 </tr>
               ))}
             </tbody>

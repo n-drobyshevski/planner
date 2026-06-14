@@ -5,6 +5,7 @@ import { DndContext, DragOverlay, closestCorners } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { m, AnimatePresence } from "motion/react";
 import { ListChecks } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { tween, tweenFast } from "@/lib/motion";
 import {
   Empty,
@@ -22,10 +23,10 @@ import { useSwipe } from "@/hooks/use-swipe";
 import type { TaskActions } from "./task-actions";
 import type { Member, TaskRow, TaskStatus } from "@/lib/types";
 
-const COLUMNS: { status: TaskStatus; title: string }[] = [
-  { status: "todo", title: "To Do" },
-  { status: "in_progress", title: "In Progress" },
-  { status: "done", title: "Done" },
+const COLUMNS: { status: TaskStatus; statusKey: string }[] = [
+  { status: "todo", statusKey: "status.todo" },
+  { status: "in_progress", statusKey: "status.inProgress" },
+  { status: "done", statusKey: "status.done" },
 ];
 
 export interface TaskBoardProps {
@@ -37,6 +38,7 @@ export interface TaskBoardProps {
 }
 
 export function TaskBoard({ tasks, colorOf, members, progressOf, actions }: TaskBoardProps) {
+  const t = useTranslations("tasks");
   const { byId, items, activeTask, sensors, onDragStart, onDragEnd } =
     useBoardDnd(tasks, actions.move);
   const [activeStatus, setActiveStatus] = useState<TaskStatus>("todo");
@@ -50,11 +52,11 @@ export function TaskBoard({ tasks, colorOf, members, progressOf, actions }: Task
       setActiveStatus((s) => statusOrder[Math.max(statusOrder.indexOf(s) - 1, 0)]),
   });
 
-  const renderColumn = (col: { status: TaskStatus; title: string }) => (
+  const renderColumn = (col: { status: TaskStatus; statusKey: string }) => (
     <Column
       key={col.status}
       status={col.status}
-      title={col.title}
+      title={t(col.statusKey)}
       count={items[col.status].length}
       onNew={() => actions.create(col.status)}
     >
@@ -106,7 +108,7 @@ export function TaskBoard({ tasks, colorOf, members, progressOf, actions }: Task
           >
             {COLUMNS.map((c) => (
               <ToggleGroupItem key={c.status} value={c.status} className="flex-1">
-                {c.title}
+                {t(c.statusKey)}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
@@ -160,14 +162,15 @@ export function TaskBoard({ tasks, colorOf, members, progressOf, actions }: Task
 }
 
 export function BoardEmpty() {
+  const t = useTranslations("tasks");
   return (
     <Empty>
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <ListChecks />
         </EmptyMedia>
-        <EmptyTitle>No tasks yet</EmptyTitle>
-        <EmptyDescription>Create your first task to get started.</EmptyDescription>
+        <EmptyTitle>{t("board.emptyTitle")}</EmptyTitle>
+        <EmptyDescription>{t("board.emptyDescription")}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );

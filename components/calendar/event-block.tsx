@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
+import { useTranslations } from "next-intl";
 import { formatTime } from "@/lib/datetime/format";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { CheckCircle2, Circle, Lock, Users } from "lucide-react";
@@ -48,6 +49,7 @@ export const EventBlock = forwardRef<
   { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, clash, onActivate, onMenu, className, ...rest },
   ref,
 ) {
+  const t = useTranslations("calendar");
   const timeZone = useViewerTimeZone();
   const maskTitles = useUiStore((s) => s.maskTitles);
   const isTask = occ.taskId != null && onToggleTaskDone != null;
@@ -62,12 +64,19 @@ export const EventBlock = forwardRef<
   const compact = heightPx != null && heightPx < 44;
   // Accessible name read aloud on focus, e.g. "Dinner, 18:30 to 20:00, shared".
   const a11yLabel = [
-    occ.title || "Untitled event",
-    `${formatTime(occ.start, timeZone)} to ${formatTime(occ.end, timeZone)}`,
-    occ.isShared ? "shared" : null,
-    !editable ? "another member's, read-only" : null,
-    occ.status === "cancelled" ? "cancelled" : occ.status === "planned" ? "planned" : null,
-    isTask ? (taskDone ? "task, done" : "task") : null,
+    occ.title || t("labels.untitledEvent"),
+    t("block.timeRange", {
+      start: formatTime(occ.start, timeZone),
+      end: formatTime(occ.end, timeZone),
+    }),
+    occ.isShared ? t("block.readState.shared") : null,
+    !editable ? t("block.readState.readonly") : null,
+    occ.status === "cancelled"
+      ? t("block.readState.cancelled")
+      : occ.status === "planned"
+        ? t("block.readState.planned")
+        : null,
+    isTask ? (taskDone ? t("block.readState.taskDone") : t("block.readState.task")) : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -125,7 +134,7 @@ export const EventBlock = forwardRef<
           (editable ? (
             <button
               type="button"
-              aria-label={taskDone ? "Mark task not done" : "Mark task done"}
+              aria-label={taskDone ? t("block.markTaskNotDone") : t("block.markTaskDone")}
               // Part of the roving unit, not its own Tab stop: the block is the
               // single focusable, and "mark done" stays keyboard-reachable via
               // Enter → details (its labelled toggle). Mouse click still toggles.
@@ -167,10 +176,10 @@ export const EventBlock = forwardRef<
         {/* Privacy / sharing as glyphs, not colour alone: a lock = private (only
             you), the partners icon = a joint/shared event both of you can see. */}
         {occ.isPrivate && (
-          <Lock className="mt-px size-3 shrink-0 opacity-90" aria-label="Private" />
+          <Lock className="mt-px size-3 shrink-0 opacity-90" aria-label={t("labels.private")} />
         )}
         {occ.isShared && (
-          <Users className="mt-px size-3 shrink-0 opacity-90" aria-label="Shared" />
+          <Users className="mt-px size-3 shrink-0 opacity-90" aria-label={t("labels.shared")} />
         )}
         {onMenu && (
           <ItemMenuButton
@@ -200,7 +209,7 @@ export const EventBlock = forwardRef<
               boxShadow: "-1px 0 0 0 var(--background)",
             }}
           />
-          <span className="sr-only">, overlaps another event</span>
+          <span className="sr-only">{t("block.overlaps")}</span>
         </>
       )}
       {editable && (

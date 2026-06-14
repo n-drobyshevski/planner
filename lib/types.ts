@@ -13,6 +13,9 @@ export type EventStatus = "cancelled" | "planned" | "confirmed";
  *  calendar (a backdrop painting the category in `categoryId`). */
 export type EventKind = "event" | "context";
 
+/** Supported UI languages (per member). Mirror the DB CHECK + i18n routing. */
+export type AppLocale = "en" | "ru";
+
 /** Appearance preferences, stored per member. Mirror the DB CHECK constraints. */
 export type ThemePreference = "light" | "dark" | "system";
 /** The 14 Catppuccin accent colors. Each has a default-(warm)-palette hex plus a
@@ -59,6 +62,9 @@ export interface Member {
   name: string;
   color: string; // hex accent
   hasPin: boolean;
+  // UI language (per member). Mirrors the DB CHECK; "en" default. Cross-device
+  // source of truth the app reconciles the URL `[locale]` segment to on load.
+  locale: AppLocale;
   // Appearance preferences (per member).
   themePreference: ThemePreference;
   accent: AccentId;

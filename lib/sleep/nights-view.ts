@@ -45,6 +45,72 @@ export interface NightView {
   source: "logged" | "derived";
 }
 
+/** The Sleep tab's descriptive summary of a span of nights. */
+export interface NightsSummary {
+  /** mean in-bed duration across nights with data; null = none */
+  avgMs: number | null;
+  /** mean bedtime as minutes since the previous local noon; null = none */
+  avgBedtime: number | null;
+  /** sample σ (n−1) of bedtime in minutes; null = fewer than two nights */
+  spread: number | null;
+  /** Σ shortfall below the in-bed target across nights with data */
+  debtMs: number;
+  /** count of nights that carry an in-bed duration */
+  nightsWithData: number;
+  /** the per-night in-bed target this summary is measured against */
+  targetMs: number;
+}
+
+/**
+ * Summarise a span of nights into the four descriptive figures the Sleep tab
+ * shows beside tonight's recommendation (avg per night, avg bedtime, bedtime
+ * spread, debt vs target). Built on `buildNightViews` so it can never disagree
+ * with the rhythm strip or history chart about what a night was.
+ */
+export function summarizeNights(
+  nights: DerivedNight[],
+  logs: SleepLog[],
+  prefs: SleepPrefs,
+  timeZone: string,
+): NightsSummary {
+  const views = buildNightViews(nights, logs, timeZone);
+  const withData = views.filter((v) => v.durationMs > 0);
+  const bedtimes = views
+    .map((v) => v.bedMin)
+    .filter((b): b is number => b !== null);
+
+  const avgMs =
+    withData.length > 0
+      ? withData.reduce((s, v) => s + v.durationMs, 0) / withData.length
+      : null;
+  const avgBedtime =
+    bedtimes.length > 0
+      ? bedtimes.reduce((a, b) => a + b, 0) / bedtimes.length
+      : null;
+  // Sample σ (n−1), matching the regularity hint in lib/sleep/adaptive.ts.
+  const spread =
+    avgBedtime !== null && bedtimes.length > 1
+      ? Math.sqrt(
+          bedtimes.reduce((s, b) => s + (b - avgBedtime) ** 2, 0) /
+            (bedtimes.length - 1),
+        )
+      : null;
+  const targetMs = targetInBedMs(prefs);
+  const debtMs = withData.reduce(
+    (s, v) => s + Math.max(0, targetMs - v.durationMs),
+    0,
+  );
+
+  return {
+    avgMs,
+    avgBedtime,
+    spread,
+    debtMs,
+    nightsWithData: withData.length,
+    targetMs,
+  };
+}
+
 /**
  * Merge derived nights with logged check-ins into one per-night view. Logged
  * times win; a night is "logged" only when both bedtime and wake were entered,

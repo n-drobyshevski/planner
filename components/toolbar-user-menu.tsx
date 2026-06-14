@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -14,12 +15,13 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/calendar/theme-toggle";
-import { signOutAction } from "@/app/login/actions";
+import { signOutAction } from "@/app/[locale]/login/actions";
 import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import type { Member } from "@/lib/types";
 
 /** Theme toggle + profile menu, rendered by the shared surface header. */
 export function ToolbarUserMenu({ current }: { current: Member | null }) {
+  const t = useTranslations("nav");
   return (
     <>
       <ThemeToggle />
@@ -33,7 +35,7 @@ export function ToolbarUserMenu({ current }: { current: Member | null }) {
               variant="ghost"
               size="icon"
               className="rounded-full"
-              aria-label="Profile menu"
+              aria-label={t("userMenu.ariaLabel")}
             >
               <Avatar className="size-8">
                 <AvatarFallback
@@ -46,13 +48,15 @@ export function ToolbarUserMenu({ current }: { current: Member | null }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Signed in as {current.name}</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {t("userMenu.signedInAs", { name: current.name })}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
                 <Link href="/settings">
                   <Settings data-icon="inline-start" />
-                  Settings
+                  {t("userMenu.settings")}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -61,7 +65,7 @@ export function ToolbarUserMenu({ current }: { current: Member | null }) {
                 }}
               >
                 <LogOut data-icon="inline-start" />
-                Sign out
+                {t("userMenu.signOut")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>

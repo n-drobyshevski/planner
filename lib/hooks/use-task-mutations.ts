@@ -10,6 +10,7 @@ import type { TaskInput } from "@/lib/supabase/mappers";
 import type { TaskRow } from "@/lib/types";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
+import { useTranslations } from "next-intl";
 
 /** A reversible action: a label for the toast + the inverse to run. */
 type UndoSpec = { label: string; undo: () => Promise<boolean> };
@@ -28,6 +29,8 @@ export function useTaskMutations(workspaceId: string | undefined) {
   const pushUndo = useHistoryStore((s) => s.push);
   const runUndo = useHistoryStore((s) => s.runUndo);
   const notify = useNotify();
+  const t = useTranslations("toasts");
+  const tc = useTranslations("common");
 
   const invalidate = (alsoEvents = false) => {
     if (!workspaceId) return;
@@ -84,7 +87,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
           return true;
         })
         .catch((e) => {
-          toast.error(e instanceof Error ? e.message : "Couldn't undo");
+          toast.error(e instanceof Error ? e.message : t("couldntUndo"));
           return false;
         }),
   });
@@ -120,20 +123,20 @@ export function useTaskMutations(workspaceId: string | undefined) {
       // there's no Ctrl+Z); it pops the same history entry Ctrl+Z would.
       notify.success(
         okMsg,
-        spec ? { action: { label: "Undo", onClick: () => void runUndo() } } : undefined,
+        spec ? { action: { label: tc("undo"), onClick: () => void runUndo() } } : undefined,
       );
       return true;
     } catch (e) {
       rollback?.(); // restore the pre-patch snapshot on failure
-      toast.error(e instanceof Error ? e.message : "Something went wrong");
+      toast.error(e instanceof Error ? e.message : tc("somethingWentWrong"));
       return false;
     }
   }
 
   return {
     create: (input: TaskInput) =>
-      run(m.createTask(sb, input), "Task created", {
-        undo: (row) => inverse("create", () => m.deleteTask(sb, row.id)),
+      run(m.createTask(sb, input), t("taskCreated"), {
+        undo: (row) => inverse(t("undoLabel.create"), () => m.deleteTask(sb, row.id)),
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       }),
     update: (
@@ -143,10 +146,10 @@ export function useTaskMutations(workspaceId: string | undefined) {
       /** Row fields to apply optimistically (e.g. { color } from a recolor). */
       optimisticRowPatch?: Partial<TaskRow>,
     ) =>
-      run(m.updateTask(sb, id, patch), "Task updated", {
+      run(m.updateTask(sb, id, patch), t("taskUpdated"), {
         undo: (row) =>
           prev
-            ? inverse("edit", () => m.updateTask(sb, id, prev, row.updatedAt))
+            ? inverse(t("undoLabel.edit"), () => m.updateTask(sb, id, prev, row.updatedAt))
             : null,
         optimistic: optimisticRowPatch
           ? () => patchTaskCache(id, (t) => ({ ...t, ...optimisticRowPatch }))
@@ -154,9 +157,9 @@ export function useTaskMutations(workspaceId: string | undefined) {
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       }),
     remove: (id: string) =>
-      run(m.deleteTaskDeep(sb, id), "Task deleted", {
+      run(m.deleteTaskDeep(sb, id), t("taskDeleted"), {
         alsoEvents: true,
-        undo: (snap) => inverse("delete", () => m.restoreDeleted(sb, snap), true),
+        undo: (snap) => inverse(t("undoLabel.delete"), () => m.restoreDeleted(sb, snap), true),
         optimistic: () => removeTaskFromCache(id),
         // The snapshot lists every cascaded row, so deeper-than-one subtrees
         // (which the optimistic patch doesn't cover) are dropped too.
@@ -176,9 +179,9 @@ export function useTaskMutations(workspaceId: string | undefined) {
         position: task.position,
         completedAt: task.completedAt,
       };
-      return run(m.updateTask(sb, task.id, patch), "Task moved", {
+      return run(m.updateTask(sb, task.id, patch), t("taskMoved"), {
         undo: (row) =>
-          inverse("move", () => m.updateTask(sb, task.id, prev, row.updatedAt)),
+          inverse(t("undoLabel.move"), () => m.updateTask(sb, task.id, prev, row.updatedAt)),
         optimistic: () => patchTaskCache(task.id, (t) => ({ ...t, ...patch })),
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       });
@@ -195,10 +198,10 @@ export function useTaskMutations(workspaceId: string | undefined) {
       };
       return run(
         m.updateTask(sb, task.id, { status: nextStatus, completedAt: nextCompletedAt }),
-        done ? "Task reopened" : "Task completed",
+        done ? t("taskReopened") : t("taskCompleted"),
         {
           undo: (row) =>
-            inverse(done ? "reopen" : "complete", () =>
+            inverse(done ? t("undoLabel.reopen") : t("undoLabel.complete"), () =>
               m.updateTask(sb, task.id, prev, row.updatedAt),
             ),
           optimistic: () =>
@@ -218,14 +221,14 @@ export function useTaskMutations(workspaceId: string | undefined) {
       segments: { start: number; end: number; title?: string }[],
       timeZone: string,
     ) =>
-      run(m.scheduleTaskBlocks(sb, task, segments, timeZone), "Added to calendar", {
+      run(m.scheduleTaskBlocks(sb, task, segments, timeZone), t("addedToCalendar"), {
         alsoEvents: true,
         apply: () => {}, // only events change; the task set is untouched
         undo: (rows) =>
           rows.length === 0
             ? null
             : inverse(
-                "schedule",
+                t("undoLabel.schedule"),
                 () => Promise.all(rows.map((r) => m.deleteEvent(sb, r.id))),
                 true,
               ),
@@ -236,14 +239,14 @@ export function useTaskMutations(workspaceId: string | undefined) {
       items: { task: TaskRow; start: number; end: number; title?: string }[],
       timeZone: string,
     ) =>
-      run(m.scheduleBlocks(sb, items, timeZone), "Added to calendar", {
+      run(m.scheduleBlocks(sb, items, timeZone), t("addedToCalendar"), {
         alsoEvents: true,
         apply: () => {}, // only events change; the task set is untouched
         undo: (rows) =>
           rows.length === 0
             ? null
             : inverse(
-                "schedule",
+                t("undoLabel.schedule"),
                 () => Promise.all(rows.map((r) => m.deleteEvent(sb, r.id))),
                 true,
               ),

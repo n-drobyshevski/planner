@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 
 import { goalProgress } from "@/lib/insights/goals";
 import { useCategoryGoals } from "@/lib/hooks/use-category-goals";
 import type { InsightsTabData } from "../insights-shell";
 import { SectionLabel } from "../tab-bits";
-import { seriesMeta } from "../series";
+import { seriesFallbackLabels, seriesMeta } from "../series";
 import { GoalBullet } from "./goal-bullet";
 import { ManageGoalsDialog } from "./manage-goals-dialog";
 
@@ -24,6 +25,8 @@ export function GoalsSection({
   /** tracked ms per categoryId over the focused window (caller-computed) */
   actualByCategory: ReadonlyMap<string | null, number>;
 }) {
+  const t = useTranslations("insights");
+  const seriesLabels = useMemo(() => seriesFallbackLabels(t), [t]);
   const { workspaceId, viewerId, categories, period, now } = data;
   const { goals, isLoading } = useCategoryGoals(workspaceId);
 
@@ -60,21 +63,19 @@ export function GoalsSection({
   return (
     <section className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <SectionLabel>Goals</SectionLabel>
+        <SectionLabel>{t("goals.title")}</SectionLabel>
         {manage}
       </div>
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-3">
           <p className="text-xs text-muted-foreground">
-            {isLoading
-              ? "Loading goals…"
-              : "Set a weekly target (or budget) for a context to see progress here — the tick marks the goal, the thin line marks today's pace."}
+            {isLoading ? t("goals.loading") : t("goals.empty")}
           </p>
         </div>
       ) : (
         <ul className="space-y-1.5" role="list">
           {rows.map(({ goal, progress }) => {
-            const meta = seriesMeta(goal.categoryId, categories);
+            const meta = seriesMeta(goal.categoryId, categories, seriesLabels);
             return (
               <GoalBullet
                 key={goal.id}

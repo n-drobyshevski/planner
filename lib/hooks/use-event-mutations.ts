@@ -14,6 +14,7 @@ import type { ItemAttributes } from "@/lib/attributes/schema";
 import { editAll as computeEditAll } from "@/lib/recurrence/edit-semantics";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
+import { useTranslations } from "next-intl";
 
 /** One item of a batched move/resize: a master-row update or a single-occurrence modify. */
 export type RescheduleOp =
@@ -47,6 +48,8 @@ export function useEventMutations(workspaceId: string | undefined) {
   // components/undo-hotkey.tsx, still uses runUndo to pop the newest entry).
   const undoById = useHistoryStore((s) => s.undoById);
   const notify = useNotify();
+  const t = useTranslations("toasts");
+  const tc = useTranslations("common");
 
   const invalidate = () => {
     if (workspaceId) qc.invalidateQueries({ queryKey: qk.eventsAll(workspaceId) });
@@ -160,7 +163,7 @@ export function useEventMutations(workspaceId: string | undefined) {
           return true;
         })
         .catch((e) => {
-          toast.error(e instanceof Error ? e.message : "Couldn't undo");
+          toast.error(e instanceof Error ? e.message : t("couldntUndo"));
           return false;
         }),
   });
@@ -191,10 +194,10 @@ export function useEventMutations(workspaceId: string | undefined) {
         action:
           undoId != null
             ? {
-                label: "Undo",
+                label: tc("undo"),
                 onClick: () =>
                   void undoById(undoId).then(
-                    (label) => label && notify.success(`Undone: ${label}`),
+                    (label) => label && notify.success(t("undone", { label })),
                   ),
               }
             : undefined,
@@ -202,25 +205,25 @@ export function useEventMutations(workspaceId: string | undefined) {
       return true;
     } catch (e) {
       rollback?.(); // restore the pre-patch snapshot on failure
-      toast.error(e instanceof Error ? e.message : "Something went wrong");
+      toast.error(e instanceof Error ? e.message : tc("somethingWentWrong"));
       return false;
     }
   }
 
   return {
     create: (input: EventInput) =>
-      run(m.createEvent(sb, input), "Event created", (row) =>
-        inverse("create", () => m.deleteEvent(sb, row.id)),
+      run(m.createEvent(sb, input), t("eventCreated"), (row) =>
+        inverse(t("undoLabel.create"), () => m.deleteEvent(sb, row.id)),
       ),
     /** Duplicate several items at once — one invalidate + one toast. */
     createMany: (inputs: EventInput[]) =>
       run(
         Promise.all(inputs.map((i) => m.createEvent(sb, i))),
-        `${inputs.length} events created`,
+        t("eventsCreated", { count: inputs.length }),
         (rows) =>
           rows.length === 0
             ? null
-            : inverse("create", () =>
+            : inverse(t("undoLabel.create"), () =>
                 Promise.all(rows.map((r) => m.deleteEvent(sb, r.id))),
               ),
       ),
@@ -235,9 +238,9 @@ export function useEventMutations(workspaceId: string | undefined) {
     ) =>
       run(
         m.updateEvent(sb, id, patch),
-        "Event updated",
+        t("eventUpdated"),
         (row) =>
-          prev ? inverse("edit", () => m.updateEvent(sb, id, prev, row.updatedAt)) : null,
+          prev ? inverse(t("undoLabel.edit"), () => m.updateEvent(sb, id, prev, row.updatedAt)) : null,
         optimisticRowPatch
           ? () => patchEventWindows(id, (e) => ({ ...e, ...optimisticRowPatch }))
           : undefined,
@@ -262,7 +265,7 @@ export function useEventMutations(workspaceId: string | undefined) {
                 }),
           ),
         ),
-        `${ops.length} events updated`,
+        t("eventsUpdated", { count: ops.length }),
         () => {
           const undoable = ops.filter(
             (o): o is Extract<RescheduleOp, { kind: "update" }> & {
@@ -271,7 +274,7 @@ export function useEventMutations(workspaceId: string | undefined) {
           );
           return undoable.length === 0
             ? null
-            : inverse("move", () =>
+            : inverse(t("undoLabel.move"), () =>
                 Promise.all(undoable.map((o) => m.updateEvent(sb, o.id, o.prev))),
               );
         },
@@ -291,8 +294,8 @@ export function useEventMutations(workspaceId: string | undefined) {
     remove: (id: string, opts?: { description?: string }) =>
       run(
         m.deleteEventDeep(sb, id),
-        "Event deleted",
-        (snap) => inverse("delete", () => m.restoreDeleted(sb, snap)),
+        t("eventDeleted"),
+        (snap) => inverse(t("undoLabel.delete"), () => m.restoreDeleted(sb, snap)),
         () => removeEventFromWindows(id),
         { description: opts?.description, offerUndo: true },
       ),
@@ -312,7 +315,7 @@ export function useEventMutations(workspaceId: string | undefined) {
                   .then(() => null),
           ),
         ),
-        `${ops.length} events deleted`,
+        t("eventsDeleted", { count: ops.length }),
         (results) => {
           const snaps = results.filter((r): r is DeletedSnapshot => r != null);
           if (snaps.length === 0) return null; // only recurring cancels — not undoable in v1
@@ -321,7 +324,7 @@ export function useEventMutations(workspaceId: string | undefined) {
             events: snaps.flatMap((s) => s.events),
             overrides: snaps.flatMap((s) => s.overrides),
           };
-          return inverse("delete", () => m.restoreDeleted(sb, merged));
+          return inverse(t("undoLabel.delete"), () => m.restoreDeleted(sb, merged));
         },
         undefined,
         { offerUndo: true },
@@ -335,10 +338,10 @@ export function useEventMutations(workspaceId: string | undefined) {
     ) =>
       run(
         m.updateEvent(sb, eventId, { categoryId }),
-        categoryId ? "Assigned to context" : "Removed from context",
+        categoryId ? t("assignedToContext") : t("removedFromContext"),
         (row) =>
           prevCategoryId !== undefined
-            ? inverse("context change", () =>
+            ? inverse(t("undoLabel.contextChange"), () =>
                 m.updateEvent(sb, eventId, { categoryId: prevCategoryId }, row.updatedAt),
               )
             : null,
@@ -353,9 +356,9 @@ export function useEventMutations(workspaceId: string | undefined) {
           type: "modify",
           patch,
         }),
-        "This event updated",
+        t("thisEventUpdated"),
         ({ prior }) =>
-          inverse("edit", () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
+          inverse(t("undoLabel.edit"), () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
         () =>
           upsertOverrideInWindows(event.id, occurrenceMs, (ex) =>
             provisionalOverride(ex, event.id, occurrenceMs, "modify", patch),
@@ -370,10 +373,10 @@ export function useEventMutations(workspaceId: string | undefined) {
     ) =>
       run(
         m.splitSeries(sb, event, occurrenceMs, patch, color, attributes),
-        "This and future updated",
+        t("thisAndFutureUpdated"),
         (newSeries) =>
           // Undo the split: drop the new future series, restore the original rrule.
-          inverse("edit", async () => {
+          inverse(t("undoLabel.edit"), async () => {
             await m.deleteEvent(sb, newSeries.id);
             await m.updateEvent(sb, event.id, {
               rrule: event.rrule,
@@ -384,7 +387,7 @@ export function useEventMutations(workspaceId: string | undefined) {
     editAll: (event: EventRow, patch: OccurrencePatch) =>
       run(
         m.updateAll(sb, event, patch),
-        "All events updated",
+        t("allEventsUpdated"),
         undefined,
         () =>
           patchEventWindows(event.id, (e) => ({ ...e, ...computeEditAll(event, patch) })),
@@ -397,17 +400,17 @@ export function useEventMutations(workspaceId: string | undefined) {
           occurrenceDate: occurrenceMs,
           type: "cancel",
         }),
-        "Event deleted",
+        t("eventDeleted"),
         ({ prior }) =>
-          inverse("delete", () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
+          inverse(t("undoLabel.delete"), () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
         () =>
           upsertOverrideInWindows(event.id, occurrenceMs, (ex) =>
             provisionalOverride(ex, event.id, occurrenceMs, "cancel"),
           ),
       ),
     deleteFuture: (event: EventRow, occurrenceMs: number) =>
-      run(m.deleteThisAndFuture(sb, event, occurrenceMs), "This and future deleted", () =>
-        inverse("delete", () =>
+      run(m.deleteThisAndFuture(sb, event, occurrenceMs), t("thisAndFutureDeleted"), () =>
+        inverse(t("undoLabel.delete"), () =>
           m.updateEvent(sb, event.id, {
             rrule: event.rrule,
             recurrenceEndsAt: event.recurrenceEndsAt,
@@ -417,8 +420,8 @@ export function useEventMutations(workspaceId: string | undefined) {
     deleteAll: (id: string) =>
       run(
         m.deleteEventDeep(sb, id),
-        "Series deleted",
-        (snap) => inverse("delete series", () => m.restoreDeleted(sb, snap)),
+        t("seriesDeleted"),
+        (snap) => inverse(t("undoLabel.deleteSeries"), () => m.restoreDeleted(sb, snap)),
         undefined,
         { offerUndo: true },
       ),

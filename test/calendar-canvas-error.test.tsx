@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent } from "./test-utils";
 import { CalendarCanvas, type CanvasProps } from "@/components/calendar/calendar-canvas";
 
 // Minimal props to reach the error branch (it returns before the views render).

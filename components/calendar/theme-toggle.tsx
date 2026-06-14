@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePreferences } from "@/lib/hooks/use-preferences";
 
 export function ThemeToggle() {
+  const t = useTranslations("calendar");
   const { resolvedTheme } = useTheme();
   const { palette, setThemePref } = usePreferences();
   const [mounted, setMounted] = useState(false);
@@ -22,7 +24,7 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      aria-label="Toggle theme"
+      aria-label={t("themeToggle.ariaLabel")}
       onClick={() => setThemePref(isDark ? "light" : "dark")}
     >
       {isDark ? <Moon /> : <Sun />}

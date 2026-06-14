@@ -1,0 +1,18 @@
+{
+  "summaryEvery": "Repeats every {interval, plural, one {# {unit}} other {# {unit}s}}",
+  "summaryAdverb": "Repeats {freq, select, DAILY {daily} WEEKLY {weekly} MONTHLY {monthly} other {regularly}}",
+  "unit": "{freq, select, DAILY {day} WEEKLY {week} MONTHLY {month} other {time}}",
+  "onDays": "{base} on {days}",
+  "untilDate": "{base}, until {date}",
+  "timesCount": "{base}, {count, plural, one {# time} other {# times}}",
+  "daySeparator": ", ",
+  "weekday": {
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat",
+    "sun": "Sun"
+  }
+}

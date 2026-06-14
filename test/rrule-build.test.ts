@@ -4,24 +4,78 @@ import {
   parseRRule,
   summarizeRecurrence,
   type RecurrenceForm,
+  type RecurrenceTranslator,
 } from "@/lib/recurrence/rrule-build";
+
+// Plain English translator stub mirroring messages/en/recurrence.json. Lets the
+// summary assertions stay meaningful and English without a next-intl provider.
+// (The until-date string is formatted inside summarizeRecurrence via
+// formatDayMonthYear(..., "en"), so the stub only composes the sentence.)
+const FREQ_ADVERB: Record<string, string> = {
+  DAILY: "daily",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+};
+const FREQ_UNIT: Record<string, string> = {
+  DAILY: "day",
+  WEEKLY: "week",
+  MONTHLY: "month",
+};
+const WEEKDAY_LABEL: Record<string, string> = {
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
+  sun: "Sun",
+};
+
+const tEn: RecurrenceTranslator = (key, values = {}) => {
+  if (key.startsWith("weekday.")) return WEEKDAY_LABEL[key.slice("weekday.".length)];
+  switch (key) {
+    case "summaryEvery": {
+      const n = Number(values.interval);
+      const unit = String(values.unit);
+      return `Repeats every ${n} ${n === 1 ? unit : `${unit}s`}`;
+    }
+    case "summaryAdverb":
+      return `Repeats ${FREQ_ADVERB[String(values.freq)]}`;
+    case "unit":
+      return FREQ_UNIT[String(values.freq)];
+    case "onDays":
+      return `${values.base} on ${values.days}`;
+    case "untilDate":
+      return `${values.base}, until ${values.date}`;
+    case "timesCount": {
+      const n = Number(values.count);
+      return `${values.base}, ${n} ${n === 1 ? "time" : "times"}`;
+    }
+    case "daySeparator":
+      return ", ";
+    default:
+      return key;
+  }
+};
+
+const summarize = (form: RecurrenceForm) => summarizeRecurrence(form, tEn, "en");
 
 describe("summarizeRecurrence", () => {
   it("weekly on a single day", () => {
     expect(
-      summarizeRecurrence({ freq: "WEEKLY", interval: 1, byWeekday: [0], end: { type: "never" } }),
+      summarize({ freq: "WEEKLY", interval: 1, byWeekday: [0], end: { type: "never" } }),
     ).toBe("Repeats weekly on Mon");
   });
 
   it("every N weeks on multiple days", () => {
     expect(
-      summarizeRecurrence({ freq: "WEEKLY", interval: 2, byWeekday: [2, 0], end: { type: "never" } }),
+      summarize({ freq: "WEEKLY", interval: 2, byWeekday: [2, 0], end: { type: "never" } }),
     ).toBe("Repeats every 2 weeks on Mon, Wed");
   });
 
   it("daily with an until date", () => {
     expect(
-      summarizeRecurrence({
+      summarize({
         freq: "DAILY",
         interval: 1,
         byWeekday: [],
@@ -32,7 +86,7 @@ describe("summarizeRecurrence", () => {
 
   it("monthly with a count", () => {
     expect(
-      summarizeRecurrence({
+      summarize({
         freq: "MONTHLY",
         interval: 1,
         byWeekday: [],
@@ -43,7 +97,7 @@ describe("summarizeRecurrence", () => {
 
   it("daily on specific weekdays", () => {
     expect(
-      summarizeRecurrence({
+      summarize({
         freq: "DAILY",
         interval: 1,
         byWeekday: [0, 2, 4],
@@ -54,7 +108,7 @@ describe("summarizeRecurrence", () => {
 
   it("daily on weekdays ignores interval in the summary", () => {
     expect(
-      summarizeRecurrence({
+      summarize({
         freq: "DAILY",
         interval: 3,
         byWeekday: [0],

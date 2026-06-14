@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Line, LineChart, YAxis } from "recharts";
 
 import {
@@ -9,14 +10,9 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { formatDuration } from "@/lib/datetime/format";
-import { fromNoon, minutesSinceNoon } from "@/lib/sleep/clock";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import type { DerivedNight } from "@/lib/sleep/derive";
-import type { SleepPrefs } from "@/lib/sleep/cycles";
-import { targetInBedMs } from "@/lib/sleep/nights-view";
 import type { SleepLog } from "@/lib/types";
-import { StatCard, StatGrid } from "../stat-card";
 import {
   INSIGHTS_CHART_MARGIN,
   insightsGrid,
@@ -24,92 +20,28 @@ import {
 } from "../chart-frame";
 import { bucketTick } from "../series";
 import { SectionLabel } from "../tab-bits";
-
-const HOUR_MS = 3_600_000;
-
-interface NightRow {
-  key: string;
-  dateKey: string;
-  hours: number;
-  ms: number;
-  source: "logged" | "derived";
-}
+import { SectionEmpty } from "../insights-empty";
 
 /**
- * Per-night duration history (logged check-in times win over the
- * calendar-derived night), summary stats, and quality/fatigue trends.
- * Logged vs derived is carried by fill pattern (solid vs hatched) plus a
- * text legend — never color alone.
+ * Morning check-in trends: quality (higher is better) and sleepiness (lower is
+ * better) per night, one of the Sleep tab's evidence blocks. Logged vs derived
+ * lives in the rhythm strip and the per-night summary; this block is purely the
+ * subjective scores, so it coaches to log more when there are none yet rather
+ * than showing an empty axis.
  */
 export function HistorySection({
   nights,
   logs,
-  prefs,
   timeZone,
-  action,
 }: {
   nights: DerivedNight[];
   logs: SleepLog[];
-  prefs: SleepPrefs;
   timeZone: string;
-  /** header-right slot — the backfill entry point lives with the data */
-  action?: React.ReactNode;
 }) {
+  const t = useTranslations("sleep");
+  const locale = useLocale();
   const reduced = usePrefersReducedMotion();
   const logByKey = useMemo(() => new Map(logs.map((l) => [l.date, l])), [logs]);
-
-  const rows = useMemo<NightRow[]>(() => {
-    return nights.map((n) => {
-      const log = logByKey.get(n.dateKey);
-      const loggedMs =
-        log && log.bedtimeAt !== null && log.wokeAt !== null
-          ? log.wokeAt - log.bedtimeAt
-          : null;
-      const ms = loggedMs ?? n.durationMs;
-      return {
-        key: String(n.dayStartMs),
-        dateKey: n.dateKey,
-        hours: ms / HOUR_MS,
-        ms,
-        source: loggedMs !== null ? ("logged" as const) : ("derived" as const),
-      };
-    });
-  }, [nights, logByKey]);
-
-  const withData = rows.filter((r) => r.ms > 0);
-
-  // Bedtimes (logged preferred, else derived start) as minutes since the
-  // previous local noon — continuous over the night span, no midnight wrap.
-  const bedtimes = useMemo(() => {
-    const out: number[] = [];
-    for (const n of nights) {
-      const log = logByKey.get(n.dateKey);
-      const at = log?.bedtimeAt ?? n.start;
-      if (at == null) continue;
-      out.push(minutesSinceNoon(at, timeZone));
-    }
-    return out;
-  }, [nights, logByKey, timeZone]);
-
-  const targetMs = targetInBedMs(prefs);
-
-  const avgMs =
-    withData.length > 0
-      ? withData.reduce((s, r) => s + r.ms, 0) / withData.length
-      : null;
-  const avgBedtime =
-    bedtimes.length > 0
-      ? bedtimes.reduce((a, b) => a + b, 0) / bedtimes.length
-      : null;
-  // Sample σ (n−1), matching the regularity hint in lib/sleep/adaptive.ts.
-  const spread =
-    avgBedtime !== null && bedtimes.length > 1
-      ? Math.sqrt(
-          bedtimes.reduce((s, b) => s + (b - avgBedtime) ** 2, 0) /
-            (bedtimes.length - 1),
-        )
-      : null;
-  const debtMs = withData.reduce((s, r) => s + Math.max(0, targetMs - r.ms), 0);
 
   const scoreRows = useMemo(
     () =>
@@ -124,85 +56,53 @@ export function HistorySection({
     [nights, logByKey],
   );
   const hasScores = scoreRows.some((r) => r.quality !== null || r.fatigue !== null);
-  // Screen-reader summary for the scores chart (the bars/lines are visual-only).
+
+  // Screen-reader summary for the scores chart (the lines are visual-only).
   const qualityScores = scoreRows.filter((r) => r.quality !== null);
   const fatigueScores = scoreRows.filter((r) => r.fatigue !== null);
-  const mornings = (n: number) => `${n} morning${n === 1 ? "" : "s"}`;
   const scoresSummary = [
     qualityScores.length > 0
-      ? `Average sleep quality ${(
-          qualityScores.reduce((s, r) => s + (r.quality as number), 0) /
-          qualityScores.length
-        ).toFixed(1)} of 5 across ${mornings(qualityScores.length)}`
+      ? t("history.srAvgQuality", {
+          value: (
+            qualityScores.reduce((s, r) => s + (r.quality as number), 0) /
+            qualityScores.length
+          ).toFixed(1),
+          count: qualityScores.length,
+        })
       : null,
     fatigueScores.length > 0
-      ? `average sleepiness ${(
-          fatigueScores.reduce((s, r) => s + (r.fatigue as number), 0) /
-          fatigueScores.length
-        ).toFixed(1)} of 9 across ${mornings(fatigueScores.length)}`
+      ? t("history.srAvgSleepiness", {
+          value: (
+            fatigueScores.reduce((s, r) => s + (r.fatigue as number), 0) /
+            fatigueScores.length
+          ).toFixed(1),
+          count: fatigueScores.length,
+        })
       : null,
   ]
     .filter(Boolean)
     .join("; ");
 
   const scoreConfig: ChartConfig = {
-    quality: { label: "Quality (1–5)", color: "var(--chart-2)" },
-    fatigue: { label: "Sleepiness (1–9)", color: "var(--chart-4)" },
+    quality: { label: t("history.qualityLabel"), color: "var(--chart-2)" },
+    fatigue: { label: t("history.sleepinessLabel"), color: "var(--chart-4)" },
   };
 
   return (
-    <section className="space-y-3">
-      <div className="flex min-h-8 items-center justify-between gap-2">
-        <SectionLabel>Sleep history</SectionLabel>
-        {action}
-      </div>
-      <StatGrid>
-        <StatCard
-          flat
-          label="Avg per night"
-          value={avgMs !== null ? formatDuration(Math.round(avgMs)) : "—"}
-          hint={`${withData.length} night${withData.length === 1 ? "" : "s"} with data`}
-        />
-        <StatCard
-          flat
-          label="Avg bedtime"
-          value={avgBedtime !== null ? fromNoon(avgBedtime) : "—"}
-        />
-        <StatCard
-          flat
-          label="Bedtime spread"
-          value={spread !== null ? `±${Math.round(spread)} min` : "—"}
-          hint="lower is steadier"
-        />
-        <StatCard
-          flat
-          label="Debt vs target"
-          value={withData.length > 0 ? formatDuration(Math.round(debtMs)) : "—"}
-          hint={`target ${formatDuration(targetMs)} in bed`}
-        />
-      </StatGrid>
-
-      <p className="sr-only">
-        {withData.length} of {rows.length} nights have sleep data
-        {avgMs !== null
-          ? `, averaging ${formatDuration(Math.round(avgMs))} in bed`
-          : ""}
-        .
-      </p>
-
-      {hasScores && (
+    <section className="space-y-2">
+      <SectionLabel>{t("history.label")}</SectionLabel>
+      {hasScores ? (
         <div className="space-y-1.5">
-          <SectionLabel>Morning check-ins</SectionLabel>
           <p className="sr-only">{scoresSummary}.</p>
           <ChartContainer
             config={scoreConfig}
             className="aspect-auto h-[140px] w-full"
-            aria-label="Sleep quality and morning sleepiness per night"
+            aria-label={t("history.chartAriaLabel")}
           >
             <LineChart data={scoreRows} accessibilityLayer margin={INSIGHTS_CHART_MARGIN}>
               {insightsGrid()}
               {insightsXAxis({
-                tickFormatter: (v) => bucketTick(Number(v), "day", timeZone),
+                tickFormatter: (v) => bucketTick(Number(v), "day", timeZone, locale),
               })}
               <YAxis hide domain={[0, 9]} />
               <ChartTooltip
@@ -211,7 +111,7 @@ export function HistorySection({
                   <ChartTooltipContent
                     labelFormatter={(_l, payload) => {
                       const k = (payload?.[0]?.payload as { key?: string })?.key;
-                      return k ? bucketTick(Number(k), "day", timeZone) : "";
+                      return k ? bucketTick(Number(k), "day", timeZone, locale) : "";
                     }}
                   />
                 }
@@ -236,10 +136,11 @@ export function HistorySection({
             </LineChart>
           </ChartContainer>
           <p className="text-xs text-muted-foreground">
-            Solid line: quality (higher is better) · dashed: sleepiness (lower is
-            better)
+            {t("history.legend")}
           </p>
         </div>
+      ) : (
+        <SectionEmpty>{t("history.empty")}</SectionEmpty>
       )}
     </section>
   );

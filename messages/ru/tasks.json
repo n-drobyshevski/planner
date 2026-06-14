@@ -1,0 +1,134 @@
+{
+  "status": {
+    "todo": "К выполнению",
+    "inProgress": "В процессе",
+    "done": "Готово"
+  },
+  "priority": {
+    "none": "Без приоритета",
+    "low": "Низкий",
+    "medium": "Средний",
+    "high": "Высокий"
+  },
+  "toolbar": {
+    "view": "Вид",
+    "board": "Доска",
+    "list": "Список",
+    "newTask": "Новая задача",
+    "moreOptions": "Ещё"
+  },
+  "board": {
+    "addTaskTo": "Добавить задачу в «{title}»",
+    "dropTasksHere": "Перетащи задачи сюда",
+    "emptyTitle": "Пока нет задач",
+    "emptyDescription": "Создай первую задачу, чтобы начать.",
+    "noBoardsYet": "У тебя пока нет досок. Нажми «Новая доска» наверху, чтобы создать первую."
+  },
+  "list": {
+    "nothingHere": "Здесь пусто."
+  },
+  "loadErrorSubject": "задачи",
+  "switcher": {
+    "boards": "Доски",
+    "newBoard": "Новая доска",
+    "edit": "Изменить «{name}»",
+    "delete": "Удалить «{name}»",
+    "deleteTitle": "Удалить «{name}»?",
+    "notEmptyTitle": "Доска не пуста",
+    "notEmptyDescription": "На этой доске ещё {count, plural, one {# задача} few {# задачи} many {# задач} other {# задачи}}. Сначала перемести или удали {count, plural, one {её} other {их}}, потом сможешь убрать доску.",
+    "deleteDescription": "Это удалит доску. Её задачи уже удалены. Сразу после этого действие можно отменить."
+  },
+  "boardDialog": {
+    "createTitle": "Новая доска",
+    "editTitle": "Изменить доску",
+    "description": "Доска — это набор задач. Оставь её себе или поделись.",
+    "namePlaceholder": "Название доски",
+    "nameLabel": "Название доски",
+    "colorLabel": "Цвет {color}",
+    "shared": "Общая",
+    "personal": "Личная",
+    "sharedToggleLabel": "Общая доска — вы оба видите и редактируете её",
+    "sharedHint": "Вы оба видите её и можете редактировать задачи.",
+    "personalHint": "Эту доску и её задачи видишь только ты.",
+    "addBoard": "Добавить доску"
+  },
+  "taskDialog": {
+    "createTitle": "Новая задача",
+    "editTitle": "Изменить задачу",
+    "titleLabel": "Название",
+    "titlePlaceholder": "Что нужно сделать?",
+    "notesLabel": "Заметки",
+    "notesPlaceholder": "Добавь детали",
+    "assigneeLabel": "Исполнитель",
+    "unassigned": "Без исполнителя",
+    "contextLabel": "Контекст",
+    "noContext": "Без контекста",
+    "priorityLabel": "Приоритет",
+    "dueDateLabel": "Срок",
+    "statusLabel": "Статус",
+    "privateLabel": "Личное (видишь только ты)",
+    "optimizationDetails": "Детали для оптимизации",
+    "deleteTitle": "Удалить эту задачу?",
+    "deleteDescription": "Это удалит задачу, её подзадачи и все блоки, которые она поставила в календарь."
+  },
+  "card": {
+    "markDone": "Отметить выполненной",
+    "markNotDone": "Отметить невыполненной",
+    "blocked": "Заблокировано",
+    "private": "Личное",
+    "overdue": "Просрочено",
+    "overdueSuffix": " (просрочено)"
+  },
+  "subtasks": {
+    "title": "Подзадачи",
+    "doInOrder": "По порядку",
+    "completeInOrder": "Выполнять подзадачи по порядку",
+    "progressLabel": "{done} из {total} подзадач выполнено",
+    "sequentialHint": "Каждая подзадача открывается, когда выполнена предыдущая.",
+    "emptyHint": "Пока нет подзадач — разбей задачу на шаги.",
+    "addPlaceholder": "Добавить подзадачу",
+    "reorder": "Переместить подзадачу",
+    "markDone": "Отметить подзадачу выполненной",
+    "markNotDone": "Отметить подзадачу невыполненной",
+    "blocked": "Заблокировано",
+    "blockedHint": "Сначала закончи предыдущую подзадачу",
+    "delete": "Удалить подзадачу"
+  },
+  "contextMenu": {
+    "open": "Открыть",
+    "markDone": "Отметить выполненной",
+    "markNotDone": "Отметить невыполненной",
+    "schedule": "Запланировать…"
+  },
+  "backlog": {
+    "tasks": "Задачи",
+    "insights": "Аналитика",
+    "scheduleHint": "Перетащи на сетку недели или дня, чтобы запланировать, или нажми «Запланировать» для настроек.",
+    "empty": "Открытых задач нет. Всё запланировано или сделано. 🎉",
+    "schedule": "Запланировать «{title}»",
+    "sheetDescription": "Нажми «Запланировать», чтобы поставить задачу в календарь."
+  },
+  "schedule": {
+    "title": "Добавить в календарь",
+    "dateLabel": "Дата",
+    "startLabel": "Начало",
+    "howLabel": "Как",
+    "oneBlock": "Один блок",
+    "split": "Разбить",
+    "subtasks": "Подзадачи",
+    "durationLabel": "Длительность",
+    "totalDurationLabel": "Общая длительность",
+    "blocksLabel": "Блоки",
+    "eachSubtaskLabel": "Каждая подзадача",
+    "subtasksHintInOrder": "{count, plural, one {# подзадача} few {# подзадачи} many {# подзадач} other {# подзадачи}} запланированы подряд, по порядку.",
+    "subtasksHint": "{count, plural, one {# подзадача} few {# подзадачи} many {# подзадач} other {# подзадачи}} запланированы подряд.",
+    "durations": {
+      "15min": "15 мин",
+      "30min": "30 мин",
+      "45min": "45 мин",
+      "1hour": "1 час",
+      "1andHalfHours": "1,5 часа",
+      "2hours": "2 часа"
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
+import { useTranslations } from "next-intl";
 import { z } from "zod";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,8 @@ import { useProfile } from "@/lib/hooks/use-profile";
 type PinMode = "set" | "change" | "remove";
 
 export function ProfileSettings() {
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const { member, isReady, saveName, saveColor, verifyCurrentPin, savePin } =
     useProfile();
   const [pinMode, setPinMode] = React.useState<PinMode | null>(null);
@@ -44,32 +47,29 @@ export function ProfileSettings() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>
-            Your name and the PIN used when switching to your profile.
-          </CardDescription>
+          <CardTitle>{t("profile.title")}</CardTitle>
+          <CardDescription>{t("profile.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           {/* Display name */}
           <FieldSet>
-            <FieldLegend variant="label">Display name</FieldLegend>
+            <FieldLegend variant="label">{t("profile.displayName.legend")}</FieldLegend>
             <FieldDescription>
-              Shown on your calendar, your avatar, and when switching profiles.
+              {t("profile.displayName.description")}
             </FieldDescription>
             {/* Keyed by member.id so it initialises from the resolved name without a sync effect. */}
             {isReady && member ? (
               <NameField key={member.id} initial={member.name} onSave={saveName} />
             ) : (
-              <Input disabled placeholder="Loading…" className="max-w-xs" />
+              <Input disabled placeholder={tCommon("loading")} className="max-w-xs" />
             )}
           </FieldSet>
 
           {/* Profile color */}
           <FieldSet>
-            <FieldLegend variant="label">Profile color</FieldLegend>
+            <FieldLegend variant="label">{t("profile.color.legend")}</FieldLegend>
             <FieldDescription>
-              Tints your avatar and your events on the calendar (unless an event
-              sets its own color).
+              {t("profile.color.description")}
             </FieldDescription>
             {isReady && member ? (
               <ColorPicker value={member.color} onSelect={saveColor} />
@@ -80,25 +80,25 @@ export function ProfileSettings() {
 
           {/* PIN */}
           <FieldSet>
-            <FieldLegend variant="label">PIN</FieldLegend>
+            <FieldLegend variant="label">{t("profile.pin.legend")}</FieldLegend>
             <FieldDescription>
               {member?.hasPin
-                ? "An 8-digit PIN is required when switching to your profile."
-                : "No PIN set — add one to lock your profile when switching."}
+                ? t("profile.pin.descriptionSet")
+                : t("profile.pin.descriptionUnset")}
             </FieldDescription>
             <div className="flex flex-wrap gap-2">
               {member?.hasPin ? (
                 <>
                   <Button variant="outline" disabled={!isReady} onClick={() => setPinMode("change")}>
-                    Change PIN
+                    {t("profile.pin.change")}
                   </Button>
                   <Button variant="ghost" disabled={!isReady} onClick={() => setPinMode("remove")}>
-                    Remove PIN
+                    {t("profile.pin.remove")}
                   </Button>
                 </>
               ) : (
                 <Button disabled={!isReady} onClick={() => setPinMode("set")}>
-                  Set PIN
+                  {t("profile.pin.set")}
                 </Button>
               )}
             </div>
@@ -124,6 +124,8 @@ function NameField({
   initial: string;
   onSave: (name: string) => Promise<boolean>;
 }) {
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const form = useForm({
     defaultValues: { name: initial },
     onSubmit: async ({ value }) => {
@@ -142,8 +144,8 @@ function NameField({
             onChange={(e) => field.handleChange(e.target.value)}
             onBlur={field.handleBlur}
             onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
-            placeholder="Your name"
-            aria-label="Display name"
+            placeholder={t("profile.displayName.placeholder")}
+            aria-label={t("profile.displayName.ariaLabel")}
           />
         )}
       </form.Field>
@@ -155,7 +157,7 @@ function NameField({
             onClick={() => void form.handleSubmit()}
             disabled={isSubmitting || trimmed === initial || !trimmed}
           >
-            Save
+            {tCommon("save")}
           </Button>
         )}
       </form.Subscribe>
@@ -176,8 +178,9 @@ function ColorPicker({
   value: string;
   onSelect: (color: string) => void;
 }) {
+  const t = useTranslations("settings");
   return (
-    <div role="radiogroup" aria-label="Profile color" className="flex flex-wrap gap-3">
+    <div role="radiogroup" aria-label={t("profile.color.ariaLabel")} className="flex flex-wrap gap-3">
       {SWATCHES.map((s) => {
         const selected = value.toLowerCase() === s.value.toLowerCase();
         return (
@@ -209,24 +212,6 @@ function ColorPicker({
   );
 }
 
-const PIN_COPY: Record<PinMode, { title: string; description: string; submit: string }> = {
-  set: {
-    title: "Set PIN",
-    description: "Choose an 8-digit PIN to require when switching to your profile.",
-    submit: "Set PIN",
-  },
-  change: {
-    title: "Change PIN",
-    description: "Enter your current PIN, then choose a new one.",
-    submit: "Change PIN",
-  },
-  remove: {
-    title: "Remove PIN",
-    description: "Enter your current PIN to remove it. Your profile won't be locked.",
-    submit: "Remove PIN",
-  },
-};
-
 function PinDialog({
   mode,
   onClose,
@@ -238,13 +223,16 @@ function PinDialog({
   verifyCurrentPin: (pin: string) => Promise<boolean>;
   savePin: (pin: string | null) => Promise<boolean>;
 }) {
+  const t = useTranslations("settings");
   return (
     <ResponsiveDialog open={mode !== null} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>{mode ? PIN_COPY[mode].title : ""}</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>
+            {mode ? t(`profile.pin.dialog.${mode}.title`) : ""}
+          </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            {mode ? PIN_COPY[mode].description : ""}
+            {mode ? t(`profile.pin.dialog.${mode}.description`) : ""}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         {/* Remounts per open (Radix unmounts closed content), so fields reset. */}
@@ -261,8 +249,9 @@ function PinDialog({
   );
 }
 
-/** New/confirm coupling lives in the schema; PIN lengths gate the button. */
-function pinFormSchema(mode: PinMode) {
+/** New/confirm coupling lives in the schema; PIN lengths gate the button.
+ *  The mismatch message is passed in so the (hook-free) schema stays localizable. */
+function pinFormSchema(mode: PinMode, mismatchMessage: string) {
   const needsNew = mode === "set" || mode === "change";
   return z
     .object({
@@ -275,7 +264,7 @@ function pinFormSchema(mode: PinMode) {
         ctx.addIssue({
           code: "custom",
           path: ["confirm"],
-          message: "PINs don't match.",
+          message: mismatchMessage,
         });
       }
     });
@@ -292,6 +281,8 @@ function PinForm({
   savePin: (pin: string | null) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const needsCurrent = mode === "change" || mode === "remove";
   const needsNew = mode === "set" || mode === "change";
 
@@ -300,11 +291,11 @@ function PinForm({
 
   const form = useForm({
     defaultValues: { current: "", next: "", confirm: "" },
-    validators: { onSubmit: pinFormSchema(mode) },
+    validators: { onSubmit: pinFormSchema(mode, t("profile.pin.mismatch")) },
     onSubmit: async ({ value }) => {
       setError(null);
       if (needsCurrent && !(await verifyCurrentPin(value.current))) {
-        setError("Incorrect PIN.");
+        setError(t("profile.pin.incorrect"));
         return;
       }
       const ok = await savePin(mode === "remove" ? null : value.next);
@@ -319,7 +310,7 @@ function PinForm({
           <form.Field name="current">
             {(field) => (
               <PinInput
-                label="Current PIN"
+                label={t("profile.pin.currentLabel")}
                 value={field.state.value}
                 onChange={field.handleChange}
                 autoFocus
@@ -332,7 +323,7 @@ function PinForm({
             <form.Field name="next">
               {(field) => (
                 <PinInput
-                  label={mode === "change" ? "New PIN" : "New 8-digit PIN"}
+                  label={mode === "change" ? t("profile.pin.newLabel") : t("profile.pin.newLabelLong")}
                   value={field.state.value}
                   onChange={field.handleChange}
                   autoFocus={!needsCurrent}
@@ -342,7 +333,7 @@ function PinForm({
             <form.Field name="confirm">
               {(field) => (
                 <PinInput
-                  label="Confirm PIN"
+                  label={t("profile.pin.confirmLabel")}
                   value={field.state.value}
                   onChange={field.handleChange}
                 />
@@ -374,7 +365,7 @@ function PinForm({
             return (
               <>
                 <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   onClick={() => void form.handleSubmit()}
@@ -385,7 +376,7 @@ function PinForm({
                       : undefined
                   }
                 >
-                  {isSubmitting ? "Saving…" : PIN_COPY[mode].submit}
+                  {isSubmitting ? tCommon("saving") : t(`profile.pin.dialog.${mode}.submit`)}
                 </Button>
               </>
             );
@@ -407,6 +398,7 @@ function PinInput({
   onChange: (v: string) => void;
   autoFocus?: boolean;
 }) {
+  const t = useTranslations("settings");
   const [show, setShow] = React.useState(false);
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -416,7 +408,7 @@ function PinInput({
           type="button"
           onClick={() => setShow((s) => !s)}
           className="flex items-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={show ? `Hide ${label}` : `Show ${label}`}
+          aria-label={show ? t("profile.pin.hideLabel", { label }) : t("profile.pin.showLabel", { label })}
           aria-pressed={show}
         >
           {show ? (

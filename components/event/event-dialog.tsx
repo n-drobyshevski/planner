@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useForm } from "@tanstack/react-form";
 import {
   ResponsiveDialog,
@@ -111,6 +112,8 @@ export function EventDialog(props: EventDialogProps) {
     readOnly = false,
     ownerName,
   } = props;
+  const t = useTranslations("events");
+  const tc = useTranslations("common");
   const mutations = useEventMutations(workspaceId);
   const timeZone = useViewerTimeZone();
 
@@ -346,11 +349,11 @@ export function EventDialog(props: EventDialogProps) {
                       <ResponsiveDialogTitle>
                         {mode === "create"
                           ? isContext
-                            ? "New context"
-                            : "New event"
+                            ? t("dialog.newContext")
+                            : t("dialog.newEvent")
                           : isContext
-                            ? "Edit context"
-                            : "Edit event"}
+                            ? t("dialog.editContext")
+                            : t("dialog.editEvent")}
                       </ResponsiveDialogTitle>
                       {mode === "create" && !readOnly && (
                         <form.Field name="itemKind">
@@ -361,11 +364,11 @@ export function EventDialog(props: EventDialogProps) {
                               size="sm"
                               value={field.state.value}
                               onValueChange={(v) => v && field.handleChange(v as EventKind)}
-                              aria-label="Item type"
+                              aria-label={t("dialog.itemType")}
                               className="shrink-0"
                             >
-                              <ToggleGroupItem value="event">Event</ToggleGroupItem>
-                              <ToggleGroupItem value="context">Context</ToggleGroupItem>
+                              <ToggleGroupItem value="event">{t("dialog.kindEvent")}</ToggleGroupItem>
+                              <ToggleGroupItem value="context">{t("dialog.kindContext")}</ToggleGroupItem>
                             </ToggleGroup>
                           )}
                         </form.Field>
@@ -378,7 +381,11 @@ export function EventDialog(props: EventDialogProps) {
                     <div className="mb-3 flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                       <Lock className="size-4 shrink-0" />
                       <span>
-                        Read-only · {ownerName ? `${ownerName}'s calendar` : "another calendar"}
+                        {t("dialog.readOnly", {
+                          owner: ownerName
+                            ? t("dialog.readOnlyOwner", { name: ownerName })
+                            : t("dialog.readOnlyOther"),
+                        })}
                       </span>
                     </div>
                   )}
@@ -396,8 +403,14 @@ export function EventDialog(props: EventDialogProps) {
                               value={field.state.value}
                               onChange={(e) => field.handleChange(e.target.value)}
                               onBlur={field.handleBlur}
-                              placeholder={isContext ? "Name this context" : "Add title"}
-                              aria-label={isContext ? "Context name" : "Event title"}
+                              placeholder={
+                                isContext
+                                  ? t("dialog.titlePlaceholderContext")
+                                  : t("dialog.titlePlaceholderEvent")
+                              }
+                              aria-label={
+                                isContext ? t("dialog.titleAriaContext") : t("dialog.titleAriaEvent")
+                              }
                               aria-invalid={isInvalid || undefined}
                               autoFocus
                               className="h-auto border-0 bg-transparent px-0 py-1 text-lg font-medium md:text-lg shadow-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-transparent"
@@ -413,13 +426,13 @@ export function EventDialog(props: EventDialogProps) {
                       {(allDay) => (
                         <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-muted-foreground">When</span>
+                            <span className="text-sm font-medium text-muted-foreground">{t("dialog.when")}</span>
                             {!isContext && (
                               <label
                                 htmlFor="ev-allday"
                                 className="flex cursor-pointer items-center gap-2 text-sm"
                               >
-                                <span>All day</span>
+                                <span>{t("dialog.allDay")}</span>
                                 <form.Field name="allDay">
                                   {(field) => (
                                     <Switch
@@ -434,13 +447,13 @@ export function EventDialog(props: EventDialogProps) {
                           </div>
 
                           <div className="grid grid-cols-[3rem_1fr_auto] items-center gap-2">
-                            <span className="text-sm text-muted-foreground">Start</span>
+                            <span className="text-sm text-muted-foreground">{t("dialog.start")}</span>
                             <form.Field name="startDate">
                               {(field) => (
                                 <DatePicker
                                   value={field.state.value}
                                   onChange={field.handleChange}
-                                  aria-label="Start date"
+                                  aria-label={t("dialog.startDate")}
                                 />
                               )}
                             </form.Field>
@@ -450,7 +463,7 @@ export function EventDialog(props: EventDialogProps) {
                                   <TimeField
                                     value={field.state.value}
                                     onChange={field.handleChange}
-                                    aria-label="Start time"
+                                    aria-label={t("dialog.startTime")}
                                     className="w-28"
                                   />
                                 )}
@@ -461,13 +474,13 @@ export function EventDialog(props: EventDialogProps) {
                           </div>
 
                           <div className="grid grid-cols-[3rem_1fr_auto] items-center gap-2">
-                            <span className="text-sm text-muted-foreground">End</span>
+                            <span className="text-sm text-muted-foreground">{t("dialog.end")}</span>
                             <form.Field name="endDate">
                               {(field) => (
                                 <DatePicker
                                   value={field.state.value}
                                   onChange={field.handleChange}
-                                  aria-label="End date"
+                                  aria-label={t("dialog.endDate")}
                                 />
                               )}
                             </form.Field>
@@ -477,7 +490,7 @@ export function EventDialog(props: EventDialogProps) {
                                   <TimeField
                                     value={field.state.value}
                                     onChange={field.handleChange}
-                                    aria-label="End time"
+                                    aria-label={t("dialog.endTime")}
                                     className="w-28"
                                   />
                                 )}
@@ -505,7 +518,7 @@ export function EventDialog(props: EventDialogProps) {
                       <form.Field name="categoryId">
                         {(field) => (
                           <Field>
-                            <FieldLabel htmlFor="ev-context">Context</FieldLabel>
+                            <FieldLabel htmlFor="ev-context">{t("dialog.context")}</FieldLabel>
                             <Select
                               value={field.state.value}
                               onValueChange={(v) =>
@@ -515,11 +528,11 @@ export function EventDialog(props: EventDialogProps) {
                               }
                             >
                               <SelectTrigger id="ev-context">
-                                <SelectValue placeholder="No context" />
+                                <SelectValue placeholder={t("dialog.noContext")} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="none">No context</SelectItem>
+                                  <SelectItem value="none">{t("dialog.noContext")}</SelectItem>
                                   {usableCategories.map((c) => (
                                     <SelectItem key={c.id} value={c.id}>
                                       {c.name}
@@ -530,7 +543,7 @@ export function EventDialog(props: EventDialogProps) {
                                     className="text-muted-foreground"
                                   >
                                     <Plus className="size-4" />
-                                    Create new context…
+                                    {t("dialog.createContext")}
                                   </SelectItem>
                                 </SelectGroup>
                               </SelectContent>
@@ -542,7 +555,7 @@ export function EventDialog(props: EventDialogProps) {
                       <form.Field name="color">
                         {(field) => (
                           <Field>
-                            <FieldLabel htmlFor="ev-color">Color</FieldLabel>
+                            <FieldLabel htmlFor="ev-color">{t("dialog.color")}</FieldLabel>
                             <ColorField
                               id="ev-color"
                               value={field.state.value}
@@ -559,13 +572,13 @@ export function EventDialog(props: EventDialogProps) {
                         sharedContext ? (
                           <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                             <Users className="size-4 shrink-0" />
-                            <span>Shared context — you both attend and can edit this.</span>
+                            <span>{t("dialog.sharedContextBanner")}</span>
                           </div>
                         ) : (
                           <form.Field name="visibility">
                             {(field) => (
                               <Field>
-                                <FieldLabel>Sharing</FieldLabel>
+                                <FieldLabel>{t("dialog.sharing")}</FieldLabel>
                                 <ToggleGroup
                                   type="single"
                                   variant="outline"
@@ -577,23 +590,23 @@ export function EventDialog(props: EventDialogProps) {
                                 >
                                   <ToggleGroupItem value="private">
                                     <Lock data-icon="inline-start" />
-                                    Private
+                                    {t("dialog.visibilityPrivate")}
                                   </ToggleGroupItem>
                                   <ToggleGroupItem value="visible">
                                     <Eye data-icon="inline-start" />
-                                    Visible
+                                    {t("dialog.visibilityVisible")}
                                   </ToggleGroupItem>
                                   <ToggleGroupItem value="shared">
                                     <Users data-icon="inline-start" />
-                                    Shared
+                                    {t("dialog.visibilityShared")}
                                   </ToggleGroupItem>
                                 </ToggleGroup>
                                 <FieldDescription>
                                   {field.state.value === "private"
-                                    ? "Only you can see this."
+                                    ? t("dialog.visibilityHintPrivate")
                                     : field.state.value === "shared"
-                                      ? "Shows on both calendars; you both can edit it."
-                                      : "Your partner can see it on your calendar; only you can edit it."}
+                                      ? t("dialog.visibilityHintShared")
+                                      : t("dialog.visibilityHintVisible")}
                                 </FieldDescription>
                               </Field>
                             )}
@@ -613,7 +626,7 @@ export function EventDialog(props: EventDialogProps) {
                           size="sm"
                           className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                         >
-                          More options
+                          {t("dialog.moreOptions")}
                           <ChevronDown
                             className={`size-4 transition-transform ${
                               readOnly || showMore ? "rotate-180" : ""
@@ -625,7 +638,7 @@ export function EventDialog(props: EventDialogProps) {
                         <form.Field name="status">
                           {(field) => (
                             <Field>
-                              <FieldLabel>Status</FieldLabel>
+                              <FieldLabel>{t("dialog.status")}</FieldLabel>
                               <ToggleGroup
                                 type="single"
                                 variant="outline"
@@ -633,9 +646,9 @@ export function EventDialog(props: EventDialogProps) {
                                 onValueChange={(v) => v && field.handleChange(v as EventStatus)}
                                 className="justify-start"
                               >
-                                <ToggleGroupItem value="planned">Planned</ToggleGroupItem>
-                                <ToggleGroupItem value="confirmed">Confirmed</ToggleGroupItem>
-                                <ToggleGroupItem value="cancelled">Cancelled</ToggleGroupItem>
+                                <ToggleGroupItem value="planned">{t("dialog.statusPlanned")}</ToggleGroupItem>
+                                <ToggleGroupItem value="confirmed">{t("dialog.statusConfirmed")}</ToggleGroupItem>
+                                <ToggleGroupItem value="cancelled">{t("dialog.statusCancelled")}</ToggleGroupItem>
                               </ToggleGroup>
                             </Field>
                           )}
@@ -644,13 +657,13 @@ export function EventDialog(props: EventDialogProps) {
                         <form.Field name="location">
                           {(field) => (
                             <Field>
-                              <FieldLabel htmlFor="ev-location">Location</FieldLabel>
+                              <FieldLabel htmlFor="ev-location">{t("dialog.location")}</FieldLabel>
                               <Input
                                 id="ev-location"
                                 value={field.state.value}
                                 onChange={(e) => field.handleChange(e.target.value)}
                                 onBlur={field.handleBlur}
-                                placeholder="Add a location"
+                                placeholder={t("dialog.locationPlaceholder")}
                               />
                             </Field>
                           )}
@@ -659,7 +672,7 @@ export function EventDialog(props: EventDialogProps) {
                         <form.Field name="description">
                           {(field) => (
                             <Field>
-                              <FieldLabel htmlFor="ev-notes">Notes</FieldLabel>
+                              <FieldLabel htmlFor="ev-notes">{t("dialog.notes")}</FieldLabel>
                               <Textarea
                                 id="ev-notes"
                                 value={field.state.value}
@@ -695,7 +708,7 @@ export function EventDialog(props: EventDialogProps) {
                                 checked={field.state.value}
                                 onCheckedChange={field.handleChange}
                               />
-                              <FieldLabel htmlFor="ev-inactive">Inactive (grayed out)</FieldLabel>
+                              <FieldLabel htmlFor="ev-inactive">{t("dialog.inactive")}</FieldLabel>
                             </Field>
                           )}
                         </form.Field>
@@ -716,7 +729,7 @@ export function EventDialog(props: EventDialogProps) {
                             size="sm"
                             className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                           >
-                            Optimization details
+                            {t("dialog.optimizationDetails")}
                             <ChevronDown
                               className={`size-4 transition-transform ${
                                 readOnly || showOptimization ? "rotate-180" : ""
@@ -748,7 +761,7 @@ export function EventDialog(props: EventDialogProps) {
           <ResponsiveDialogFooter className="sm:justify-between">
             {readOnly ? (
               <Button variant="outline" onClick={() => onOpenChange(false)} className="ml-auto">
-                Close
+                {tc("close")}
               </Button>
             ) : (
               <form.Subscribe selector={(s) => s.isSubmitting}>
@@ -762,7 +775,7 @@ export function EventDialog(props: EventDialogProps) {
                         className="text-destructive"
                       >
                         <Trash2 data-icon="inline-start" />
-                        Delete
+                        {tc("delete")}
                       </Button>
                     ) : (
                       <span />
@@ -773,13 +786,13 @@ export function EventDialog(props: EventDialogProps) {
                         onClick={() => onOpenChange(false)}
                         disabled={isSubmitting}
                       >
-                        Cancel
+                        {tc("cancel")}
                       </Button>
                       <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
                         {isSubmitting && (
                           <Spinner data-icon="inline-start" />
                         )}
-                        {mode === "create" ? "Create" : "Save"}
+                        {mode === "create" ? tc("create") : tc("save")}
                       </Button>
                     </div>
                   </>

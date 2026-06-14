@@ -1,6 +1,7 @@
 "use client";
 
 import { Lightbulb, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,29 +16,29 @@ import { SectionLabel } from "./tab-bits";
  * click; repeats of the same data are served from the per-member DB cache.
  */
 export function DigestCard({ payload }: { payload: DigestPayload }) {
+  const t = useTranslations("insights");
   const { available, digest, isGenerating, generate } = useDigest(payload);
 
   if (available === false) return null;
 
   return (
     <section className="space-y-1.5">
-      <SectionLabel>Digest</SectionLabel>
+      <SectionLabel>{t("digest.label")}</SectionLabel>
       <div className="rounded-lg border bg-card p-3 shadow-soft">
         {digest === null ? (
           isGenerating ? (
-            <div className="space-y-2" aria-busy aria-label="Writing the digest">
+            <div className="space-y-2" aria-busy aria-label={t("digest.writing")}>
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-2/3" />
               <p className="text-xs text-muted-foreground">
-                Reading the period&hellip; usually about ten seconds.
+                {t("digest.reading")}
               </p>
             </div>
           ) : (
             <div className="flex flex-col items-start gap-2">
               <p className="text-sm text-muted-foreground">
-                A short written read of this period — what stood out and what to
-                do about it.
+                {t("digest.intro")}
               </p>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Button
@@ -47,11 +48,10 @@ export function DigestCard({ payload }: { payload: DigestPayload }) {
                   disabled={available === null}
                 >
                   <Sparkles data-icon="inline-start" />
-                  Write the digest
+                  {t("digest.write")}
                 </Button>
                 <p className="text-[11px] text-muted-foreground">
-                  Sends summary statistics and context names only — never event
-                  details or sleep data.
+                  {t("digest.privacy")}
                 </p>
               </div>
             </div>
@@ -84,7 +84,7 @@ export function DigestCard({ payload }: { payload: DigestPayload }) {
             {/* No rewrite button on purpose: identical data is a cache hit by
                 design, and any data change resets the card to idle anyway. */}
             <p className="text-[11px] text-muted-foreground">
-              Written for {payload.period.label} from summary statistics only.
+              {t("digest.footer", { label: payload.period.label })}
             </p>
           </div>
         )}

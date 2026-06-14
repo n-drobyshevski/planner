@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { SquarePen, CheckCircle2, Circle, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { ItemContextMenu } from "@/components/shared/item-context-menu";
 import type { TaskRow } from "@/lib/types";
 
@@ -25,6 +26,8 @@ export function TaskContextMenu({
   onChangeColor: (color: string | null) => void;
   children: React.ReactElement;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const done = task.status === "done";
   return (
     <ItemContextMenu
@@ -32,13 +35,13 @@ export function TaskContextMenu({
       color={task.color}
       onColorChange={onChangeColor}
       actions={[
-        { label: "Open", icon: SquarePen, onSelect: onOpen },
+        { label: t("contextMenu.open"), icon: SquarePen, onSelect: onOpen },
         {
-          label: done ? "Mark not done" : "Mark done",
+          label: done ? t("contextMenu.markNotDone") : t("contextMenu.markDone"),
           icon: done ? Circle : CheckCircle2,
           onSelect: onToggleDone,
         },
-        { label: "Delete", icon: Trash2, destructive: true, onSelect: onDelete },
+        { label: tc("delete"), icon: Trash2, destructive: true, onSelect: onDelete },
       ]}
     >
       {children}

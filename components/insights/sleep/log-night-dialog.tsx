@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useForm } from "@tanstack/react-form";
 import { NotebookPen, Trash2 } from "lucide-react";
 
@@ -61,6 +62,8 @@ export function LogNightDialog({
   /** delete the log for a wake date (only offered when one exists) */
   onDelete: (date: string) => Promise<void>;
 }) {
+  const t = useTranslations("sleep");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -105,7 +108,7 @@ export function LogNightDialog({
           fatigue: value.draft.fatigue,
           note: value.draft.note.trim() === "" ? null : value.draft.note.trim(),
         });
-        notify.success("Night saved");
+        notify.success(t("logNight.savedToast"));
         setOpen(false);
       } catch {
         /* the mutation hook already toasted; keep the dialog open to retry */
@@ -128,7 +131,7 @@ export function LogNightDialog({
     setDeleting(true);
     try {
       await onDelete(form.state.values.date);
-      notify.success("Night deleted");
+      notify.success(t("logNight.deletedToast"));
       setConfirmingDelete(false);
       setOpen(false);
     } catch {
@@ -143,31 +146,30 @@ export function LogNightDialog({
     <>
       <Button variant="outline" size="sm" onClick={openDialog}>
         <NotebookPen data-icon="inline-start" />
-        Log a night
+        {t("logNight.trigger")}
       </Button>
       <ResponsiveDialog open={open} onOpenChange={setOpen}>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>Log a night</ResponsiveDialogTitle>
+            <ResponsiveDialogTitle>{t("logNight.title")}</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
-              Backfill or correct a morning — saving replaces anything already
-              logged for that date.
+              {t("logNight.description")}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogBody className="space-y-4">
             <form.Field name="date">
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="backfill-date">Morning of</FieldLabel>
+                  <FieldLabel htmlFor="backfill-date">{t("logNight.morningOf")}</FieldLabel>
                   <DatePicker
                     id="backfill-date"
                     value={field.state.value}
                     onChange={pickDate}
                     maxDate={todayKey}
-                    aria-label="Wake date"
+                    aria-label={t("logNight.wakeDateAriaLabel")}
                   />
                   <FieldDescription>
-                    The date you woke up. Future dates can&apos;t be logged.
+                    {t("logNight.morningOfDescription")}
                   </FieldDescription>
                 </Field>
               )}
@@ -190,7 +192,7 @@ export function LogNightDialog({
                 <>
                   {/* The button text swaps aren't announced; this region is. */}
                   <span aria-live="polite" className="sr-only">
-                    {saving ? "Saving the night" : deleting ? "Deleting the night" : ""}
+                    {saving ? t("logNight.savingSr") : deleting ? t("logNight.deletingSr") : ""}
                   </span>
                   {logByKey.has(date) && (
                     <Button
@@ -200,17 +202,17 @@ export function LogNightDialog({
                       disabled={deleting}
                     >
                       <Trash2 data-icon="inline-start" />
-                      Delete this night
+                      {t("logNight.deleteThisNight")}
                     </Button>
                   )}
                   <Button variant="ghost" onClick={() => setOpen(false)}>
-                    Cancel
+                    {tCommon("cancel")}
                   </Button>
                   <Button
                     onClick={() => void form.handleSubmit()}
                     disabled={saving || !draftHasContent(draft)}
                   >
-                    {saving ? "Saving…" : "Save night"}
+                    {saving ? t("logNight.saving") : t("logNight.save")}
                   </Button>
                 </>
               )}
@@ -221,26 +223,20 @@ export function LogNightDialog({
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this night’s log?</AlertDialogTitle>
+            <AlertDialogTitle>{t("logNight.confirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               <form.Subscribe selector={(s) => s.values.date}>
-                {(date) => (
-                  <>
-                    This removes your check-in for {date} — quality, fatigue,
-                    times and note. Nights derived from your calendar are not
-                    affected.
-                  </>
-                )}
+                {(date) => <>{t("logNight.confirmBody", { date })}</>}
               </form.Subscribe>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void confirmDelete()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? "Deleting…" : "Delete log"}
+              {deleting ? t("logNight.deleting") : t("logNight.deleteLog")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

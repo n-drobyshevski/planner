@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { MoreVertical, type LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -85,6 +86,7 @@ export function ItemContextMenu({
   mobileSheet?: boolean;
   children: React.ReactElement;
 }) {
+  const t = useTranslations("nav");
   const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
@@ -148,7 +150,7 @@ export function ItemContextMenu({
         )}
         {onColorChange && (
           <ContextMenuSub>
-            <ContextMenuSubTrigger>Color</ContextMenuSubTrigger>
+            <ContextMenuSubTrigger>{t("itemMenu.color")}</ContextMenuSubTrigger>
             <ContextMenuSubContent className="p-2">
               <ColorSwatchPicker
                 value={color ?? null}
@@ -190,17 +192,18 @@ export function ItemActionSheet({
   color?: string | null;
   onColorChange?: (color: string | null) => void;
 }) {
+  const t = useTranslations("nav");
   const close = () => onOpenChange(false);
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>{title ?? "Options"}</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>{title ?? t("itemMenu.options")}</ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody className="flex flex-col gap-4 py-3 pb-6">
           {onColorChange && (
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Color</span>
+              <span className="text-xs font-medium text-muted-foreground">{t("itemMenu.color")}</span>
               <ColorSwatchPicker
                 value={color ?? null}
                 onSelect={(c) => {
@@ -275,12 +278,13 @@ export function ItemActionSheet({
 export const ItemMenuButton = React.forwardRef<
   HTMLButtonElement,
   { onMenu: () => void; className?: string; label?: string }
->(function ItemMenuButton({ onMenu, className, label = "More options" }, ref) {
+>(function ItemMenuButton({ onMenu, className, label }, ref) {
+  const t = useTranslations("nav");
   return (
     <button
       ref={ref}
       type="button"
-      aria-label={label}
+      aria-label={label ?? t("itemMenu.moreOptions")}
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
