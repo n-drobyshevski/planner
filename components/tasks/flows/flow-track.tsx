@@ -20,7 +20,8 @@ const ELBOW = 12; // horizontal run of a branch diverge/merge curve
 
 export interface FlowTrackProps {
   rows: LaidOutLane[];
-  totalHeight: number;
+  /** full canvas height — fills the viewport so gridlines/now-line run the whole height */
+  height: number;
   t0: number;
   t1: number;
   pxPerDay: number;
@@ -43,7 +44,7 @@ interface Hover {
 
 export function FlowTrack({
   rows,
-  totalHeight,
+  height,
   t0,
   t1,
   pxPerDay,
@@ -62,12 +63,12 @@ export function FlowTrack({
   return (
     <div
       className="relative"
-      style={{ width: trackWidth, height: totalHeight }}
+      style={{ width: trackWidth, height }}
       onMouseLeave={() => setHover(null)}
     >
       <svg
         width={trackWidth}
-        height={totalHeight}
+        height={height}
         className="absolute inset-0"
         aria-hidden
       >
@@ -80,7 +81,7 @@ export function FlowTrack({
               x1={gx}
               y1={0}
               x2={gx}
-              y2={totalHeight}
+              y2={height}
               stroke="var(--border)"
               strokeOpacity={0.6}
             />

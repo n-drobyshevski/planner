@@ -73,10 +73,12 @@ export function TaskFlows({
   const [nowMs] = useState(() => Date.now());
   const [pxPerDay, setPxPerDay] = useState<number>(ZOOM.week);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  // Measured scroll-viewport width — drives the side padding that lets the
-  // now-line reach the track centre even when the data alone is narrower than
-  // the screen. Measured synchronously before paint so centring doesn't flicker.
+  // Measured scroll-viewport size. Width drives the side padding that lets the
+  // now-line reach the track centre even when the data is narrower than the
+  // screen; height lets the gutter + track fill the view instead of stopping at
+  // the last lane. Measured before paint so centring doesn't flicker.
   const [viewportW, setViewportW] = useState(0);
+  const [viewportH, setViewportH] = useState(0);
 
   const lanes = useMemo(
     () => buildFlowLanes({ topLevel: tasks, childrenByParent, eventsByTask, nowMs }),
@@ -95,6 +97,9 @@ export function TaskFlows({
     [lanes, expanded],
   );
   const trackWidth = Math.ceil(((t1 - t0) / DAY_MS) * pxPerDay);
+  // Fill the viewport below the ruler so the gutter + track don't stop at the
+  // last lane; grow past it (and scroll) when there are more lanes than fit.
+  const fillHeight = Math.max(totalHeight, viewportH - G.rulerHeight);
 
   const ticks = useMemo(
     () => buildTicks(t0, t1, pxPerDay, timeZone, locale),
@@ -106,8 +111,12 @@ export function TaskFlows({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    setViewportW(el.clientWidth);
-    const ro = new ResizeObserver(() => setViewportW(el.clientWidth));
+    const measure = () => {
+      setViewportW(el.clientWidth);
+      setViewportH(el.clientHeight);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -238,7 +247,7 @@ export function TaskFlows({
       <div className="flex">
         <div
           className="sticky left-0 z-10 border-r border-border bg-card"
-          style={{ width: G.gutterWidth, height: totalHeight }}
+          style={{ width: G.gutterWidth, height: fillHeight }}
         >
           {rows.map(({ lane, top, isExpanded, branchRows }) => {
             const ownerColor = members.get(lane.task.ownerId)?.color ?? colorOf(lane.task);
@@ -314,7 +323,7 @@ export function TaskFlows({
 
         <FlowTrack
           rows={rows}
-          totalHeight={totalHeight}
+          height={fillHeight}
           t0={t0}
           t1={t1}
           pxPerDay={pxPerDay}
