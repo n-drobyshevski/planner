@@ -17,6 +17,7 @@ import {
   DASHBOARD_CARDS,
   isCustomized,
   moveCard,
+  type DashboardCardId,
   type DashboardLayout,
 } from "@/lib/insights/dashboard";
 
@@ -30,12 +31,18 @@ const LABEL_BY_ID = new Map(DASHBOARD_CARDS.map((c) => [c.id, c.label]));
  */
 export function CustomizeDashboardSheet({
   layout,
+  lockedIds,
   onChange,
 }: {
   layout: DashboardLayout;
+  /** ids that are always shown elsewhere (the answer-zone lead figures), so
+   *  they're not offered as toggleable cards here */
+  lockedIds?: DashboardCardId[];
   onChange: (next: { order: string[]; hidden: string[] }) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const locked = new Set(lockedIds ?? []);
+  const rows = layout.order.filter((id) => !locked.has(id));
 
   function write(order: readonly string[], hidden: ReadonlySet<string>) {
     onChange({ order: [...order], hidden: [...hidden] });
@@ -62,8 +69,13 @@ export function CustomizeDashboardSheet({
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogBody className="space-y-3">
+            {locked.size > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Total, daily average, and active days always lead the overview.
+              </p>
+            )}
             <ul className="space-y-1" role="list">
-              {layout.order.map((id, i) => {
+              {rows.map((id, i) => {
                 const visible = !layout.hidden.has(id);
                 return (
                   <li key={id} className="flex items-center gap-2">
@@ -99,7 +111,7 @@ export function CustomizeDashboardSheet({
                       variant="ghost"
                       size="icon"
                       className="size-11 text-muted-foreground sm:size-8"
-                      disabled={i === layout.order.length - 1}
+                      disabled={i === rows.length - 1}
                       aria-label={`Move ${LABEL_BY_ID.get(id) ?? id} down`}
                       onClick={() =>
                         write(moveCard(layout.order, id, "down"), layout.hidden)

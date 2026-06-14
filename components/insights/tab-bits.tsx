@@ -43,6 +43,53 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * The reading's structural spacing. A tab is three "movements" — the answer,
+ * the evidence, what to do — set apart by a wider gap than the sections inside
+ * each. `Reading` stacks them; `Movement` groups a labelled run of sections.
+ * Grouping comes from rhythm, never from extra chrome (no eyebrows, no nested
+ * cards) — the warm paper carries the structure.
+ */
+export function Reading({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("space-y-6", className)}>{children}</div>;
+}
+
+/**
+ * One lead figure — a bigger sibling of `Figure` for the 2–3 headline numbers
+ * that sit under a tab's answer sentence. Still a label-over-value on the paper,
+ * NOT a bordered KPI card: the value is a step up (text-base) so the answer's
+ * supporting numbers read first, without becoming a hero metric.
+ */
+export function LeadFigures({
+  items,
+  className,
+}: {
+  items: { label: string; value: string; hint?: string }[];
+  className?: string;
+}) {
+  return (
+    <dl className={cn("flex flex-wrap gap-x-7 gap-y-2", className)}>
+      {items.map((f) => (
+        <div key={f.label} className="min-w-0">
+          <dt className="text-xs text-muted-foreground">{f.label}</dt>
+          <dd className="text-base leading-tight font-semibold tabular-nums">
+            {f.value}
+          </dd>
+          {f.hint && (
+            <dd className="text-[11px] text-muted-foreground">{f.hint}</dd>
+          )}
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
  * A compact inline statistic — a small label over a tabular value — for the
  * secondary numbers that would over-weight a view as a grid of StatCards now
  * that the lede carries the lead metric. Group several inside a

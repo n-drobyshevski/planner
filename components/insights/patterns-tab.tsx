@@ -23,7 +23,7 @@ import { InsightLede } from "./insight-lede";
 import { BalanceSections } from "./balance-tab";
 import { InsightsEmpty, SectionEmpty } from "./insights-empty";
 import { HourHeatmap } from "./hour-heatmap";
-import { Figure, SectionLabel, TabGrid } from "./tab-bits";
+import { Figure, Reading, SectionLabel, TabGrid } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 const DAYPART_LABELS: Record<Daypart, string> = {
@@ -106,12 +106,19 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
     frag,
   });
 
+  const leadFigures = [
+    { label: "Heaviest weekday", value: formatDuration(top.avg), hint: top.full },
+    ...(frag.medianBlockMs !== null
+      ? [{ label: "Typical block", value: formatDuration(frag.medianBlockMs) }]
+      : []),
+  ];
+
   const config: ChartConfig = {
     avg: { label: "Avg per day", color: "var(--chart-1)" },
   };
 
   return (
-    <div className="space-y-4">
+    <Reading>
       <p className="sr-only">
         Average tracked time peaks on {top.full} at {formatDuration(top.avg)} per day.
         {frag.blockCount > 0
@@ -119,7 +126,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
           : ""}
       </p>
 
-      {lede && <InsightLede lede={lede} />}
+      {lede && <InsightLede lede={lede} figures={leadFigures} />}
 
       <TabGrid>
       <section className="space-y-1.5">
@@ -226,7 +233,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
       <div className="border-t border-border/60 xl:col-span-2" aria-hidden />
       <BalanceSections data={data} />
       </TabGrid>
-    </div>
+    </Reading>
   );
 }
 
@@ -269,6 +276,7 @@ function AttributesSection({
       ) : (
         <StatGrid>
           <StatCard
+            flat
             label="Deep work"
             value={
               focusSplit.share !== null
@@ -282,6 +290,7 @@ function AttributesSection({
             }
           />
           <StatCard
+            flat
             label="Best time of day"
             value={best ? DAYPART_LABELS[best.daypart].split(" ")[0] : "—"}
             hint={
@@ -292,12 +301,14 @@ function AttributesSection({
           />
           {worst && worst.daypart !== best?.daypart && (
             <StatCard
+              flat
               label="Toughest time of day"
               value={DAYPART_LABELS[worst.daypart].split(" ")[0]}
               hint={`satisfaction ${worst.agg.mean.toFixed(1)}/5 · n ${worst.agg.n}`}
             />
           )}
           <StatCard
+            flat
             label="Energy level"
             value={meanEnergy !== null ? `${meanEnergy.toFixed(1)}/3` : "—"}
             hint={

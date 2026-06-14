@@ -43,7 +43,7 @@ const pct = (part: number, whole: number): string =>
   `${whole > 0 ? Math.round((part / whole) * 100) : 0}%`;
 
 /**
- * Plain change clause from a delta, e.g. " — up 12% (3h) vs the previous week".
+ * Plain change clause from a delta, e.g. ", up 12% (3h) vs the previous week".
  * `magnitude` formats the absolute delta for the metric (a duration, a count).
  * Returns "" when there is nothing useful to compare — no movement, or no
  * previous window to compare against (the bare number speaks for itself).
@@ -54,9 +54,9 @@ function changeClause(
   magnitude: (absDelta: number) => string,
 ): string {
   if (d.deltaPct === null) return ""; // previous window was empty
-  if (d.deltaPct === 0) return ` — level with the previous ${unit}`;
+  if (d.deltaPct === 0) return `, level with the previous ${unit}`;
   const dir = d.deltaPct > 0 ? "up" : "down";
-  return ` — ${dir} ${Math.round(Math.abs(d.deltaPct) * 100)}% (${magnitude(
+  return `, ${dir} ${Math.round(Math.abs(d.deltaPct) * 100)}% (${magnitude(
     Math.abs(d.delta),
   )}) vs the previous ${unit}`;
 }
@@ -103,7 +103,7 @@ export function deriveTrendsLede(args: {
   } else {
     const rate =
       args.trend.slopeMsPerBucket !== null
-        ? ` — about ${args.trend.slopeMsPerBucket > 0 ? "+" : "−"}${formatDuration(
+        ? `, about ${args.trend.slopeMsPerBucket > 0 ? "+" : "−"}${formatDuration(
             Math.abs(args.trend.slopeMsPerBucket),
           )} per ${g}`
         : "";
@@ -162,7 +162,7 @@ export function deriveTasksLede(args: {
     headline = `You finished ${done} ${tasksWord(done)} in this period.`;
   } else {
     const diff = Math.abs(d.delta);
-    headline = `You finished ${done} ${tasksWord(done)} in this period — ${diff} ${
+    headline = `You finished ${done} ${tasksWord(done)} in this period, ${diff} ${
       d.delta > 0 ? "more" : "fewer"
     } than the previous ${unit}.`;
   }

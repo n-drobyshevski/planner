@@ -57,6 +57,7 @@ export function StatCard({
   hint,
   warning = false,
   emphasis = false,
+  flat = false,
   className,
 }: {
   label: string;
@@ -68,13 +69,17 @@ export function StatCard({
   /** slightly larger value + roomier card; the InsightLede sentence, not a
    *  StatCard, owns the tab's lead metric now */
   emphasis?: boolean;
+  /** drop the card frame — a borderless figure on the paper (the de-cardified
+   *  default for insights grids; warm paper carries the grouping, not a box) */
+  flat?: boolean;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card shadow-soft",
-        emphasis ? "p-3" : "p-2.5",
+        flat
+          ? "min-w-0"
+          : cn("rounded-lg border bg-card shadow-soft", emphasis ? "p-3" : "p-2.5"),
         className,
       )}
     >

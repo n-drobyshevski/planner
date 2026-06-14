@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Bar, BarChart, Cell, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, Line, LineChart, ReferenceLine, YAxis } from "recharts";
 
 import {
   ChartContainer,
@@ -16,6 +16,12 @@ import type { DerivedNight } from "@/lib/sleep/derive";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { SleepLog } from "@/lib/types";
 import { StatCard, StatGrid } from "../stat-card";
+import {
+  INSIGHTS_CHART_MARGIN,
+  insightsGrid,
+  insightsXAxis,
+  insightsYAxis,
+} from "../chart-frame";
 import { bucketTick } from "../series";
 import { CHART_H, SectionLabel } from "../tab-bits";
 
@@ -157,20 +163,24 @@ export function HistorySection({
       </div>
       <StatGrid>
         <StatCard
+          flat
           label="Avg per night"
           value={avgMs !== null ? formatDuration(Math.round(avgMs)) : "—"}
           hint={`${withData.length} night${withData.length === 1 ? "" : "s"} with data`}
         />
         <StatCard
+          flat
           label="Avg bedtime"
           value={avgBedtime !== null ? fromNoon(avgBedtime) : "—"}
         />
         <StatCard
+          flat
           label="Bedtime spread"
           value={spread !== null ? `±${Math.round(spread)} min` : "—"}
           hint="lower is steadier"
         />
         <StatCard
+          flat
           label="Debt vs target"
           value={withData.length > 0 ? formatDuration(Math.round(debtMs)) : "—"}
           hint={`target ${formatDuration(targetMs)} in bed`}
@@ -192,11 +202,7 @@ export function HistorySection({
             className={`aspect-auto ${CHART_H.compact} w-full`}
             aria-label="Time in bed per night"
           >
-            <BarChart
-              data={rows}
-              accessibilityLayer
-              margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
-            >
+            <BarChart data={rows} accessibilityLayer margin={INSIGHTS_CHART_MARGIN}>
               <defs>
                 {/* hatched fill marks calendar-derived nights (shape, not color) */}
                 <pattern
@@ -209,16 +215,11 @@ export function HistorySection({
                   <line x1="0" y1="0" x2="0" y2="5" stroke="var(--chart-1)" strokeWidth="2.5" opacity="0.55" />
                 </pattern>
               </defs>
-              <XAxis
-                dataKey="key"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={6}
-                minTickGap={24}
-                interval="preserveStartEnd"
-                tickFormatter={(v: string) => bucketTick(Number(v), "day", timeZone)}
-              />
-              <YAxis hide domain={[0, "dataMax"]} />
+              {insightsGrid()}
+              {insightsXAxis({
+                tickFormatter: (v) => bucketTick(Number(v), "day", timeZone),
+              })}
+              {insightsYAxis({ tickCount: 3 })}
               <ChartTooltip
                 cursor={false}
                 content={
@@ -278,20 +279,11 @@ export function HistorySection({
             className="aspect-auto h-[140px] w-full"
             aria-label="Sleep quality and morning sleepiness per night"
           >
-            <LineChart
-              data={scoreRows}
-              accessibilityLayer
-              margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
-            >
-              <XAxis
-                dataKey="key"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={6}
-                minTickGap={24}
-                interval="preserveStartEnd"
-                tickFormatter={(v: string) => bucketTick(Number(v), "day", timeZone)}
-              />
+            <LineChart data={scoreRows} accessibilityLayer margin={INSIGHTS_CHART_MARGIN}>
+              {insightsGrid()}
+              {insightsXAxis({
+                tickFormatter: (v) => bucketTick(Number(v), "day", timeZone),
+              })}
               <YAxis hide domain={[0, 9]} />
               <ChartTooltip
                 cursor={false}

@@ -11,6 +11,7 @@
 
 import { CircleAlert, Info, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LeadFigures } from "./tab-bits";
 import type { Lede, LedeTone } from "@/lib/insights/ledes";
 
 const TONE_ICONS: Record<LedeTone, LucideIcon> = {
@@ -18,28 +19,54 @@ const TONE_ICONS: Record<LedeTone, LucideIcon> = {
   attention: CircleAlert,
 };
 
-export function InsightLede({ lede, className }: { lede: Lede; className?: string }) {
+export interface LeadFigure {
+  label: string;
+  value: string;
+  hint?: string;
+}
+
+/**
+ * The answer zone — the first movement of an Insights "reading". The headline
+ * sentence leads at full contrast and weight; the support clause and the two or
+ * three lead figures sit under it as quiet label-over-value pairs on the paper.
+ * Prominence comes from position, weight, and the surrounding space, never from
+ * display size (the scale still tops out near 1rem) or a bordered hero card.
+ */
+export function InsightLede({
+  lede,
+  figures,
+  className,
+}: {
+  lede: Lede;
+  figures?: LeadFigure[];
+  className?: string;
+}) {
   const Icon = TONE_ICONS[lede.tone];
   return (
-    <div className={cn("flex items-start gap-2 px-0.5", className)}>
+    <header className={cn("flex items-start gap-2.5 px-0.5", className)}>
       <Icon
         aria-hidden
         className={cn(
-          "mt-0.5 size-4 shrink-0",
+          "mt-1 size-4 shrink-0",
           lede.tone === "attention" ? "text-destructive" : "text-muted-foreground",
         )}
       />
-      <div className="min-w-0 space-y-0.5">
-        <p className="text-base leading-snug font-medium text-balance">
-          {lede.tone === "attention" && (
-            <span className="sr-only">Needs attention: </span>
+      <div className="min-w-0 flex-1 space-y-3">
+        <div className="space-y-1">
+          <p className="text-base leading-snug font-semibold text-balance">
+            {lede.tone === "attention" && (
+              <span className="sr-only">Needs attention: </span>
+            )}
+            {lede.headline}
+          </p>
+          {lede.support && (
+            <p className="text-sm leading-snug text-muted-foreground text-pretty">
+              {lede.support}
+            </p>
           )}
-          {lede.headline}
-        </p>
-        {lede.support && (
-          <p className="text-sm text-muted-foreground">{lede.support}</p>
-        )}
+        </div>
+        {figures && figures.length > 0 && <LeadFigures items={figures} />}
       </div>
-    </div>
+    </header>
   );
 }

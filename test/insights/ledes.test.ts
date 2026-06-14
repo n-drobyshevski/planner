@@ -83,7 +83,7 @@ describe("deriveOverviewLede", () => {
     expect(lede).not.toBeNull();
     expect(lede!.tone).toBe("neutral");
     expect(lede!.headline).toBe(
-      "You tracked 31h — up 11% (3h) vs the previous week.",
+      "You tracked 31h, up 11% (3h) vs the previous week.",
     );
     expect(lede!.support).toBe("Most of it went to Work (45%).");
   });
@@ -105,7 +105,7 @@ describe("deriveOverviewLede", () => {
       preset: "last-30d",
       topContext: null,
     });
-    expect(lede!.headline).toBe("You tracked 10h — level with the previous period.");
+    expect(lede!.headline).toBe("You tracked 10h, level with the previous period.");
   });
 });
 
@@ -126,7 +126,7 @@ describe("deriveTrendsLede", () => {
       granularity: "day",
       busiest: { full: "Wed 10 Jun", ms: 24 * H },
     });
-    expect(lede.headline).toBe("Your tracked time is trending up — about +18m per day.");
+    expect(lede.headline).toBe("Your tracked time is trending up, about +18m per day.");
     expect(lede.support).toBe("Busiest day: Wed 10 Jun (24h).");
   });
 
@@ -189,7 +189,7 @@ describe("deriveTasksLede", () => {
     });
     expect(lede.tone).toBe("neutral");
     expect(lede.headline).toBe(
-      "You finished 9 tasks in this period — 2 more than the previous week.",
+      "You finished 9 tasks in this period, 2 more than the previous week.",
     );
     expect(lede.support).toBe("80% of due tasks landed on time.");
   });

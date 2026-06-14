@@ -8,8 +8,6 @@ import {
   Line,
   LineChart,
   ReferenceDot,
-  XAxis,
-  YAxis,
 } from "recharts";
 import {
   ChartContainer,
@@ -32,11 +30,18 @@ import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { deriveTrendsLede } from "@/lib/insights/ledes";
 import { ChartCard } from "./chart-card";
+import {
+  INSIGHTS_CHART_MARGIN,
+  TooltipRow,
+  insightsGrid,
+  insightsXAxis,
+  insightsYAxis,
+} from "./chart-frame";
 import { InsightLede } from "./insight-lede";
 import { DayDetailSheet } from "./day-detail-sheet";
 import { InsightsEmpty } from "./insights-empty";
 import { bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, Figure, SectionLabel, TabGrid, srPercent } from "./tab-bits";
+import { CHART_H, Figure, Reading, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 export function TrendsTab({ data }: { data: InsightsTabData }) {
@@ -152,14 +157,23 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
     busiest: { full: busiest.full, ms: busiest.ms },
   });
 
+  const leadFigures = [
+    { label: "Total tracked", value: formatDuration(total) },
+    {
+      label: `Busiest ${granularity}`,
+      value: formatDuration(busiest.ms),
+      hint: busiest.full,
+    },
+  ];
+
   return (
-    <div className="space-y-4">
+    <Reading>
       <p className="sr-only">
         {formatDuration(total)} tracked across {rows.length} {granularity} buckets.
         Busiest: {busiest.full} with {formatDuration(busiest.ms)}.
       </p>
 
-      <InsightLede lede={lede} />
+      <InsightLede lede={lede} figures={leadFigures} />
 
       <TabGrid>
       <ChartCard
@@ -170,9 +184,14 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         headline={`Busiest ${granularity}: ${busiest.full} (${formatDuration(busiest.ms)}).${trendClause}`}
         chartTypes={["bar", "line", "area"]}
         footnote={
-          granularity === "day"
-            ? "Curve: trailing 7-day average · tap a day for detail"
-            : undefined
+          [
+            granularity === "day"
+              ? "Curve: trailing 7-day average · tap a day for detail"
+              : null,
+            anomalies.length > 0 ? "○ unusual day" : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
         }
       >
         {(settings) => (
@@ -183,23 +202,18 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
           >
             <ComposedChart
               data={rows}
-              margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
+              margin={INSIGHTS_CHART_MARGIN}
               onClick={(state) => {
                 if (granularity !== "day") return;
                 const label = (state as { activeLabel?: string } | null)?.activeLabel;
                 if (label) setDetailDay(Number(label));
               }}
             >
-              <XAxis
-                dataKey="key"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={6}
-                minTickGap={24}
-                interval="preserveStartEnd"
-                tickFormatter={(v: string) => bucketTick(Number(v), granularity, timeZone)}
-              />
-              <YAxis hide domain={[0, "dataMax"]} />
+              {insightsGrid()}
+              {insightsXAxis({
+                tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+              })}
+              {insightsYAxis({ tickCount: 3 })}
               <ChartTooltip
                 cursor={false}
                 content={
@@ -208,18 +222,11 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                       (payload?.[0]?.payload as { full?: string } | undefined)?.full ?? ""
                     }
                     formatter={(value, name, item) => (
-                      <div className="flex w-full items-center justify-between gap-3">
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className="size-2 shrink-0 rounded-[2px]"
-                            style={{ background: item.color }}
-                          />
-                          {totalConfig[name as string]?.label ?? name}
-                        </span>
-                        <span className="font-mono tabular-nums">
-                          {formatDuration(Number(value))}
-                        </span>
-                      </div>
+                      <TooltipRow
+                        color={item.color}
+                        label={totalConfig[name as string]?.label ?? name}
+                        value={formatDuration(Number(value))}
+                      />
                     )}
                   />
                 }
@@ -400,19 +407,12 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
               className={`aspect-auto ${CHART_H.standard} w-full`}
               aria-label={`Tracked time per context per ${granularity}, top ${Math.min(5, catTrend.seriesKeys.length)} contexts`}
             >
-              <LineChart data={catRows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-                <XAxis
-                  dataKey="key"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={6}
-                  minTickGap={24}
-                  interval="preserveStartEnd"
-                  tickFormatter={(v: string) =>
-                    bucketTick(Number(v), granularity, timeZone)
-                  }
-                />
-                <YAxis hide domain={[0, "dataMax"]} />
+              <LineChart data={catRows} margin={INSIGHTS_CHART_MARGIN}>
+                {insightsGrid()}
+                {insightsXAxis({
+                  tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+                })}
+                {insightsYAxis({ tickCount: 3 })}
                 <ChartTooltip
                   cursor={false}
                   content={
@@ -422,18 +422,11 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
                         ""
                       }
                       formatter={(value, name, item) => (
-                        <div className="flex w-full items-center justify-between gap-3">
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              className="size-2 shrink-0 rounded-[2px]"
-                              style={{ background: item.color }}
-                            />
-                            {catConfig[name as string]?.label ?? name}
-                          </span>
-                          <span className="font-mono tabular-nums">
-                            {formatDuration(Number(value))}
-                          </span>
-                        </div>
+                        <TooltipRow
+                          color={item.color}
+                          label={catConfig[name as string]?.label ?? name}
+                          value={formatDuration(Number(value))}
+                        />
                       )}
                     />
                   }
@@ -463,6 +456,6 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         onClose={() => setDetailDay(null)}
         data={data}
       />
-    </div>
+    </Reading>
   );
 }

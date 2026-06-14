@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { m } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
+import { tween } from "@/lib/motion";
 import { useIdlePreload } from "@/lib/lazy";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useWindowEvents, useWorkspaceRealtime } from "@/lib/hooks/use-window-events";
@@ -35,6 +37,13 @@ import { cn } from "@/lib/utils";
 import type { Category, Member, Occurrence, TaskRow, TimeWindow } from "@/lib/types";
 
 const emptySubscribe = () => () => {};
+
+// Session-level gate for the content crossfade (mirrors components/crossfade.tsx):
+// flipped true after the first insights content paints, so the very first paint
+// never animates (animating the initial load would be a page-load sequence, which
+// the product bans). Reading a module flag during render is pure-enough and is the
+// same pattern Crossfade uses; a ref read during render is disallowed by lint.
+let insightsPainted = false;
 
 const TAB_LABELS: Record<InsightsTab, string> = {
   overview: "Overview",
@@ -133,6 +142,15 @@ function InsightsShellInner({
     () => true,
     () => false,
   );
+
+  // Enter-only crossfade on tab / period change (the keyed content remounts and
+  // fades in). The session-level `insightsPainted` flag (module scope) gates the
+  // FIRST content paint so the initial load never animates; it flips in an effect
+  // (not during render) and is read during render like Crossfade's `navigated`.
+  // Reduced motion is dropped globally by <MotionConfig reducedMotion="user">.
+  useEffect(() => {
+    insightsPainted = true;
+  }, []);
 
   const workspace = useWorkspace();
   const wsId = workspace.data?.workspaceId;
@@ -393,14 +411,19 @@ function InsightsShellInner({
             <InsightsTabSkeleton />
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-[1600px] p-3 sm:p-4 xl:px-6">
+          <m.div
+            key={`${tab}:${period.label}`}
+            initial={insightsPainted ? { opacity: 0 } : false}
+            animate={{ opacity: 1, transition: tween }}
+            className="mx-auto w-full max-w-[1600px] p-3 sm:p-4 xl:px-6"
+          >
             <h2 className="sr-only">{period.label}</h2>
             {tab === "overview" && <OverviewTab data={data} />}
             {tab === "trends" && <TrendsTab data={data} />}
             {tab === "patterns" && <PatternsTab data={data} />}
             {tab === "tasks" && <TasksTab data={data} />}
             {tab === "you" && <YouTab data={data} />}
-          </div>
+          </m.div>
         )}
       </main>
     </div>

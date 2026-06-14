@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Bar, BarChart, XAxis, YAxis } from "recharts";
+import { Bar, BarChart } from "recharts";
 import {
   ChartContainer,
   ChartLegend,
@@ -24,10 +24,17 @@ import { MIN_CATEGORY_RATINGS, satisfactionByCategory } from "@/lib/analytics/co
 import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { toPaletteColor } from "@/lib/theme/appearance";
+import {
+  INSIGHTS_CHART_MARGIN,
+  TooltipRow,
+  insightsGrid,
+  insightsXAxis,
+  insightsYAxis,
+} from "./chart-frame";
 import { GoalsSection } from "./goals/goals-section";
 import { SectionEmpty } from "./insights-empty";
 import { NEUTRAL, bucketLabel, bucketTick, seriesMeta } from "./series";
-import { CHART_H, SectionLabel } from "./tab-bits";
+import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /**
@@ -111,21 +118,25 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
         (payload?.[0]?.payload as { full?: string } | undefined)?.full ?? ""
       }
       formatter={(value, name, item) => (
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="flex items-center gap-1.5">
-            <span
-              className="size-2 shrink-0 rounded-[2px]"
-              style={{ background: item.color }}
-            />
-            {config[name as string]?.label ?? name}
-          </span>
-          <span className="font-mono tabular-nums">
-            {formatDuration(Number(value))}
-          </span>
-        </div>
+        <TooltipRow
+          color={item.color}
+          label={config[name as string]?.label ?? name}
+          value={formatDuration(Number(value))}
+        />
       )}
     />
   );
+
+  // The two-of-you read: each member's share of the shared + visible time on
+  // screen (privacy holds — a partner's private time is never in `occurrences`,
+  // so it's never counted or shown). The viewer reads as "You".
+  const memberTotals = memberSplit.memberIds
+    .map((id) => ({
+      id,
+      ms: memberRows.reduce((s, r) => s + (Number((r as Record<string, unknown>)[id]) || 0), 0),
+    }))
+    .sort((a, b) => (a.id === data.viewerId ? -1 : b.id === data.viewerId ? 1 : b.ms - a.ms));
+  const memberTotalMs = memberTotals.reduce((s, m) => s + m.ms, 0);
 
   return (
     <>
@@ -136,17 +147,12 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
           className={`aspect-auto ${CHART_H.standard} w-full`}
           aria-label={`Stacked tracked time per context per ${granularity}, ${period.label}`}
         >
-          <BarChart data={stackedRows} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-            <XAxis
-              dataKey="key"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={6}
-              minTickGap={24}
-              interval="preserveStartEnd"
-              tickFormatter={(v: string) => bucketTick(Number(v), granularity, timeZone)}
-            />
-            <YAxis hide domain={[0, "dataMax"]} />
+          <BarChart data={stackedRows} margin={INSIGHTS_CHART_MARGIN}>
+            {insightsGrid()}
+            {insightsXAxis({
+              tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+            })}
+            {insightsYAxis({ tickCount: 3 })}
             <ChartTooltip cursor={false} content={tooltipContent(stackedConfig)} />
             <ChartLegend content={<ChartLegendContent />} />
             {stacked.seriesKeys.map((k, i) => (
@@ -285,29 +291,43 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
       </section>
 
       {showMembers && memberSplit.memberIds.length > 1 && (
-        <section className="space-y-1.5 xl:col-span-2">
-          <SectionLabel>Who tracked it, per {granularity}</SectionLabel>
+        <section className="space-y-2 xl:col-span-2">
+          <SectionLabel>The two of you, per {granularity}</SectionLabel>
+          {memberTotalMs > 0 && (
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              {memberTotals.map((m) => {
+                const label =
+                  m.id === data.viewerId
+                    ? "You"
+                    : (data.members.get(m.id)?.name ?? "Partner");
+                const color = (memberConfig[m.id]?.color as string) ?? NEUTRAL;
+                return (
+                  <span key={m.id} className="flex items-center gap-1.5">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: color }}
+                      aria-hidden
+                    />
+                    <span className="font-medium">{label}</span>
+                    <span className="font-mono tabular-nums text-muted-foreground">
+                      {srPercent(m.ms, memberTotalMs)} · {formatDuration(m.ms)}
+                    </span>
+                  </span>
+                );
+              })}
+            </p>
+          )}
           <ChartContainer
             config={memberConfig}
             className={`aspect-auto ${CHART_H.compact} w-full`}
             aria-label={`Tracked time per member per ${granularity}`}
           >
-            <BarChart
-              data={memberRows}
-              margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
-            >
-              <XAxis
-                dataKey="key"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={6}
-                minTickGap={24}
-                interval="preserveStartEnd"
-                tickFormatter={(v: string) =>
-                  bucketTick(Number(v), granularity, timeZone)
-                }
-              />
-              <YAxis hide domain={[0, "dataMax"]} />
+            <BarChart data={memberRows} margin={INSIGHTS_CHART_MARGIN}>
+              {insightsGrid()}
+              {insightsXAxis({
+                tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone),
+              })}
+              {insightsYAxis({ tickCount: 3 })}
               <ChartTooltip cursor={false} content={tooltipContent(memberConfig)} />
               <ChartLegend content={<ChartLegendContent />} />
               {memberSplit.memberIds.map((id) => (
@@ -322,7 +342,8 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
             </BarChart>
           </ChartContainer>
           <p className="text-[11px] text-muted-foreground">
-            Joint events count for their owner&apos;s calendar.
+            Shared and visible time only; private time stays private. Joint events
+            count for their owner&apos;s calendar.
           </p>
         </section>
       )}

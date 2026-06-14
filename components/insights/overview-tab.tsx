@@ -6,14 +6,9 @@ import { tz } from "@date-fns/tz";
 import {
   Area,
   Bar,
-  Cell,
   ComposedChart,
   Line,
-  Pie,
-  PieChart,
   ReferenceLine,
-  XAxis,
-  YAxis,
 } from "recharts";
 import {
   ChartContainer,
@@ -41,6 +36,13 @@ import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { deriveOverviewLede } from "@/lib/insights/ledes";
 import { StatCard, StatGrid } from "./stat-card";
 import { ChartCard } from "./chart-card";
+import {
+  INSIGHTS_CHART_MARGIN,
+  TooltipRow,
+  insightsGrid,
+  insightsXAxis,
+  insightsYAxis,
+} from "./chart-frame";
 import { InsightLede } from "./insight-lede";
 import { CustomizeDashboardSheet } from "./customize-dashboard-sheet";
 import { DayDetailSheet } from "./day-detail-sheet";
@@ -48,11 +50,18 @@ import { GoalsSection } from "./goals/goals-section";
 import { OptimizeTab } from "./optimize-tab";
 import { InsightsEmpty } from "./insights-empty";
 import { NEUTRAL, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, TabGrid, srPercent } from "./tab-bits";
+import { CHART_H, Reading, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
-/** Categories shown individually in the donut before collapsing into "Other". */
+/** Categories shown individually in the share bar before collapsing into "Other". */
 const TOP_CATEGORIES = 6;
+
+/**
+ * The three headline numbers are permanent lead figures in the answer zone, so
+ * they never render as dashboard cards (that would duplicate them). The
+ * customize sheet hides them too.
+ */
+const LEAD_STAT_IDS: DashboardCardId[] = ["total", "daily-avg", "active-days"];
 
 /**
  * Section cards that earn the full grid width on desktop (their content reads
@@ -70,11 +79,12 @@ function median(values: number[]): number {
 }
 
 /**
- * The Overview is a customizable dashboard: a registry of cards
- * (lib/insights/dashboard.ts) rendered in the member's stored order, with
- * hidden cards skipped. No stored prefs reproduces the classic layout
- * exactly; consecutive stat cards share one StatGrid so the grid only
- * fragments when the member interleaves a section on purpose.
+ * The Overview is a customizable dashboard read as a three-movement "reading":
+ * the answer (the lede sentence + its lead figures), the evidence (a registry
+ * of cards — lib/insights/dashboard.ts — in the member's stored order, hidden
+ * cards skipped, stat cards de-cardified into borderless figures), and what to
+ * do (the folded-in Optimize suggestions, subordinate at the foot). No stored
+ * prefs reproduces the classic layout exactly.
  */
 export function OverviewTab({ data }: { data: InsightsTabData }) {
   const reduced = usePrefersReducedMotion();
@@ -146,7 +156,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     [usage.perDay, prevUsage.perDay],
   );
 
-  const donutData = useMemo(() => {
+  const shareData = useMemo(() => {
     const rows = usage.byCategory.map((c) => {
       const meta = seriesMeta(c.categoryId ?? "__uncategorized__", data.categories);
       return { id: c.categoryId ?? "uncategorized", ...meta, ms: c.ms };
@@ -193,11 +203,11 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     totalDelta.deltaPct === null
       ? `${formatDuration(total)} tracked this period.`
       : totalDelta.deltaPct === 0
-        ? `${formatDuration(total)} tracked — level with the previous period.`
-        : `${formatDuration(total)} tracked — ${totalDelta.deltaPct > 0 ? "up" : "down"} ${Math.round(Math.abs(totalDelta.deltaPct) * 100)}% vs the previous period.`;
+        ? `${formatDuration(total)} tracked, level with the previous period.`
+        : `${formatDuration(total)} tracked, ${totalDelta.deltaPct > 0 ? "up" : "down"} ${Math.round(Math.abs(totalDelta.deltaPct) * 100)}% vs the previous period.`;
 
-  const donutHeadline = donutData[0]
-    ? `Most time went to ${donutData[0].name} (${srPercent(donutData[0].ms, total)}).`
+  const shareHeadline = shareData[0]
+    ? `Most time went to ${shareData[0].name} (${srPercent(shareData[0].ms, total)}).`
     : undefined;
 
   // The tab lede: the period's answer in one sentence, above everything.
@@ -215,30 +225,29 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       : null,
   });
 
-  // --- Card registry: every dashboard id renders through these two maps. ----
+  // The lead figures under the answer sentence — the three numbers that frame
+  // the period, on the paper rather than in a wall of KPI cards.
+  const leadFigures =
+    total > 0
+      ? [
+          { label: "Total", value: formatDuration(total) },
+          { label: "Daily avg", value: formatDuration(usage.summary.dailyAverageMs) },
+          {
+            label: "Active days",
+            value: `${usage.summary.activeDays}/${period.days.length}`,
+          },
+        ]
+      : undefined;
 
-  const statCards: Record<string, React.ReactNode> = {
-    total: (
-      <StatCard
-        key="total"
-        label="Total"
-        value={formatDuration(total)}
-        delta={delta(total, prevUsage.summary.totalMs)}
-        emphasis
-        className="col-span-2"
-      />
-    ),
-    "daily-avg": (
-      <StatCard
-        key="daily-avg"
-        label="Daily avg"
-        value={formatDuration(usage.summary.dailyAverageMs)}
-        delta={delta(usage.summary.dailyAverageMs, prevUsage.summary.dailyAverageMs)}
-      />
-    ),
+  // --- Card registry: every dashboard id renders through these two maps. ----
+  // The three lead figures are intentionally absent (they live in the answer
+  // zone); stat cards render flat — borderless figures, not boxes.
+
+  const statCards: Partial<Record<DashboardCardId, React.ReactNode>> = {
     events: (
       <StatCard
         key="events"
+        flat
         label="Events"
         value={String(usage.summary.eventCount)}
         delta={delta(usage.summary.eventCount, prevUsage.summary.eventCount)}
@@ -248,6 +257,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     "avg-session": (
       <StatCard
         key="avg-session"
+        flat
         label="Avg session"
         value={
           usage.summary.eventCount > 0
@@ -260,6 +270,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     "busiest-day": (
       <StatCard
         key="busiest-day"
+        flat
         label="Busiest day"
         value={
           usage.summary.busiestDay ? formatDuration(usage.summary.busiestDay.ms) : "—"
@@ -271,16 +282,10 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
         }
       />
     ),
-    "active-days": (
-      <StatCard
-        key="active-days"
-        label="Active days"
-        value={`${usage.summary.activeDays}/${period.days.length}`}
-      />
-    ),
     "tasks-done": (
       <StatCard
         key="tasks-done"
+        flat
         label="Tasks done"
         value={String(taskStats.completedCount)}
         delta={delta(taskStats.completedCount, prevTaskStats.completedCount)}
@@ -289,6 +294,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     "on-time": (
       <StatCard
         key="on-time"
+        flat
         label="On time"
         value={
           taskStats.adherenceRate === null
@@ -301,6 +307,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
     overdue: (
       <StatCard
         key="overdue"
+        flat
         label="Overdue"
         value={String(taskStats.overdueOpenCount)}
         warning={taskStats.overdueOpenCount > 0}
@@ -333,25 +340,18 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
           >
             <ComposedChart
               data={perDayData}
-              margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
+              margin={INSIGHTS_CHART_MARGIN}
               onClick={(state) => {
                 const label = (state as { activeLabel?: string } | null)
                   ?.activeLabel;
                 if (label) setDetailDay(Number(label));
               }}
             >
-              <XAxis
-                dataKey="key"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={6}
-                minTickGap={24}
-                interval="preserveStartEnd"
-                tickFormatter={(value: string) =>
-                  format(Number(value), "d", { in: ctx })
-                }
-              />
-              <YAxis hide domain={[0, "dataMax"]} />
+              {insightsGrid()}
+              {insightsXAxis({
+                tickFormatter: (value) => format(Number(value), "d", { in: ctx }),
+              })}
+              {insightsYAxis({ tickCount: 3 })}
               <ChartTooltip
                 cursor={false}
                 content={
@@ -361,18 +361,11 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
                         ?.full ?? ""
                     }
                     formatter={(value, name, item) => (
-                      <div className="flex w-full items-center justify-between gap-3">
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className="size-2 shrink-0 rounded-[2px]"
-                            style={{ background: item.color }}
-                          />
-                          {perDayConfig[name as string]?.label ?? name}
-                        </span>
-                        <span className="font-mono tabular-nums">
-                          {formatDuration(Number(value))}
-                        </span>
-                      </div>
+                      <TooltipRow
+                        color={item.color}
+                        label={perDayConfig[name as string]?.label ?? name}
+                        value={formatDuration(Number(value))}
+                      />
                     )}
                   />
                 }
@@ -438,87 +431,47 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       </ChartCard>
     ),
     "by-context": (
-      <section key="by-context" className="space-y-2">
+      <section key="by-context" className="space-y-3">
         <div className="space-y-0.5">
           <SectionLabel>By context</SectionLabel>
-          {donutHeadline && <p className="text-sm font-medium">{donutHeadline}</p>}
+          {shareHeadline && <p className="text-sm font-medium">{shareHeadline}</p>}
         </div>
-        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <div className="relative mx-auto h-[170px] w-[170px] shrink-0 sm:mx-0">
-            <ChartContainer
-              config={{}}
-              className="aspect-square h-[170px] w-full"
-              aria-label="Share of tracked time per context"
-            >
-              <PieChart>
-                <ChartTooltip
-                  cursor={false}
-                  content={
-                    <ChartTooltipContent
-                      hideLabel
-                      formatter={(value, _name, item) => {
-                        const p = item.payload as { name: string; color: string };
-                        return (
-                          <div className="flex w-full items-center justify-between gap-3">
-                            <span className="flex items-center gap-1.5">
-                              <span
-                                className="size-2 shrink-0 rounded-[2px]"
-                                style={{ background: p.color }}
-                              />
-                              {p.name}
-                            </span>
-                            <span className="font-mono tabular-nums">
-                              {formatDuration(Number(value))}
-                            </span>
-                          </div>
-                        );
-                      }}
-                    />
-                  }
-                />
-                <Pie
-                  data={donutData}
-                  dataKey="ms"
-                  nameKey="name"
-                  innerRadius={50}
-                  outerRadius={80}
-                  strokeWidth={2}
-                  isAnimationActive={!reduced}
-                >
-                  {donutData.map((d) => (
-                    <Cell key={d.id} fill={d.color} stroke="var(--card)" />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ChartContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-base leading-none font-semibold tabular-nums">
-                {formatDuration(total)}
-              </span>
-              <span className="mt-0.5 text-[11px] text-muted-foreground">
-                tracked
-              </span>
-            </div>
-          </div>
-          <ul className="w-full min-w-0 flex-1 space-y-1">
-            {donutData.map((d) => (
-              <li key={d.id} className="flex items-center gap-2 text-xs">
-                <span
-                  className="size-2.5 shrink-0 rounded-[3px]"
-                  style={{ background: d.color }}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1 truncate">{d.name}</span>
-                <span className="font-mono tabular-nums text-muted-foreground">
-                  {formatDuration(d.ms)}
-                </span>
-                <span className="w-9 text-right font-mono tabular-nums text-muted-foreground/70">
-                  {srPercent(d.ms, total)}
-                </span>
-              </li>
-            ))}
-          </ul>
+        {/* A 100% share bar — quieter than a donut and a more direct read of
+            proportion. The list below carries the accessible detail; the bar is
+            decorative, so it's aria-hidden. */}
+        <div
+          className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-muted"
+          aria-hidden
+        >
+          {shareData.map((d) => (
+            <div
+              key={d.id}
+              className="h-full min-w-px"
+              style={{
+                width: `${total > 0 ? (d.ms / total) * 100 : 0}%`,
+                background: d.color,
+              }}
+            />
+          ))}
         </div>
+        <ul className="space-y-1">
+          {shareData.map((d) => (
+            <li key={d.id} className="flex items-center gap-2 text-xs">
+              <span
+                className="size-2.5 shrink-0 rounded-[3px]"
+                style={{ background: d.color }}
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1 truncate">{d.name}</span>
+              <span className="font-mono tabular-nums text-muted-foreground">
+                {formatDuration(d.ms)}
+              </span>
+              <span className="w-9 text-right font-mono tabular-nums text-muted-foreground">
+                {srPercent(d.ms, total)}
+              </span>
+            </li>
+          ))}
+        </ul>
       </section>
     ),
     shifts:
@@ -564,15 +517,16 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   const runs = layoutRuns(layout);
 
   return (
-    <div className="space-y-4">
+    <Reading>
       <div className="flex items-start justify-between gap-3">
         {lede ? (
-          <InsightLede lede={lede} className="min-w-0 flex-1" />
+          <InsightLede lede={lede} figures={leadFigures} className="min-w-0 flex-1" />
         ) : (
           <div className="min-w-0 flex-1" />
         )}
         <CustomizeDashboardSheet
           layout={layout}
+          lockedIds={LEAD_STAT_IDS}
           onChange={(next) => void updatePrefs({ dashboard: next }).catch(() => {})}
         />
       </div>
@@ -583,46 +537,55 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
           {usage.summary.busiestDay
             ? ` Busiest day ${format(usage.summary.busiestDay.dayMs, "EEEE d MMMM", { in: ctx })} with ${formatDuration(usage.summary.busiestDay.ms)}.`
             : ""}
-          {donutData[0] ? ` Most time went to ${donutData[0].name}.` : ""}
+          {shareData[0] ? ` Most time went to ${shareData[0].name}.` : ""}
         </p>
       )}
 
-      {/* Stat rows and the wide per-day chart take the full width; the donut,
-          shift chips and goals flow two-up on desktop. */}
-      <TabGrid>
-        {runs.map((run, i) => {
-          if (run.type === "stats") {
-            const cards = run.ids
-              .map((id) => statCards[id])
-              .filter((node): node is React.ReactNode => node != null);
-            return cards.length > 0 ? (
-              <StatGrid key={`stats-${i}`} className="xl:col-span-2">
-                {cards}
-              </StatGrid>
-            ) : null;
-          }
-          // Sections other than goals need tracked time; goals shows its own
-          // empty/progress state regardless (a budget can be "on track" at 0h).
-          if (total === 0 && run.id !== "goals") return null;
-          const node = sections[run.id];
-          if (node == null) return null;
-          return (
-            <div
-              key={run.id}
-              className={FULL_WIDTH_SECTIONS.has(run.id) ? "xl:col-span-2" : undefined}
-            >
-              {node}
-            </div>
-          );
-        })}
-      </TabGrid>
-
-      {/* "What to do": the actionable layer folded in from the former Optimize
-          tab, beneath the answer + the dashboard so Overview still opens with
-          the takeaway. Guarded on tracked time so it never doubles the empty
-          state below. */}
       {total > 0 && (
-        <section className="space-y-2 border-t pt-4">
+        // Movement 2 — the evidence. Stat rows and the wide per-day chart take
+        // the full width; the share bar, shift chips and goals flow two-up.
+        <TabGrid>
+          {runs.map((run, i) => {
+            if (run.type === "stats") {
+              const cards = run.ids
+                .map((id) => statCards[id])
+                .filter((node): node is React.ReactNode => node != null);
+              return cards.length > 0 ? (
+                <StatGrid key={`stats-${i}`} className="xl:col-span-2">
+                  {cards}
+                </StatGrid>
+              ) : null;
+            }
+            // Sections other than goals need tracked time; goals shows its own
+            // empty/progress state regardless (a budget can be "on track" at 0h).
+            const node = sections[run.id];
+            if (node == null) return null;
+            return (
+              <div
+                key={run.id}
+                className={
+                  FULL_WIDTH_SECTIONS.has(run.id) ? "xl:col-span-2" : undefined
+                }
+              >
+                {node}
+              </div>
+            );
+          })}
+        </TabGrid>
+      )}
+
+      {/* Goals can stand alone at 0h tracked (a budget is meaningful empty). */}
+      {total === 0 &&
+        workspaceId &&
+        viewerId &&
+        !layout.hidden.has("goals") && (
+          <GoalsSection data={data} actualByCategory={actualByCategory} />
+        )}
+
+      {/* Movement 3 — what to do: the actionable layer folded in from the former
+          Optimize tab, subordinate beneath the answer + evidence. */}
+      {total > 0 && (
+        <section className="space-y-2 border-t pt-5">
           <SectionLabel>What to do</SectionLabel>
           <OptimizeTab data={data} />
         </section>
@@ -631,6 +594,6 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
       {total === 0 && <InsightsEmpty />}
 
       <DayDetailSheet dayMs={detailDay} onClose={() => setDetailDay(null)} data={data} />
-    </div>
+    </Reading>
   );
 }
