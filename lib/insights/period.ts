@@ -28,7 +28,7 @@ export type PeriodPreset =
 
 export type Granularity = "day" | "week" | "month";
 
-export type InsightsTab = "overview" | "trends" | "patterns" | "tasks" | "you";
+export type InsightsTab = "overview" | "trends" | "patterns" | "tasks" | "sleep";
 
 /** All tabs in display order. */
 export const INSIGHTS_TABS: InsightsTab[] = [
@@ -36,20 +36,20 @@ export const INSIGHTS_TABS: InsightsTab[] = [
   "trends",
   "patterns",
   "tasks",
-  "you",
+  "sleep",
 ];
 
 /**
- * Tab keys retired in the 7→5 consolidation, mapped to the view that absorbed
- * them. Old /insights?tab= deep links resolve through this so they still land
- * on the right place (Balance → Patterns, Optimize → Overview's "What to do"
- * section, Sleep → You). Saved views never stored a tab, so nothing else needs
- * migrating.
+ * Retired tab keys, mapped to the view that absorbed (or renamed) them. Old
+ * /insights?tab= deep links resolve through this so they still land on the right
+ * place: Balance → Patterns and Optimize → Overview's "What to do" section (the
+ * 7→5 consolidation), plus You → Sleep (the tab was briefly labelled "You").
+ * Saved views never stored a tab, so nothing else needs migrating.
  */
 const TAB_ALIASES: Record<string, InsightsTab> = {
   balance: "patterns",
   optimize: "overview",
-  sleep: "you",
+  you: "sleep",
 };
 
 export interface PeriodState {

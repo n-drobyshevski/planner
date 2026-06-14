@@ -50,27 +50,27 @@ const TAB_LABELS: Record<InsightsTab, string> = {
   trends: "Trends",
   patterns: "Patterns",
   tasks: "Tasks",
-  you: "You",
+  sleep: "Sleep",
 };
 
 // Each tab is its own lazy chunk (recharts stays out of the route JS); warmed
 // during idle so switching tabs never shows the skeleton in practice. After
 // the 7→5 consolidation the former Balance and Optimize bodies render inside
-// Patterns and Overview respectively (they fold into those chunks), and Sleep
-// backs the private "You" tab.
+// Patterns and Overview respectively (they fold into those chunks), and the
+// private Sleep tab backs the "sleep" view.
 const tabLoading = () => <ChartSkeleton height={360} className="mt-1" />;
 const loadOverview = () => import("./overview-tab").then((m) => m.OverviewTab);
 const loadTrends = () => import("./trends-tab").then((m) => m.TrendsTab);
 const loadPatterns = () => import("./patterns-tab").then((m) => m.PatternsTab);
 const loadTasksTab = () => import("./tasks-tab").then((m) => m.TasksTab);
-const loadYou = () => import("./sleep-tab").then((m) => m.SleepTab);
+const loadSleep = () => import("./sleep-tab").then((m) => m.SleepTab);
 const OverviewTab = dynamic(loadOverview, { ssr: false, loading: tabLoading });
 const TrendsTab = dynamic(loadTrends, { ssr: false, loading: tabLoading });
 const PatternsTab = dynamic(loadPatterns, { ssr: false, loading: tabLoading });
 const TasksTab = dynamic(loadTasksTab, { ssr: false, loading: tabLoading });
-const YouTab = dynamic(loadYou, { ssr: false, loading: tabLoading });
+const SleepTab = dynamic(loadSleep, { ssr: false, loading: tabLoading });
 
-const TAB_PRELOADS = [loadOverview, loadTrends, loadPatterns, loadTasksTab, loadYou];
+const TAB_PRELOADS = [loadOverview, loadTrends, loadPatterns, loadTasksTab, loadSleep];
 
 /** Everything a tab needs, computed once in the shell. */
 export interface InsightsTabData {
@@ -358,7 +358,7 @@ function InsightsShellInner({
             onHiddenCategoryIdsChange={setHiddenCategoryIds}
             includeInactive={includeInactive}
             onIncludeInactiveChange={setIncludeInactive}
-            filtersInert={tab === "you"}
+            filtersInert={tab === "sleep"}
           />
         }
       />
@@ -422,7 +422,7 @@ function InsightsShellInner({
             {tab === "trends" && <TrendsTab data={data} />}
             {tab === "patterns" && <PatternsTab data={data} />}
             {tab === "tasks" && <TasksTab data={data} />}
-            {tab === "you" && <YouTab data={data} />}
+            {tab === "sleep" && <SleepTab data={data} />}
           </m.div>
         )}
       </main>

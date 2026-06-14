@@ -230,12 +230,13 @@ describe("URL codec", () => {
     expect(parseGranularityParam("week")).toBe("week");
     expect(parseGranularityParam("bogus")).toBeNull();
     expect(parseTabParam("patterns")).toBe("patterns");
-    expect(parseTabParam("you")).toBe("you");
-    // Retired tab keys resolve through the alias map (the 7→5 consolidation),
-    // so old /insights?tab= deep links still land on the merged view.
+    expect(parseTabParam("sleep")).toBe("sleep");
+    // Retired tab keys resolve through the alias map (the 7→5 consolidation,
+    // plus the brief "You" rename), so old /insights?tab= deep links still land
+    // on the merged/renamed view.
     expect(parseTabParam("balance")).toBe("patterns");
     expect(parseTabParam("optimize")).toBe("overview");
-    expect(parseTabParam("sleep")).toBe("you");
+    expect(parseTabParam("you")).toBe("sleep");
     expect(parseTabParam(undefined)).toBe("overview");
     expect(parseTabParam("bogus")).toBe("overview");
   });
