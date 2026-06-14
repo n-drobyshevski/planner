@@ -194,7 +194,7 @@ export function TaskFlows({
       {/* sticky ruler */}
       <div className="sticky top-0 z-20 flex" style={{ height: G.rulerHeight }}>
         <div
-          className="sticky left-0 z-30 flex items-center gap-1 overflow-hidden border-r border-b border-border bg-card px-2"
+          className="sticky left-0 z-30 flex shrink-0 items-center gap-1 overflow-hidden border-r border-b border-border bg-card px-2"
           style={{ width: G.gutterWidth, height: G.rulerHeight }}
         >
           <ToggleGroup
@@ -221,7 +221,7 @@ export function TaskFlows({
           </Button>
         </div>
         <div
-          className="relative border-b border-border bg-background"
+          className="relative shrink-0 border-b border-border bg-background"
           style={{ width: trackWidth, height: G.rulerHeight }}
         >
           {ticks.map((tk, i) => {
@@ -246,7 +246,7 @@ export function TaskFlows({
       {/* body: sticky gutter + graph track */}
       <div className="flex">
         <div
-          className="sticky left-0 z-10 border-r border-border bg-card"
+          className="sticky left-0 z-10 shrink-0 border-r border-border bg-card"
           style={{ width: G.gutterWidth, height: fillHeight }}
         >
           {rows.map(({ lane, top, isExpanded, branchRows }) => {

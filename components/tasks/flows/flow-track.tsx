@@ -62,7 +62,7 @@ export function FlowTrack({
 
   return (
     <div
-      className="relative"
+      className="relative shrink-0"
       style={{ width: trackWidth, height }}
       onMouseLeave={() => setHover(null)}
     >
