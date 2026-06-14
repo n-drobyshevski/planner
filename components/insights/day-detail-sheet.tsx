@@ -32,14 +32,22 @@ function clippedMs(o: Occurrence, dayStart: number, dayEnd: number): number {
   return Math.max(0, Math.min(o.end, dayEnd) - Math.max(o.start, dayStart));
 }
 
-/** Compact attribute chips, e.g. "Energy: 2 Medium · Focus: Deep". */
-function attributeChips(o: Occurrence): string[] {
+/** Compact attribute chips, e.g. "Energy: 2 Medium · Focus: Deep". `ta` is the
+ *  `common` translator (attribute labels/options live there, shared with the editor). */
+function attributeChips(
+  o: Occurrence,
+  ta: (key: string) => string,
+): string[] {
   const chips: string[] = [];
   for (const meta of ATTRIBUTE_META) {
     const value = o.attributes[meta.key];
     if (value === undefined) continue;
     const option = meta.options.find((opt) => opt.value === String(value));
-    chips.push(`${meta.label}: ${option?.label ?? String(value)}`);
+    const optLabel =
+      meta.key === "satisfaction"
+        ? (option?.label ?? String(value))
+        : ta(`attributes.${meta.key}.options.${String(value)}`);
+    chips.push(`${ta(`attributes.${meta.key}.label`)}: ${optLabel}`);
   }
   return chips;
 }
@@ -55,6 +63,7 @@ export function DayDetailSheet({
   data: InsightsTabData;
 }) {
   const t = useTranslations("insights");
+  const ta = useTranslations("common");
   const locale = useLocale();
   const seriesLabels = seriesFallbackLabels(t);
   const { period, occurrences, categories, timeZone } = data;
@@ -96,7 +105,7 @@ export function DayDetailSheet({
               <ul className="flex flex-col gap-2" role="list">
                 {day.items.map((o) => {
                   const meta = seriesMeta(o.categoryId ?? "__uncategorized__", categories, seriesLabels);
-                  const chips = attributeChips(o);
+                  const chips = attributeChips(o, ta);
                   return (
                     <li
                       key={o.key}

@@ -22,5 +22,26 @@
   "undo": "Отменить",
   "retry": "Повторить",
   "saving": "Сохранение…",
-  "somethingWentWrong": "Что-то пошло не так"
+  "somethingWentWrong": "Что-то пошло не так",
+  "attributes": {
+    "energy": {
+      "label": "Энергия",
+      "description": "Насколько это требует сил.",
+      "options": { "1": "1 Низкая", "2": "2 Средняя", "3": "3 Высокая" }
+    },
+    "flexibility": {
+      "label": "Гибкость",
+      "description": "Насколько это можно подвинуть, если день заполнится.",
+      "options": { "fixed": "Жёстко", "movable": "Подвижно", "flexible": "Гибко" }
+    },
+    "focus": {
+      "label": "Фокус",
+      "description": "Какая нужна концентрация.",
+      "options": { "deep": "Глубокий", "shallow": "Поверхностный" }
+    },
+    "satisfaction": {
+      "label": "Удовлетворённость",
+      "description": "Как ощущалось, оглядываясь назад."
+    }
+  }
 }
