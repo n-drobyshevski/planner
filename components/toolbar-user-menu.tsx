@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Link, getPathname } from "@/i18n/navigation";
-import { useLocale, useTranslations } from "next-intl";
-import { toast } from "sonner";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,68 +14,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { PinInput } from "@/components/auth/pin-input";
 import { ThemeToggle } from "@/components/calendar/theme-toggle";
-import {
-  signOutAction,
-  switchAccountAction,
-} from "@/app/[locale]/login/actions";
+import { useAccountSwitch } from "@/components/account-switch";
+import { signOutAction } from "@/app/[locale]/login/actions";
 import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
-import type { Locale } from "@/i18n/routing";
 import type { Member } from "@/lib/types";
 
 /** Theme toggle + profile menu, rendered by the shared surface header. */
-export function ToolbarUserMenu({
-  current,
-  others = [],
-}: {
-  current: Member | null;
-  /** The workspace's other member(s) — exactly one in practice. */
-  others?: Member[];
-}) {
+export function ToolbarUserMenu({ current }: { current: Member | null }) {
   const t = useTranslations("nav");
-  const locale = useLocale();
-  // The member whose PIN we're collecting before switching (null = no dialog).
-  const [pinTarget, setPinTarget] = useState<Member | null>(null);
-  const [pin, setPin] = useState("");
-  const [pending, startTransition] = useTransition();
-
-  // Only members linked to an auth user can actually be switched into.
-  const switchable = others.filter((m) => m.authUserId);
-
-  function runSwitch(member: Member, pinValue: string) {
-    if (pending) return;
-    startTransition(async () => {
-      const res = await switchAccountAction(member.id, pinValue);
-      if (res && "error" in res) {
-        toast.error(res.error);
-        return;
-      }
-      // A hard navigation is the only reliable way to drop the previous
-      // member's React Query caches (workspace, events, tasks, insights).
-      window.location.assign(
-        getPathname({ href: "/calendar", locale: locale as Locale }),
-      );
-    });
-  }
-
-  function onSelectSwitch(member: Member) {
-    if (member.hasPin) {
-      setPin("");
-      setPinTarget(member);
-    } else {
-      runSwitch(member, "");
-    }
-  }
+  const { switchable, onSelectSwitch, pending, dialog } = useAccountSwitch();
 
   return (
     <>
@@ -146,53 +92,7 @@ export function ToolbarUserMenu({
         </DropdownMenu>
       )}
 
-      {/* Controlled as a sibling of the menu (not nested in its content) so the
-          dropdown can close cleanly without a focus race. */}
-      <Dialog
-        open={pinTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setPinTarget(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {t("userMenu.switchDialog.title", { name: pinTarget?.name ?? "" })}
-            </DialogTitle>
-            <DialogDescription>
-              {t("userMenu.switchDialog.description", {
-                name: pinTarget?.name ?? "",
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            className="flex flex-col gap-1.5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (pinTarget) runSwitch(pinTarget, pin);
-            }}
-          >
-            <PinInput
-              value={pin}
-              onChange={setPin}
-              disabled={pending}
-              autoFocus
-            />
-            <DialogFooter className="mt-4">
-              <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={pending}>
-                  {t("userMenu.switchDialog.cancel")}
-                </Button>
-              </DialogClose>
-              <Button type="submit" disabled={pending || pin.length !== 8}>
-                {pending
-                  ? t("userMenu.switchDialog.switching")
-                  : t("userMenu.switchDialog.submit")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {dialog}
     </>
   );
 }

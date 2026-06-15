@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToolbarSlot } from "@/components/toolbar-slots";
 import { MobileAccountSection } from "@/components/mobile-account-section";
+import { useAccountSwitch } from "@/components/account-switch";
 import { CollectionSwitcher } from "./collection-switcher";
 import type { Member } from "@/lib/types";
 
@@ -114,7 +115,9 @@ function TasksMobileMenu({
   current: Member | null;
 }) {
   const t = useTranslations("tasks");
+  const { switchable, onSelectSwitch, pending, dialog } = useAccountSwitch();
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -135,8 +138,15 @@ function TasksMobileMenu({
           <DropdownMenuRadioItem value="board">{t("toolbar.board")}</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="list">{t("toolbar.list")}</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
-        <MobileAccountSection current={current} />
+        <MobileAccountSection
+          current={current}
+          switchable={switchable}
+          onSelectSwitch={onSelectSwitch}
+          pending={pending}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
+    {dialog}
+    </>
   );
 }
