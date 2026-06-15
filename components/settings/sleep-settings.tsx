@@ -107,7 +107,7 @@ export function SleepSettings() {
         <CardTitle>{t("sleep.title")}</CardTitle>
         <CardDescription>{t("sleep.description")}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         <form.Field
           name="cycleLength"
           listeners={{

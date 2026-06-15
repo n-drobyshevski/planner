@@ -14,7 +14,14 @@ import {
   ResponsiveDialogBody,
   ResponsiveDialogFooter,
 } from "@/components/ui/responsive-dialog";
-import { Field, FieldError } from "@/components/ui/field";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -178,112 +185,117 @@ export function CollectionDialog({
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
-        <ResponsiveDialogBody className="flex flex-col gap-4 py-3">
-          <form.Field name="name">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
-              return (
-                <Field data-invalid={isInvalid || undefined}>
-                  <Input
-                    name={field.name}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    placeholder={t("collectionDialog.namePlaceholder")}
-                    onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
-                    aria-label={t("collectionDialog.nameLabel")}
-                    aria-invalid={isInvalid || undefined}
-                    autoFocus
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+        <ResponsiveDialogBody>
+          <FieldGroup>
+            <form.Field name="name">
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
+                return (
+                  <Field data-invalid={isInvalid || undefined}>
+                    <FieldLabel htmlFor="col-name" className="sr-only">
+                      {t("collectionDialog.nameLabel")}
+                    </FieldLabel>
+                    <Input
+                      id="col-name"
+                      name={field.name}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      placeholder={t("collectionDialog.namePlaceholder")}
+                      onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
+                      aria-invalid={isInvalid || undefined}
+                      autoFocus
+                    />
+                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                  </Field>
+                );
+              }}
+            </form.Field>
+
+            <form.Field name="color">
+              {(field) => (
+                <Field>
+                  <FieldLabel>{t("collectionDialog.colorFieldLabel")}</FieldLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {PALETTE.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={t("collectionDialog.colorLabel", { color: c })}
+                        aria-pressed={field.state.value === c}
+                        onClick={() => field.handleChange(c)}
+                        className={cn(
+                          "size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          field.state.value === c && "ring-2 ring-foreground",
+                        )}
+                        style={{ backgroundColor: toPaletteColor(c) }}
+                      />
+                    ))}
+                  </div>
                 </Field>
-              );
-            }}
-          </form.Field>
+              )}
+            </form.Field>
 
-          <form.Field name="color">
-            {(field) => (
-              <div className="flex flex-wrap gap-2">
-                {PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={t("collectionDialog.colorLabel", { color: c })}
-                    aria-pressed={field.state.value === c}
-                    onClick={() => field.handleChange(c)}
-                    className={cn(
-                      "size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      field.state.value === c && "ring-2 ring-foreground",
+            <form.Field name="lineStyle">
+              {(field) => (
+                <Field>
+                  <FieldLabel>{t("collectionDialog.lineStyleLabel")}</FieldLabel>
+                  <form.Subscribe selector={(s) => s.values.color}>
+                    {(color) => (
+                      <div className="flex flex-wrap gap-2">
+                        {FLOW_LINE_STYLES.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            aria-label={t(`flowLineStyle.${s}`)}
+                            aria-pressed={field.state.value === s}
+                            onClick={() => field.handleChange(s)}
+                            className={cn(
+                              "flex h-7 items-center rounded-md border border-border px-2 ring-offset-2 ring-offset-background transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              field.state.value === s && "border-foreground/30 ring-2 ring-foreground",
+                            )}
+                          >
+                            <LineStyleSample style={s} color={toPaletteColor(color ?? PALETTE[0])} />
+                          </button>
+                        ))}
+                      </div>
                     )}
-                    style={{ backgroundColor: toPaletteColor(c) }}
-                  />
-                ))}
-              </div>
-            )}
-          </form.Field>
+                  </form.Subscribe>
+                </Field>
+              )}
+            </form.Field>
 
-          <form.Field name="lineStyle">
-            {(field) => (
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xs text-muted-foreground">
-                  {t("collectionDialog.lineStyleLabel")}
-                </p>
-                <form.Subscribe selector={(s) => s.values.color}>
-                  {(color) => (
-                    <div className="flex flex-wrap gap-2">
-                      {FLOW_LINE_STYLES.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          aria-label={t(`flowLineStyle.${s}`)}
-                          aria-pressed={field.state.value === s}
-                          onClick={() => field.handleChange(s)}
-                          className={cn(
-                            "flex h-7 items-center rounded-md border border-border px-2 ring-offset-2 ring-offset-background transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            field.state.value === s && "border-foreground/30 ring-2 ring-foreground",
-                          )}
-                        >
-                          <LineStyleSample style={s} color={toPaletteColor(color ?? PALETTE[0])} />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </form.Subscribe>
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="shared">
-            {(field) => (
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-center justify-between gap-2 text-sm">
-                  <span className="flex items-center gap-2">
-                    {field.state.value ? (
-                      <Users className="size-4 text-muted-foreground" />
-                    ) : (
-                      <User className="size-4 text-muted-foreground" />
-                    )}
-                    <span>
+            <form.Field name="shared">
+              {(field) => (
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel htmlFor="col-shared" className="flex items-center gap-2">
+                      {field.state.value ? (
+                        <Users className="size-4 text-muted-foreground" />
+                      ) : (
+                        <User className="size-4 text-muted-foreground" />
+                      )}
                       {field.state.value
                         ? t("collectionDialog.shared")
                         : t("collectionDialog.personal")}
-                    </span>
-                  </span>
+                    </FieldLabel>
+                    <FieldDescription>
+                      {field.state.value
+                        ? t("collectionDialog.sharedHint")
+                        : t("collectionDialog.personalHint")}
+                    </FieldDescription>
+                  </FieldContent>
                   <Switch
+                    id="col-shared"
                     checked={field.state.value}
                     onCheckedChange={field.handleChange}
                     aria-label={t("collectionDialog.sharedToggleLabel")}
                   />
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  {field.state.value
-                    ? t("collectionDialog.sharedHint")
-                    : t("collectionDialog.personalHint")}
-                </p>
-              </div>
-            )}
-          </form.Field>
+                </Field>
+              )}
+            </form.Field>
+          </FieldGroup>
         </ResponsiveDialogBody>
 
         <ResponsiveDialogFooter>

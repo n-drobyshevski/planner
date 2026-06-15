@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -156,7 +156,8 @@ export function LogNightDialog({
               {t("logNight.description")}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
-          <ResponsiveDialogBody className="space-y-4">
+          <ResponsiveDialogBody>
+            <FieldGroup>
             <form.Field name="date">
               {(field) => (
                 <Field>
@@ -183,6 +184,7 @@ export function LogNightDialog({
                 />
               )}
             </form.Field>
+            </FieldGroup>
           </ResponsiveDialogBody>
           <ResponsiveDialogFooter>
             <form.Subscribe
@@ -205,7 +207,7 @@ export function LogNightDialog({
                       {t("logNight.deleteThisNight")}
                     </Button>
                   )}
-                  <Button variant="ghost" onClick={() => setOpen(false)}>
+                  <Button variant="outline" onClick={() => setOpen(false)}>
                     {tCommon("cancel")}
                   </Button>
                   <Button

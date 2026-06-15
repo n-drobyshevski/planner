@@ -15,7 +15,14 @@ import {
   ResponsiveDialogBody,
   ResponsiveDialogFooter,
 } from "@/components/ui/responsive-dialog";
-import { Field, FieldError } from "@/components/ui/field";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -93,81 +100,88 @@ export function CreateContextDialog({
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
-        <ResponsiveDialogBody className="flex flex-col gap-4 py-3">
-          <form.Field name="name">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
-              return (
-                <Field data-invalid={isInvalid || undefined}>
-                  <Input
-                    name={field.name}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    placeholder={t("createContext.namePlaceholder")}
-                    onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
-                    aria-label={t("createContext.nameLabel")}
-                    aria-invalid={isInvalid || undefined}
-                    autoFocus
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+        <ResponsiveDialogBody>
+          <FieldGroup>
+            <form.Field name="name">
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
+                return (
+                  <Field data-invalid={isInvalid || undefined}>
+                    <FieldLabel htmlFor="ctx-name" className="sr-only">
+                      {t("createContext.nameLabel")}
+                    </FieldLabel>
+                    <Input
+                      id="ctx-name"
+                      name={field.name}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      placeholder={t("createContext.namePlaceholder")}
+                      onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
+                      aria-invalid={isInvalid || undefined}
+                      autoFocus
+                    />
+                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                  </Field>
+                );
+              }}
+            </form.Field>
+
+            <form.Field name="color">
+              {(field) => (
+                <Field>
+                  <FieldLabel>{t("createContext.colorLabel")}</FieldLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {PALETTE.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={t("createContext.colorAriaLabel", { color: c })}
+                        aria-pressed={field.state.value === c}
+                        onClick={() => field.handleChange(c)}
+                        className={cn(
+                          "size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          field.state.value === c && "ring-2 ring-foreground",
+                        )}
+                        style={{ backgroundColor: toPaletteColor(c) }}
+                      />
+                    ))}
+                  </div>
                 </Field>
-              );
-            }}
-          </form.Field>
+              )}
+            </form.Field>
 
-          <form.Field name="color">
-            {(field) => (
-              <div className="flex flex-wrap gap-2">
-                {PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={t("createContext.colorAriaLabel", { color: c })}
-                    aria-pressed={field.state.value === c}
-                    onClick={() => field.handleChange(c)}
-                    className={cn(
-                      "size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      field.state.value === c && "ring-2 ring-foreground",
-                    )}
-                    style={{ backgroundColor: toPaletteColor(c) }}
-                  />
-                ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="shared">
-            {(field) => (
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-center justify-between gap-2 text-sm">
-                  <span className="flex items-center gap-2">
-                    {field.state.value ? (
-                      <Users className="size-4 text-muted-foreground" />
-                    ) : (
-                      <User className="size-4 text-muted-foreground" />
-                    )}
-                    <span>
+            <form.Field name="shared">
+              {(field) => (
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel htmlFor="ctx-shared" className="flex items-center gap-2">
+                      {field.state.value ? (
+                        <Users className="size-4 text-muted-foreground" />
+                      ) : (
+                        <User className="size-4 text-muted-foreground" />
+                      )}
                       {field.state.value
                         ? t("createContext.shared")
                         : t("createContext.personal")}
-                    </span>
-                  </span>
+                    </FieldLabel>
+                    <FieldDescription>
+                      {field.state.value
+                        ? t("createContext.sharedHint")
+                        : t("createContext.personalHint")}
+                    </FieldDescription>
+                  </FieldContent>
                   <Switch
+                    id="ctx-shared"
                     checked={field.state.value}
                     onCheckedChange={field.handleChange}
                     aria-label={t("createContext.sharedSwitchAriaLabel")}
                   />
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  {field.state.value
-                    ? t("createContext.sharedHint")
-                    : t("createContext.personalHint")}
-                </p>
-              </div>
-            )}
-          </form.Field>
+                </Field>
+              )}
+            </form.Field>
+          </FieldGroup>
         </ResponsiveDialogBody>
 
         <ResponsiveDialogFooter>

@@ -36,6 +36,7 @@
     "description": "Объедини связанные события в общий или личный контекст.",
     "namePlaceholder": "Название контекста",
     "nameLabel": "Название контекста",
+    "colorLabel": "Цвет",
     "colorAriaLabel": "Цвет {color}",
     "shared": "Общий",
     "personal": "Личный",

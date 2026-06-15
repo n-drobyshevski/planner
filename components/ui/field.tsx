@@ -38,6 +38,35 @@ function FieldLegend({
   )
 }
 
+function FieldSection({
+  title,
+  description,
+  separator = false,
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"fieldset"> & {
+  title?: React.ReactNode
+  description?: React.ReactNode
+  /** Top hairline divider, marking this section off from the one above it. */
+  separator?: boolean
+}) {
+  return (
+    <FieldSet
+      data-slot="field-section"
+      // A section is a labelled group of fields. The optional top hairline (never
+      // a hard rule, per DESIGN.md) separates adjacent sections without adding
+      // chrome; the legend carries the grouping, spacing carries the rest.
+      className={cn(separator && "border-t border-border/60 pt-6", className)}
+      {...props}
+    >
+      {title && <FieldLegend variant="label">{title}</FieldLegend>}
+      {description && <FieldDescription>{description}</FieldDescription>}
+      {children}
+    </FieldSet>
+  )
+}
+
 function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -237,6 +266,7 @@ export {
   FieldError,
   FieldGroup,
   FieldLegend,
+  FieldSection,
   FieldSeparator,
   FieldSet,
   FieldContent,

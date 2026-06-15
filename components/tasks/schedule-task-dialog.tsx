@@ -11,7 +11,13 @@ import {
   ResponsiveDialogBody,
   ResponsiveDialogFooter,
 } from "@/components/ui/responsive-dialog";
-import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
@@ -259,11 +265,11 @@ export function ScheduleTaskDialog({
                           value={field.state.value}
                           onChange={field.handleChange}
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <FieldDescription>
                           {task.sequential
                             ? t("schedule.subtasksHintInOrder", { count: ordered.length })
                             : t("schedule.subtasksHint", { count: ordered.length })}
-                        </p>
+                        </FieldDescription>
                       </Field>
                     )}
                   </form.Field>
