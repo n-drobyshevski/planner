@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   bedtimesForWake,
   CYCLE_RANGE,
+  firstCommitment,
   GET_READY_MS,
   recommendTonight,
   type SleepPrefs,
   wakesForBedtime,
 } from "@/lib/sleep/cycles";
 import type { HabitualPhase } from "@/lib/sleep/circadian";
+import type { Occurrence } from "@/lib/types";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -185,5 +187,76 @@ describe("recommendTonight", () => {
     const bed = recommendTonight({ ...args, now: nightBefore })!.bedtimeMs;
     expect(recommendTonight({ ...args, now: bed })!.tooLate).toBe(false);
     expect(recommendTonight({ ...args, now: bed + MIN })!.tooLate).toBe(true);
+  });
+});
+
+describe("firstCommitment", () => {
+  const VIEWER = "viewer";
+  const PARTNER = "partner";
+  // Tomorrow's window: [2026-06-02 00:00, 2026-06-03 00:00).
+  const winStart = Date.UTC(2026, 5, 2);
+  const at = (h: number, m = 0) => Date.UTC(2026, 5, 2, h, m);
+
+  function occ(over: Partial<Occurrence> = {}): Occurrence {
+    return {
+      key: "k",
+      eventId: "e",
+      occurrenceDate: at(9),
+      start: at(9),
+      end: at(10),
+      allDay: false,
+      inactive: false,
+      status: "confirmed",
+      title: "Thing",
+      description: null,
+      location: null,
+      categoryId: null,
+      color: null,
+      kind: "event",
+      ownerId: VIEWER,
+      isPrivate: false,
+      isShared: false,
+      taskId: null,
+      attributes: {},
+      isRecurring: false,
+      isException: false,
+      ...over,
+    };
+  }
+
+  it("counts a timed context window and picks it over a later event", () => {
+    const work = occ({ kind: "context", title: "Work", start: at(8, 30), end: at(11, 45) });
+    const event = occ({ kind: "event", title: "Decathlon", start: at(17, 15) });
+    expect(firstCommitment([event, work], VIEWER, winStart)?.title).toBe("Work");
+  });
+
+  it("ignores all-day, inactive, and cancelled occurrences", () => {
+    expect(
+      firstCommitment(
+        [
+          occ({ allDay: true, start: at(6) }),
+          occ({ inactive: true, kind: "context", start: at(7) }),
+          occ({ status: "cancelled", start: at(8) }),
+          occ({ title: "Real", start: at(9) }),
+        ],
+        VIEWER,
+        winStart,
+      )?.title,
+    ).toBe("Real");
+  });
+
+  it("keeps shared commitments but drops the partner's private ones", () => {
+    const partnerPrivate = occ({ ownerId: PARTNER, isShared: false, start: at(8) });
+    const shared = occ({ ownerId: PARTNER, isShared: true, title: "Shared", start: at(9) });
+    expect(firstCommitment([partnerPrivate, shared], VIEWER, winStart)?.title).toBe("Shared");
+  });
+
+  it("drops occurrences that started before the window (spilled in from today)", () => {
+    const spill = occ({ start: winStart - HOUR });
+    expect(firstCommitment([spill], VIEWER, winStart)).toBeNull();
+  });
+
+  it("returns null when nothing qualifies", () => {
+    expect(firstCommitment([], VIEWER, winStart)).toBeNull();
   });
 });

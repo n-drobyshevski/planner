@@ -21,6 +21,31 @@ import {
   type HabitualPhase,
 } from "@/lib/sleep/circadian";
 import { dayStartOffset } from "@/lib/datetime/local";
+import type { Occurrence } from "@/lib/types";
+
+/**
+ * Tomorrow's first timed commitment that should set the alarm: the earliest
+ * non-all-day, non-inactive, non-cancelled occurrence the viewer is on the hook
+ * for (their own, or a shared/joint one — the partner's private plans don't set
+ * your alarm). Timed CONTEXT windows (work/school backdrops) count as real
+ * commitments alongside normal events; only the START matters. `windowStart`
+ * drops overlaps spilling in from the previous day.
+ */
+export function firstCommitment(
+  occurrences: Occurrence[],
+  viewerId: string,
+  windowStart: number,
+): Occurrence | null {
+  let first: Occurrence | null = null;
+  for (const o of occurrences) {
+    if (o.inactive || o.allDay) continue;
+    if (o.status === "cancelled") continue;
+    if (!(o.ownerId === viewerId || o.isShared)) continue;
+    if (o.start < windowStart) continue;
+    if (first === null || o.start < first.start) first = o;
+  }
+  return first;
+}
 
 export interface SleepPrefs {
   cycleLengthMin: number;
