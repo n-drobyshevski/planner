@@ -14,6 +14,7 @@ import {
 import {
   Field,
   FieldGroup,
+  FieldSection,
   FieldLabel,
   FieldDescription,
   FieldError,
@@ -390,7 +391,7 @@ export function EventDialog(props: EventDialogProps) {
                     </div>
                   )}
                   <fieldset disabled={readOnly} className="contents">
-                  <FieldGroup className="gap-4">
+                  <FieldGroup>
                     {/* Title — prominent, borderless */}
                     <form.Field name="title">
                       {(field) => {
@@ -513,6 +514,8 @@ export function EventDialog(props: EventDialogProps) {
                       )}
                     </form.Subscribe>
 
+                    {/* Filing + sharing — how the item is categorised and who sees it. */}
+                    <FieldSection>
                     {/* Context + Color — paired row */}
                     <div className="grid grid-cols-2 gap-3">
                       <form.Field name="categoryId">
@@ -614,6 +617,7 @@ export function EventDialog(props: EventDialogProps) {
                         )
                       }
                     </form.Subscribe>
+                    </FieldSection>
 
                     <Separator />
 

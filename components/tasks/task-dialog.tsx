@@ -23,6 +23,7 @@ import {
 import {
   Field,
   FieldGroup,
+  FieldSection,
   FieldLabel,
   FieldError,
   FieldContent,
@@ -99,6 +100,12 @@ export function TaskDialog(props: TaskDialogProps) {
   });
   const [showOptimization, setShowOptimization] = useState(() =>
     hasAnyAttribute(defaults.attributes),
+  );
+  // Auto-expand "More options" when editing a task that already uses any of the
+  // fields tucked behind it, so nothing stays hidden; collapsed for quick adds.
+  const [showMore, setShowMore] = useState(
+    () =>
+      defaults.status !== "todo" || defaults.isMilestone || defaults.isPrivate,
   );
 
   const usableCategories = categories.filter(
@@ -225,163 +232,193 @@ export function TaskDialog(props: TaskDialogProps) {
               )}
             </form.Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <form.Field name="assigneeId">
+            {/* Details — assignment, scheduling, and priority grouped together
+                so the core fields above stay uncluttered. */}
+            <FieldSection title={t("taskDialog.detailsLabel")}>
+              <div className="grid grid-cols-2 gap-3">
+                <form.Field name="assigneeId">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>{t("taskDialog.assigneeLabel")}</FieldLabel>
+                      <Select value={field.state.value} onValueChange={field.handleChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("taskDialog.unassigned")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="none">{t("taskDialog.unassigned")}</SelectItem>
+                            {members.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="categoryId">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>{t("taskDialog.contextLabel")}</FieldLabel>
+                      <Select value={field.state.value} onValueChange={field.handleChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("taskDialog.noContext")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="none">{t("taskDialog.noContext")}</SelectItem>
+                            {usableCategories.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+                </form.Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <form.Field name="startDate">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="task-start">{t("taskDialog.startDateLabel")}</FieldLabel>
+                      <DatePicker
+                        id="task-start"
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        clearable
+                        aria-label={t("taskDialog.startDateLabel")}
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="dueDate">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="task-due">{t("taskDialog.dueDateLabel")}</FieldLabel>
+                      <DatePicker
+                        id="task-due"
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        clearable
+                        aria-label={t("taskDialog.dueDateLabel")}
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+              </div>
+
+              {/* Priority is a 4-value enum — a ToggleGroup matches the Status and
+                  visibility controls used elsewhere. The value union ("none" | "1"
+                  | "2" | "3") is unchanged, so the schema/payload contract holds; a
+                  re-tap (empty value) falls back to "none". */}
+              <form.Field name="priority">
                 {(field) => (
                   <Field>
-                    <FieldLabel>{t("taskDialog.assigneeLabel")}</FieldLabel>
-                    <Select value={field.state.value} onValueChange={field.handleChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("taskDialog.unassigned")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="none">{t("taskDialog.unassigned")}</SelectItem>
-                          {members.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-              </form.Field>
-
-              <form.Field name="categoryId">
-                {(field) => (
-                  <Field>
-                    <FieldLabel>{t("taskDialog.contextLabel")}</FieldLabel>
-                    <Select value={field.state.value} onValueChange={field.handleChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("taskDialog.noContext")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="none">{t("taskDialog.noContext")}</SelectItem>
-                          {usableCategories.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-              </form.Field>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <form.Field name="startDate">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="task-start">{t("taskDialog.startDateLabel")}</FieldLabel>
-                    <DatePicker
-                      id="task-start"
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      clearable
-                      aria-label={t("taskDialog.startDateLabel")}
-                    />
-                  </Field>
-                )}
-              </form.Field>
-
-              <form.Field name="dueDate">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="task-due">{t("taskDialog.dueDateLabel")}</FieldLabel>
-                    <DatePicker
-                      id="task-due"
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      clearable
-                      aria-label={t("taskDialog.dueDateLabel")}
-                    />
-                  </Field>
-                )}
-              </form.Field>
-            </div>
-
-            <form.Field name="priority">
-              {(field) => (
-                <Field>
-                  <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(v) =>
-                      field.handleChange(v as TaskFormValues["priority"])
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("priority.none")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="none">{t("priority.none")}</SelectItem>
-                        <SelectItem value="1">{t("priority.low")}</SelectItem>
-                        <SelectItem value="2">{t("priority.medium")}</SelectItem>
-                        <SelectItem value="3">{t("priority.high")}</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-            </form.Field>
-
-            {mode === "edit" && (
-              <form.Field name="status">
-                {(field) => (
-                  <Field>
-                    <FieldLabel>{t("taskDialog.statusLabel")}</FieldLabel>
+                    <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
                     <ToggleGroup
                       type="single"
                       variant="outline"
                       value={field.state.value}
-                      onValueChange={(v) => v && field.handleChange(v as TaskStatus)}
+                      onValueChange={(v) =>
+                        field.handleChange((v || "none") as TaskFormValues["priority"])
+                      }
                       className="justify-start"
                     >
-                      <ToggleGroupItem value="todo">{t("status.todo")}</ToggleGroupItem>
-                      <ToggleGroupItem value="in_progress">{t("status.inProgress")}</ToggleGroupItem>
-                      <ToggleGroupItem value="done">{t("status.done")}</ToggleGroupItem>
+                      <ToggleGroupItem value="none">{t("priority.none")}</ToggleGroupItem>
+                      <ToggleGroupItem value="1">{t("priority.low")}</ToggleGroupItem>
+                      <ToggleGroupItem value="2">{t("priority.medium")}</ToggleGroupItem>
+                      <ToggleGroupItem value="3">{t("priority.high")}</ToggleGroupItem>
                     </ToggleGroup>
                   </Field>
                 )}
               </form.Field>
-            )}
+            </FieldSection>
 
-            <form.Field name="isMilestone">
-              {(field) => (
-                <Field orientation="horizontal">
-                  <Switch
-                    id="task-milestone"
-                    checked={field.state.value}
-                    onCheckedChange={field.handleChange}
+            {/* More options — status (edit only) and the two flags tucked behind
+                progressive disclosure so the form mirrors the Event dialog. */}
+            <Collapsible open={showMore} onOpenChange={setShowMore}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                >
+                  {t("taskDialog.moreOptions")}
+                  <ChevronDown
+                    className={`size-4 transition-transform ${showMore ? "rotate-180" : ""}`}
                   />
-                  <FieldContent>
-                    <FieldLabel htmlFor="task-milestone">
-                      {t("taskDialog.milestoneLabel")}
-                    </FieldLabel>
-                    <FieldDescription>{t("taskDialog.milestoneHint")}</FieldDescription>
-                  </FieldContent>
-                </Field>
-              )}
-            </form.Field>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <FieldSection className="pt-4">
+                  {mode === "edit" && (
+                    <form.Field name="status">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel>{t("taskDialog.statusLabel")}</FieldLabel>
+                          <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            value={field.state.value}
+                            onValueChange={(v) => v && field.handleChange(v as TaskStatus)}
+                            className="justify-start"
+                          >
+                            <ToggleGroupItem value="todo">{t("status.todo")}</ToggleGroupItem>
+                            <ToggleGroupItem value="in_progress">{t("status.inProgress")}</ToggleGroupItem>
+                            <ToggleGroupItem value="done">{t("status.done")}</ToggleGroupItem>
+                          </ToggleGroup>
+                        </Field>
+                      )}
+                    </form.Field>
+                  )}
 
-            <form.Field name="isPrivate">
-              {(field) => (
-                <Field orientation="horizontal">
-                  <Switch
-                    id="task-private"
-                    checked={field.state.value}
-                    onCheckedChange={field.handleChange}
-                  />
-                  <FieldLabel htmlFor="task-private">{t("taskDialog.privateLabel")}</FieldLabel>
-                </Field>
-              )}
-            </form.Field>
+                  <form.Field name="isMilestone">
+                    {(field) => (
+                      <Field orientation="horizontal">
+                        <FieldContent>
+                          <FieldLabel htmlFor="task-milestone">
+                            {t("taskDialog.milestoneLabel")}
+                          </FieldLabel>
+                          <FieldDescription>{t("taskDialog.milestoneHint")}</FieldDescription>
+                        </FieldContent>
+                        <Switch
+                          id="task-milestone"
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="isPrivate">
+                    {(field) => (
+                      <Field orientation="horizontal">
+                        <FieldContent>
+                          <FieldLabel htmlFor="task-private">
+                            {t("taskDialog.privateLabel")}
+                          </FieldLabel>
+                          <FieldDescription>{t("taskDialog.privateHint")}</FieldDescription>
+                        </FieldContent>
+                        <Switch
+                          id="task-private"
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                </FieldSection>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Optimization details — optional attributes feeding /insights.
                 Scheduled blocks inherit them (scheduleTaskBlocks). */}
@@ -414,7 +451,7 @@ export function TaskDialog(props: TaskDialogProps) {
           </FieldGroup>
 
           {mode === "edit" && task && (
-            <div className="mt-4">
+            <div className="mt-6">
               <SubtaskEditor
                 parent={task}
                 subtasks={props.subtasks ?? []}
