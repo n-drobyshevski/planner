@@ -7,8 +7,6 @@ import { z } from "zod";
 import { itemAttributesSchema } from "@/lib/attributes/schema";
 import { flowLineStyleSchema } from "@/lib/tasks/flow-line-styles";
 
-export const taskStatusSchema = z.enum(["todo", "in_progress", "done"]);
-
 const nullableUuid = z.uuid().nullable();
 
 // Shared between the write schemas below and the dialog form schema, so the
@@ -31,7 +29,7 @@ const taskInputBase = z.object({
   description: descriptionSchema.nullable().optional(),
   isPrivate: z.boolean().optional(),
   color: z.string().min(1).nullable().optional(),
-  status: taskStatusSchema.optional(),
+  boardId: nullableUuid.optional(),
   // The form offers 1..3; 0 stays legal for legacy rows (DB CHECK is 0..3).
   priority: z.number().int().min(0).max(3).nullable().optional(),
   dueDate: z.iso.date().nullable().optional(),
@@ -43,39 +41,22 @@ const taskInputBase = z.object({
   attributes: itemAttributesSchema.optional(),
 });
 
-/** Full create payload. Enforces the done <-> completedAt coupling the DB CHECKs. */
-export const taskInputSchema = taskInputBase.superRefine((v, ctx) => {
-  const done = (v.status ?? "todo") === "done";
-  if (done !== (v.completedAt != null)) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["completedAt"],
-      message: done
-        ? "A done task needs a completion time."
-        : "Only done tasks carry a completion time.",
-    });
-  }
-});
+/**
+ * Full create payload. The completedAt <-> done coupling is now owned by the DB
+ * (a BEFORE trigger sets/clears completedAt from the target board's is_done), so
+ * the schema no longer cross-checks the pair — a bare boardId can't know whether
+ * its board is a completion column.
+ */
+export const taskInputSchema = taskInputBase;
 
 /**
  * Update payload: any subset of fields, but never workspace/owner (tasks don't
- * move between workspaces or change creators). When a patch carries only one of
- * status/completedAt the DB trigger normalizes the pair, so the coupling is
- * only checked when both are present.
+ * move between workspaces or change creators). completedAt is normalized server-
+ * side from the task's board, so no cross-field check here.
  */
 export const taskPatchSchema = taskInputBase
   .omit({ workspaceId: true, ownerId: true })
-  .partial()
-  .superRefine((v, ctx) => {
-    if (v.status === undefined || v.completedAt === undefined) return;
-    if ((v.status === "done") !== (v.completedAt != null)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["completedAt"],
-        message: "Completion time doesn't match the status.",
-      });
-    }
-  });
+  .partial();
 
 /**
  * The task dialog's field shape: selects use "none" sentinels and the date
@@ -92,7 +73,8 @@ export const taskFormSchema = z.object({
   dueDate: z.literal("").or(z.iso.date()),
   startDate: z.literal("").or(z.iso.date()),
   isMilestone: z.boolean(),
-  status: taskStatusSchema,
+  // "" = the collection's default (first) board; otherwise a board id.
+  boardId: z.string(),
   attributes: itemAttributesSchema,
 });
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
@@ -108,9 +90,35 @@ export const collectionInputSchema = z.object({
   ownerId: nullableUuid,
   name: collectionNameSchema,
   color: z.string().min(1),
-  lineStyle: flowLineStyleSchema.optional(),
   sortOrder: z.number().finite().optional(),
 });
+
+const boardNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Please name the column.")
+  .max(100, "Keep the name under 100 characters.");
+
+export const boardInputSchema = z.object({
+  workspaceId: z.uuid(),
+  collectionId: z.uuid(),
+  name: boardNameSchema,
+  lineStyle: flowLineStyleSchema.optional(),
+  position: z.number().finite().optional(),
+  isDone: z.boolean().optional(),
+});
+
+export const boardPatchSchema = boardInputSchema
+  .pick({ name: true, lineStyle: true, position: true, isDone: true })
+  .partial();
+
+/** The board (column) editor's field shape. */
+export const boardFormSchema = z.object({
+  name: boardNameSchema,
+  lineStyle: flowLineStyleSchema,
+  isDone: z.boolean(),
+});
+export type BoardFormValues = z.infer<typeof boardFormSchema>;
 
 /**
  * The schedule dialog's field shape. Durations/counts stay strings (select and
@@ -130,13 +138,12 @@ export type ScheduleTaskFormValues = z.infer<typeof scheduleTaskFormSchema>;
 export const collectionFormSchema = z.object({
   name: collectionNameSchema,
   color: z.string().min(1),
-  lineStyle: flowLineStyleSchema,
   shared: z.boolean(),
 });
 export type CollectionFormValues = z.infer<typeof collectionFormSchema>;
 
 export const collectionPatchSchema = collectionInputSchema
-  .pick({ name: true, color: true, lineStyle: true, sortOrder: true })
+  .pick({ name: true, color: true, sortOrder: true })
   .partial();
 
 /**

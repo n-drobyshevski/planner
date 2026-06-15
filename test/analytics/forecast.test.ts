@@ -53,7 +53,7 @@ function task(over: Partial<TaskRow> = {}): TaskRow {
     description: null,
     isPrivate: false,
     color: null,
-    status: "todo",
+    boardId: null,
     priority: 3,
     dueDate: null,
     startDate: null,
@@ -189,7 +189,7 @@ describe("computeForecast — dueUnscheduled", () => {
   it("excludes done tasks, subtasks, undated tasks, and due dates outside the window", () => {
     const input = makeInput({
       tasks: [
-        task({ dueDate: "2026-06-10", status: "done", completedAt: T0 }),
+        task({ dueDate: "2026-06-10", completedAt: T0 }),
         task({ dueDate: "2026-06-10", parentId: "parent" }),
         task({ dueDate: null }),
         task({ dueDate: "2026-06-07" }), // before the window

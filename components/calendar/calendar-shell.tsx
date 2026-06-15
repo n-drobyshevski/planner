@@ -335,14 +335,14 @@ export function CalendarShell({
     [tasksById, categoryMap, memberMap],
   );
   const taskDoneById = useMemo(
-    () => new Map(tasks.map((t) => [t.id, t.status === "done"])),
+    () => new Map(tasks.map((t) => [t.id, t.completedAt != null])),
     [tasks],
   );
   const childrenByParent = useMemo(() => groupByParent(tasks), [tasks]);
   // The backlog rail is for scheduling your OWN tasks; others' tasks (now
   // returned by RLS as non-private) aren't schedulable from here.
   const backlogTasks = (childrenByParent.get(null) ?? []).filter(
-    (t) => t.status !== "done" && t.ownerId === viewerId,
+    (t) => t.completedAt == null && t.ownerId === viewerId,
   );
   const [scheduling, setScheduling] = useState<TaskRow | null>(null);
   const [deletingTask, setDeletingTask] = useState<TaskRow | null>(null);

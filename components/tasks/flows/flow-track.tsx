@@ -44,8 +44,8 @@ export interface FlowTrackProps {
   /** day/week/month tick timestamps; drawn as faint vertical gridlines */
   gridMs: number[];
   colorOf: (t: TaskRow) => string;
-  /** the active collection's line style, applied to every trunk/branch span stroke */
-  lineStyle: FlowLineStyle;
+  /** the Flows line style for a task, resolved from its board (state). */
+  lineStyleOf: (t: TaskRow) => FlowLineStyle;
   currentMemberId: string | null;
   /** localized tooltip / aria text for a node */
   nodeLabel: (node: FlowNode, task: TaskRow) => string;
@@ -70,7 +70,7 @@ export function FlowTrack({
   nowMs,
   gridMs,
   colorOf,
-  lineStyle,
+  lineStyleOf,
   currentMemberId,
   nodeLabel,
   segmentLabel,
@@ -79,10 +79,6 @@ export function FlowTrack({
   const [hover, setHover] = useState<Hover | null>(null);
   const x = (ms: number) => xForTime(ms, t0, pxPerDay);
   const nowX = x(Math.min(nowMs, t1));
-  // The collection's stroke recipe, shared by every trunk and branch span. A subtask
-  // branch can't carry a true sine, so wavy falls back to a fine dash there.
-  const stroke = lineStyleStroke(lineStyle);
-  const branchDash = stroke.wavy ? "2 3" : stroke.dasharray;
 
   return (
     <div
@@ -117,6 +113,10 @@ export function FlowTrack({
           const trunkY = top + G.laneHeight / 2;
           const startX = x(lane.startMs);
           const isFuture = lane.startMs > nowMs;
+          // Stroke recipe for this lane's state (its board's line style). A
+          // subtask branch can't carry a true sine, so wavy falls back to a fine
+          // dash there; each branch uses its own task's state below.
+          const stroke = lineStyleStroke(lineStyleOf(lane.task));
           // A not-yet-started task with a future start has no elapsed span to draw.
           const planned = !lane.milestone && isFuture && lane.endMs === null;
           const endX = x(lane.endMs ?? Math.min(nowMs, t1));
@@ -178,22 +178,26 @@ export function FlowTrack({
                   )}
                 </>
               )}
-              {/* subtask branches (only present when the lane is expanded) */}
-              {branchRows.map(({ branch, subTop }) => (
-                <Branch
-                  key={branch.task.id}
-                  branch={branch}
-                  trunkY={trunkY}
-                  subY={subTop + G.subRowHeight / 2}
-                  x={x}
-                  color={color}
-                  mine={branch.task.ownerId === currentMemberId}
-                  nowMs={nowMs}
-                  t1={t1}
-                  dasharray={branchDash}
-                  opacityScale={stroke.opacityScale}
-                />
-              ))}
+              {/* subtask branches (only present when the lane is expanded), each
+                  drawn in its own state's line style */}
+              {branchRows.map(({ branch, subTop }) => {
+                const bStroke = lineStyleStroke(lineStyleOf(branch.task));
+                return (
+                  <Branch
+                    key={branch.task.id}
+                    branch={branch}
+                    trunkY={trunkY}
+                    subY={subTop + G.subRowHeight / 2}
+                    x={x}
+                    color={color}
+                    mine={branch.task.ownerId === currentMemberId}
+                    nowMs={nowMs}
+                    t1={t1}
+                    dasharray={bStroke.wavy ? "2 3" : bStroke.dasharray}
+                    opacityScale={bStroke.opacityScale}
+                  />
+                );
+              })}
               {/* trunk nodes */}
               {trunkNodes.map((n, i) => (
                 <NodeShape key={i} node={n} cx={x(n.ms)} cy={trunkY} color={color} />
@@ -364,7 +368,7 @@ function Branch({
             cy={subY}
             color={color}
             mine={mine}
-            done={branch.task.status === "done"}
+            done={branch.task.completedAt != null}
             future={branch.startMs > nowMs}
             small
           />

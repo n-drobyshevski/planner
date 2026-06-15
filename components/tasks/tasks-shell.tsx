@@ -117,6 +117,10 @@ export function TasksShell({
     () => workspace.data?.collections ?? [],
     [workspace.data?.collections],
   );
+  const allBoards = useMemo(
+    () => workspace.data?.boards ?? [],
+    [workspace.data?.boards],
+  );
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const colorOf = (t: TaskRow) => resolveTaskColor(t, catMap, memberMap);
@@ -150,6 +154,22 @@ export function TasksShell({
     return counts;
   }, [tasks]);
 
+  // The active collection's columns, ordered. Drives the board/list grouping and
+  // the per-board Flows line style.
+  const activeBoards = useMemo(
+    () =>
+      activeCollection
+        ? allBoards
+            .filter((b) => b.collectionId === activeCollection.id)
+            .sort((a, b) => a.position - b.position)
+        : [],
+    [allBoards, activeCollection],
+  );
+  const lineStyleOf = useMemo(() => {
+    const byId = new Map(allBoards.map((b) => [b.id, b.lineStyle]));
+    return (t: TaskRow) => (t.boardId ? byId.get(t.boardId) ?? "solid" : "solid");
+  }, [allBoards]);
+
   const childrenByParent = useMemo(() => groupByParent(collectionTasks), [collectionTasks]);
   const topLevel = childrenByParent.get(null) ?? [];
 
@@ -180,8 +200,8 @@ export function TasksShell({
   const actions: TaskActions = {
     open: (t) => dialogs.openEdit(t.id),
     toggleDone: (t) => void mutations.toggleDone(t),
-    move: (t, status, position) => void mutations.move(t, status, position),
-    create: (status) => dialogs.openCreate(status),
+    move: (t, boardId, position) => void mutations.move(t, boardId, position),
+    create: (boardId) => dialogs.openCreate(boardId),
     addSubtask: (t) => dialogs.openCreate(undefined, t.id),
     changeColor: (t, color) =>
       void mutations.update(t.id, { color }, { color: t.color }, { color }),
@@ -285,7 +305,7 @@ export function TasksShell({
                       childrenByParent={childrenByParent}
                       eventsByTask={eventsByTask}
                       colorOf={colorOf}
-                      lineStyle={activeCollection?.lineStyle ?? "solid"}
+                      lineStyleOf={lineStyleOf}
                       members={memberMap}
                       currentMemberId={workspace.data?.currentMember?.id ?? null}
                       actions={actions}
@@ -295,6 +315,9 @@ export function TasksShell({
                   ) : view === "board" ? (
                     <TaskBoard
                       tasks={topLevel}
+                      boards={activeBoards}
+                      collectionId={activeCollection?.id ?? ""}
+                      workspaceId={workspace.data?.workspaceId ?? ""}
                       colorOf={colorOf}
                       members={memberMap}
                       progressOf={progressFor}
@@ -303,6 +326,7 @@ export function TasksShell({
                   ) : (
                     <TaskList
                       tasks={topLevel}
+                      boards={activeBoards}
                       colorOf={colorOf}
                       members={memberMap}
                       progressOf={progressFor}
@@ -328,6 +352,7 @@ export function TasksShell({
             workspaceId={workspace.data.workspaceId}
             currentMemberId={workspace.data.currentMember.id}
             collectionId={activeCollection?.id ?? null}
+            boards={activeBoards}
             members={members}
             categories={categories}
             task={editingTask}
@@ -342,7 +367,7 @@ export function TasksShell({
                     }))
                 : undefined
             }
-            defaultStatus={dialogs.editor.mode === "create" ? dialogs.editor.status : undefined}
+            defaultBoardId={dialogs.editor.mode === "create" ? dialogs.editor.boardId : undefined}
             onSchedule={
               editingTask
                 ? () => dialogs.scheduleFromEditor(editingTask)

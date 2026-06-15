@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
-import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
+import type { DefaultBoardNames } from "@/lib/supabase/mutations";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
 import {
@@ -80,8 +80,8 @@ export function useCollectionMutations() {
       ownerId: string | null;
       name: string;
       color: string;
-      lineStyle?: FlowLineStyle;
       sortOrder?: number;
+      boardNames?: DefaultBoardNames;
     }): Promise<string | null> => {
       try {
         const id = await m.createCollection(sb, input);
@@ -97,7 +97,7 @@ export function useCollectionMutations() {
 
     update: (
       id: string,
-      patch: { name?: string; color?: string; lineStyle?: FlowLineStyle; sortOrder?: number },
+      patch: { name?: string; color?: string; sortOrder?: number },
     ) =>
       run(m.updateCollection(sb, id, patch), "Collection updated", {
         optimistic: () => patchWorkspace(qc, patchCollectionById(id, patch)),

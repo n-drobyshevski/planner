@@ -252,7 +252,7 @@ function SubtaskRow({
     transition,
     isDragging,
   } = useSortable({ id: task.id });
-  const done = task.status === "done";
+  const done = task.completedAt != null;
 
   return (
     <li

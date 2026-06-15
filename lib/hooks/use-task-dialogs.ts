@@ -1,10 +1,10 @@
 "use client";
 
 import { useReducer } from "react";
-import type { TaskRow, TaskStatus } from "@/lib/types";
+import type { TaskRow } from "@/lib/types";
 
 export type EditorState =
-  | { mode: "create"; status?: TaskStatus; parentId?: string }
+  | { mode: "create"; boardId?: string; parentId?: string }
   | { mode: "edit"; taskId: string };
 
 interface DialogsState {
@@ -14,7 +14,7 @@ interface DialogsState {
 }
 
 type DialogsAction =
-  | { type: "openCreate"; status?: TaskStatus; parentId?: string }
+  | { type: "openCreate"; boardId?: string; parentId?: string }
   | { type: "openEdit"; taskId: string }
   | { type: "openSchedule"; task: TaskRow }
   /** "Add to calendar" from inside the editor: swap editor → schedule. */
@@ -29,7 +29,7 @@ function reducer(state: DialogsState, action: DialogsAction): DialogsState {
     case "openCreate":
       return {
         ...state,
-        editor: { mode: "create", status: action.status, parentId: action.parentId },
+        editor: { mode: "create", boardId: action.boardId, parentId: action.parentId },
       };
     case "openEdit":
       return { ...state, editor: { mode: "edit", taskId: action.taskId } };
@@ -61,8 +61,8 @@ export function useTaskDialogs() {
     editor: state.editor,
     scheduling: state.scheduling,
     deleting: state.deleting,
-    openCreate: (status?: TaskStatus, parentId?: string) =>
-      dispatch({ type: "openCreate", status, parentId }),
+    openCreate: (boardId?: string, parentId?: string) =>
+      dispatch({ type: "openCreate", boardId, parentId }),
     openEdit: (taskId: string) => dispatch({ type: "openEdit", taskId }),
     openSchedule: (task: TaskRow) => dispatch({ type: "openSchedule", task }),
     scheduleFromEditor: (task: TaskRow) => dispatch({ type: "scheduleFromEditor", task }),

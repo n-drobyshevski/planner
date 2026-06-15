@@ -16,7 +16,7 @@ export function blockedIds(
   if (!sequential) return set;
   let sawIncomplete = false;
   for (const t of orderedSiblings) {
-    if (t.status !== "done") {
+    if (t.completedAt == null) {
       if (sawIncomplete) set.add(t.id);
       else sawIncomplete = true; // the first incomplete is actionable
     }
@@ -30,13 +30,13 @@ export function isBlocked(
   orderedSiblings: TaskRow[],
   sequential: boolean,
 ): boolean {
-  if (!sequential || task.status === "done") return false;
+  if (!sequential || task.completedAt != null) return false;
   const i = orderedSiblings.findIndex((t) => t.id === task.id);
   if (i < 0) return false;
-  return orderedSiblings.slice(0, i).some((t) => t.status !== "done");
+  return orderedSiblings.slice(0, i).some((t) => t.completedAt == null);
 }
 
 /** The next subtask to work on (first not-done in order), or null. */
 export function nextActionable(orderedSiblings: TaskRow[]): TaskRow | null {
-  return orderedSiblings.find((t) => t.status !== "done") ?? null;
+  return orderedSiblings.find((t) => t.completedAt == null) ?? null;
 }

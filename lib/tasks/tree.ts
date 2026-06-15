@@ -31,6 +31,6 @@ export function childrenOf(tasks: TaskRow[], parentId: string): TaskRow[] {
 /** Completion progress of a list of subtasks. */
 export function progressOf(children: TaskRow[]): { done: number; total: number } {
   let done = 0;
-  for (const c of children) if (c.status === "done") done++;
+  for (const c of children) if (c.completedAt != null) done++;
   return { done, total: children.length };
 }

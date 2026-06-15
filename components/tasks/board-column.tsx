@@ -8,42 +8,46 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TaskContextMenu } from "./task-context-menu";
 import { TaskCard } from "./task-card";
-import type { Member, TaskRow, TaskStatus } from "@/lib/types";
+import type { Board, Member, TaskRow } from "@/lib/types";
 
 export function Column({
-  status,
-  title,
+  board,
   count,
   onNew,
+  menu,
   children,
 }: {
-  status: TaskStatus;
-  title: string;
+  board: Board;
   count: number;
   onNew: () => void;
+  /** Optional per-column controls (the edit/delete menu). */
+  menu?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const t = useTranslations("tasks");
-  const { setNodeRef, isOver } = useDroppable({ id: status });
-  const headingId = `board-col-${status}`;
+  const { setNodeRef, isOver } = useDroppable({ id: board.id });
+  const headingId = `board-col-${board.id}`;
   return (
     <section aria-labelledby={headingId} className="flex min-h-0 flex-col rounded-xl bg-muted/40">
-      <header className="flex items-center justify-between px-3 pt-3 pb-2">
-        <h3 id={headingId} className="flex items-center gap-2 text-sm font-semibold">
-          {title}
+      <header className="flex items-center justify-between gap-1 px-3 pt-3 pb-2">
+        <h3 id={headingId} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          <span className="truncate">{board.name}</span>
           <span className="rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground tabular-nums">
             {count}
           </span>
         </h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7"
-          aria-label={t("board.addTaskTo", { title })}
-          onClick={onNew}
-        >
-          <Plus />
-        </Button>
+        <div className="flex shrink-0 items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            aria-label={t("board.addTaskTo", { title: board.name })}
+            onClick={onNew}
+          >
+            <Plus />
+          </Button>
+          {menu}
+        </div>
       </header>
       <div
         ref={setNodeRef}

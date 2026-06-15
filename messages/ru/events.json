@@ -15,8 +15,7 @@
     "copyToMyCalendar": "Скопировать в мой календарь"
   },
   "taskStatus": {
-    "todo": "К выполнению",
-    "in_progress": "В процессе",
+    "open": "Открыто",
     "done": "Готово"
   },
   "dialog": {

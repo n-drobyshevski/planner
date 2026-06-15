@@ -7,7 +7,8 @@ import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import { upsertTask, removeTasks } from "@/lib/tasks/cache";
 import type { TaskInput } from "@/lib/supabase/mappers";
-import type { TaskRow } from "@/lib/types";
+import type { Board, TaskRow } from "@/lib/types";
+import type { WorkspaceData } from "@/lib/hooks/use-workspace";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
 import { useTranslations } from "next-intl";
@@ -46,6 +47,19 @@ export function useTaskMutations(workspaceId: string | undefined) {
     qc.setQueryData<TaskRow[]>(qk.tasks(workspaceId), (old) =>
       old ? updater(old) : old,
     );
+  };
+  // Boards live in the workspace bundle; read them from cache so callers don't
+  // have to thread the list through every mutation site.
+  const boardsOf = (collectionId: string | null): Board[] => {
+    const data = qc.getQueryData<WorkspaceData>(qk.workspace);
+    return (data?.boards ?? [])
+      .filter((b) => b.collectionId === collectionId)
+      .sort((a, b) => a.position - b.position);
+  };
+  const isDoneBoard = (boardId: string | null): boolean => {
+    if (!boardId) return false;
+    const data = qc.getQueryData<WorkspaceData>(qk.workspace);
+    return (data?.boards ?? []).find((b) => b.id === boardId)?.isDone ?? false;
   };
 
   // --- Optimistic cache patches -------------------------------------------
@@ -167,37 +181,47 @@ export function useTaskMutations(workspaceId: string | undefined) {
           setTasks((old) => removeTasks(old, snap.tasks.map((r) => r.id as string))),
       }),
 
-    /** Move to a status column at a new position; manages completed_at on transition. */
-    move: (task: TaskRow, status: TaskRow["status"], position: number) => {
-      const patch: Partial<TaskInput> = { status, position };
-      if (status !== task.status) {
-        if (status === "done") patch.completedAt = Date.now();
-        else if (task.status === "done") patch.completedAt = null;
-      }
+    /** Move to a board column at a new position; the server normalizes completed_at. */
+    move: (task: TaskRow, boardId: string, position: number) => {
+      const targetDone = isDoneBoard(boardId);
+      const patch: Partial<TaskInput> = { boardId, position };
+      // Optimistic completed_at; the BEFORE trigger sets it authoritatively from
+      // the target board's is_done on the server.
+      const nextCompletedAt = targetDone ? task.completedAt ?? Date.now() : null;
+      if (boardId !== task.boardId) patch.completedAt = nextCompletedAt;
       const prev: Partial<TaskInput> = {
-        status: task.status,
+        boardId: task.boardId,
         position: task.position,
         completedAt: task.completedAt,
       };
       return run(m.updateTask(sb, task.id, patch), t("taskMoved"), {
         undo: (row) =>
           inverse(t("undoLabel.move"), () => m.updateTask(sb, task.id, prev, row.updatedAt)),
-        optimistic: () => patchTaskCache(task.id, (t) => ({ ...t, ...patch })),
+        optimistic: () =>
+          patchTaskCache(task.id, (t) => ({ ...t, ...patch, completedAt: nextCompletedAt })),
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       });
     },
 
-    /** Toggle the done state (e.g. a checkbox). */
+    /**
+     * Toggle the done state (e.g. a checkbox): move the task to its collection's
+     * completion column, or back to the first non-done column. No-op when the
+     * collection has no suitable board (e.g. a board-less task).
+     */
     toggleDone: (task: TaskRow) => {
-      const done = task.status === "done";
-      const nextStatus: TaskRow["status"] = done ? "todo" : "done";
+      const done = task.completedAt != null;
+      const cols = boardsOf(task.collectionId);
+      const target = done
+        ? cols.find((b) => !b.isDone) ?? null
+        : cols.find((b) => b.isDone) ?? null;
+      if (!target) return Promise.resolve(false);
       const nextCompletedAt = done ? null : Date.now();
       const prev: Partial<TaskInput> = {
-        status: task.status,
+        boardId: task.boardId,
         completedAt: task.completedAt,
       };
       return run(
-        m.updateTask(sb, task.id, { status: nextStatus, completedAt: nextCompletedAt }),
+        m.updateTask(sb, task.id, { boardId: target.id, completedAt: nextCompletedAt }),
         done ? t("taskReopened") : t("taskCompleted"),
         {
           undo: (row) =>
@@ -207,7 +231,7 @@ export function useTaskMutations(workspaceId: string | undefined) {
           optimistic: () =>
             patchTaskCache(task.id, (t) => ({
               ...t,
-              status: nextStatus,
+              boardId: target.id,
               completedAt: nextCompletedAt,
             })),
           apply: (row) => setTasks((old) => upsertTask(old, row)),

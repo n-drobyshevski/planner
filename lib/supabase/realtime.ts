@@ -62,6 +62,11 @@ export function subscribeWorkspace(
     )
     .on(
       "postgres_changes",
+      { event: "*", schema: "public", table: "boards", filter },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
       { event: "*", schema: "public", table: "tasks", filter },
       onChange,
     )

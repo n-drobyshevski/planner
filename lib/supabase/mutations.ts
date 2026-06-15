@@ -6,6 +6,7 @@ import type {
   InsightsView,
   SleepLog,
   TaskRow,
+  Board,
   AppLocale,
   ThemePreference,
   AccentId,
@@ -20,6 +21,7 @@ import {
   mapInsightsView,
   mapSleepLog,
   mapTask,
+  mapBoard,
   categoryGoalInputToRow,
   eventInputToRow,
   eventPatchToRow,
@@ -27,11 +29,14 @@ import {
   sleepLogInputToRow,
   taskInputToRow,
   taskPatchToRow,
+  boardInputToRow,
+  boardPatchToRow,
   type CategoryGoalInput,
   type EventInput,
   type InsightsViewInput,
   type SleepLogInput,
   type TaskInput,
+  type BoardInput,
 } from "./mappers";
 import {
   editAll,
@@ -44,10 +49,11 @@ import {
   taskPatchSchema,
   collectionInputSchema,
   collectionPatchSchema,
+  boardInputSchema,
+  boardPatchSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
 import { buildRRule, parseRRule } from "@/lib/recurrence/rrule-build";
-import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import type { ItemAttributes } from "@/lib/attributes/schema";
 
 export class StaleWriteError extends Error {
@@ -554,6 +560,19 @@ export class CollectionNotEmptyError extends Error {
   }
 }
 
+/** Default column names for a new collection's three seeded boards. */
+export interface DefaultBoardNames {
+  todo: string;
+  inProgress: string;
+  done: string;
+}
+
+const FALLBACK_BOARD_NAMES: DefaultBoardNames = {
+  todo: "To Do",
+  inProgress: "In Progress",
+  done: "Done",
+};
+
 export async function createCollection(
   sb: SupabaseClient,
   input: {
@@ -561,8 +580,9 @@ export async function createCollection(
     ownerId: string | null;
     name: string;
     color: string;
-    lineStyle?: FlowLineStyle;
     sortOrder?: number;
+    /** Localized labels for the three seeded columns; English fallback otherwise. */
+    boardNames?: DefaultBoardNames;
   },
 ): Promise<string> {
   const parsed = parseInput(collectionInputSchema, input);
@@ -573,25 +593,33 @@ export async function createCollection(
       owner_id: parsed.ownerId,
       name: parsed.name,
       color: parsed.color,
-      line_style: parsed.lineStyle ?? "solid",
       sort_order: parsed.sortOrder ?? 0,
     })
     .select("id")
     .single();
   if (error) throw error;
-  return data.id as string;
+  const collectionId = data.id as string;
+
+  // Seed the three default columns (the right-most is the completion column).
+  const names = input.boardNames ?? FALLBACK_BOARD_NAMES;
+  const { error: boardErr } = await sb.from("boards").insert([
+    { workspace_id: parsed.workspaceId, collection_id: collectionId, name: names.todo, line_style: "solid", position: 0, is_done: false },
+    { workspace_id: parsed.workspaceId, collection_id: collectionId, name: names.inProgress, line_style: "solid", position: 1, is_done: false },
+    { workspace_id: parsed.workspaceId, collection_id: collectionId, name: names.done, line_style: "solid", position: 2, is_done: true },
+  ]);
+  if (boardErr) throw boardErr;
+  return collectionId;
 }
 
 export async function updateCollection(
   sb: SupabaseClient,
   id: string,
-  patch: { name?: string; color?: string; lineStyle?: FlowLineStyle; sortOrder?: number },
+  patch: { name?: string; color?: string; sortOrder?: number },
 ): Promise<void> {
   const parsed = parseInput(collectionPatchSchema, patch);
   const row: Record<string, unknown> = {};
   if (parsed.name != null) row.name = parsed.name;
   if (parsed.color != null) row.color = parsed.color;
-  if (parsed.lineStyle != null) row.line_style = parsed.lineStyle;
   if (parsed.sortOrder != null) row.sort_order = parsed.sortOrder;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("collections").update(row).eq("id", id);
@@ -647,6 +675,101 @@ export async function restoreCollection(
   collection: Record<string, unknown>,
 ): Promise<void> {
   const { error } = await sb.from("collections").insert(collection);
+  if (error) throw error;
+}
+
+// --- Boards (collection columns) -------------------------------------------
+
+/** A board (column) still holds tasks, so it can't be deleted. */
+export class BoardNotEmptyError extends Error {
+  constructor(public readonly taskCount: number) {
+    super(
+      taskCount === 1
+        ? "This column still has 1 task. Move or delete it first."
+        : `This column still has ${taskCount} tasks. Move or delete them first.`,
+    );
+    this.name = "BoardNotEmptyError";
+  }
+}
+
+/** Create a board (column). Returns the new row so the cache can add it. */
+export async function createBoard(
+  sb: SupabaseClient,
+  input: BoardInput,
+): Promise<Board> {
+  const parsed = parseInput(boardInputSchema, input);
+  const { data, error } = await sb
+    .from("boards")
+    .insert(boardInputToRow(parsed))
+    .select()
+    .single();
+  if (error) throw error;
+  return mapBoard(data);
+}
+
+export async function updateBoard(
+  sb: SupabaseClient,
+  id: string,
+  patch: Partial<BoardInput>,
+): Promise<void> {
+  const parsed = parseInput(boardPatchSchema, patch);
+  const row = boardPatchToRow(parsed);
+  if (Object.keys(row).length === 0) return;
+  const { error } = await sb.from("boards").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+/** Persist a new column order (id -> position). */
+export async function reorderBoards(
+  sb: SupabaseClient,
+  positions: { id: string; position: number }[],
+): Promise<void> {
+  await Promise.all(
+    positions.map(({ id, position }) =>
+      sb
+        .from("boards")
+        .update({ position })
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) throw error;
+        }),
+    ),
+  );
+}
+
+/**
+ * Delete a board, but only when it holds no tasks (block-if-non-empty). Throws
+ * `BoardNotEmptyError` otherwise. Returns the deleted row for undo.
+ */
+export async function deleteBoard(
+  sb: SupabaseClient,
+  id: string,
+): Promise<Record<string, unknown>> {
+  const { count, error: cntErr } = await sb
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("board_id", id);
+  if (cntErr) throw cntErr;
+  if (count && count > 0) throw new BoardNotEmptyError(count);
+
+  const { data: board, error: selErr } = await sb
+    .from("boards")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (selErr) throw selErr;
+
+  const { error } = await sb.from("boards").delete().eq("id", id);
+  if (error) throw error;
+  return board as Record<string, unknown>;
+}
+
+/** Re-insert a deleted board (undo). */
+export async function restoreBoard(
+  sb: SupabaseClient,
+  board: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await sb.from("boards").insert(board);
   if (error) throw error;
 }
 

@@ -52,7 +52,7 @@ export function FlowRowMenu({
 }) {
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
-  const done = task.status === "done";
+  const done = task.completedAt != null;
 
   const actions: ItemAction[] = [
     { label: t("contextMenu.open"), icon: SquarePen, onSelect: onOpen },

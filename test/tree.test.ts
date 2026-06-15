@@ -5,7 +5,7 @@ import {
   childrenOf,
   progressOf,
 } from "@/lib/tasks/tree";
-import type { TaskRow, TaskStatus } from "@/lib/types";
+import type { TaskRow } from "@/lib/types";
 
 function mk(p: Partial<TaskRow> & { id: string }): TaskRow {
   return {
@@ -19,7 +19,7 @@ function mk(p: Partial<TaskRow> & { id: string }): TaskRow {
     description: null,
     isPrivate: false,
     color: null,
-    status: "todo" as TaskStatus,
+    boardId: null,
     priority: null,
     dueDate: null,
     startDate: null,
@@ -83,9 +83,9 @@ describe("progressOf", () => {
   it("counts done out of total", () => {
     expect(
       progressOf([
-        mk({ id: "a", status: "done" }),
-        mk({ id: "b", status: "todo" }),
-        mk({ id: "c", status: "done" }),
+        mk({ id: "a", completedAt: 100 }),
+        mk({ id: "b", completedAt: null }),
+        mk({ id: "c", completedAt: 100 }),
       ]),
     ).toEqual({ done: 2, total: 3 });
   });

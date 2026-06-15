@@ -15,8 +15,7 @@
     "copyToMyCalendar": "Copy to my calendar"
   },
   "taskStatus": {
-    "todo": "To do",
-    "in_progress": "In progress",
+    "open": "Open",
     "done": "Done"
   },
   "dialog": {

@@ -63,7 +63,7 @@ export const TaskCard = forwardRef<
 ) {
   const t = useTranslations("tasks");
   const locale = useLocale();
-  const done = task.status === "done";
+  const done = task.completedAt != null;
   const maskTitles = useUiStore((s) => s.maskTitles);
   const timeZone = useViewerTimeZone();
   const overdue =
