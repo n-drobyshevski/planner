@@ -58,6 +58,7 @@ describe("resolvePeriod — calendar presets (UTC)", () => {
         "this-week": "На этой неделе",
         "last-week": "На прошлой неделе",
         "this-month": "В этом месяце",
+        "last-7d": "Последние 7 дней",
         "last-30d": "Последние 30 дней",
         "last-90d": "Последние 90 дней",
       },
@@ -80,6 +81,16 @@ describe("resolvePeriod — calendar presets (UTC)", () => {
     // Previous month has a different length (May = 31 days) — calendar-unit compare.
     expect(p.prevWindow).toEqual({ start: utc(2026, 4, 1), end: utc(2026, 5, 1) });
     expect(p.prevDays).toHaveLength(31);
+  });
+
+  it("last-7d rolls back 7 days from the end of today (day granularity)", () => {
+    const p = resolvePeriod(state({ preset: "last-7d" }), { timeZone: UTC, now });
+    expect(p.window.end).toBe(utc(2026, 5, 11)); // tomorrow midnight (today inclusive)
+    expect(p.window.start).toBe(utc(2026, 5, 4)); // 7 days back
+    expect(p.days).toHaveLength(7);
+    expect(p.granularity).toBe("day");
+    expect(p.prevWindow).toEqual({ start: utc(2026, 4, 28), end: utc(2026, 5, 4) });
+    expect(p.label).toMatch(/^Last 7 days · 4 – 10 Jun 2026$/);
   });
 
   it("last-30d rolls back from the end of today and compares to the prior 30", () => {
@@ -240,6 +251,7 @@ describe("granularity rules", () => {
 describe("URL codec", () => {
   it("parses range tokens with a this-week default", () => {
     expect(parseRangeParam("this-week")).toBe("this-week");
+    expect(parseRangeParam("7d")).toBe("last-7d");
     expect(parseRangeParam("30d")).toBe("last-30d");
     expect(parseRangeParam("90d")).toBe("last-90d");
     expect(parseRangeParam("bogus")).toBe("this-week");
@@ -296,6 +308,12 @@ describe("URL codec", () => {
     expect(search).toContain("from=2026-06-01");
     expect(search).toContain("to=2026-06-07");
     expect(search).toContain("tab=trends");
+  });
+
+  it("encodes the last-7d preset as the 7d token", () => {
+    expect(periodToSearch(state({ preset: "last-7d" }), "sleep", UTC)).toBe(
+      "?range=7d&granularity=day&tab=sleep",
+    );
   });
 
   it("omits the default overview tab from the query", () => {

@@ -16,6 +16,7 @@ const PRESETS: { value: PeriodPreset; key: string }[] = [
   { value: "this-week", key: "thisWeek" },
   { value: "last-week", key: "lastWeek" },
   { value: "this-month", key: "thisMonth" },
+  { value: "last-7d", key: "last7d" },
   { value: "last-30d", key: "last30d" },
   { value: "last-90d", key: "last90d" },
   { value: "custom", key: "custom" },

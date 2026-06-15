@@ -42,9 +42,14 @@ async function InsightsRoute({
   // tab become the cache key below. Presets like "this-week" stay symbolic in
   // PeriodState (resolved client-side by resolvePeriod), so the parse is
   // deterministic and the cached payload never embeds a server-side "now".
-  return (
-    <CachedInsights state={parsePeriodSearch(sp)} tab={parseTabParam(sp.tab)} />
-  );
+  const tab = parseTabParam(sp.tab);
+  const state = parsePeriodSearch(sp);
+  // Sleep defaults to a rolling "Last 7 days" window (vs. the calendar week,
+  // which shows empty future days) — but only when no range was explicitly
+  // requested, so deep links like ?tab=sleep&range=this-month are respected.
+  // Derived purely from searchParams, so it stays cache-key-safe below.
+  if (tab === "sleep" && !sp.range) state.preset = "last-7d";
+  return <CachedInsights state={state} tab={tab} />;
 }
 
 /**
