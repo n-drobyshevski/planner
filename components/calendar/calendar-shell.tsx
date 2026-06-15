@@ -13,7 +13,7 @@ import { getWindow, getVisibleDays, navigate, defaultCreateDay } from "@/lib/dat
 import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { TimezoneProvider } from "@/lib/datetime/timezone-context";
 import { filterVisible, canEdit } from "@/lib/scope/visibility";
-import { resolveOccurrenceColor } from "@/lib/calendar/colors";
+import { resolveBlockColor } from "@/lib/calendar/colors";
 import { sharedRemovalVariant } from "@/lib/calendar/delete-copy";
 import {
   contextOccurrences,
@@ -309,10 +309,6 @@ export function CalendarShell({
     () => new Map((workspace.data?.categories ?? []).map((c) => [c.id, c])),
     [workspace.data],
   );
-  const colorOf = useMemo(
-    () => (o: Occurrence) => resolveOccurrenceColor(o, categoryMap, memberMap),
-    [categoryMap, memberMap],
-  );
   // Context backdrops (expanded occurrences) for auto-assigning a Context when
   // an item is created inside one.
   const contextOccs = useMemo(() => contextOccurrences(occurrences), [occurrences]);
@@ -331,6 +327,13 @@ export function CalendarShell({
   const { tasks } = useTasks(workspace.data?.workspaceId);
   const taskMutations = useTaskMutations(workspace.data?.workspaceId);
   const tasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+  // A block scheduled from a task follows that task's color, so a recolor in any
+  // task view updates the calendar block too (the task is the source of truth);
+  // plain events keep occurrence resolution.
+  const colorOf = useMemo(
+    () => (o: Occurrence) => resolveBlockColor(o, tasksById, categoryMap, memberMap),
+    [tasksById, categoryMap, memberMap],
+  );
   const taskDoneById = useMemo(
     () => new Map(tasks.map((t) => [t.id, t.status === "done"])),
     [tasks],

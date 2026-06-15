@@ -171,7 +171,8 @@ export function TasksShell({
     move: (t, status, position) => void mutations.move(t, status, position),
     create: (status) => dialogs.openCreate(status),
     addSubtask: (t) => dialogs.openCreate(undefined, t.id),
-    changeColor: (t, color) => void mutations.update(t.id, { color }, { color: t.color }),
+    changeColor: (t, color) =>
+      void mutations.update(t.id, { color }, { color: t.color }, { color }),
     remove: (t) => dialogs.openDelete(t),
   };
 

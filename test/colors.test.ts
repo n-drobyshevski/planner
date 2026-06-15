@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveOccurrenceColor } from "@/lib/calendar/colors";
+import { resolveOccurrenceColor, resolveBlockColor } from "@/lib/calendar/colors";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import type { Category, Member, Occurrence, TaskRow } from "@/lib/types";
@@ -125,6 +125,36 @@ describe("resolveTaskColor", () => {
   it("falls back to category color when no own color", () => {
     const t = task({ categoryId: "c1" });
     expect(resolveTaskColor(t, categories, members)).toBe("#111111");
+  });
+});
+
+describe("resolveBlockColor", () => {
+  const categories = new Map([
+    ["c1", cat("c1", "#111111")],
+    ["c2", cat("c2", "#999999")],
+  ]);
+  const members = new Map([["m1", member("m1", "#222222")]]);
+
+  it("follows the linked task's color override, not the occurrence's category", () => {
+    const o = occ({ taskId: "t1", categoryId: "c1" }); // occ alone -> #111111
+    const tasks = new Map([["t1", task({ id: "t1", color: "#abcdef" })]]);
+    expect(resolveBlockColor(o, tasks, categories, members)).toBe("#abcdef");
+  });
+
+  it("follows the linked task's category when the task has no override", () => {
+    const o = occ({ taskId: "t1", categoryId: "c1" }); // occ category c1 -> #111111
+    const tasks = new Map([["t1", task({ id: "t1", categoryId: "c2" })]]); // task -> #999999
+    expect(resolveBlockColor(o, tasks, categories, members)).toBe("#999999");
+  });
+
+  it("falls back to occurrence resolution for a plain (non-task) event", () => {
+    const o = occ({ taskId: null, categoryId: "c1" });
+    expect(resolveBlockColor(o, new Map(), categories, members)).toBe("#111111");
+  });
+
+  it("falls back to occurrence resolution when the task isn't loaded", () => {
+    const o = occ({ taskId: "missing", color: "#abcdef" });
+    expect(resolveBlockColor(o, new Map(), categories, members)).toBe("#abcdef");
   });
 });
 
