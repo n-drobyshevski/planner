@@ -21,16 +21,61 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import { CONTEXT_PALETTE as PALETTE } from "@/lib/contexts/palette";
+import {
+  FLOW_LINE_STYLES,
+  lineStyleStroke,
+  wavePath,
+  type FlowLineStyle,
+} from "@/lib/tasks/flow-line-styles";
 import { useBoardMutations } from "@/lib/hooks/use-board-mutations";
 import { boardFormSchema, type BoardFormValues } from "@/lib/tasks/schemas";
 import type { Board } from "@/lib/types";
 
 function initialValues(mode: "create" | "edit", board?: Board | null): BoardFormValues {
   if (mode === "edit" && board) {
-    return { name: board.name, color: board.color, shared: board.ownerId === null };
+    return {
+      name: board.name,
+      color: board.color,
+      lineStyle: board.lineStyle,
+      shared: board.ownerId === null,
+    };
   }
   // Default to Shared: the common case for a two-person planner.
-  return { name: "", color: PALETTE[0], shared: true };
+  return { name: "", color: PALETTE[0], lineStyle: "solid", shared: true };
+}
+
+/** A short stroke drawn in `style`, tinted `color` — the picker's live preview. */
+function LineStyleSample({ style, color }: { style: FlowLineStyle; color?: string }) {
+  const { dasharray, opacityScale, wavy } = lineStyleStroke(style);
+  const W = 40;
+  const H = 14;
+  const y = H / 2;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden className="block">
+      {wavy ? (
+        <path
+          d={wavePath(3, W - 3, y)}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeOpacity={opacityScale}
+          strokeLinecap="round"
+        />
+      ) : (
+        <line
+          x1={3}
+          y1={y}
+          x2={W - 3}
+          y2={y}
+          stroke={color}
+          strokeWidth={2}
+          strokeOpacity={opacityScale}
+          strokeDasharray={dasharray}
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
 }
 
 /**
@@ -76,8 +121,16 @@ export function BoardDialog({
         // reconcile in the background (failures surface via toast + undo).
         const isShared = board.ownerId === null;
         onOpenChange(false);
-        if (name !== board.name || value.color !== board.color) {
-          void mutations.update(board.id, { name, color: value.color });
+        if (
+          name !== board.name ||
+          value.color !== board.color ||
+          value.lineStyle !== board.lineStyle
+        ) {
+          void mutations.update(board.id, {
+            name,
+            color: value.color,
+            lineStyle: value.lineStyle,
+          });
         }
         if (value.shared !== isShared) {
           void mutations.setShared(board.id, value.shared ? null : currentMemberId);
@@ -91,6 +144,7 @@ export function BoardDialog({
         ownerId: value.shared ? null : currentMemberId,
         name,
         color: value.color,
+        lineStyle: value.lineStyle,
         sortOrder: Date.now(),
       });
       if (id) {
@@ -160,6 +214,37 @@ export function BoardDialog({
                     style={{ backgroundColor: toPaletteColor(c) }}
                   />
                 ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="lineStyle">
+            {(field) => (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs text-muted-foreground">
+                  {t("boardDialog.lineStyleLabel")}
+                </p>
+                <form.Subscribe selector={(s) => s.values.color}>
+                  {(color) => (
+                    <div className="flex flex-wrap gap-2">
+                      {FLOW_LINE_STYLES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-label={t(`flowLineStyle.${s}`)}
+                          aria-pressed={field.state.value === s}
+                          onClick={() => field.handleChange(s)}
+                          className={cn(
+                            "flex h-7 items-center rounded-md border border-border px-2 ring-offset-2 ring-offset-background transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            field.state.value === s && "border-foreground/30 ring-2 ring-foreground",
+                          )}
+                        >
+                          <LineStyleSample style={s} color={toPaletteColor(color ?? PALETTE[0])} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </form.Subscribe>
               </div>
             )}
           </form.Field>

@@ -20,7 +20,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldError,
+  FieldContent,
+  FieldDescription,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,10 +71,14 @@ export interface TaskDialogProps {
   task?: TaskRow | null;
   /** live children of the task being edited (for the subtasks section) */
   subtasks?: TaskRow[];
+  /** create mode: file the new task under this parent (inherits its context). */
+  createParent?: TaskRow | null;
   /** status column the create was initiated from */
   defaultStatus?: TaskStatus;
   /** open the Schedule dialog for this task (edit mode only) */
   onSchedule?: () => void;
+  /** create mode: fired after the new task is successfully inserted. */
+  onCreated?: () => void;
 }
 
 export function TaskDialog(props: TaskDialogProps) {
@@ -103,6 +114,8 @@ export function TaskDialog(props: TaskDialogProps) {
       isPrivate: values.isPrivate,
       priority: values.priority === "none" ? null : Number(values.priority),
       dueDate: values.dueDate || null,
+      startDate: values.startDate || null,
+      isMilestone: values.isMilestone,
       status: values.status,
       attributes: values.attributes,
     };
@@ -122,13 +135,19 @@ export function TaskDialog(props: TaskDialogProps) {
     if (mode === "create") {
       const input: TaskInput = {
         workspaceId,
-        ownerId: currentMemberId,
-        boardId: props.boardId ?? null,
+        // A subtask stays under its parent's owner (matching the inline
+        // SubtaskEditor) so the subtree's ownership/privacy stays coherent.
+        ownerId: props.createParent?.ownerId ?? currentMemberId,
+        boardId: props.createParent?.boardId ?? props.boardId ?? null,
+        parentId: props.createParent?.id ?? null,
         position: Date.now(), // new tasks sort to the bottom of their column
         ...payload,
         completedAt: payload.status === "done" ? Date.now() : null,
       };
-      if (await mutations.create(input)) onOpenChange(false);
+      if (await mutations.create(input)) {
+        props.onCreated?.();
+        onOpenChange(false);
+      }
       return;
     }
     if (!task) return;
@@ -155,7 +174,9 @@ export function TaskDialog(props: TaskDialogProps) {
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>
-              {mode === "create" ? t("taskDialog.createTitle") : t("taskDialog.editTitle")}
+              {mode === "create"
+                ? t(props.createParent ? "taskDialog.subtaskTitle" : "taskDialog.createTitle")
+                : t("taskDialog.editTitle")}
             </ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
 
@@ -253,28 +274,17 @@ export function TaskDialog(props: TaskDialogProps) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <form.Field name="priority">
+              <form.Field name="startDate">
                 {(field) => (
                   <Field>
-                    <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
-                    <Select
+                    <FieldLabel htmlFor="task-start">{t("taskDialog.startDateLabel")}</FieldLabel>
+                    <DatePicker
+                      id="task-start"
                       value={field.state.value}
-                      onValueChange={(v) =>
-                        field.handleChange(v as TaskFormValues["priority"])
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("priority.none")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="none">{t("priority.none")}</SelectItem>
-                          <SelectItem value="1">{t("priority.low")}</SelectItem>
-                          <SelectItem value="2">{t("priority.medium")}</SelectItem>
-                          <SelectItem value="3">{t("priority.high")}</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      onChange={field.handleChange}
+                      clearable
+                      aria-label={t("taskDialog.startDateLabel")}
+                    />
                   </Field>
                 )}
               </form.Field>
@@ -294,6 +304,32 @@ export function TaskDialog(props: TaskDialogProps) {
                 )}
               </form.Field>
             </div>
+
+            <form.Field name="priority">
+              {(field) => (
+                <Field>
+                  <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(v) =>
+                      field.handleChange(v as TaskFormValues["priority"])
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("priority.none")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="none">{t("priority.none")}</SelectItem>
+                        <SelectItem value="1">{t("priority.low")}</SelectItem>
+                        <SelectItem value="2">{t("priority.medium")}</SelectItem>
+                        <SelectItem value="3">{t("priority.high")}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+            </form.Field>
 
             {mode === "edit" && (
               <form.Field name="status">
@@ -315,6 +351,24 @@ export function TaskDialog(props: TaskDialogProps) {
                 )}
               </form.Field>
             )}
+
+            <form.Field name="isMilestone">
+              {(field) => (
+                <Field orientation="horizontal">
+                  <Switch
+                    id="task-milestone"
+                    checked={field.state.value}
+                    onCheckedChange={field.handleChange}
+                  />
+                  <FieldContent>
+                    <FieldLabel htmlFor="task-milestone">
+                      {t("taskDialog.milestoneLabel")}
+                    </FieldLabel>
+                    <FieldDescription>{t("taskDialog.milestoneHint")}</FieldDescription>
+                  </FieldContent>
+                </Field>
+              )}
+            </form.Field>
 
             <form.Field name="isPrivate">
               {(field) => (
@@ -446,7 +500,7 @@ export function TaskDialog(props: TaskDialogProps) {
 }
 
 function buildInitial(props: TaskDialogProps): TaskFormValues {
-  const { mode, task, defaultStatus } = props;
+  const { mode, task, defaultStatus, createParent } = props;
   if (mode === "edit" && task) {
     return {
       title: task.title,
@@ -456,18 +510,24 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
       isPrivate: task.isPrivate,
       priority: task.priority ? (String(task.priority) as TaskFormValues["priority"]) : "none",
       dueDate: task.dueDate ?? "",
+      startDate: task.startDate ?? "",
+      isMilestone: task.isMilestone,
       status: task.status,
       attributes: parseAttributes(task.attributes),
     };
   }
+  // A subtask inherits its parent's assignee, context, and privacy (matching
+  // the inline SubtaskEditor); a plain top-level task starts unset.
   return {
     title: "",
     description: "",
-    assigneeId: "none",
-    categoryId: "none",
-    isPrivate: false,
+    assigneeId: createParent?.assigneeId ?? "none",
+    categoryId: createParent?.categoryId ?? "none",
+    isPrivate: createParent?.isPrivate ?? false,
     priority: "none",
     dueDate: "",
+    startDate: "",
+    isMilestone: false,
     status: defaultStatus ?? "todo",
     attributes: {},
   };

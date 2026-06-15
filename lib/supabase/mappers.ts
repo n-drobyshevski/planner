@@ -2,6 +2,7 @@
 // (camelCase, epoch ms). Keep all conversion in one place.
 
 import { parseAttributes, type ItemAttributes } from "@/lib/attributes/schema";
+import { asFlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import type {
   EventRow,
   EventStatus,
@@ -214,6 +215,7 @@ export function mapBoard(r: Row): Board {
     ownerId: (r.owner_id as string | null) ?? null,
     name: r.name as string,
     color: r.color as string,
+    lineStyle: asFlowLineStyle(r.line_style as string | null),
     sortOrder: (r.sort_order as number) ?? 0,
   };
 }
@@ -262,6 +264,8 @@ export function mapTask(r: Row): TaskRow {
     status: r.status as TaskRow["status"],
     priority: (r.priority as number | null) ?? null,
     dueDate: (r.due_date as string | null) ?? null,
+    startDate: (r.start_date as string | null) ?? null,
+    isMilestone: Boolean(r.is_milestone),
     position: (r.position as number) ?? 0,
     sequential: Boolean(r.sequential),
     completedAt: toMsOrNull(r.completed_at),
@@ -393,6 +397,10 @@ export interface TaskInput {
   priority?: number | null;
   /** zone-free calendar date ("yyyy-MM-dd") */
   dueDate?: string | null;
+  /** zone-free planned start date ("yyyy-MM-dd"); null = anchor to creation */
+  startDate?: string | null;
+  /** point-in-time task: Flows renders a moment marker, not a span */
+  isMilestone?: boolean;
   position?: number;
   sequential?: boolean;
   completedAt?: number | null;
@@ -415,6 +423,8 @@ export function taskInputToRow(input: TaskInput): Row {
     status: input.status ?? "todo",
     priority: input.priority ?? null,
     due_date: input.dueDate ?? null,
+    start_date: input.startDate ?? null,
+    is_milestone: input.isMilestone ?? false,
     position: input.position ?? 0,
     sequential: input.sequential ?? false,
     completed_at: toIsoOrNull(input.completedAt ?? null),
@@ -436,6 +446,8 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("status" in patch) row.status = patch.status;
   if ("priority" in patch) row.priority = patch.priority ?? null;
   if ("dueDate" in patch) row.due_date = patch.dueDate ?? null;
+  if ("startDate" in patch) row.start_date = patch.startDate ?? null;
+  if ("isMilestone" in patch) row.is_milestone = patch.isMilestone ?? false;
   if ("position" in patch) row.position = patch.position;
   if ("sequential" in patch) row.sequential = patch.sequential;
   if ("completedAt" in patch) row.completed_at = toIsoOrNull(patch.completedAt ?? null);

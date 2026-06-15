@@ -47,6 +47,7 @@ import {
   parseInput,
 } from "@/lib/tasks/schemas";
 import { buildRRule, parseRRule } from "@/lib/recurrence/rrule-build";
+import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import type { ItemAttributes } from "@/lib/attributes/schema";
 
 export class StaleWriteError extends Error {
@@ -555,7 +556,14 @@ export class BoardNotEmptyError extends Error {
 
 export async function createBoard(
   sb: SupabaseClient,
-  input: { workspaceId: string; ownerId: string | null; name: string; color: string; sortOrder?: number },
+  input: {
+    workspaceId: string;
+    ownerId: string | null;
+    name: string;
+    color: string;
+    lineStyle?: FlowLineStyle;
+    sortOrder?: number;
+  },
 ): Promise<string> {
   const parsed = parseInput(boardInputSchema, input);
   const { data, error } = await sb
@@ -565,6 +573,7 @@ export async function createBoard(
       owner_id: parsed.ownerId,
       name: parsed.name,
       color: parsed.color,
+      line_style: parsed.lineStyle ?? "solid",
       sort_order: parsed.sortOrder ?? 0,
     })
     .select("id")
@@ -576,12 +585,13 @@ export async function createBoard(
 export async function updateBoard(
   sb: SupabaseClient,
   id: string,
-  patch: { name?: string; color?: string; sortOrder?: number },
+  patch: { name?: string; color?: string; lineStyle?: FlowLineStyle; sortOrder?: number },
 ): Promise<void> {
   const parsed = parseInput(boardPatchSchema, patch);
   const row: Record<string, unknown> = {};
   if (parsed.name != null) row.name = parsed.name;
   if (parsed.color != null) row.color = parsed.color;
+  if (parsed.lineStyle != null) row.line_style = parsed.lineStyle;
   if (parsed.sortOrder != null) row.sort_order = parsed.sortOrder;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("boards").update(row).eq("id", id);

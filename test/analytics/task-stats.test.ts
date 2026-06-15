@@ -28,6 +28,8 @@ function task(over: Partial<TaskRow>): TaskRow {
     status: "todo",
     priority: null,
     dueDate: null,
+    startDate: null,
+    isMilestone: false,
     position: 0,
     sequential: false,
     completedAt: null,

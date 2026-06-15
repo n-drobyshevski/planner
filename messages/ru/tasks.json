@@ -38,8 +38,22 @@
       "month": "Месяц"
     },
     "today": "Сегодня",
+    "now": "Сейчас",
+    "plannedStart": "Начало",
+    "milestone": {
+      "label": "Веха",
+      "moment": "Веха",
+      "upcoming": "Предстоящая веха",
+      "done": "Веха достигнута"
+    },
     "expand": "Показать подзадачи",
-    "collapse": "Скрыть подзадачи"
+    "collapse": "Скрыть подзадачи",
+    "menu": {
+      "center": "Центрировать на шкале",
+      "addSubtask": "Добавить подзадачу",
+      "expandAll": "Развернуть все",
+      "collapseAll": "Свернуть все"
+    }
   },
   "board": {
     "addTaskTo": "Добавить задачу в «{title}»",
@@ -62,6 +76,15 @@
     "notEmptyDescription": "На этой доске ещё {count, plural, one {# задача} few {# задачи} many {# задач} other {# задачи}}. Сначала перемести или удали {count, plural, one {её} other {их}}, потом сможешь убрать доску.",
     "deleteDescription": "Это удалит доску. Её задачи уже удалены. Сразу после этого действие можно отменить."
   },
+  "flowLineStyle": {
+    "solid": "Сплошная",
+    "dotted": "Пунктир",
+    "dashed": "Штрихи",
+    "dashdot": "Штрих-пунктир",
+    "longdash": "Длинный штрих",
+    "faded": "Блёклая",
+    "wavy": "Волнистая"
+  },
   "boardDialog": {
     "createTitle": "Новая доска",
     "editTitle": "Изменить доску",
@@ -69,6 +92,7 @@
     "namePlaceholder": "Название доски",
     "nameLabel": "Название доски",
     "colorLabel": "Цвет {color}",
+    "lineStyleLabel": "Стиль линии",
     "shared": "Общая",
     "personal": "Личная",
     "sharedToggleLabel": "Общая доска — вы оба видите и редактируете её",
@@ -78,6 +102,7 @@
   },
   "taskDialog": {
     "createTitle": "Новая задача",
+    "subtaskTitle": "Добавить подзадачу",
     "editTitle": "Изменить задачу",
     "titleLabel": "Название",
     "titlePlaceholder": "Что нужно сделать?",
@@ -89,6 +114,9 @@
     "noContext": "Без контекста",
     "priorityLabel": "Приоритет",
     "dueDateLabel": "Срок",
+    "startDateLabel": "Дата начала",
+    "milestoneLabel": "Веха",
+    "milestoneHint": "Точка во времени, а не отрезок. В «Потоках» показывается одним маркером.",
     "statusLabel": "Статус",
     "privateLabel": "Личное (видишь только ты)",
     "optimizationDetails": "Детали для оптимизации",

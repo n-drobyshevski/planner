@@ -5,6 +5,7 @@
 import { z } from "zod";
 
 import { itemAttributesSchema } from "@/lib/attributes/schema";
+import { flowLineStyleSchema } from "@/lib/tasks/flow-line-styles";
 
 export const taskStatusSchema = z.enum(["todo", "in_progress", "done"]);
 
@@ -34,6 +35,8 @@ const taskInputBase = z.object({
   // The form offers 1..3; 0 stays legal for legacy rows (DB CHECK is 0..3).
   priority: z.number().int().min(0).max(3).nullable().optional(),
   dueDate: z.iso.date().nullable().optional(),
+  startDate: z.iso.date().nullable().optional(),
+  isMilestone: z.boolean().optional(),
   position: z.number().finite().optional(),
   sequential: z.boolean().optional(),
   completedAt: z.number().int().nullable().optional(),
@@ -87,6 +90,8 @@ export const taskFormSchema = z.object({
   isPrivate: z.boolean(),
   priority: z.enum(["none", "1", "2", "3"]),
   dueDate: z.literal("").or(z.iso.date()),
+  startDate: z.literal("").or(z.iso.date()),
+  isMilestone: z.boolean(),
   status: taskStatusSchema,
   attributes: itemAttributesSchema,
 });
@@ -103,6 +108,7 @@ export const boardInputSchema = z.object({
   ownerId: nullableUuid,
   name: boardNameSchema,
   color: z.string().min(1),
+  lineStyle: flowLineStyleSchema.optional(),
   sortOrder: z.number().finite().optional(),
 });
 
@@ -124,12 +130,13 @@ export type ScheduleTaskFormValues = z.infer<typeof scheduleTaskFormSchema>;
 export const boardFormSchema = z.object({
   name: boardNameSchema,
   color: z.string().min(1),
+  lineStyle: flowLineStyleSchema,
   shared: z.boolean(),
 });
 export type BoardFormValues = z.infer<typeof boardFormSchema>;
 
 export const boardPatchSchema = boardInputSchema
-  .pick({ name: true, color: true, sortOrder: true })
+  .pick({ name: true, color: true, lineStyle: true, sortOrder: true })
   .partial();
 
 /**

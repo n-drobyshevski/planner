@@ -4,7 +4,7 @@ import { useReducer } from "react";
 import type { TaskRow, TaskStatus } from "@/lib/types";
 
 export type EditorState =
-  | { mode: "create"; status?: TaskStatus }
+  | { mode: "create"; status?: TaskStatus; parentId?: string }
   | { mode: "edit"; taskId: string };
 
 interface DialogsState {
@@ -14,7 +14,7 @@ interface DialogsState {
 }
 
 type DialogsAction =
-  | { type: "openCreate"; status?: TaskStatus }
+  | { type: "openCreate"; status?: TaskStatus; parentId?: string }
   | { type: "openEdit"; taskId: string }
   | { type: "openSchedule"; task: TaskRow }
   /** "Add to calendar" from inside the editor: swap editor → schedule. */
@@ -27,7 +27,10 @@ type DialogsAction =
 function reducer(state: DialogsState, action: DialogsAction): DialogsState {
   switch (action.type) {
     case "openCreate":
-      return { ...state, editor: { mode: "create", status: action.status } };
+      return {
+        ...state,
+        editor: { mode: "create", status: action.status, parentId: action.parentId },
+      };
     case "openEdit":
       return { ...state, editor: { mode: "edit", taskId: action.taskId } };
     case "openSchedule":
@@ -58,7 +61,8 @@ export function useTaskDialogs() {
     editor: state.editor,
     scheduling: state.scheduling,
     deleting: state.deleting,
-    openCreate: (status?: TaskStatus) => dispatch({ type: "openCreate", status }),
+    openCreate: (status?: TaskStatus, parentId?: string) =>
+      dispatch({ type: "openCreate", status, parentId }),
     openEdit: (taskId: string) => dispatch({ type: "openEdit", taskId }),
     openSchedule: (task: TaskRow) => dispatch({ type: "openSchedule", task }),
     scheduleFromEditor: (task: TaskRow) => dispatch({ type: "scheduleFromEditor", task }),

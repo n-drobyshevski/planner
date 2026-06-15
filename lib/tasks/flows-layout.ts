@@ -31,6 +31,8 @@ export interface FlowSegment {
   /** null = still open (render to `now`) */
   endMs: number | null;
   nodes: FlowNode[];
+  /** point-in-time task: render a single moment marker at `startMs`, no span line */
+  milestone: boolean;
 }
 
 export interface FlowLane extends FlowSegment {
@@ -88,7 +90,15 @@ function buildSegment(
     nodes.push({ ms: task.createdAt, kind: "created", status: task.status });
   }
 
-  const startMs = nodes[0].ms;
+  // Left anchor: the explicit planned start (zone-free date -> UTC midnight) when
+  // set, else the creation event. A milestone sits exactly at its planned start;
+  // a span never clips work that actually began before the planned date.
+  const plannedStart = task.startDate ? dateInputToUtcMs(task.startDate) : nodes[0].ms;
+  const firstActivity = nodes.find((n) => n.kind === "started" || n.kind === "done")?.ms;
+  const startMs = task.isMilestone
+    ? plannedStart
+    : Math.min(plannedStart, firstActivity ?? plannedStart);
+
   const done = task.status === "done";
   let endMs: number | null = null;
   if (done) {
@@ -111,7 +121,7 @@ function buildSegment(
   }
   nodes.sort(byMs);
 
-  return { task, startMs, endMs, nodes };
+  return { task, startMs, endMs, nodes, milestone: task.isMilestone };
 }
 
 /**
@@ -160,7 +170,9 @@ export function flowsWindow(
   let max = nowMs;
   const visit = (s: FlowSegment) => {
     min = Math.min(min, s.startMs);
-    max = Math.max(max, s.endMs ?? nowMs);
+    // `startMs` can sit in the future (a planned start / milestone), so it must
+    // extend the right edge too — not just the left.
+    max = Math.max(max, s.startMs, s.endMs ?? nowMs);
     for (const n of s.nodes) {
       min = Math.min(min, n.ms);
       max = Math.max(max, n.ms);

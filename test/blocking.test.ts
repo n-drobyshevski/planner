@@ -18,6 +18,8 @@ function mk(id: string, status: TaskStatus): TaskRow {
     status,
     priority: null,
     dueDate: null,
+    startDate: null,
+    isMilestone: false,
     position: 0,
     sequential: false,
     completedAt: null,

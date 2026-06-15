@@ -2,6 +2,7 @@
 // the data layer converts to/from Postgres `timestamptz` at the boundary.
 
 import type { ItemAttributes } from "@/lib/attributes/schema";
+import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 
 export type OverrideType = "cancel" | "modify";
 export type TaskStatus = "todo" | "in_progress" | "done";
@@ -132,6 +133,8 @@ export interface Board {
   ownerId: string | null; // null = shared board
   name: string;
   color: string; // hex
+  /** Flows trunk stroke pattern; see lib/tasks/flow-line-styles.ts */
+  lineStyle: FlowLineStyle;
   sortOrder: number;
 }
 
@@ -198,6 +201,10 @@ export interface TaskRow {
   priority: number | null;
   /** optional deadline as a zone-free calendar date ("yyyy-MM-dd"); overdue is judged in the viewer's zone */
   dueDate: string | null;
+  /** optional planned start as a zone-free calendar date ("yyyy-MM-dd"); null = anchor to creation in Flows */
+  startDate: string | null;
+  /** true = a point-in-time task; Flows renders it as a single moment marker, not a span */
+  isMilestone: boolean;
   /** order within its status column / among siblings */
   position: number;
   /** parent only: subtasks must be completed in order */

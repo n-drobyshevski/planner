@@ -72,6 +72,10 @@ export function TasksShell({
   const router = useRouter();
   const [view, setView] = useState<TasksView>(initialView);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(initialBoardId);
+  // One-shot signal telling the Flows view to expand a lane after a subtask was
+  // added to it from that view's context menu. The bumping `key` lets Flows act
+  // on each add even when the same parent is targeted twice.
+  const [expandLane, setExpandLane] = useState<{ id: string; key: number } | null>(null);
   const dialogs = useTaskDialogs();
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
@@ -166,9 +170,18 @@ export function TasksShell({
     toggleDone: (t) => void mutations.toggleDone(t),
     move: (t, status, position) => void mutations.move(t, status, position),
     create: (status) => dialogs.openCreate(status),
+    addSubtask: (t) => dialogs.openCreate(undefined, t.id),
     changeColor: (t, color) => void mutations.update(t.id, { color }, { color: t.color }),
     remove: (t) => dialogs.openDelete(t),
   };
+
+  // The parent a create-as-subtask was launched from (Flows "Add subtask").
+  // Resolved from the live task set so the dialog can inherit its board,
+  // privacy, and context, and file the new row under it.
+  const creatingParent =
+    editorState?.mode === "create" && editorState.parentId
+      ? tasks.find((t) => t.id === editorState.parentId) ?? null
+      : null;
 
   function syncUrl(v: TasksView, boardId: string | null) {
     const params = new URLSearchParams();
@@ -243,9 +256,11 @@ export function TasksShell({
                   childrenByParent={childrenByParent}
                   eventsByTask={eventsByTask}
                   colorOf={colorOf}
+                  lineStyle={activeBoard?.lineStyle ?? "solid"}
                   members={memberMap}
                   currentMemberId={workspace.data?.currentMember?.id ?? null}
                   actions={actions}
+                  expandLane={expandLane}
                   loading={eventsLoading}
                 />
               ) : view === "board" ? (
@@ -286,6 +301,16 @@ export function TasksShell({
             categories={categories}
             task={editingTask}
             subtasks={editingSubtasks}
+            createParent={dialogs.editor.mode === "create" ? creatingParent : null}
+            onCreated={
+              creatingParent
+                ? () =>
+                    setExpandLane((prev) => ({
+                      id: creatingParent.id,
+                      key: (prev?.key ?? 0) + 1,
+                    }))
+                : undefined
+            }
             defaultStatus={dialogs.editor.mode === "create" ? dialogs.editor.status : undefined}
             onSchedule={
               editingTask

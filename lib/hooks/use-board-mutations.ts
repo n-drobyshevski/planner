@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
+import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
 import {
@@ -78,6 +79,7 @@ export function useBoardMutations() {
       ownerId: string | null;
       name: string;
       color: string;
+      lineStyle?: FlowLineStyle;
       sortOrder?: number;
     }): Promise<string | null> => {
       try {
@@ -92,7 +94,10 @@ export function useBoardMutations() {
       }
     },
 
-    update: (id: string, patch: { name?: string; color?: string; sortOrder?: number }) =>
+    update: (
+      id: string,
+      patch: { name?: string; color?: string; lineStyle?: FlowLineStyle; sortOrder?: number },
+    ) =>
       run(m.updateBoard(sb, id, patch), "Board updated", {
         optimistic: () => patchWorkspace(qc, patchBoardById(id, patch)),
       }),

@@ -38,8 +38,22 @@
       "month": "Month"
     },
     "today": "Today",
+    "now": "Now",
+    "plannedStart": "Starts",
+    "milestone": {
+      "label": "Milestone",
+      "moment": "Milestone",
+      "upcoming": "Upcoming milestone",
+      "done": "Milestone reached"
+    },
     "expand": "Show subtasks",
-    "collapse": "Hide subtasks"
+    "collapse": "Hide subtasks",
+    "menu": {
+      "center": "Center on timeline",
+      "addSubtask": "Add subtask",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all"
+    }
   },
   "board": {
     "addTaskTo": "Add task to {title}",
@@ -62,6 +76,15 @@
     "notEmptyDescription": "This board still has {count, plural, one {# task} other {# tasks}}. Move or delete {count, plural, one {it} other {them}} first, then you can remove the board.",
     "deleteDescription": "This removes the board. Its tasks are already gone. You can undo this right after."
   },
+  "flowLineStyle": {
+    "solid": "Solid",
+    "dotted": "Dotted",
+    "dashed": "Dashed",
+    "dashdot": "Dash-dot",
+    "longdash": "Long dash",
+    "faded": "Faded",
+    "wavy": "Wavy"
+  },
   "boardDialog": {
     "createTitle": "New board",
     "editTitle": "Edit board",
@@ -69,6 +92,7 @@
     "namePlaceholder": "Board name",
     "nameLabel": "Board name",
     "colorLabel": "Color {color}",
+    "lineStyleLabel": "Line style",
     "shared": "Shared",
     "personal": "Personal",
     "sharedToggleLabel": "Shared board — you both see and edit it",
@@ -78,6 +102,7 @@
   },
   "taskDialog": {
     "createTitle": "New task",
+    "subtaskTitle": "Add subtask",
     "editTitle": "Edit task",
     "titleLabel": "Title",
     "titlePlaceholder": "What needs doing?",
@@ -89,6 +114,9 @@
     "noContext": "No context",
     "priorityLabel": "Priority",
     "dueDateLabel": "Due date",
+    "startDateLabel": "Start date",
+    "milestoneLabel": "Milestone",
+    "milestoneHint": "A point in time, not a span. Shows as a single marker in Flows.",
     "statusLabel": "Status",
     "privateLabel": "Private (only you can see this)",
     "optimizationDetails": "Optimization details",

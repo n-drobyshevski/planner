@@ -28,6 +28,8 @@ function task(over: Partial<TaskRow>): TaskRow {
     status: "todo",
     priority: null,
     dueDate: null,
+    startDate: null,
+    isMilestone: false,
     position: 0,
     sequential: false,
     completedAt: null,
@@ -98,6 +100,43 @@ describe("buildFlowLanes", () => {
     expect(due?.overdue).toBe(true);
   });
 
+  it("anchors the trunk to an explicit start date, overriding the creation event", () => {
+    // created day 0, but planned to start on day 4 — the left edge follows the plan
+    const tk = task({ id: "s", status: "todo", startDate: "2026-06-05", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["s", [ev({ taskId: "s", changedAt: T0 })]],
+    ]);
+    const [lane] = buildFlowLanes({ topLevel: [tk], childrenByParent: noChildren, eventsByTask: events, nowMs: now });
+    expect(lane.startMs).toBe(Date.UTC(2026, 5, 5));
+    expect(lane.milestone).toBe(false);
+  });
+
+  it("never clips work that began before its planned start", () => {
+    // planned day 4, but actually started day 2 — trunk begins at the earlier of the two
+    const tk = task({ id: "e", status: "in_progress", startDate: "2026-06-05", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      [
+        "e",
+        [
+          ev({ taskId: "e", changedAt: T0 }),
+          ev({ taskId: "e", fromStatus: "todo", toStatus: "in_progress", changedAt: T0 + 2 * DAY_MS }),
+        ],
+      ],
+    ]);
+    const [lane] = buildFlowLanes({ topLevel: [tk], childrenByParent: noChildren, eventsByTask: events, nowMs: now });
+    expect(lane.startMs).toBe(T0 + 2 * DAY_MS);
+  });
+
+  it("carries the milestone flag onto the segment", () => {
+    const tk = task({ id: "m", status: "todo", isMilestone: true, startDate: "2026-06-20" });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["m", [ev({ taskId: "m", changedAt: T0 })]],
+    ]);
+    const [lane] = buildFlowLanes({ topLevel: [tk], childrenByParent: noChildren, eventsByTask: events, nowMs: now });
+    expect(lane.milestone).toBe(true);
+    expect(lane.startMs).toBe(Date.UTC(2026, 5, 20));
+  });
+
   it("attaches subtasks as branches and sorts open lanes before done", () => {
     const open = task({ id: "open", status: "todo", createdAt: T0 + DAY_MS });
     const done = task({ id: "done", status: "done", completedAt: T0 + 2 * DAY_MS, createdAt: T0 });
@@ -128,6 +167,17 @@ describe("flowsWindow + xForTime", () => {
     expect(xForTime(t0, t0, 10)).toBe(0);
     expect(xForTime(t0 + DAY_MS, t0, 10)).toBe(10);
     expect(t1).toBeGreaterThan(t0);
+  });
+
+  it("extends the right edge to include a future planned start", () => {
+    const future = task({ id: "f", status: "todo", startDate: "2026-07-01", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["f", [ev({ taskId: "f", changedAt: T0 })]],
+    ]);
+    const lanes = buildFlowLanes({ topLevel: [future], childrenByParent: noChildren, eventsByTask: events, nowMs: now });
+    const { t1 } = flowsWindow(lanes, now, { lookbackDays: 90, padDays: 1 });
+    // window reaches past the future start (1 Jul), not just clamped near `now` (11 Jun)
+    expect(t1).toBeGreaterThanOrEqual(Date.UTC(2026, 6, 1));
   });
 });
 

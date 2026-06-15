@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ChevronRight, CalendarRange, LocateFixed } from "lucide-react";
+import { ChevronRight, CalendarRange, LocateFixed, Plus, CircleDot } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, addDays, addMonths, format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { cn } from "@/lib/utils";
@@ -26,9 +26,11 @@ import {
   layoutRows,
   xForTime,
   type FlowNode,
+  type FlowSegment,
 } from "@/lib/tasks/flows-layout";
+import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import { FlowTrack } from "./flows/flow-track";
-import { TaskContextMenu } from "./task-context-menu";
+import { FlowRowMenu } from "./flows/flow-row-menu";
 import type { TaskActions } from "./task-actions";
 import type { Member, TaskRow, TaskStatusEvent } from "@/lib/types";
 
@@ -43,9 +45,13 @@ export interface TaskFlowsProps {
   childrenByParent: Map<string | null, TaskRow[]>;
   eventsByTask: Map<string, TaskStatusEvent[]>;
   colorOf: (t: TaskRow) => string;
+  /** the active board's Flows line style, applied to every trunk/branch stroke */
+  lineStyle?: FlowLineStyle;
   members: Map<string, Member>;
   currentMemberId: string | null;
   actions: TaskActions;
+  /** Bumped by the shell after a subtask is added here, to auto-expand its lane. */
+  expandLane?: { id: string; key: number } | null;
   /** status-event history still loading (tasks may already be ready) */
   loading?: boolean;
 }
@@ -57,9 +63,11 @@ export function TaskFlows({
   childrenByParent,
   eventsByTask,
   colorOf,
+  lineStyle = "solid",
   members,
   currentMemberId,
   actions,
+  expandLane,
   loading,
 }: TaskFlowsProps) {
   const t = useTranslations("tasks");
@@ -79,6 +87,17 @@ export function TaskFlows({
   const [nowMs] = useState(() => Date.now());
   const [pxPerDay, setPxPerDay] = useState<number>(ZOOM.week);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  // Auto-expand a lane when the shell signals a subtask was just added to it
+  // (Add subtask → its new branch should be visible without a manual expand).
+  // Adjusting state during render off the bumping `key` is React's recommended
+  // alternative to an effect for reacting to a changed prop.
+  const [seenExpandKey, setSeenExpandKey] = useState<number | null>(null);
+  if (expandLane && expandLane.key !== seenExpandKey) {
+    setSeenExpandKey(expandLane.key);
+    if (!expanded.has(expandLane.id)) {
+      setExpanded((prev) => new Set(prev).add(expandLane.id));
+    }
+  }
   // Measured canvas viewport. Width drives the side padding that lets the
   // now-line reach the centre even when the data is narrower than the screen;
   // height lets the track fill the view. Measured before paint (callback ref)
@@ -161,6 +180,36 @@ export function TaskFlows({
     syncScroll();
   }
 
+  // Centre the canvas on a row's activity: the midpoint of its span (clamped to
+  // the render window so a long-open or long-finished task still lands on
+  // screen). Works on a trunk or a branch, whether or not it's expanded.
+  function scrollToTask(taskId: string) {
+    const c = canvasRef.current;
+    if (!c) return;
+    let seg: FlowSegment | undefined;
+    for (const lane of lanes) {
+      if (lane.task.id === taskId) {
+        seg = lane;
+        break;
+      }
+      const branch = lane.branches.find((b) => b.task.id === taskId);
+      if (branch) {
+        seg = branch;
+        break;
+      }
+    }
+    if (!seg) return;
+    const mid = clamp((seg.startMs + (seg.endMs ?? nowMs)) / 2, t0, t1);
+    const x = xForTime(mid, t0, pxPerDay);
+    c.scrollLeft = Math.max(0, x - c.clientWidth / 2);
+    syncScroll();
+  }
+
+  const anyExpandable = useMemo(() => lanes.some((l) => l.branches.length > 0), [lanes]);
+  const expandAll = () =>
+    setExpanded(new Set(lanes.filter((l) => l.branches.length > 0).map((l) => l.task.id)));
+  const collapseAll = () => setExpanded(new Set());
+
   // Centre the now-line once the canvas is measured and there's data — in a
   // layout effect (before paint) so the padded track is already in the DOM and
   // there's no left-aligned flash before it settles on centre.
@@ -188,6 +237,17 @@ export function TaskFlows({
         ? formatWeekdayDayMonth(node.ms, timeZone, locale)
         : `${formatWeekdayDayMonth(node.ms, timeZone, locale)} · ${formatTime(node.ms, timeZone)}`;
     return `${task.title}: ${t(`flows.node.${kindKey}`)} · ${when}`;
+  }
+
+  /** Localized tooltip / accessible name for a milestone or planned-start marker. */
+  function segmentLabel(seg: FlowSegment): string {
+    const when = formatWeekdayDayMonth(seg.startMs, timeZone, locale);
+    if (seg.milestone) {
+      const key =
+        seg.task.status === "done" ? "done" : seg.startMs > nowMs ? "upcoming" : "moment";
+      return `${seg.task.title}: ${t(`flows.milestone.${key}`)} · ${when}`;
+    }
+    return `${seg.task.title}: ${t("flows.plannedStart")} · ${when}`;
   }
 
   if (loading) return <FlowsSkeleton />;
@@ -256,6 +316,20 @@ export function TaskFlows({
                 </div>
               );
             })}
+            {/* "Now" marker — the horizon between past and ahead, in the accent */}
+            {(() => {
+              const nx = xForTime(Math.min(nowMs, t1), t0, pxPerDay);
+              if (nx < 0) return null;
+              return (
+                <div
+                  className="absolute top-0 flex h-full items-center gap-1 pl-1.5 text-[11px] font-medium tabular-nums text-primary"
+                  style={{ left: nx }}
+                >
+                  <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+                  {t("flows.now")}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -300,17 +374,29 @@ export function TaskFlows({
                   ) : (
                     <span className="w-5 shrink-0" aria-hidden />
                   )}
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: ownerColor }}
-                    aria-hidden
-                  />
-                  <TaskContextMenu
+                  {lane.task.isMilestone ? (
+                    <CircleDot
+                      className="size-3 shrink-0"
+                      style={{ color: ownerColor }}
+                      aria-label={t("flows.milestone.label")}
+                    />
+                  ) : (
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: ownerColor }}
+                      aria-hidden
+                    />
+                  )}
+                  <FlowRowMenu
                     task={lane.task}
                     onOpen={() => actions.open(lane.task)}
                     onToggleDone={() => actions.toggleDone(lane.task)}
+                    onCenter={() => scrollToTask(lane.task.id)}
                     onDelete={() => actions.remove(lane.task)}
                     onChangeColor={(c) => actions.changeColor(lane.task, c)}
+                    onAddSubtask={() => actions.addSubtask(lane.task)}
+                    onExpandAll={anyExpandable ? expandAll : undefined}
+                    onCollapseAll={anyExpandable ? collapseAll : undefined}
                   >
                     <button
                       type="button"
@@ -322,27 +408,49 @@ export function TaskFlows({
                     >
                       {lane.task.title}
                     </button>
-                  </TaskContextMenu>
+                  </FlowRowMenu>
                 </div>
 
                 {isExpanded &&
                   branchRows.map(({ branch, subTop }) => (
-                    <button
+                    <FlowRowMenu
                       key={branch.task.id}
-                      type="button"
-                      onClick={() => actions.open(branch.task)}
-                      className={cn(
-                        "absolute truncate pl-9 pr-2 text-left text-xs text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                        branch.task.status === "done" && "line-through",
-                      )}
-                      style={{ left: 0, top: subTop, width: G.gutterWidth, height: G.subRowHeight }}
+                      task={branch.task}
+                      onOpen={() => actions.open(branch.task)}
+                      onToggleDone={() => actions.toggleDone(branch.task)}
+                      onCenter={() => scrollToTask(branch.task.id)}
+                      onDelete={() => actions.remove(branch.task)}
+                      onChangeColor={(c) => actions.changeColor(branch.task, c)}
                     >
-                      {branch.task.title}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => actions.open(branch.task)}
+                        className={cn(
+                          "absolute truncate pl-9 pr-2 text-left text-xs text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                          branch.task.status === "done" && "line-through",
+                        )}
+                        style={{ left: 0, top: subTop, width: G.gutterWidth, height: G.subRowHeight }}
+                      >
+                        {branch.task.title}
+                      </button>
+                    </FlowRowMenu>
                   ))}
               </div>
             );
           })}
+            {/* Add-task affordance, parked in the empty filler below the last lane
+                so it never offsets the gutter/track row alignment. */}
+            <button
+              type="button"
+              onClick={() => actions.create()}
+              className="group absolute flex items-center gap-2 rounded px-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              style={{ left: 0, top: totalHeight, width: G.gutterWidth, height: G.laneHeight }}
+            >
+              <span className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground transition-colors group-hover:bg-muted group-hover:text-foreground">
+                <Plus className="size-4" />
+              </span>
+              <span className="truncate">{t("toolbar.newTask")}</span>
+            </button>
           </div>
         </div>
 
@@ -357,8 +465,10 @@ export function TaskFlows({
             nowMs={nowMs}
             gridMs={gridMs}
             colorOf={colorOf}
+            lineStyle={lineStyle}
             currentMemberId={currentMemberId}
             nodeLabel={nodeLabel}
+            segmentLabel={segmentLabel}
             onOpenTask={actions.open}
           />
         </div>
