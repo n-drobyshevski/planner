@@ -166,6 +166,7 @@ function InsightsShellInner({
       "this-week": t("period.thisWeek"),
       "last-week": t("period.lastWeek"),
       "this-month": t("period.thisMonth"),
+      "last-7d": t("period.last7d"),
       "last-30d": t("period.last30d"),
       "last-90d": t("period.last90d"),
     }),
@@ -300,7 +301,17 @@ function InsightsShellInner({
   }
   function changeTab(t: InsightsTab) {
     setTab(t);
-    pushUrl(state, t);
+    // Sleep reads better as a trailing window than the calendar week (which
+    // includes empty future days), so entering it from the untouched default
+    // flips to "Last 7 days". A deliberate range (anything but this-week) is
+    // preserved, and the selector stays usable on Sleep.
+    let nextState = state;
+    if (t === "sleep" && state.preset === "this-week") {
+      nextState = { ...state, preset: "last-7d" };
+      setNow(Date.now());
+      setState(nextState);
+    }
+    pushUrl(nextState, t);
   }
 
   // Saved views: the slice on screen as a config, and applying one routed

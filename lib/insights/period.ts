@@ -23,6 +23,7 @@ export type PeriodPreset =
   | "this-week"
   | "last-week"
   | "this-month"
+  | "last-7d"
   | "last-30d"
   | "last-90d"
   | "custom";
@@ -193,6 +194,7 @@ export const PRESET_LABELS: Record<Exclude<PeriodPreset, "custom">, string> = {
   "this-week": "This week",
   "last-week": "Last week",
   "this-month": "This month",
+  "last-7d": "Last 7 days",
   "last-30d": "Last 30 days",
   "last-90d": "Last 90 days",
 };
@@ -265,9 +267,10 @@ export function resolvePeriod(state: PeriodState, opts: PeriodOpts): ResolvedPer
       prevEnd = start;
       break;
     }
+    case "last-7d":
     case "last-30d":
     case "last-90d": {
-      const count = state.preset === "last-30d" ? 30 : 90;
+      const count = state.preset === "last-7d" ? 7 : state.preset === "last-30d" ? 30 : 90;
       // Rolling window ending today (inclusive).
       const e = addDays(today, 1, { in: ctx });
       end = getTime(e);
@@ -342,6 +345,7 @@ const RANGE_TOKENS: Record<string, PeriodPreset> = {
   "this-week": "this-week",
   "last-week": "last-week",
   "this-month": "this-month",
+  "7d": "last-7d",
   "30d": "last-30d",
   "90d": "last-90d",
   custom: "custom",
@@ -350,6 +354,7 @@ const TOKEN_BY_PRESET: Record<PeriodPreset, string> = {
   "this-week": "this-week",
   "last-week": "last-week",
   "this-month": "this-month",
+  "last-7d": "7d",
   "last-30d": "30d",
   "last-90d": "90d",
   custom: "custom",

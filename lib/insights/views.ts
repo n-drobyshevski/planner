@@ -30,6 +30,7 @@ const PRESETS = [
   "this-week",
   "last-week",
   "this-month",
+  "last-7d",
   "last-30d",
   "last-90d",
   "custom",
