@@ -12,7 +12,7 @@ import type {
   CategoryGoal,
   InsightsPrefs,
   InsightsView,
-  Board,
+  Collection,
   SleepLog,
   TaskRow,
   TaskStatusEvent,
@@ -208,7 +208,7 @@ export function mapCategory(r: Row): Category {
   };
 }
 
-export function mapBoard(r: Row): Board {
+export function mapCollection(r: Row): Collection {
   return {
     id: r.id as string,
     workspaceId: r.workspace_id as string,
@@ -255,7 +255,7 @@ export function mapTask(r: Row): TaskRow {
     ownerId: r.owner_id as string,
     assigneeId: (r.assignee_id as string | null) ?? null,
     parentId: (r.parent_id as string | null) ?? null,
-    boardId: (r.board_id as string | null) ?? null,
+    collectionId: (r.collection_id as string | null) ?? null,
     categoryId: (r.category_id as string | null) ?? null,
     title: r.title as string,
     description: (r.description as string | null) ?? null,
@@ -387,7 +387,7 @@ export interface TaskInput {
   ownerId: string;
   assigneeId?: string | null;
   parentId?: string | null;
-  boardId?: string | null;
+  collectionId?: string | null;
   categoryId?: string | null;
   title: string;
   description?: string | null;
@@ -414,7 +414,7 @@ export function taskInputToRow(input: TaskInput): Row {
     owner_id: input.ownerId,
     assignee_id: input.assigneeId ?? null,
     parent_id: input.parentId ?? null,
-    board_id: input.boardId ?? null,
+    collection_id: input.collectionId ?? null,
     category_id: input.categoryId ?? null,
     title: input.title,
     description: input.description ?? null,
@@ -437,7 +437,7 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   const row: Row = {};
   if ("assigneeId" in patch) row.assignee_id = patch.assigneeId ?? null;
   if ("parentId" in patch) row.parent_id = patch.parentId ?? null;
-  if ("boardId" in patch) row.board_id = patch.boardId ?? null;
+  if ("collectionId" in patch) row.collection_id = patch.collectionId ?? null;
   if ("categoryId" in patch) row.category_id = patch.categoryId ?? null;
   if ("title" in patch) row.title = patch.title;
   if ("description" in patch) row.description = patch.description ?? null;

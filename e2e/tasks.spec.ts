@@ -72,7 +72,7 @@ test("realtime: a shared task created by one member appears for the other", asyn
     await a.getByRole("button", { name: "Create" }).click();
     await expect(a.getByText(title).first()).toBeVisible({ timeout: 15_000 });
 
-    // B receives it live (shared board, not private) without reloading.
+    // B receives it live (shared collection, not private) without reloading.
     await expect(b.getByText(title).first()).toBeVisible({ timeout: 20_000 });
 
     // cleanup

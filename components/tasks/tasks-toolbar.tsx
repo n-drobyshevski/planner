@@ -14,53 +14,54 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToolbarSlot } from "@/components/toolbar-slots";
 import { MobileAccountSection } from "@/components/mobile-account-section";
-import { BoardSwitcher } from "./board-switcher";
+import { CollectionSwitcher } from "./collection-switcher";
 import type { Member } from "@/lib/types";
 
 export type TasksView = "board" | "list" | "flows";
 
 /**
  * Tasks controls, portaled into the shared surface header (SurfaceChrome owns
- * the <header>, AppNav, swipe, and the desktop user menu). The board switcher
- * sits in the center slot — right of the AppNav mode switcher, mirroring how
- * Insights places its period selector — and stays put across breakpoints; below
- * `md` the view toggle collapses into the `⋯` menu so the row never overflows a
- * phone.
+ * the <header>, AppNav, swipe, and the desktop user menu). The collection
+ * switcher sits in the center slot — right of the AppNav mode switcher,
+ * mirroring how Insights places its period selector — and stays put across
+ * breakpoints; below `md` the view toggle collapses into the `⋯` menu so the row
+ * never overflows a phone.
  */
 export function TasksToolbar({
   view,
   onViewChange,
   onNewTask,
   currentMember,
-  activeBoardId,
-  onBoardChange,
-  taskCountByBoard,
-  boardCount,
+  activeCollectionId,
+  onCollectionChange,
+  taskCountByCollection,
+  collectionCount,
 }: {
   view: TasksView;
   onViewChange: (v: TasksView) => void;
   onNewTask: () => void;
   currentMember: Member | null;
-  activeBoardId: string | null;
-  onBoardChange: (boardId: string) => void;
-  taskCountByBoard: Map<string, number>;
-  /** Number of boards — drives whether the switcher shows in Board view. */
-  boardCount: number;
+  activeCollectionId: string | null;
+  onCollectionChange: (collectionId: string) => void;
+  taskCountByCollection: Map<string, number>;
+  /** Number of collections — drives whether the switcher shows. */
+  collectionCount: number;
 }) {
   const t = useTranslations("tasks");
-  // The in-view breadcrumb owns board switching/managing in every view, so the
-  // toolbar switcher would be a redundant second board control — hide it. The
-  // lone exception is the no-boards empty state, where the switcher is the only
-  // "New board" entry point (the breadcrumb needs an active board to render).
-  const showSwitcher = boardCount === 0;
+  // The in-view breadcrumb owns collection switching/managing in every view, so
+  // the toolbar switcher would be a redundant second control — hide it. The lone
+  // exception is the no-collections empty state, where the switcher is the only
+  // "New collection" entry point (the breadcrumb needs an active collection to
+  // render).
+  const showSwitcher = collectionCount === 0;
   return (
     <>
       <ToolbarSlot name="center">
         {showSwitcher && (
-          <BoardSwitcher
-            activeBoardId={activeBoardId}
-            onActiveBoardChange={onBoardChange}
-            taskCountByBoard={taskCountByBoard}
+          <CollectionSwitcher
+            activeCollectionId={activeCollectionId}
+            onActiveCollectionChange={onCollectionChange}
+            taskCountByCollection={taskCountByCollection}
           />
         )}
       </ToolbarSlot>

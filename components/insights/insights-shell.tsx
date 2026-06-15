@@ -92,7 +92,7 @@ export interface InsightsTabData {
   tasks: TaskRow[];
   categories: Map<string, Category>;
   members: Map<string, Member>;
-  boards: { id: string; name: string }[];
+  collections: { id: string; name: string }[];
   /** for tabs that read/write customization rows (goals, prefs, views) */
   workspaceId: string;
   viewerId: string;
@@ -273,7 +273,7 @@ function InsightsShellInner({
     tasks,
     categories: categoryMap,
     members: memberMap,
-    boards: workspace.data?.boards ?? [],
+    collections: workspace.data?.collections ?? [],
     workspaceId: wsId ?? "",
     viewerId,
     timeZone,

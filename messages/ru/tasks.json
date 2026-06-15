@@ -59,29 +59,31 @@
     "addTaskTo": "Добавить задачу в «{title}»",
     "dropTasksHere": "Перетащи задачи сюда",
     "emptyTitle": "Пока нет задач",
-    "emptyDescription": "Создай первую задачу, чтобы начать.",
-    "noBoardsYet": "У тебя пока нет досок. Нажми «Новая доска» наверху, чтобы создать первую."
+    "emptyDescription": "Создай первую задачу, чтобы начать."
+  },
+  "collection": {
+    "noCollectionsYet": "У тебя пока нет коллекций. Нажми «Новая коллекция» наверху, чтобы создать первую."
   },
   "list": {
     "nothingHere": "Здесь пусто."
   },
   "loadErrorSubject": "задачи",
   "switcher": {
-    "boards": "Доски",
-    "newBoard": "Новая доска",
+    "collections": "Коллекции",
+    "newCollection": "Новая коллекция",
     "edit": "Изменить «{name}»",
     "delete": "Удалить «{name}»",
     "deleteTitle": "Удалить «{name}»?",
-    "notEmptyTitle": "Доска не пуста",
-    "notEmptyDescription": "На этой доске ещё {count, plural, one {# задача} few {# задачи} many {# задач} other {# задачи}}. Сначала перемести или удали {count, plural, one {её} other {их}}, потом сможешь убрать доску.",
-    "deleteDescription": "Это удалит доску. Её задачи уже удалены. Сразу после этого действие можно отменить.",
+    "notEmptyTitle": "Коллекция не пуста",
+    "notEmptyDescription": "В этой коллекции ещё {count, plural, one {# задача} few {# задачи} many {# задач} other {# задачи}}. Сначала перемести или удали {count, plural, one {её} other {их}}, потом сможешь убрать коллекцию.",
+    "deleteDescription": "Это удалит коллекцию. Её задачи уже удалены. Сразу после этого действие можно отменить.",
     "makeShared": "Сделать общей",
     "makePersonal": "Сделать личной"
   },
   "breadcrumb": {
-    "label": "Доска",
+    "label": "Коллекция",
     "root": "Задачи",
-    "manageBoard": "Управление «{name}»"
+    "manageCollection": "Управление «{name}»"
   },
   "flowLineStyle": {
     "solid": "Сплошная",
@@ -92,20 +94,20 @@
     "faded": "Блёклая",
     "wavy": "Волнистая"
   },
-  "boardDialog": {
-    "createTitle": "Новая доска",
-    "editTitle": "Изменить доску",
-    "description": "Доска — это набор задач. Оставь её себе или поделись.",
-    "namePlaceholder": "Название доски",
-    "nameLabel": "Название доски",
+  "collectionDialog": {
+    "createTitle": "Новая коллекция",
+    "editTitle": "Изменить коллекцию",
+    "description": "Коллекция — это набор связанных задач. Оставь её себе или поделись.",
+    "namePlaceholder": "Название коллекции",
+    "nameLabel": "Название коллекции",
     "colorLabel": "Цвет {color}",
     "lineStyleLabel": "Стиль линии",
     "shared": "Общая",
     "personal": "Личная",
-    "sharedToggleLabel": "Общая доска — вы оба видите и редактируете её",
+    "sharedToggleLabel": "Общая коллекция — вы оба видите и редактируете её",
     "sharedHint": "Вы оба видите её и можете редактировать задачи.",
-    "personalHint": "Эту доску и её задачи видишь только ты.",
-    "addBoard": "Добавить доску"
+    "personalHint": "Эту коллекцию и её задачи видишь только ты.",
+    "addCollection": "Добавить коллекцию"
   },
   "taskDialog": {
     "createTitle": "Новая задача",

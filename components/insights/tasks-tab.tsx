@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/empty";
 import {
   computeTaskStats,
-  statsByBoard,
+  statsByCollection,
   taskVelocity,
 } from "@/lib/analytics/task-stats";
 import { formatDuration } from "@/lib/datetime/format";
@@ -85,8 +85,8 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
     () => taskVelocity(tasks, period.buckets),
     [tasks, period.buckets],
   );
-  const boards = useMemo(
-    () => statsByBoard(tasks, period.window, now, timeZone),
+  const collections = useMemo(
+    () => statsByCollection(tasks, period.window, now, timeZone),
     [tasks, period, now, timeZone],
   );
 
@@ -122,12 +122,12 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
     completed: { label: t("tasks.seriesCompleted"), color: "var(--chart-2)" },
     created: { label: t("tasks.seriesCreated"), color: COMPARISON_COLOR },
   };
-  const boardName = (id: string | null) =>
+  const collectionName = (id: string | null) =>
     id === null
-      ? t("tasks.noBoard")
-      : (data.boards.find((b) => b.id === id)?.name ?? t("tasks.unknownBoard"));
+      ? t("tasks.noCollection")
+      : (data.collections.find((c) => c.id === id)?.name ?? t("tasks.unknownCollection"));
 
-  const hasBoardBreakdown = boards.length > 1;
+  const hasCollectionBreakdown = collections.length > 1;
 
   const lede = deriveTasksLede({ stats, prevStats, preset: data.preset, t, locale });
 
@@ -196,7 +196,7 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
         </p>
       </div>
 
-      <section className={hasBoardBreakdown ? "space-y-1.5" : "space-y-1.5 lg:col-span-2"}>
+      <section className={hasCollectionBreakdown ? "space-y-1.5" : "space-y-1.5 lg:col-span-2"}>
         <SectionLabel>{t("tasks.velocity", { granularity })}</SectionLabel>
         <ChartContainer
           config={velocityConfig}
@@ -237,17 +237,17 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
         </ChartContainer>
       </section>
 
-      {hasBoardBreakdown && (
+      {hasCollectionBreakdown && (
         <section className="space-y-1.5">
-          <SectionLabel>{t("tasks.byBoard")}</SectionLabel>
+          <SectionLabel>{t("tasks.byCollection")}</SectionLabel>
           <Table className="text-xs">
             <TableCaption className="sr-only">
-              {t("tasks.byBoardCaption", { label: period.label })}
+              {t("tasks.byCollectionCaption", { label: period.label })}
             </TableCaption>
             <TableHeader>
               <TableRow className="text-muted-foreground hover:bg-transparent">
                 <TableHead scope="col" className="h-auto px-0 py-1.5 text-muted-foreground">
-                  {t("tasks.colBoard")}
+                  {t("tasks.colCollection")}
                 </TableHead>
                 <TableHead scope="col" className="h-auto px-0 py-1.5 text-right text-muted-foreground">
                   {t("tasks.colDone")}
@@ -264,28 +264,28 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {boards.map((b) => (
-                <TableRow key={b.boardId ?? "none"} className="border-border/60">
+              {collections.map((c) => (
+                <TableRow key={c.collectionId ?? "none"} className="border-border/60">
                   <TableCell className="max-w-0 truncate px-0 py-1.5">
-                    {boardName(b.boardId)}
+                    {collectionName(c.collectionId)}
                   </TableCell>
                   <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
-                    {b.completedCount}
+                    {c.completedCount}
                   </TableCell>
                   <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
-                    {b.createdCount}
+                    {c.createdCount}
                   </TableCell>
                   <TableCell className="px-0 py-1.5 text-right font-mono tabular-nums">
-                    {b.dueCount}
+                    {c.dueCount}
                   </TableCell>
                   <TableCell
                     className={
-                      b.overdueOpenCount > 0
+                      c.overdueOpenCount > 0
                         ? "px-0 py-1.5 text-right font-mono tabular-nums text-destructive"
                         : "px-0 py-1.5 text-right font-mono tabular-nums text-muted-foreground"
                     }
                   >
-                    {b.overdueOpenCount}
+                    {c.overdueOpenCount}
                   </TableCell>
                 </TableRow>
               ))}

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   taskInputSchema,
   taskPatchSchema,
-  boardInputSchema,
-  boardPatchSchema,
+  collectionInputSchema,
+  collectionPatchSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
 
@@ -26,7 +26,7 @@ describe("taskInputSchema", () => {
       ...base,
       assigneeId: ME,
       parentId: null,
-      boardId: null,
+      collectionId: null,
       categoryId: null,
       description: "fragile stuff first",
       isPrivate: true,
@@ -122,25 +122,25 @@ describe("taskPatchSchema", () => {
   });
 });
 
-describe("board schemas", () => {
-  it("accepts shared (null owner) and personal boards", () => {
+describe("collection schemas", () => {
+  it("accepts shared (null owner) and personal collections", () => {
     expect(
-      boardInputSchema.safeParse({ workspaceId: WS, ownerId: null, name: "Trip", color: "sky" }).success,
+      collectionInputSchema.safeParse({ workspaceId: WS, ownerId: null, name: "Trip", color: "sky" }).success,
     ).toBe(true);
     expect(
-      boardInputSchema.safeParse({ workspaceId: WS, ownerId: ME, name: "Mine", color: "sky" }).success,
+      collectionInputSchema.safeParse({ workspaceId: WS, ownerId: ME, name: "Mine", color: "sky" }).success,
     ).toBe(true);
   });
 
-  it("rejects an unnamed board", () => {
+  it("rejects an unnamed collection", () => {
     expect(
-      boardInputSchema.safeParse({ workspaceId: WS, ownerId: null, name: " ", color: "sky" }).success,
+      collectionInputSchema.safeParse({ workspaceId: WS, ownerId: null, name: " ", color: "sky" }).success,
     ).toBe(false);
   });
 
-  it("accepts a partial board patch", () => {
-    expect(boardPatchSchema.safeParse({ name: "Renamed" }).success).toBe(true);
-    expect(boardPatchSchema.safeParse({}).success).toBe(true);
+  it("accepts a partial collection patch", () => {
+    expect(collectionPatchSchema.safeParse({ name: "Renamed" }).success).toBe(true);
+    expect(collectionPatchSchema.safeParse({}).success).toBe(true);
   });
 });
 

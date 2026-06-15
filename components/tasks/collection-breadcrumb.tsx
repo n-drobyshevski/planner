@@ -43,10 +43,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { useBoardMutations } from "@/lib/hooks/use-board-mutations";
-import { BoardDialog } from "./board-dialog";
-import { Dot, BoardLine } from "./board-glyphs";
-import type { Board } from "@/lib/types";
+import { useCollectionMutations } from "@/lib/hooks/use-collection-mutations";
+import { CollectionDialog } from "./collection-dialog";
+import { Dot, CollectionLine } from "./collection-glyphs";
+import type { Collection } from "@/lib/types";
 
 /**
  * Run a follow-up action on the next tick. The right-click ContextMenu is
@@ -59,42 +59,43 @@ function defer(fn: () => void) {
 }
 
 /**
- * The in-view board control for the Kanban view: a breadcrumb (`Tasks › Board`)
- * whose board segment opens a menu to switch boards and manage *any* board
- * (edit / share / delete) — by left-click (full menu) or right-click / long-press
- * (quick actions on the current board). Replaces the toolbar BoardSwitcher while
- * the board view is active; both reuse BoardDialog + useBoardMutations, so a
- * board is managed identically wherever you reach it from.
+ * The in-view collection control: a breadcrumb (`Tasks › Collection`) whose
+ * collection segment opens a menu to switch collections and manage *any*
+ * collection (edit / share / delete) — by left-click (full menu) or right-click /
+ * long-press (quick actions on the current collection). Shown across every view
+ * (Board / List / Flows); reuses CollectionDialog + useCollectionMutations, so a
+ * collection is managed identically wherever you reach it from.
  */
-export function BoardBreadcrumb({
-  boards,
-  activeBoardId,
-  onActiveBoardChange,
-  taskCountByBoard,
+export function CollectionBreadcrumb({
+  collections,
+  activeCollectionId,
+  onActiveCollectionChange,
+  taskCountByCollection,
   workspaceId,
   currentMemberId,
 }: {
-  boards: Board[];
-  activeBoardId: string | null;
-  onActiveBoardChange: (boardId: string) => void;
-  /** Task count (incl. subtasks) per board id — for the delete guard. */
-  taskCountByBoard: Map<string, number>;
+  collections: Collection[];
+  activeCollectionId: string | null;
+  onActiveCollectionChange: (collectionId: string) => void;
+  /** Task count (incl. subtasks) per collection id — for the delete guard. */
+  taskCountByCollection: Map<string, number>;
   workspaceId: string;
   currentMemberId: string;
 }) {
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
-  const mutations = useBoardMutations();
+  const mutations = useCollectionMutations();
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<Board | null>(null);
-  const [deleting, setDeleting] = React.useState<Board | null>(null);
+  const [editing, setEditing] = React.useState<Collection | null>(null);
+  const [deleting, setDeleting] = React.useState<Collection | null>(null);
 
-  const active = boards.find((b) => b.id === activeBoardId) ?? boards[0] ?? null;
-  const deletingCount = deleting ? taskCountByBoard.get(deleting.id) ?? 0 : 0;
+  const active =
+    collections.find((c) => c.id === activeCollectionId) ?? collections[0] ?? null;
+  const deletingCount = deleting ? taskCountByCollection.get(deleting.id) ?? 0 : 0;
 
-  function toggleShared(b: Board) {
-    void mutations.setShared(b.id, b.ownerId === null ? currentMemberId : null);
+  function toggleShared(c: Collection) {
+    void mutations.setShared(c.id, c.ownerId === null ? currentMemberId : null);
   }
 
   async function confirmDelete() {
@@ -103,12 +104,12 @@ export function BoardBreadcrumb({
     const ok = await mutations.remove(deletedId);
     setDeleting(null);
     if (ok && deletedId === active?.id) {
-      const next = boards.find((b) => b.id !== deletedId);
-      if (next) onActiveBoardChange(next.id);
+      const next = collections.find((c) => c.id !== deletedId);
+      if (next) onActiveCollectionChange(next.id);
     }
   }
 
-  // The board view only mounts the breadcrumb once a board exists, but stay safe.
+  // The view only mounts the breadcrumb once a collection exists, but stay safe.
   if (!active) return null;
 
   return (
@@ -137,7 +138,7 @@ export function BoardBreadcrumb({
             </DropdownMenuTrigger>
           </ContextMenuTrigger>
 
-          {/* Right-click / long-press: quick actions on the current board. */}
+          {/* Right-click / long-press: quick actions on the current collection. */}
           <ContextMenuContent className="w-56">
             <ContextMenuItem onSelect={() => defer(() => setEditing(active))}>
               <Pencil />
@@ -160,18 +161,18 @@ export function BoardBreadcrumb({
           </ContextMenuContent>
         </ContextMenu>
 
-        {/* Left-click: switch any board + manage any board (edit/share/delete). */}
+        {/* Left-click: switch any collection + manage any collection. */}
         <DropdownMenuContent align="start" className="w-64">
-          <DropdownMenuLabel>{t("switcher.boards")}</DropdownMenuLabel>
-          {boards.map((b) => (
-            <div key={b.id} className="flex items-center gap-0.5">
+          <DropdownMenuLabel>{t("switcher.collections")}</DropdownMenuLabel>
+          {collections.map((c) => (
+            <div key={c.id} className="flex items-center gap-0.5">
               <DropdownMenuItem
                 className="min-w-0 flex-1"
-                onSelect={() => onActiveBoardChange(b.id)}
+                onSelect={() => onActiveCollectionChange(c.id)}
               >
-                <BoardLine board={b} />
-                <span className="flex-1 truncate">{b.name}</span>
-                {b.ownerId === null ? (
+                <CollectionLine collection={c} />
+                <span className="flex-1 truncate">{c.name}</span>
+                {c.ownerId === null ? (
                   <Users className="size-3.5 text-muted-foreground" />
                 ) : (
                   <User className="size-3.5 text-muted-foreground" />
@@ -179,39 +180,39 @@ export function BoardBreadcrumb({
                 <Check
                   className={cn(
                     "size-4",
-                    b.id === active.id ? "opacity-100" : "opacity-0",
+                    c.id === active.id ? "opacity-100" : "opacity-0",
                   )}
                 />
               </DropdownMenuItem>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger
-                  aria-label={t("breadcrumb.manageBoard", { name: b.name })}
+                  aria-label={t("breadcrumb.manageCollection", { name: c.name })}
                   className="size-8 shrink-0 justify-center p-0 [&>svg:last-of-type]:hidden"
                 >
                   <MoreHorizontal />
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="w-48">
-                  <DropdownMenuItem onSelect={() => setEditing(b)}>
+                  <DropdownMenuItem onSelect={() => setEditing(c)}>
                     <Pencil data-icon="inline-start" />
-                    {t("switcher.edit", { name: b.name })}
+                    {t("switcher.edit", { name: c.name })}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => toggleShared(b)}>
-                    {b.ownerId === null ? (
+                  <DropdownMenuItem onSelect={() => toggleShared(c)}>
+                    {c.ownerId === null ? (
                       <User data-icon="inline-start" />
                     ) : (
                       <Users data-icon="inline-start" />
                     )}
-                    {b.ownerId === null
+                    {c.ownerId === null
                       ? t("switcher.makePersonal")
                       : t("switcher.makeShared")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
-                    onSelect={() => setDeleting(b)}
+                    onSelect={() => setDeleting(c)}
                   >
                     <Trash2 data-icon="inline-start" />
-                    {t("switcher.delete", { name: b.name })}
+                    {t("switcher.delete", { name: c.name })}
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
@@ -221,24 +222,24 @@ export function BoardBreadcrumb({
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
             <Plus data-icon="inline-start" />
-            {t("switcher.newBoard")}
+            {t("switcher.newCollection")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <BoardDialog
+      <CollectionDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         mode="create"
         workspaceId={workspaceId}
         currentMemberId={currentMemberId}
-        onCreated={onActiveBoardChange}
+        onCreated={onActiveCollectionChange}
       />
-      <BoardDialog
+      <CollectionDialog
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         mode="edit"
-        board={editing}
+        collection={editing}
         workspaceId={workspaceId}
         currentMemberId={currentMemberId}
       />

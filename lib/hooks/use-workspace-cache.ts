@@ -3,7 +3,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/supabase/query-keys";
 import type { WorkspaceData } from "@/lib/hooks/use-workspace";
-import type { Board, Category, Member } from "@/lib/types";
+import type { Collection, Category, Member } from "@/lib/types";
 
 // Optimistic patches for the cached workspace bundle (qk.workspace). The mirror
 // of patchEventWindows in use-event-mutations: a mutation applies the patch
@@ -26,18 +26,18 @@ export function patchWorkspace(
   return () => qc.setQueryData(qk.workspace, prev);
 }
 
-export const patchBoardById =
-  (id: string, patch: Partial<Board>) =>
+export const patchCollectionById =
+  (id: string, patch: Partial<Collection>) =>
   (d: WorkspaceData): WorkspaceData => ({
     ...d,
-    boards: d.boards.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    collections: d.collections.map((c) => (c.id === id ? { ...c, ...patch } : c)),
   });
 
-export const removeBoardById =
+export const removeCollectionById =
   (id: string) =>
   (d: WorkspaceData): WorkspaceData => ({
     ...d,
-    boards: d.boards.filter((b) => b.id !== id),
+    collections: d.collections.filter((c) => c.id !== id),
   });
 
 export const patchCategoryById =

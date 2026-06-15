@@ -44,7 +44,7 @@ export interface FlowTrackProps {
   /** day/week/month tick timestamps; drawn as faint vertical gridlines */
   gridMs: number[];
   colorOf: (t: TaskRow) => string;
-  /** the active board's line style, applied to every trunk/branch span stroke */
+  /** the active collection's line style, applied to every trunk/branch span stroke */
   lineStyle: FlowLineStyle;
   currentMemberId: string | null;
   /** localized tooltip / aria text for a node */
@@ -79,7 +79,7 @@ export function FlowTrack({
   const [hover, setHover] = useState<Hover | null>(null);
   const x = (ms: number) => xForTime(ms, t0, pxPerDay);
   const nowX = x(Math.min(nowMs, t1));
-  // The board's stroke recipe, shared by every trunk and branch span. A subtask
+  // The collection's stroke recipe, shared by every trunk and branch span. A subtask
   // branch can't carry a true sine, so wavy falls back to a fine dash there.
   const stroke = lineStyleStroke(lineStyle);
   const branchDash = stroke.wavy ? "2 3" : stroke.dasharray;
@@ -149,7 +149,7 @@ export function FlowTrack({
                 </>
               ) : (
                 <>
-                  {/* trunk — drawn in the board's line style (wavy = sine path) */}
+                  {/* trunk — drawn in the collection's line style (wavy = sine path) */}
                   {stroke.wavy ? (
                     <path
                       d={wavePath(startX, endX, trunkY)}
@@ -333,9 +333,9 @@ function Branch({
   mine: boolean;
   nowMs: number;
   t1: number;
-  /** the board line style's dash pattern, applied to the span run */
+  /** the collection line style's dash pattern, applied to the span run */
   dasharray?: string;
-  /** the board line style's opacity multiplier (e.g. `faded`) */
+  /** the collection line style's opacity multiplier (e.g. `faded`) */
   opacityScale: number;
 }) {
   const divergeX = x(branch.startMs);

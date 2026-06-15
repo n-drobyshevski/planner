@@ -115,7 +115,7 @@ const baseTaskRow = {
   owner_id: "m1",
   assignee_id: null,
   parent_id: null,
-  board_id: null,
+  collection_id: null,
   category_id: null,
   title: "Task",
   description: null,

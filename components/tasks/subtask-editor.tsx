@@ -84,7 +84,7 @@ export function SubtaskEditor({
       workspaceId,
       ownerId: parent.ownerId,
       parentId: parent.id,
-      boardId: parent.boardId,
+      collectionId: parent.collectionId,
       assigneeId: parent.assigneeId,
       categoryId: parent.categoryId,
       title,

@@ -32,47 +32,47 @@ async function deleteTaskByTitle(page: Page, title: string) {
   await expect(page.getByText(title)).toHaveCount(0, { timeout: 15_000 });
 }
 
-test("boards: create, filter by board, guard non-empty delete, delete", async ({
+test("collections: create, filter by collection, guard non-empty delete, delete", async ({
   page,
 }, testInfo) => {
   test.setTimeout(90_000);
   await signInToTasks(page, "Alex");
-  const boardName = `B-${testInfo.testId}`;
-  const taskTitle = `BT-${testInfo.testId}`;
+  const collectionName = `C-${testInfo.testId}`;
+  const taskTitle = `CT-${testInfo.testId}`;
 
-  // Create a board via the switcher; creation switches the view to it.
+  // Create a collection via the breadcrumb; creation switches the view to it.
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
-  await page.getByRole("menuitem", { name: "New board" }).click();
-  await page.getByLabel("Board name").fill(boardName);
-  await page.getByRole("button", { name: "Add board" }).click();
+  await page.getByRole("menuitem", { name: "New collection" }).click();
+  await page.getByLabel("Collection name").fill(collectionName);
+  await page.getByRole("button", { name: "Add collection" }).click();
   await expect(
-    page.getByRole("button", { name: boardName, exact: true }),
+    page.getByRole("button", { name: collectionName, exact: true }),
   ).toBeVisible({ timeout: 15_000 });
 
-  // A task created here is filed under the new board…
+  // A task created here is filed under the new collection…
   await createTask(page, taskTitle);
 
-  // …and is not visible on the original board.
-  await page.getByRole("button", { name: boardName, exact: true }).click();
+  // …and is not visible in the original collection.
+  await page.getByRole("button", { name: collectionName, exact: true }).click();
   await page.getByRole("menuitem", { name: "Tasks" }).click();
   await expect(page.getByText(taskTitle)).toHaveCount(0);
 
-  // Back on the new board it's there again.
+  // Back in the new collection it's there again.
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
-  await page.getByRole("menuitem", { name: boardName }).click();
+  await page.getByRole("menuitem", { name: collectionName }).click();
   await expect(page.getByText(taskTitle).first()).toBeVisible();
 
-  // Deleting a non-empty board is blocked with an explanation.
-  await page.getByRole("button", { name: boardName, exact: true }).click();
-  await page.getByRole("menuitem", { name: `Delete “${boardName}”` }).click();
-  await expect(page.getByText("Board isn’t empty")).toBeVisible();
+  // Deleting a non-empty collection is blocked with an explanation.
+  await page.getByRole("button", { name: collectionName, exact: true }).click();
+  await page.getByRole("menuitem", { name: `Delete “${collectionName}”` }).click();
+  await expect(page.getByText("Collection isn’t empty")).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
 
   // Empty it, then the delete goes through and the view falls back.
   await deleteTaskByTitle(page, taskTitle);
-  await page.getByRole("button", { name: boardName, exact: true }).click();
-  await page.getByRole("menuitem", { name: `Delete “${boardName}”` }).click();
-  await page.getByText(`Delete “${boardName}”?`).waitFor();
+  await page.getByRole("button", { name: collectionName, exact: true }).click();
+  await page.getByRole("menuitem", { name: `Delete “${collectionName}”` }).click();
+  await page.getByText(`Delete “${collectionName}”?`).waitFor();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(
     page.getByRole("button", { name: "Tasks", exact: true }),

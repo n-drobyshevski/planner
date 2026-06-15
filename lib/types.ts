@@ -125,12 +125,13 @@ export interface Category {
   sortOrder: number;
 }
 
-/** A task board — a named collection of tasks. Personal (owner = a member) or
- *  Shared (ownerId null, both members see + edit). Mirrors Category. */
-export interface Board {
+/** A collection — a named group of tasks, viewable as a Board (kanban), List, or
+ *  Flows. Personal (owner = a member) or Shared (ownerId null, both members see
+ *  + edit). Mirrors Category. */
+export interface Collection {
   id: string;
   workspaceId: string;
-  ownerId: string | null; // null = shared board
+  ownerId: string | null; // null = shared collection
   name: string;
   color: string; // hex
   /** Flows trunk stroke pattern; see lib/tasks/flow-line-styles.ts */
@@ -188,7 +189,7 @@ export interface TaskRow {
   ownerId: string; // creator; drives edit rights
   assigneeId: string | null; // responsible member; null = unassigned
   parentId: string | null; // subtask -> parent; null = top-level
-  boardId: string | null; // the board this task lives on
+  collectionId: string | null; // the collection this task lives in
   categoryId: string | null;
   title: string;
   description: string | null;

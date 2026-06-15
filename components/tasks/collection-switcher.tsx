@@ -32,42 +32,44 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
-import { useBoardMutations } from "@/lib/hooks/use-board-mutations";
-import { BoardDialog } from "./board-dialog";
-import { Dot, BoardLine } from "./board-glyphs";
-import type { Board } from "@/lib/types";
+import { useCollectionMutations } from "@/lib/hooks/use-collection-mutations";
+import { CollectionDialog } from "./collection-dialog";
+import { Dot, CollectionLine } from "./collection-glyphs";
+import type { Collection } from "@/lib/types";
 
 /**
- * The board picker that sits at the left of the Tasks toolbar: shows the active
- * board, switches between boards, and hosts create / edit / delete. Pulls its
- * own data (boards from the workspace bundle, task counts from useTasks) so the
- * toolbar only has to pass the active id and a change handler.
+ * The collection picker that sits at the left of the Tasks toolbar: shows the
+ * active collection, switches between collections, and hosts create / edit /
+ * delete. Pulls its own data (collections from the workspace bundle, task counts
+ * from useTasks) so the toolbar only has to pass the active id and a change
+ * handler.
  */
-export function BoardSwitcher({
-  activeBoardId,
-  onActiveBoardChange,
-  taskCountByBoard,
+export function CollectionSwitcher({
+  activeCollectionId,
+  onActiveCollectionChange,
+  taskCountByCollection,
 }: {
-  activeBoardId: string | null;
-  onActiveBoardChange: (boardId: string) => void;
-  /** Task count (incl. subtasks) per board id — for the delete guard. */
-  taskCountByBoard: Map<string, number>;
+  activeCollectionId: string | null;
+  onActiveCollectionChange: (collectionId: string) => void;
+  /** Task count (incl. subtasks) per collection id — for the delete guard. */
+  taskCountByCollection: Map<string, number>;
 }) {
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
   const ws = useWorkspace();
   const workspaceId = ws.data?.workspaceId;
   const currentMember = ws.data?.currentMember ?? null;
-  const boards = ws.data?.boards ?? [];
-  const mutations = useBoardMutations();
+  const collections = ws.data?.collections ?? [];
+  const mutations = useCollectionMutations();
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<Board | null>(null);
-  const [deleting, setDeleting] = React.useState<Board | null>(null);
+  const [editing, setEditing] = React.useState<Collection | null>(null);
+  const [deleting, setDeleting] = React.useState<Collection | null>(null);
 
-  const active = boards.find((b) => b.id === activeBoardId) ?? boards[0] ?? null;
+  const active =
+    collections.find((c) => c.id === activeCollectionId) ?? collections[0] ?? null;
 
-  const deletingCount = deleting ? taskCountByBoard.get(deleting.id) ?? 0 : 0;
+  const deletingCount = deleting ? taskCountByCollection.get(deleting.id) ?? 0 : 0;
 
   async function confirmDelete() {
     if (!deleting || deletingCount > 0) return;
@@ -75,27 +77,27 @@ export function BoardSwitcher({
     const ok = await mutations.remove(deletedId);
     setDeleting(null);
     if (ok && deletedId === active?.id) {
-      const next = boards.find((b) => b.id !== deletedId);
-      if (next) onActiveBoardChange(next.id);
+      const next = collections.find((c) => c.id !== deletedId);
+      if (next) onActiveCollectionChange(next.id);
     }
   }
 
-  // No boards yet — offer to create the first one.
-  if (boards.length === 0) {
+  // No collections yet — offer to create the first one.
+  if (collections.length === 0) {
     return (
       <>
         <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
           <Plus data-icon="inline-start" />
-          {t("switcher.newBoard")}
+          {t("switcher.newCollection")}
         </Button>
         {workspaceId && currentMember && (
-          <BoardDialog
+          <CollectionDialog
             open={createOpen}
             onOpenChange={setCreateOpen}
             mode="create"
             workspaceId={workspaceId}
             currentMemberId={currentMember.id}
-            onCreated={onActiveBoardChange}
+            onCreated={onActiveCollectionChange}
           />
         )}
       </>
@@ -113,22 +115,22 @@ export function BoardSwitcher({
           >
             {active && <Dot color={active.color} />}
             <span className="truncate font-heading font-semibold">
-              {active?.name ?? t("switcher.boards")}
+              {active?.name ?? t("switcher.collections")}
             </span>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-60">
-          <DropdownMenuLabel>{t("switcher.boards")}</DropdownMenuLabel>
-          {boards.map((b) => (
+          <DropdownMenuLabel>{t("switcher.collections")}</DropdownMenuLabel>
+          {collections.map((c) => (
             <DropdownMenuItem
-              key={b.id}
-              onSelect={() => onActiveBoardChange(b.id)}
+              key={c.id}
+              onSelect={() => onActiveCollectionChange(c.id)}
               className="gap-2"
             >
-              <BoardLine board={b} />
-              <span className="flex-1 truncate">{b.name}</span>
-              {b.ownerId === null ? (
+              <CollectionLine collection={c} />
+              <span className="flex-1 truncate">{c.name}</span>
+              {c.ownerId === null ? (
                 <Users className="size-3.5 text-muted-foreground" />
               ) : (
                 <User className="size-3.5 text-muted-foreground" />
@@ -136,7 +138,7 @@ export function BoardSwitcher({
               <Check
                 className={cn(
                   "size-4",
-                  b.id === active?.id ? "opacity-100" : "opacity-0",
+                  c.id === active?.id ? "opacity-100" : "opacity-0",
                 )}
               />
             </DropdownMenuItem>
@@ -145,7 +147,7 @@ export function BoardSwitcher({
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
             <Plus data-icon="inline-start" />
-            {t("switcher.newBoard")}
+            {t("switcher.newCollection")}
           </DropdownMenuItem>
           {active && (
             <>
@@ -186,19 +188,19 @@ export function BoardSwitcher({
 
       {workspaceId && currentMember && (
         <>
-          <BoardDialog
+          <CollectionDialog
             open={createOpen}
             onOpenChange={setCreateOpen}
             mode="create"
             workspaceId={workspaceId}
             currentMemberId={currentMember.id}
-            onCreated={onActiveBoardChange}
+            onCreated={onActiveCollectionChange}
           />
-          <BoardDialog
+          <CollectionDialog
             open={editing !== null}
             onOpenChange={(o) => !o && setEditing(null)}
             mode="edit"
-            board={editing}
+            collection={editing}
             workspaceId={workspaceId}
             currentMemberId={currentMember.id}
           />

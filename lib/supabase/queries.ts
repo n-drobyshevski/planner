@@ -7,7 +7,7 @@ import type {
   CategoryGoal,
   InsightsPrefs,
   InsightsView,
-  Board,
+  Collection,
   SleepLog,
   TaskRow,
   TaskStatusEvent,
@@ -21,7 +21,7 @@ import {
   mapCategoryGoal,
   mapInsightsPrefs,
   mapInsightsView,
-  mapBoard,
+  mapCollection,
   mapSleepLog,
   mapTask,
   mapStatusEvent,
@@ -32,30 +32,30 @@ export interface WorkspaceBundle {
   workspaceName: string;
   members: Member[];
   categories: Category[];
-  boards: Board[];
+  collections: Collection[];
 }
 
 /** Load the (single) workspace the signed-in member belongs to. RLS scopes it. */
 export async function fetchWorkspaceBundle(
   sb: SupabaseClient,
 ): Promise<WorkspaceBundle> {
-  const [wsRes, memRes, catRes, boardRes] = await Promise.all([
+  const [wsRes, memRes, catRes, collRes] = await Promise.all([
     sb.from("workspaces").select("*").limit(1).single(),
     sb.from("members").select("*").order("created_at"),
     sb.from("categories").select("*").order("sort_order"),
-    sb.from("boards").select("*").order("sort_order"),
+    sb.from("collections").select("*").order("sort_order"),
   ]);
   if (wsRes.error) throw wsRes.error;
   if (memRes.error) throw memRes.error;
   if (catRes.error) throw catRes.error;
-  if (boardRes.error) throw boardRes.error;
+  if (collRes.error) throw collRes.error;
 
   return {
     workspaceId: wsRes.data.id as string,
     workspaceName: wsRes.data.name as string,
     members: (memRes.data ?? []).map(mapMember),
     categories: (catRes.data ?? []).map(mapCategory),
-    boards: (boardRes.data ?? []).map(mapBoard),
+    collections: (collRes.data ?? []).map(mapCollection),
   };
 }
 

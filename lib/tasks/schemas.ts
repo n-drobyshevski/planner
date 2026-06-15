@@ -1,4 +1,4 @@
-// Runtime validation for task/board writes. The mutation layer
+// Runtime validation for task/collection writes. The mutation layer
 // (lib/supabase/mutations.ts) parses every create/update through these, so a
 // buggy caller can't write malformed rows; forms reuse the same primitives so
 // validation messages live in one place.
@@ -25,7 +25,7 @@ const taskInputBase = z.object({
   ownerId: z.uuid(),
   assigneeId: nullableUuid.optional(),
   parentId: nullableUuid.optional(),
-  boardId: nullableUuid.optional(),
+  collectionId: nullableUuid.optional(),
   categoryId: nullableUuid.optional(),
   title: titleSchema,
   description: descriptionSchema.nullable().optional(),
@@ -97,16 +97,16 @@ export const taskFormSchema = z.object({
 });
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
 
-const boardNameSchema = z
+const collectionNameSchema = z
   .string()
   .trim()
-  .min(1, "Please name the board.")
+  .min(1, "Please name the collection.")
   .max(100, "Keep the name under 100 characters.");
 
-export const boardInputSchema = z.object({
+export const collectionInputSchema = z.object({
   workspaceId: z.uuid(),
   ownerId: nullableUuid,
-  name: boardNameSchema,
+  name: collectionNameSchema,
   color: z.string().min(1),
   lineStyle: flowLineStyleSchema.optional(),
   sortOrder: z.number().finite().optional(),
@@ -126,16 +126,16 @@ export const scheduleTaskFormSchema = z.object({
 });
 export type ScheduleTaskFormValues = z.infer<typeof scheduleTaskFormSchema>;
 
-/** The board dialog's field shape (create and edit share it). */
-export const boardFormSchema = z.object({
-  name: boardNameSchema,
+/** The collection dialog's field shape (create and edit share it). */
+export const collectionFormSchema = z.object({
+  name: collectionNameSchema,
   color: z.string().min(1),
   lineStyle: flowLineStyleSchema,
   shared: z.boolean(),
 });
-export type BoardFormValues = z.infer<typeof boardFormSchema>;
+export type CollectionFormValues = z.infer<typeof collectionFormSchema>;
 
-export const boardPatchSchema = boardInputSchema
+export const collectionPatchSchema = collectionInputSchema
   .pick({ name: true, color: true, lineStyle: true, sortOrder: true })
   .partial();
 

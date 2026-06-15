@@ -1,8 +1,8 @@
 import { toPaletteColor } from "@/lib/theme/appearance";
 import { lineStyleStroke, wavePath } from "@/lib/tasks/flow-line-styles";
-import type { Board } from "@/lib/types";
+import type { Collection } from "@/lib/types";
 
-/** A small filled circle in a board's color. */
+/** A small filled circle in a collection's color. */
 export function Dot({ color, className }: { color: string; className?: string }) {
   return (
     <span
@@ -12,10 +12,10 @@ export function Dot({ color, className }: { color: string; className?: string })
   );
 }
 
-/** A short stroke in a board's color + Flows line style — its line "personality". */
-export function BoardLine({ board }: { board: Board }) {
-  const { dasharray, opacityScale, wavy } = lineStyleStroke(board.lineStyle);
-  const color = toPaletteColor(board.color);
+/** A short stroke in a collection's color + Flows line style — its line "personality". */
+export function CollectionLine({ collection }: { collection: Collection }) {
+  const { dasharray, opacityScale, wavy } = lineStyleStroke(collection.lineStyle);
+  const color = toPaletteColor(collection.color);
   return (
     <svg width={18} height={10} viewBox="0 0 18 10" aria-hidden className="shrink-0">
       {wavy ? (

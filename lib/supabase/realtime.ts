@@ -57,7 +57,7 @@ export function subscribeWorkspace(
     )
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "boards", filter },
+      { event: "*", schema: "public", table: "collections", filter },
       onChange,
     )
     .on(

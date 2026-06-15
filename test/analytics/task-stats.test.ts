@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeTaskStats, taskVelocity, statsByBoard } from "@/lib/analytics/task-stats";
+import { computeTaskStats, taskVelocity, statsByCollection } from "@/lib/analytics/task-stats";
 import type { Bucket } from "@/lib/insights/period";
 import type { TaskRow, TimeWindow } from "@/lib/types";
 
@@ -19,7 +19,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     ownerId: "me",
     assigneeId: null,
     parentId: null,
-    boardId: null,
+    collectionId: null,
     categoryId: null,
     title: "t",
     description: null,
@@ -152,20 +152,20 @@ describe("taskVelocity", () => {
   });
 });
 
-describe("statsByBoard", () => {
-  it("groups per board (null = no board), most completed first", () => {
-    const rows = statsByBoard(
+describe("statsByCollection", () => {
+  it("groups per collection (null = no collection), most completed first", () => {
+    const rows = statsByCollection(
       [
-        done({ id: "a", boardId: "b1", completedAt: T0 + DAY }),
-        done({ id: "b", boardId: "b1", completedAt: T0 + DAY }),
-        task({ id: "c", boardId: null, createdAt: T0 + HOUR }),
-        task({ id: "d", boardId: "b2", dueDate: "2026-06-02" }), // overdue open
+        done({ id: "a", collectionId: "b1", completedAt: T0 + DAY }),
+        done({ id: "b", collectionId: "b1", completedAt: T0 + DAY }),
+        task({ id: "c", collectionId: null, createdAt: T0 + HOUR }),
+        task({ id: "d", collectionId: "b2", dueDate: "2026-06-02" }), // overdue open
       ],
       win,
       now,
       UTC,
     );
-    expect(rows.map((r) => r.boardId)).toEqual(["b1", null, "b2"]);
+    expect(rows.map((r) => r.collectionId)).toEqual(["b1", null, "b2"]);
     expect(rows[0]).toMatchObject({ completedCount: 2 });
     expect(rows[1]).toMatchObject({ createdCount: 1 });
     expect(rows[2]).toMatchObject({ dueCount: 1, overdueOpenCount: 1 });

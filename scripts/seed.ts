@@ -111,20 +111,20 @@ async function main() {
   const social = cats.find((c) => c.name === "Social")!;
   console.log(`✓ ${cats.length} categories`);
 
-  // Boards: a shared default + a second shared board, plus one personal board
-  // (left empty, handy for trying the delete flow).
-  const { data: boards, error: boardErr } = await admin
-    .from("boards")
+  // Collections: a shared default + a second shared collection, plus one
+  // personal collection (left empty, handy for trying the delete flow).
+  const { data: collections, error: collErr } = await admin
+    .from("collections")
     .insert([
       { workspace_id: ws.id, owner_id: null, name: "Tasks", color: "#c0492a", sort_order: 0 },
       { workspace_id: ws.id, owner_id: null, name: "Errands", color: "#0369a1", sort_order: 1 },
       { workspace_id: ws.id, owner_id: memA.id, name: `${memA.name} · Focus`, color: "#7c3aed", sort_order: 2 },
     ])
     .select();
-  if (boardErr) throw boardErr;
-  const boardMain = boards.find((b) => b.name === "Tasks")!;
-  const boardErrands = boards.find((b) => b.name === "Errands")!;
-  console.log(`✓ ${boards.length} boards`);
+  if (collErr) throw collErr;
+  const collectionMain = collections.find((c) => c.name === "Tasks")!;
+  const collectionErrands = collections.find((c) => c.name === "Errands")!;
+  console.log(`✓ ${collections.length} collections`);
 
   // Sample events around "today".
   const tz = "Europe/Berlin";
@@ -187,22 +187,22 @@ async function main() {
     .from("tasks")
     .insert([
       {
-        workspace_id: ws.id, owner_id: memA.id, category_id: home.id, board_id: boardMain.id,
+        workspace_id: ws.id, owner_id: memA.id, category_id: home.id, collection_id: collectionMain.id,
         title: "Plan spring garden",
         status: "todo", position: 1, sequential: true,
       },
       {
-        workspace_id: ws.id, owner_id: memB.id, category_id: memBWork.id, board_id: boardMain.id,
+        workspace_id: ws.id, owner_id: memB.id, category_id: memBWork.id, collection_id: collectionMain.id,
         title: "Performance review prep", is_private: true,
         status: "in_progress", position: 2, sequential: false,
       },
       {
-        workspace_id: ws.id, owner_id: memA.id, category_id: home.id, board_id: boardErrands.id,
+        workspace_id: ws.id, owner_id: memA.id, category_id: home.id, collection_id: collectionErrands.id,
         title: "Pay rent",
         status: "todo", position: 3, priority: 3, due_date: dateAt(3), sequential: false,
       },
       {
-        workspace_id: ws.id, owner_id: memA.id, assignee_id: memA.id, board_id: boardMain.id,
+        workspace_id: ws.id, owner_id: memA.id, assignee_id: memA.id, collection_id: collectionMain.id,
         title: "Write report",
         status: "todo", position: 4, sequential: false,
       },
@@ -216,17 +216,17 @@ async function main() {
   // "Buy seeds" is done ("Clear the beds" is already done -> 1/3 progress).
   const { error: stErr } = await admin.from("tasks").insert([
     {
-      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, board_id: garden.board_id,
+      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, collection_id: garden.collection_id,
       title: "Clear the beds",
       status: "done", position: 1, completed_at: new Date().toISOString(),
     },
     {
-      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, board_id: garden.board_id,
+      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, collection_id: garden.collection_id,
       title: "Buy seeds",
       status: "todo", position: 2,
     },
     {
-      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, board_id: garden.board_id,
+      workspace_id: ws.id, owner_id: memA.id, parent_id: garden.id, collection_id: garden.collection_id,
       title: "Plant",
       status: "todo", position: 3,
     },

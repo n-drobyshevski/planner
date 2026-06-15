@@ -42,8 +42,8 @@ import {
 import {
   taskInputSchema,
   taskPatchSchema,
-  boardInputSchema,
-  boardPatchSchema,
+  collectionInputSchema,
+  collectionPatchSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
 import { buildRRule, parseRRule } from "@/lib/recurrence/rrule-build";
@@ -540,21 +540,21 @@ export async function restoreCategory(
   }
 }
 
-// --- Boards ----------------------------------------------------------------
+// --- Collections -----------------------------------------------------------
 
-/** A board still holds tasks, so it can't be deleted (block-if-non-empty). */
-export class BoardNotEmptyError extends Error {
+/** A collection still holds tasks, so it can't be deleted (block-if-non-empty). */
+export class CollectionNotEmptyError extends Error {
   constructor(public readonly taskCount: number) {
     super(
       taskCount === 1
-        ? "This board still has 1 task. Move or delete it first."
-        : `This board still has ${taskCount} tasks. Move or delete them first.`,
+        ? "This collection still has 1 task. Move or delete it first."
+        : `This collection still has ${taskCount} tasks. Move or delete them first.`,
     );
-    this.name = "BoardNotEmptyError";
+    this.name = "CollectionNotEmptyError";
   }
 }
 
-export async function createBoard(
+export async function createCollection(
   sb: SupabaseClient,
   input: {
     workspaceId: string;
@@ -565,9 +565,9 @@ export async function createBoard(
     sortOrder?: number;
   },
 ): Promise<string> {
-  const parsed = parseInput(boardInputSchema, input);
+  const parsed = parseInput(collectionInputSchema, input);
   const { data, error } = await sb
-    .from("boards")
+    .from("collections")
     .insert({
       workspace_id: parsed.workspaceId,
       owner_id: parsed.ownerId,
@@ -582,71 +582,71 @@ export async function createBoard(
   return data.id as string;
 }
 
-export async function updateBoard(
+export async function updateCollection(
   sb: SupabaseClient,
   id: string,
   patch: { name?: string; color?: string; lineStyle?: FlowLineStyle; sortOrder?: number },
 ): Promise<void> {
-  const parsed = parseInput(boardPatchSchema, patch);
+  const parsed = parseInput(collectionPatchSchema, patch);
   const row: Record<string, unknown> = {};
   if (parsed.name != null) row.name = parsed.name;
   if (parsed.color != null) row.color = parsed.color;
   if (parsed.lineStyle != null) row.line_style = parsed.lineStyle;
   if (parsed.sortOrder != null) row.sort_order = parsed.sortOrder;
   if (Object.keys(row).length === 0) return;
-  const { error } = await sb.from("boards").update(row).eq("id", id);
+  const { error } = await sb.from("collections").update(row).eq("id", id);
   if (error) throw error;
 }
 
 /**
- * Convert a board between Personal and Shared by setting its owner: `null` makes
- * it Shared (both members see + edit it), a member id makes it Personal. Mirrors
- * `setCategoryOwner`; `boards_write` only permits `owner_id` null or self, so a
- * member can only re-own a board they can already edit.
+ * Convert a collection between Personal and Shared by setting its owner: `null`
+ * makes it Shared (both members see + edit it), a member id makes it Personal.
+ * Mirrors `setCategoryOwner`; `collections_write` only permits `owner_id` null or
+ * self, so a member can only re-own a collection they can already edit.
  */
-export async function setBoardOwner(
+export async function setCollectionOwner(
   sb: SupabaseClient,
   id: string,
   ownerId: string | null,
 ): Promise<void> {
-  const { error } = await sb.from("boards").update({ owner_id: ownerId }).eq("id", id);
+  const { error } = await sb.from("collections").update({ owner_id: ownerId }).eq("id", id);
   if (error) throw error;
 }
 
 /**
- * Delete a board, but only when it holds no tasks (block-if-non-empty). Throws
- * `BoardNotEmptyError` otherwise. Returns the deleted row so the delete can be
- * undone by `restoreBoard`.
+ * Delete a collection, but only when it holds no tasks (block-if-non-empty).
+ * Throws `CollectionNotEmptyError` otherwise. Returns the deleted row so the
+ * delete can be undone by `restoreCollection`.
  */
-export async function deleteBoard(
+export async function deleteCollection(
   sb: SupabaseClient,
   id: string,
 ): Promise<Record<string, unknown>> {
   const { count, error: cntErr } = await sb
     .from("tasks")
     .select("id", { count: "exact", head: true })
-    .eq("board_id", id);
+    .eq("collection_id", id);
   if (cntErr) throw cntErr;
-  if (count && count > 0) throw new BoardNotEmptyError(count);
+  if (count && count > 0) throw new CollectionNotEmptyError(count);
 
-  const { data: board, error: selErr } = await sb
-    .from("boards")
+  const { data: collection, error: selErr } = await sb
+    .from("collections")
     .select("*")
     .eq("id", id)
     .single();
   if (selErr) throw selErr;
 
-  const { error } = await sb.from("boards").delete().eq("id", id);
+  const { error } = await sb.from("collections").delete().eq("id", id);
   if (error) throw error;
-  return board as Record<string, unknown>;
+  return collection as Record<string, unknown>;
 }
 
-/** Re-insert a deleted board (undo). */
-export async function restoreBoard(
+/** Re-insert a deleted collection (undo). */
+export async function restoreCollection(
   sb: SupabaseClient,
-  board: Record<string, unknown>,
+  collection: Record<string, unknown>,
 ): Promise<void> {
-  const { error } = await sb.from("boards").insert(board);
+  const { error } = await sb.from("collections").insert(collection);
   if (error) throw error;
 }
 

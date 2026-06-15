@@ -21,7 +21,7 @@ import { combineDateTime } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TasksToolbar, type TasksView } from "./tasks-toolbar";
 import { TaskBoard } from "./task-board";
-import { BoardBreadcrumb } from "./board-breadcrumb";
+import { CollectionBreadcrumb } from "./collection-breadcrumb";
 import { TaskList } from "./task-list";
 import { LoadError } from "@/components/shared/load-error";
 import {
@@ -62,17 +62,19 @@ const OVERLAY_PRELOADS = [loadTaskDialog, loadScheduleTaskDialog, loadTaskFlows]
 export function TasksShell({
   initialView,
   viewFromUrl,
-  initialBoardId,
+  initialCollectionId,
 }: {
   initialView: TasksView;
   viewFromUrl: boolean;
-  initialBoardId: string | null;
+  initialCollectionId: string | null;
 }) {
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
   const router = useRouter();
   const [view, setView] = useState<TasksView>(initialView);
-  const [activeBoardId, setActiveBoardId] = useState<string | null>(initialBoardId);
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(
+    initialCollectionId,
+  );
   // One-shot signal telling the Flows view to expand a lane after a subtask was
   // added to it from that view's context menu. The bumping `key` lets Flows act
   // on each add even when the same parent is targeted twice.
@@ -111,35 +113,44 @@ export function TasksShell({
 
   const members = workspace.data?.members ?? [];
   const categories = workspace.data?.categories ?? [];
-  const boards = useMemo(() => workspace.data?.boards ?? [], [workspace.data?.boards]);
+  const collections = useMemo(
+    () => workspace.data?.collections ?? [],
+    [workspace.data?.collections],
+  );
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const colorOf = (t: TaskRow) => resolveTaskColor(t, catMap, memberMap);
 
-  // The active board: the URL/selected one if it still exists, else the first.
-  // Deriving (rather than syncing into state) means a deleted/stale selection
-  // transparently falls back to the first board — every consumer reads
-  // `activeBoard?.id`, so creation and filtering stay correct without an effect.
-  const activeBoard =
-    boards.find((b) => b.id === activeBoardId) ?? boards[0] ?? null;
+  // The active collection: the URL/selected one if it still exists, else the
+  // first. Deriving (rather than syncing into state) means a deleted/stale
+  // selection transparently falls back to the first collection — every consumer
+  // reads `activeCollection?.id`, so creation and filtering stay correct without
+  // an effect.
+  const activeCollection =
+    collections.find((c) => c.id === activeCollectionId) ?? collections[0] ?? null;
 
-  // Only this board's tasks (subtasks inherit their parent's board).
-  const boardTasks = useMemo(
-    () => (activeBoard ? tasks.filter((t) => t.boardId === activeBoard.id) : []),
-    [tasks, activeBoard],
+  // Only this collection's tasks (subtasks inherit their parent's collection).
+  const collectionTasks = useMemo(
+    () =>
+      activeCollection
+        ? tasks.filter((t) => t.collectionId === activeCollection.id)
+        : [],
+    [tasks, activeCollection],
   );
 
-  // Tasks (incl. subtasks) per board, from the full set — for the switcher's
-  // delete guard. Computed once here so the switcher needn't re-subscribe.
-  const taskCountByBoard = useMemo(() => {
+  // Tasks (incl. subtasks) per collection, from the full set — for the
+  // switcher's delete guard. Computed once here so the switcher needn't
+  // re-subscribe.
+  const taskCountByCollection = useMemo(() => {
     const counts = new Map<string, number>();
     for (const t of tasks) {
-      if (t.boardId) counts.set(t.boardId, (counts.get(t.boardId) ?? 0) + 1);
+      if (t.collectionId)
+        counts.set(t.collectionId, (counts.get(t.collectionId) ?? 0) + 1);
     }
     return counts;
   }, [tasks]);
 
-  const childrenByParent = useMemo(() => groupByParent(boardTasks), [boardTasks]);
+  const childrenByParent = useMemo(() => groupByParent(collectionTasks), [collectionTasks]);
   const topLevel = childrenByParent.get(null) ?? [];
 
   // Status events grouped by task id, for the Flows view's per-lane timelines.
@@ -178,28 +189,28 @@ export function TasksShell({
   };
 
   // The parent a create-as-subtask was launched from (Flows "Add subtask").
-  // Resolved from the live task set so the dialog can inherit its board,
+  // Resolved from the live task set so the dialog can inherit its collection,
   // privacy, and context, and file the new row under it.
   const creatingParent =
     editorState?.mode === "create" && editorState.parentId
       ? tasks.find((t) => t.id === editorState.parentId) ?? null
       : null;
 
-  function syncUrl(v: TasksView, boardId: string | null) {
+  function syncUrl(v: TasksView, collectionId: string | null) {
     const params = new URLSearchParams();
     params.set("view", v);
-    if (boardId) params.set("board", boardId);
+    if (collectionId) params.set("collection", collectionId);
     router.replace(`/tasks?${params.toString()}`, { scroll: false });
   }
 
   function changeView(v: TasksView) {
     setView(v);
-    syncUrl(v, activeBoard?.id ?? null);
+    syncUrl(v, activeCollection?.id ?? null);
   }
 
-  function changeBoard(boardId: string) {
-    setActiveBoardId(boardId);
-    syncUrl(view, boardId);
+  function changeCollection(collectionId: string) {
+    setActiveCollectionId(collectionId);
+    syncUrl(view, collectionId);
   }
 
   const loading = workspace.isLoading || isLoading;
@@ -222,10 +233,10 @@ export function TasksShell({
         onViewChange={changeView}
         onNewTask={() => dialogs.openCreate()}
         currentMember={workspace.data?.currentMember ?? null}
-        activeBoardId={activeBoard?.id ?? null}
-        onBoardChange={changeBoard}
-        taskCountByBoard={taskCountByBoard}
-        boardCount={boards.length}
+        activeCollectionId={activeCollection?.id ?? null}
+        onCollectionChange={changeCollection}
+        taskCountByCollection={taskCountByCollection}
+        collectionCount={collections.length}
       />
 
       <main className="min-h-0 flex-1 overflow-hidden">
@@ -237,19 +248,19 @@ export function TasksShell({
           <Centered>
             <Spinner className="size-5" />
           </Centered>
-        ) : !activeBoard ? (
-          <Centered>{t("board.noBoardsYet")}</Centered>
+        ) : !activeCollection ? (
+          <Centered>{t("collection.noCollectionsYet")}</Centered>
         ) : (
-          // The breadcrumb is the board control across every view, so it lives
-          // above the crossfade and stays put while the board/list/flows
+          // The breadcrumb is the collection control across every view, so it
+          // lives above the crossfade and stays put while the board/list/flows
           // representations swap below it.
           <div className="flex h-full flex-col">
             {workspace.data?.currentMember && (
-              <BoardBreadcrumb
-                boards={boards}
-                activeBoardId={activeBoard.id}
-                onActiveBoardChange={changeBoard}
-                taskCountByBoard={taskCountByBoard}
+              <CollectionBreadcrumb
+                collections={collections}
+                activeCollectionId={activeCollection.id}
+                onActiveCollectionChange={changeCollection}
+                taskCountByCollection={taskCountByCollection}
                 workspaceId={workspace.data.workspaceId}
                 currentMemberId={workspace.data.currentMember.id}
               />
@@ -274,7 +285,7 @@ export function TasksShell({
                       childrenByParent={childrenByParent}
                       eventsByTask={eventsByTask}
                       colorOf={colorOf}
-                      lineStyle={activeBoard?.lineStyle ?? "solid"}
+                      lineStyle={activeCollection?.lineStyle ?? "solid"}
                       members={memberMap}
                       currentMemberId={workspace.data?.currentMember?.id ?? null}
                       actions={actions}
@@ -316,7 +327,7 @@ export function TasksShell({
             mode={dialogs.editor.mode}
             workspaceId={workspace.data.workspaceId}
             currentMemberId={workspace.data.currentMember.id}
-            boardId={activeBoard?.id ?? null}
+            collectionId={activeCollection?.id ?? null}
             members={members}
             categories={categories}
             task={editingTask}

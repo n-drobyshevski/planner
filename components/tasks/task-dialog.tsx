@@ -64,8 +64,8 @@ export interface TaskDialogProps {
   mode: "create" | "edit";
   workspaceId: string;
   currentMemberId: string;
-  /** Board the new task is filed under (create mode). */
-  boardId?: string | null;
+  /** Collection the new task is filed under (create mode). */
+  collectionId?: string | null;
   members: Member[];
   categories: Category[];
   task?: TaskRow | null;
@@ -138,7 +138,7 @@ export function TaskDialog(props: TaskDialogProps) {
         // A subtask stays under its parent's owner (matching the inline
         // SubtaskEditor) so the subtree's ownership/privacy stays coherent.
         ownerId: props.createParent?.ownerId ?? currentMemberId,
-        boardId: props.createParent?.boardId ?? props.boardId ?? null,
+        collectionId: props.createParent?.collectionId ?? props.collectionId ?? null,
         parentId: props.createParent?.id ?? null,
         position: Date.now(), // new tasks sort to the bottom of their column
         ...payload,

@@ -27,17 +27,20 @@ import {
   wavePath,
   type FlowLineStyle,
 } from "@/lib/tasks/flow-line-styles";
-import { useBoardMutations } from "@/lib/hooks/use-board-mutations";
-import { boardFormSchema, type BoardFormValues } from "@/lib/tasks/schemas";
-import type { Board } from "@/lib/types";
+import { useCollectionMutations } from "@/lib/hooks/use-collection-mutations";
+import { collectionFormSchema, type CollectionFormValues } from "@/lib/tasks/schemas";
+import type { Collection } from "@/lib/types";
 
-function initialValues(mode: "create" | "edit", board?: Board | null): BoardFormValues {
-  if (mode === "edit" && board) {
+function initialValues(
+  mode: "create" | "edit",
+  collection?: Collection | null,
+): CollectionFormValues {
+  if (mode === "edit" && collection) {
     return {
-      name: board.name,
-      color: board.color,
-      lineStyle: board.lineStyle,
-      shared: board.ownerId === null,
+      name: collection.name,
+      color: collection.color,
+      lineStyle: collection.lineStyle,
+      shared: collection.ownerId === null,
     };
   }
   // Default to Shared: the common case for a two-person planner.
@@ -79,17 +82,17 @@ function LineStyleSample({ style, color }: { style: FlowLineStyle; color?: strin
 }
 
 /**
- * Create or edit a task board, presented as a centered dialog on desktop and a
+ * Create or edit a collection, presented as a centered dialog on desktop and a
  * bottom sheet on phones. Mirrors CreateContextDialog — same fields (name,
- * color, Shared/Personal) and look — so a board is managed just like a context.
- * In create mode it reports the new id via onCreated so the opener can switch to
- * it immediately.
+ * color, Shared/Personal) and look — so a collection is managed just like a
+ * context. In create mode it reports the new id via onCreated so the opener can
+ * switch to it immediately.
  */
-export function BoardDialog({
+export function CollectionDialog({
   open,
   onOpenChange,
   mode,
-  board,
+  collection,
   workspaceId,
   currentMemberId,
   onCreated,
@@ -97,48 +100,48 @@ export function BoardDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
-  /** The board being edited (edit mode only). */
-  board?: Board | null;
+  /** The collection being edited (edit mode only). */
+  collection?: Collection | null;
   workspaceId: string;
   currentMemberId: string;
-  /** Called with the new board id once it's created (create mode). */
-  onCreated?: (boardId: string) => void;
+  /** Called with the new collection id once it's created (create mode). */
+  onCreated?: (collectionId: string) => void;
 }) {
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
-  const mutations = useBoardMutations();
+  const mutations = useCollectionMutations();
 
   const form = useForm({
-    defaultValues: initialValues(mode, board),
-    validators: { onSubmit: boardFormSchema },
+    defaultValues: initialValues(mode, collection),
+    validators: { onSubmit: collectionFormSchema },
     onSubmit: async ({ value }) => {
       const name = value.name.trim();
 
       if (mode === "edit") {
-        if (!board) return;
+        if (!collection) return;
         // Edit: apply name/color and, if the share state changed, owner too. Both
         // mutations patch the cache optimistically, so close now and let them
         // reconcile in the background (failures surface via toast + undo).
-        const isShared = board.ownerId === null;
+        const isShared = collection.ownerId === null;
         onOpenChange(false);
         if (
-          name !== board.name ||
-          value.color !== board.color ||
-          value.lineStyle !== board.lineStyle
+          name !== collection.name ||
+          value.color !== collection.color ||
+          value.lineStyle !== collection.lineStyle
         ) {
-          void mutations.update(board.id, {
+          void mutations.update(collection.id, {
             name,
             color: value.color,
             lineStyle: value.lineStyle,
           });
         }
         if (value.shared !== isShared) {
-          void mutations.setShared(board.id, value.shared ? null : currentMemberId);
+          void mutations.setShared(collection.id, value.shared ? null : currentMemberId);
         }
         return;
       }
 
-      // create: await the new id so we can switch the board view to it.
+      // create: await the new id so we can switch the collection view to it.
       const id = await mutations.create({
         workspaceId,
         ownerId: value.shared ? null : currentMemberId,
@@ -154,22 +157,24 @@ export function BoardDialog({
     },
   });
 
-  // Reset to the board's values (edit) or a clean slate (create) on (re)open —
-  // the dialog stays mounted between opens.
+  // Reset to the collection's values (edit) or a clean slate (create) on (re)open
+  // — the dialog stays mounted between opens.
   React.useEffect(() => {
     if (!open) return;
-    form.reset(initialValues(mode, board));
-  }, [open, mode, board, form]);
+    form.reset(initialValues(mode, collection));
+  }, [open, mode, collection, form]);
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>
-            {mode === "create" ? t("boardDialog.createTitle") : t("boardDialog.editTitle")}
+            {mode === "create"
+              ? t("collectionDialog.createTitle")
+              : t("collectionDialog.editTitle")}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            {t("boardDialog.description")}
+            {t("collectionDialog.description")}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -185,9 +190,9 @@ export function BoardDialog({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
-                    placeholder={t("boardDialog.namePlaceholder")}
+                    placeholder={t("collectionDialog.namePlaceholder")}
                     onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
-                    aria-label={t("boardDialog.nameLabel")}
+                    aria-label={t("collectionDialog.nameLabel")}
                     aria-invalid={isInvalid || undefined}
                     autoFocus
                   />
@@ -204,7 +209,7 @@ export function BoardDialog({
                   <button
                     key={c}
                     type="button"
-                    aria-label={t("boardDialog.colorLabel", { color: c })}
+                    aria-label={t("collectionDialog.colorLabel", { color: c })}
                     aria-pressed={field.state.value === c}
                     onClick={() => field.handleChange(c)}
                     className={cn(
@@ -222,7 +227,7 @@ export function BoardDialog({
             {(field) => (
               <div className="flex flex-col gap-1.5">
                 <p className="text-xs text-muted-foreground">
-                  {t("boardDialog.lineStyleLabel")}
+                  {t("collectionDialog.lineStyleLabel")}
                 </p>
                 <form.Subscribe selector={(s) => s.values.color}>
                   {(color) => (
@@ -259,18 +264,22 @@ export function BoardDialog({
                     ) : (
                       <User className="size-4 text-muted-foreground" />
                     )}
-                    <span>{field.state.value ? t("boardDialog.shared") : t("boardDialog.personal")}</span>
+                    <span>
+                      {field.state.value
+                        ? t("collectionDialog.shared")
+                        : t("collectionDialog.personal")}
+                    </span>
                   </span>
                   <Switch
                     checked={field.state.value}
                     onCheckedChange={field.handleChange}
-                    aria-label={t("boardDialog.sharedToggleLabel")}
+                    aria-label={t("collectionDialog.sharedToggleLabel")}
                   />
                 </label>
                 <p className="text-xs text-muted-foreground">
                   {field.state.value
-                    ? t("boardDialog.sharedHint")
-                    : t("boardDialog.personalHint")}
+                    ? t("collectionDialog.sharedHint")
+                    : t("collectionDialog.personalHint")}
                 </p>
               </div>
             )}
@@ -297,7 +306,7 @@ export function BoardDialog({
                   {isSubmitting && (
                     <Spinner data-icon="inline-start" />
                   )}
-                  {mode === "create" ? t("boardDialog.addBoard") : tc("save")}
+                  {mode === "create" ? t("collectionDialog.addCollection") : tc("save")}
                 </Button>
               </>
             )}

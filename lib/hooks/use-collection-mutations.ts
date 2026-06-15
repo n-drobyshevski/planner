@@ -10,20 +10,21 @@ import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
 import {
   patchWorkspace,
-  patchBoardById,
-  removeBoardById,
+  patchCollectionById,
+  removeCollectionById,
 } from "@/lib/hooks/use-workspace-cache";
 
 /** A reversible action: a label for the toast + the inverse to run. */
 type UndoSpec = { label: string; undo: () => Promise<boolean> };
 
 /**
- * Board write operations wrapped with cache invalidation + toasts. Boards live
- * in the workspace bundle, so every change invalidates the workspace query;
- * realtime invalidates it too so the other member sees boards live. Successful
- * writes push an inverse onto the history store so Ctrl+Z can undo.
+ * Collection write operations wrapped with cache invalidation + toasts.
+ * Collections live in the workspace bundle, so every change invalidates the
+ * workspace query; realtime invalidates it too so the other member sees
+ * collections live. Successful writes push an inverse onto the history store so
+ * Ctrl+Z can undo.
  */
-export function useBoardMutations() {
+export function useCollectionMutations() {
   const qc = useQueryClient();
   const sb = createClient();
   const pushUndo = useHistoryStore((s) => s.push);
@@ -73,7 +74,7 @@ export function useBoardMutations() {
   }
 
   return {
-    /** Create a board; resolves to its new id, or null on failure. */
+    /** Create a collection; resolves to its new id, or null on failure. */
     create: async (input: {
       workspaceId: string;
       ownerId: string | null;
@@ -83,10 +84,10 @@ export function useBoardMutations() {
       sortOrder?: number;
     }): Promise<string | null> => {
       try {
-        const id = await m.createBoard(sb, input);
+        const id = await m.createCollection(sb, input);
         invalidate();
-        pushUndo(inverse("create", () => m.deleteBoard(sb, id)));
-        notify.success("Board created");
+        pushUndo(inverse("create", () => m.deleteCollection(sb, id)));
+        notify.success("Collection created");
         return id;
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Something went wrong");
@@ -98,22 +99,22 @@ export function useBoardMutations() {
       id: string,
       patch: { name?: string; color?: string; lineStyle?: FlowLineStyle; sortOrder?: number },
     ) =>
-      run(m.updateBoard(sb, id, patch), "Board updated", {
-        optimistic: () => patchWorkspace(qc, patchBoardById(id, patch)),
+      run(m.updateCollection(sb, id, patch), "Collection updated", {
+        optimistic: () => patchWorkspace(qc, patchCollectionById(id, patch)),
       }),
 
     setShared: (id: string, ownerId: string | null) =>
       run(
-        m.setBoardOwner(sb, id, ownerId),
-        ownerId === null ? "Board shared" : "Board made personal",
-        { optimistic: () => patchWorkspace(qc, patchBoardById(id, { ownerId })) },
+        m.setCollectionOwner(sb, id, ownerId),
+        ownerId === null ? "Collection shared" : "Collection made personal",
+        { optimistic: () => patchWorkspace(qc, patchCollectionById(id, { ownerId })) },
       ),
 
-    /** Delete a board (blocked if it still holds tasks). Returns success. */
+    /** Delete a collection (blocked if it still holds tasks). Returns success. */
     remove: (id: string) =>
-      run(m.deleteBoard(sb, id), "Board deleted", {
-        undo: (board) => inverse("delete", () => m.restoreBoard(sb, board)),
-        optimistic: () => patchWorkspace(qc, removeBoardById(id)),
+      run(m.deleteCollection(sb, id), "Collection deleted", {
+        undo: (collection) => inverse("delete", () => m.restoreCollection(sb, collection)),
+        optimistic: () => patchWorkspace(qc, removeCollectionById(id)),
       }),
   };
 }

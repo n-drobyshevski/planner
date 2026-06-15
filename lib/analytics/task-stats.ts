@@ -40,9 +40,9 @@ export interface VelocityPoint {
   completed: number;
 }
 
-export interface BoardStats {
-  /** null = tasks outside any board */
-  boardId: string | null;
+export interface CollectionStats {
+  /** null = tasks outside any collection */
+  collectionId: string | null;
   createdCount: number;
   completedCount: number;
   dueCount: number;
@@ -141,30 +141,30 @@ export function taskVelocity(tasks: TaskRow[], buckets: Bucket[]): VelocityPoint
 }
 
 /**
- * Window stats per board (null = no board), for every board that has any
- * top-level task; most completed first, then most created.
+ * Window stats per collection (null = no collection), for every collection that
+ * has any top-level task; most completed first, then most created.
  */
-export function statsByBoard(
+export function statsByCollection(
   tasks: TaskRow[],
   window: TimeWindow,
   now: number,
   timeZone: string,
-): BoardStats[] {
+): CollectionStats[] {
   const top = topLevel(tasks);
   const todayKey = dateKeyInZone(now, timeZone);
-  const byBoard = new Map<string | null, BoardStats>();
+  const byCollection = new Map<string | null, CollectionStats>();
 
   for (const t of top) {
-    let row = byBoard.get(t.boardId);
+    let row = byCollection.get(t.collectionId);
     if (!row) {
       row = {
-        boardId: t.boardId,
+        collectionId: t.collectionId,
         createdCount: 0,
         completedCount: 0,
         dueCount: 0,
         overdueOpenCount: 0,
       };
-      byBoard.set(t.boardId, row);
+      byCollection.set(t.collectionId, row);
     }
     if (inWindow(t.createdAt, window)) row.createdCount += 1;
     if (inWindow(t.completedAt, window)) row.completedCount += 1;
@@ -174,7 +174,7 @@ export function statsByBoard(
     }
   }
 
-  return [...byBoard.values()].sort(
+  return [...byCollection.values()].sort(
     (a, b) =>
       b.completedCount - a.completedCount ||
       b.createdCount - a.createdCount ||

@@ -1,7 +1,7 @@
-// The selectable line styles for a board, carried into the Flows timeline as the
-// stroke pattern of that board's task trunks/branches. One source of truth shared
-// by the board dialog's preview picker and the Flows renderer (mirrors how
-// CONTEXT_PALETTE is shared by every color picker). Pure + deterministic.
+// The selectable line styles for a collection, carried into the Flows timeline as
+// the stroke pattern of that collection's task trunks/branches. One source of truth
+// shared by the collection dialog's preview picker and the Flows renderer (mirrors
+// how CONTEXT_PALETTE is shared by every color picker). Pure + deterministic.
 import { z } from "zod";
 
 export const FLOW_LINE_STYLES = [

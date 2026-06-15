@@ -49,7 +49,7 @@ export interface TaskFlowsProps {
   childrenByParent: Map<string | null, TaskRow[]>;
   eventsByTask: Map<string, TaskStatusEvent[]>;
   colorOf: (t: TaskRow) => string;
-  /** the active board's Flows line style, applied to every trunk/branch stroke */
+  /** the active collection's Flows line style, applied to every trunk/branch stroke */
   lineStyle?: FlowLineStyle;
   members: Map<string, Member>;
   currentMemberId: string | null;

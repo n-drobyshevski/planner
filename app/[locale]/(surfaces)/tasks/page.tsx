@@ -11,7 +11,7 @@ import type { TasksView } from "@/components/tasks/tasks-toolbar";
 export default function TasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; board?: string }>;
+  searchParams: Promise<{ view?: string; collection?: string }>;
 }) {
   return (
     <Suspense fallback={<TasksSkeleton />}>
@@ -23,11 +23,11 @@ export default function TasksPage({
 async function TasksRoute({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; board?: string }>;
+  searchParams: Promise<{ view?: string; collection?: string }>;
 }) {
   const sp = await searchParams;
   // Params are normalized OUT here, in the dynamic scope; the plain results
-  // become the cache key below (one entry per view/board combination).
+  // become the cache key below (one entry per view/collection combination).
   const initialView: TasksView =
     sp.view === "list" ? "list" : sp.view === "flows" ? "flows" : "board";
   const viewFromUrl =
@@ -36,25 +36,25 @@ async function TasksRoute({
     <CachedTasks
       view={initialView}
       viewFromUrl={viewFromUrl}
-      boardId={sp.board ?? null}
+      collectionId={sp.collection ?? null}
     />
   );
 }
 
 /**
- * The RSC payload for a given (view, board) is pure code-derived UI — all data
- * is client-fetched — so it's cached: repeat visits skip the server render,
- * and within the profile's client `stale` window the router serves surface
- * back-navigation from browser memory with no roundtrip at all.
+ * The RSC payload for a given (view, collection) is pure code-derived UI — all
+ * data is client-fetched — so it's cached: repeat visits skip the server
+ * render, and within the profile's client `stale` window the router serves
+ * surface back-navigation from browser memory with no roundtrip at all.
  */
 async function CachedTasks({
   view,
   viewFromUrl,
-  boardId,
+  collectionId,
 }: {
   view: TasksView;
   viewFromUrl: boolean;
-  boardId: string | null;
+  collectionId: string | null;
 }) {
   "use cache";
   cacheLife("hours");
@@ -62,7 +62,7 @@ async function CachedTasks({
     <TasksShell
       initialView={view}
       viewFromUrl={viewFromUrl}
-      initialBoardId={boardId}
+      initialCollectionId={collectionId}
     />
   );
 }

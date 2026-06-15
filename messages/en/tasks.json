@@ -59,29 +59,31 @@
     "addTaskTo": "Add task to {title}",
     "dropTasksHere": "Drop tasks here",
     "emptyTitle": "No tasks yet",
-    "emptyDescription": "Create your first task to get started.",
-    "noBoardsYet": "You don’t have any boards yet. Use the “New board” button up top to create your first one."
+    "emptyDescription": "Create your first task to get started."
+  },
+  "collection": {
+    "noCollectionsYet": "You don’t have any collections yet. Use the “New collection” button up top to create your first one."
   },
   "list": {
     "nothingHere": "Nothing here."
   },
   "loadErrorSubject": "tasks",
   "switcher": {
-    "boards": "Boards",
-    "newBoard": "New board",
+    "collections": "Collections",
+    "newCollection": "New collection",
     "edit": "Edit “{name}”",
     "delete": "Delete “{name}”",
     "deleteTitle": "Delete “{name}”?",
-    "notEmptyTitle": "Board isn’t empty",
-    "notEmptyDescription": "This board still has {count, plural, one {# task} other {# tasks}}. Move or delete {count, plural, one {it} other {them}} first, then you can remove the board.",
-    "deleteDescription": "This removes the board. Its tasks are already gone. You can undo this right after.",
+    "notEmptyTitle": "Collection isn’t empty",
+    "notEmptyDescription": "This collection still has {count, plural, one {# task} other {# tasks}}. Move or delete {count, plural, one {it} other {them}} first, then you can remove the collection.",
+    "deleteDescription": "This removes the collection. Its tasks are already gone. You can undo this right after.",
     "makeShared": "Make shared",
     "makePersonal": "Make personal"
   },
   "breadcrumb": {
-    "label": "Board",
+    "label": "Collection",
     "root": "Tasks",
-    "manageBoard": "Manage “{name}”"
+    "manageCollection": "Manage “{name}”"
   },
   "flowLineStyle": {
     "solid": "Solid",
@@ -92,20 +94,20 @@
     "faded": "Faded",
     "wavy": "Wavy"
   },
-  "boardDialog": {
-    "createTitle": "New board",
-    "editTitle": "Edit board",
-    "description": "A board is a collection of tasks. Keep it to yourself or share it.",
-    "namePlaceholder": "Board name",
-    "nameLabel": "Board name",
+  "collectionDialog": {
+    "createTitle": "New collection",
+    "editTitle": "Edit collection",
+    "description": "A collection groups related tasks. Keep it to yourself or share it.",
+    "namePlaceholder": "Collection name",
+    "nameLabel": "Collection name",
     "colorLabel": "Color {color}",
     "lineStyleLabel": "Line style",
     "shared": "Shared",
     "personal": "Personal",
-    "sharedToggleLabel": "Shared board — you both see and edit it",
+    "sharedToggleLabel": "Shared collection — you both see and edit it",
     "sharedHint": "You both see it and can edit its tasks.",
-    "personalHint": "Only you can see this board and its tasks.",
-    "addBoard": "Add board"
+    "personalHint": "Only you can see this collection and its tasks.",
+    "addCollection": "Add collection"
   },
   "taskDialog": {
     "createTitle": "New task",
