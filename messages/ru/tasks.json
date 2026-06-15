@@ -74,7 +74,14 @@
     "deleteTitle": "Удалить «{name}»?",
     "notEmptyTitle": "Доска не пуста",
     "notEmptyDescription": "На этой доске ещё {count, plural, one {# задача} few {# задачи} many {# задач} other {# задачи}}. Сначала перемести или удали {count, plural, one {её} other {их}}, потом сможешь убрать доску.",
-    "deleteDescription": "Это удалит доску. Её задачи уже удалены. Сразу после этого действие можно отменить."
+    "deleteDescription": "Это удалит доску. Её задачи уже удалены. Сразу после этого действие можно отменить.",
+    "makeShared": "Сделать общей",
+    "makePersonal": "Сделать личной"
+  },
+  "breadcrumb": {
+    "label": "Доска",
+    "root": "Задачи",
+    "manageBoard": "Управление «{name}»"
   },
   "flowLineStyle": {
     "solid": "Сплошная",

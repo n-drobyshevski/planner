@@ -21,6 +21,7 @@ import { combineDateTime } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TasksToolbar, type TasksView } from "./tasks-toolbar";
 import { TaskBoard } from "./task-board";
+import { BoardBreadcrumb } from "./board-breadcrumb";
 import { TaskList } from "./task-list";
 import { LoadError } from "@/components/shared/load-error";
 import {
@@ -224,6 +225,7 @@ export function TasksShell({
         activeBoardId={activeBoard?.id ?? null}
         onBoardChange={changeBoard}
         taskCountByBoard={taskCountByBoard}
+        boardCount={boards.length}
       />
 
       <main className="min-h-0 flex-1 overflow-hidden">
@@ -238,51 +240,68 @@ export function TasksShell({
         ) : !activeBoard ? (
           <Centered>{t("board.noBoardsYet")}</Centered>
         ) : (
-          // Crossfade the board/list swap instead of an instant cut. `initial=
-          // {false}` paints the first view at once; only the manual switch
-          // animates. The swap is a deliberate user action, so the brief
-          // mode="wait" exit→enter never interrupts work.
-          <AnimatePresence mode="wait" initial={false}>
-            <m.div
-              key={view}
-              variants={fade}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="h-full"
-            >
-              {view === "flows" && !isMobile ? (
-                <TaskFlows
-                  tasks={topLevel}
-                  childrenByParent={childrenByParent}
-                  eventsByTask={eventsByTask}
-                  colorOf={colorOf}
-                  lineStyle={activeBoard?.lineStyle ?? "solid"}
-                  members={memberMap}
-                  currentMemberId={workspace.data?.currentMember?.id ?? null}
-                  actions={actions}
-                  expandLane={expandLane}
-                  loading={eventsLoading}
-                />
-              ) : view === "board" ? (
-                <TaskBoard
-                  tasks={topLevel}
-                  colorOf={colorOf}
-                  members={memberMap}
-                  progressOf={progressFor}
-                  actions={actions}
-                />
-              ) : (
-                <TaskList
-                  tasks={topLevel}
-                  colorOf={colorOf}
-                  members={memberMap}
-                  progressOf={progressFor}
-                  actions={actions}
-                />
-              )}
-            </m.div>
-          </AnimatePresence>
+          // The breadcrumb is the board control across every view, so it lives
+          // above the crossfade and stays put while the board/list/flows
+          // representations swap below it.
+          <div className="flex h-full flex-col">
+            {workspace.data?.currentMember && (
+              <BoardBreadcrumb
+                boards={boards}
+                activeBoardId={activeBoard.id}
+                onActiveBoardChange={changeBoard}
+                taskCountByBoard={taskCountByBoard}
+                workspaceId={workspace.data.workspaceId}
+                currentMemberId={workspace.data.currentMember.id}
+              />
+            )}
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {/* Crossfade the board/list swap instead of an instant cut.
+                  `initial={false}` paints the first view at once; only the
+                  manual switch animates. The swap is a deliberate user action,
+                  so the brief mode="wait" exit→enter never interrupts work. */}
+              <AnimatePresence mode="wait" initial={false}>
+                <m.div
+                  key={view}
+                  variants={fade}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="h-full"
+                >
+                  {view === "flows" && !isMobile ? (
+                    <TaskFlows
+                      tasks={topLevel}
+                      childrenByParent={childrenByParent}
+                      eventsByTask={eventsByTask}
+                      colorOf={colorOf}
+                      lineStyle={activeBoard?.lineStyle ?? "solid"}
+                      members={memberMap}
+                      currentMemberId={workspace.data?.currentMember?.id ?? null}
+                      actions={actions}
+                      expandLane={expandLane}
+                      loading={eventsLoading}
+                    />
+                  ) : view === "board" ? (
+                    <TaskBoard
+                      tasks={topLevel}
+                      colorOf={colorOf}
+                      members={memberMap}
+                      progressOf={progressFor}
+                      actions={actions}
+                    />
+                  ) : (
+                    <TaskList
+                      tasks={topLevel}
+                      colorOf={colorOf}
+                      members={memberMap}
+                      progressOf={progressFor}
+                      actions={actions}
+                    />
+                  )}
+                </m.div>
+              </AnimatePresence>
+            </div>
+          </div>
         )}
       </main>
 

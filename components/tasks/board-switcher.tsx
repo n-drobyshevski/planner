@@ -31,54 +31,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { toPaletteColor } from "@/lib/theme/appearance";
-import { lineStyleStroke, wavePath } from "@/lib/tasks/flow-line-styles";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useBoardMutations } from "@/lib/hooks/use-board-mutations";
 import { BoardDialog } from "./board-dialog";
+import { Dot, BoardLine } from "./board-glyphs";
 import type { Board } from "@/lib/types";
-
-/** A small filled circle in a board's color. */
-function Dot({ color }: { color: string }) {
-  return (
-    <span
-      className="size-2.5 shrink-0 rounded-full"
-      style={{ backgroundColor: toPaletteColor(color) }}
-    />
-  );
-}
-
-/** A short stroke in a board's color + Flows line style — its line "personality". */
-function BoardLine({ board }: { board: Board }) {
-  const { dasharray, opacityScale, wavy } = lineStyleStroke(board.lineStyle);
-  const color = toPaletteColor(board.color);
-  return (
-    <svg width={18} height={10} viewBox="0 0 18 10" aria-hidden className="shrink-0">
-      {wavy ? (
-        <path
-          d={wavePath(2, 16, 5)}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          strokeOpacity={opacityScale}
-          strokeLinecap="round"
-        />
-      ) : (
-        <line
-          x1={2}
-          y1={5}
-          x2={16}
-          y2={5}
-          stroke={color}
-          strokeWidth={2}
-          strokeOpacity={opacityScale}
-          strokeDasharray={dasharray}
-          strokeLinecap="round"
-        />
-      )}
-    </svg>
-  );
-}
 
 /**
  * The board picker that sits at the left of the Tasks toolbar: shows the active
@@ -196,6 +153,25 @@ export function BoardSwitcher({
                 <Pencil data-icon="inline-start" />
                 {t("switcher.edit", { name: active.name })}
               </DropdownMenuItem>
+              {currentMember && (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void mutations.setShared(
+                      active.id,
+                      active.ownerId === null ? currentMember.id : null,
+                    )
+                  }
+                >
+                  {active.ownerId === null ? (
+                    <User data-icon="inline-start" />
+                  ) : (
+                    <Users data-icon="inline-start" />
+                  )}
+                  {active.ownerId === null
+                    ? t("switcher.makePersonal")
+                    : t("switcher.makeShared")}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 variant="destructive"
                 onSelect={() => setDeleting(active)}

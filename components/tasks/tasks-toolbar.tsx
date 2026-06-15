@@ -35,6 +35,7 @@ export function TasksToolbar({
   activeBoardId,
   onBoardChange,
   taskCountByBoard,
+  boardCount,
 }: {
   view: TasksView;
   onViewChange: (v: TasksView) => void;
@@ -43,16 +44,25 @@ export function TasksToolbar({
   activeBoardId: string | null;
   onBoardChange: (boardId: string) => void;
   taskCountByBoard: Map<string, number>;
+  /** Number of boards — drives whether the switcher shows in Board view. */
+  boardCount: number;
 }) {
   const t = useTranslations("tasks");
+  // The in-view breadcrumb owns board switching/managing in every view, so the
+  // toolbar switcher would be a redundant second board control — hide it. The
+  // lone exception is the no-boards empty state, where the switcher is the only
+  // "New board" entry point (the breadcrumb needs an active board to render).
+  const showSwitcher = boardCount === 0;
   return (
     <>
       <ToolbarSlot name="center">
-        <BoardSwitcher
-          activeBoardId={activeBoardId}
-          onActiveBoardChange={onBoardChange}
-          taskCountByBoard={taskCountByBoard}
-        />
+        {showSwitcher && (
+          <BoardSwitcher
+            activeBoardId={activeBoardId}
+            onActiveBoardChange={onBoardChange}
+            taskCountByBoard={taskCountByBoard}
+          />
+        )}
       </ToolbarSlot>
       <ToolbarSlot name="trailing">
         <ToggleGroup

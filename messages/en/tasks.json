@@ -74,7 +74,14 @@
     "deleteTitle": "Delete “{name}”?",
     "notEmptyTitle": "Board isn’t empty",
     "notEmptyDescription": "This board still has {count, plural, one {# task} other {# tasks}}. Move or delete {count, plural, one {it} other {them}} first, then you can remove the board.",
-    "deleteDescription": "This removes the board. Its tasks are already gone. You can undo this right after."
+    "deleteDescription": "This removes the board. Its tasks are already gone. You can undo this right after.",
+    "makeShared": "Make shared",
+    "makePersonal": "Make personal"
+  },
+  "breadcrumb": {
+    "label": "Board",
+    "root": "Tasks",
+    "manageBoard": "Manage “{name}”"
   },
   "flowLineStyle": {
     "solid": "Solid",

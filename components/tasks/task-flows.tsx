@@ -38,6 +38,10 @@ const G = FLOW_GEOM;
 const ZOOM = { month: 9, week: 26, day: 80 } as const;
 const ZOOM_MIN = 6;
 const ZOOM_MAX = 160;
+// Horizontal gap (px) within which a date-tick label is hidden so it never
+// collides with the "Now" pill on the ruler. Covers the widest now label
+// (the dot + a locale word like "Сейчас") plus a comfortable margin.
+const NOW_LABEL_GUARD_PX = 48;
 type Density = keyof typeof ZOOM;
 
 export interface TaskFlowsProps {
@@ -123,6 +127,9 @@ export function TaskFlows({
     [lanes, expanded],
   );
   const trackWidth = Math.ceil(((t1 - t0) / DAY_MS) * pxPerDay);
+  // x of the now-line, pinned to the right edge once now passes the window.
+  // Shared by the ruler's "Now" pill and the tick-label collision guard.
+  const nowX = xForTime(Math.min(nowMs, t1), t0, pxPerDay);
   // Fill the canvas so the gutter + track don't stop at the last lane; grow
   // past it (and scroll) when there are more lanes than fit. canvasH already
   // excludes the frozen header row.
@@ -175,7 +182,6 @@ export function TaskFlows({
   function scrollToNow() {
     const c = canvasRef.current;
     if (!c) return;
-    const nowX = xForTime(Math.min(nowMs, t1), t0, pxPerDay);
     c.scrollLeft = Math.max(0, nowX - c.clientWidth / 2);
     syncScroll();
   }
@@ -306,6 +312,10 @@ export function TaskFlows({
               // its gridline is clipped, and its label would bleed under the
               // corner, so skip it.
               if (x < 0) return null;
+              // The "Now" pill is the accent horizon and takes the row; a tick
+              // label landing under it would collide ("19·Now"), so the tick
+              // yields its label here. Its gridline still draws on the canvas.
+              if (Math.abs(x - nowX) < NOW_LABEL_GUARD_PX) return null;
               return (
                 <div
                   key={i}
@@ -317,19 +327,15 @@ export function TaskFlows({
               );
             })}
             {/* "Now" marker — the horizon between past and ahead, in the accent */}
-            {(() => {
-              const nx = xForTime(Math.min(nowMs, t1), t0, pxPerDay);
-              if (nx < 0) return null;
-              return (
-                <div
-                  className="absolute top-0 flex h-full items-center gap-1 pl-1.5 text-[11px] font-medium tabular-nums text-primary"
-                  style={{ left: nx }}
-                >
-                  <span className="size-1.5 rounded-full bg-primary" aria-hidden />
-                  {t("flows.now")}
-                </div>
-              );
-            })()}
+            {nowX >= 0 && (
+              <div
+                className="absolute top-0 flex h-full items-center gap-1 pl-1.5 text-[11px] font-medium tabular-nums text-primary"
+                style={{ left: nowX }}
+              >
+                <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+                {t("flows.now")}
+              </div>
+            )}
           </div>
         </div>
       </div>
