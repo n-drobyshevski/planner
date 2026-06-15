@@ -25,7 +25,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     description: null,
     isPrivate: false,
     color: null,
-    status: "todo",
+    boardId: null,
     priority: null,
     dueDate: null,
     startDate: null,
@@ -45,8 +45,9 @@ function ev(over: Partial<TaskStatusEvent>): TaskStatusEvent {
     id: "e",
     taskId: "t",
     workspaceId: "w",
-    fromStatus: null,
-    toStatus: "todo",
+    fromBoardId: null,
+    toBoardId: "b-todo",
+    toIsDone: false,
     changedBy: "me",
     changedAt: T0,
     ...over,
@@ -57,14 +58,14 @@ const noChildren = new Map<string | null, TaskRow[]>();
 
 describe("buildFlowLanes", () => {
   it("derives created/started/done nodes and a closed span for a done task", () => {
-    const tk = task({ id: "a", status: "done", completedAt: T0 + 5 * DAY_MS });
+    const tk = task({ id: "a", completedAt: T0 + 5 * DAY_MS });
     const events = new Map<string, TaskStatusEvent[]>([
       [
         "a",
         [
-          ev({ taskId: "a", fromStatus: null, toStatus: "todo", changedAt: T0 }),
-          ev({ taskId: "a", fromStatus: "todo", toStatus: "in_progress", changedAt: T0 + 2 * DAY_MS }),
-          ev({ taskId: "a", fromStatus: "in_progress", toStatus: "done", changedAt: T0 + 5 * DAY_MS }),
+          ev({ taskId: "a", changedAt: T0 }),
+          ev({ taskId: "a", fromBoardId: "b-todo", toBoardId: "b-prog", changedAt: T0 + 2 * DAY_MS }),
+          ev({ taskId: "a", fromBoardId: "b-prog", toBoardId: "b-done", toIsDone: true, changedAt: T0 + 5 * DAY_MS }),
         ],
       ],
     ]);
@@ -75,13 +76,13 @@ describe("buildFlowLanes", () => {
   });
 
   it("classifies a backfilled completion (from_status null, to done) as done, not created", () => {
-    const tk = task({ id: "b", status: "done", completedAt: T0 + 3 * DAY_MS });
+    const tk = task({ id: "b", completedAt: T0 + 3 * DAY_MS });
     const events = new Map<string, TaskStatusEvent[]>([
       [
         "b",
         [
-          ev({ taskId: "b", fromStatus: null, toStatus: "todo", changedAt: T0 }),
-          ev({ taskId: "b", fromStatus: null, toStatus: "done", changedAt: T0 + 3 * DAY_MS }),
+          ev({ taskId: "b", changedAt: T0 }),
+          ev({ taskId: "b", toIsDone: true, changedAt: T0 + 3 * DAY_MS }),
         ],
       ],
     ]);
@@ -90,7 +91,7 @@ describe("buildFlowLanes", () => {
   });
 
   it("leaves an open task's endMs null and flags an overdue due marker", () => {
-    const tk = task({ id: "c", status: "todo", dueDate: "2026-06-05" }); // before now (11 Jun)
+    const tk = task({ id: "c", dueDate: "2026-06-05" }); // before now (11 Jun)
     const events = new Map<string, TaskStatusEvent[]>([
       ["c", [ev({ taskId: "c", changedAt: T0 })]],
     ]);
@@ -102,7 +103,7 @@ describe("buildFlowLanes", () => {
 
   it("anchors the trunk to an explicit start date, overriding the creation event", () => {
     // created day 0, but planned to start on day 4 — the left edge follows the plan
-    const tk = task({ id: "s", status: "todo", startDate: "2026-06-05", createdAt: T0 });
+    const tk = task({ id: "s", startDate: "2026-06-05", createdAt: T0 });
     const events = new Map<string, TaskStatusEvent[]>([
       ["s", [ev({ taskId: "s", changedAt: T0 })]],
     ]);
@@ -113,13 +114,13 @@ describe("buildFlowLanes", () => {
 
   it("never clips work that began before its planned start", () => {
     // planned day 4, but actually started day 2 — trunk begins at the earlier of the two
-    const tk = task({ id: "e", status: "in_progress", startDate: "2026-06-05", createdAt: T0 });
+    const tk = task({ id: "e", startDate: "2026-06-05", createdAt: T0 });
     const events = new Map<string, TaskStatusEvent[]>([
       [
         "e",
         [
           ev({ taskId: "e", changedAt: T0 }),
-          ev({ taskId: "e", fromStatus: "todo", toStatus: "in_progress", changedAt: T0 + 2 * DAY_MS }),
+          ev({ taskId: "e", fromBoardId: "b-todo", toBoardId: "b-prog", changedAt: T0 + 2 * DAY_MS }),
         ],
       ],
     ]);
@@ -128,7 +129,7 @@ describe("buildFlowLanes", () => {
   });
 
   it("carries the milestone flag onto the segment", () => {
-    const tk = task({ id: "m", status: "todo", isMilestone: true, startDate: "2026-06-20" });
+    const tk = task({ id: "m", isMilestone: true, startDate: "2026-06-20" });
     const events = new Map<string, TaskStatusEvent[]>([
       ["m", [ev({ taskId: "m", changedAt: T0 })]],
     ]);
@@ -138,13 +139,13 @@ describe("buildFlowLanes", () => {
   });
 
   it("attaches subtasks as branches and sorts open lanes before done", () => {
-    const open = task({ id: "open", status: "todo", createdAt: T0 + DAY_MS });
-    const done = task({ id: "done", status: "done", completedAt: T0 + 2 * DAY_MS, createdAt: T0 });
+    const open = task({ id: "open", createdAt: T0 + DAY_MS });
+    const done = task({ id: "done", completedAt: T0 + 2 * DAY_MS, createdAt: T0 });
     const child = task({ id: "kid", parentId: "open", createdAt: T0 + 2 * DAY_MS });
     const children = new Map<string | null, TaskRow[]>([["open", [child]]]);
     const events = new Map<string, TaskStatusEvent[]>([
       ["open", [ev({ taskId: "open", changedAt: T0 + DAY_MS })]],
-      ["done", [ev({ taskId: "done", changedAt: T0 }), ev({ taskId: "done", fromStatus: null, toStatus: "done", changedAt: T0 + 2 * DAY_MS })]],
+      ["done", [ev({ taskId: "done", changedAt: T0 }), ev({ taskId: "done", toIsDone: true, changedAt: T0 + 2 * DAY_MS })]],
       ["kid", [ev({ taskId: "kid", changedAt: T0 + 2 * DAY_MS })]],
     ]);
     const lanes = buildFlowLanes({ topLevel: [done, open], childrenByParent: children, eventsByTask: events, nowMs: now });
@@ -170,7 +171,7 @@ describe("flowsWindow + xForTime", () => {
   });
 
   it("extends the right edge to include a future planned start", () => {
-    const future = task({ id: "f", status: "todo", startDate: "2026-07-01", createdAt: T0 });
+    const future = task({ id: "f", startDate: "2026-07-01", createdAt: T0 });
     const events = new Map<string, TaskStatusEvent[]>([
       ["f", [ev({ taskId: "f", changedAt: T0 })]],
     ]);

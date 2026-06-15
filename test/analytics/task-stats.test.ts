@@ -25,7 +25,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     description: null,
     isPrivate: false,
     color: null,
-    status: "todo",
+    boardId: null,
     priority: null,
     dueDate: null,
     startDate: null,
@@ -41,7 +41,7 @@ function task(over: Partial<TaskRow>): TaskRow {
 }
 
 const done = (over: Partial<TaskRow>): TaskRow =>
-  task({ status: "done", completedAt: T0 + DAY, ...over });
+  task({ completedAt: T0 + DAY, ...over });
 
 describe("computeTaskStats", () => {
   it("counts created/completed/due inside the window, top-level only", () => {

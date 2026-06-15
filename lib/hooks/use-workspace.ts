@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchWorkspaceBundle } from "@/lib/supabase/queries";
 import { qk } from "@/lib/supabase/query-keys";
-import type { Member, Category, Collection } from "@/lib/types";
+import type { Member, Category, Collection, Board } from "@/lib/types";
 
 export interface WorkspaceData {
   workspaceId: string;
@@ -12,6 +12,7 @@ export interface WorkspaceData {
   members: Member[];
   categories: Category[];
   collections: Collection[];
+  boards: Board[];
   currentMember: Member | null;
 }
 
@@ -34,6 +35,7 @@ export function useWorkspace() {
         members: bundle.members,
         categories: bundle.categories,
         collections: bundle.collections,
+        boards: bundle.boards,
         currentMember,
       };
     },

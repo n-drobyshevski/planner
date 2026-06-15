@@ -174,7 +174,7 @@ function BacklogList({
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-2">
       {tasks.map((task) => {
         const assignee = task.assigneeId ? members.get(task.assigneeId) ?? null : null;
-        const done = task.status === "done";
+        const done = task.completedAt != null;
         return (
           <ItemContextMenu
             key={task.id}

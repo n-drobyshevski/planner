@@ -121,7 +121,7 @@ const baseTaskRow = {
   description: null,
   is_private: false,
   color: null,
-  status: "todo",
+  board_id: null,
   priority: null,
   due_date: null,
   position: 0,

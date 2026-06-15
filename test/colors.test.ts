@@ -78,7 +78,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     description: null,
     isPrivate: false,
     color: null,
-    status: "todo",
+    boardId: null,
     priority: null,
     dueDate: null,
     startDate: null,

@@ -5,7 +5,6 @@ import type { ItemAttributes } from "@/lib/attributes/schema";
 import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 
 export type OverrideType = "cancel" | "modify";
-export type TaskStatus = "todo" | "in_progress" | "done";
 /** An event's lifecycle state, driving how it renders on the calendar:
  *  'cancelled' (diagonal grayed stripes), 'planned' (dotted outline), or
  *  'confirmed' (plain fill, the default). */
@@ -134,9 +133,29 @@ export interface Collection {
   ownerId: string | null; // null = shared collection
   name: string;
   color: string; // hex
-  /** Flows trunk stroke pattern; see lib/tasks/flow-line-styles.ts */
-  lineStyle: FlowLineStyle;
   sortOrder: number;
+}
+
+/**
+ * A board — one column/state of a collection's kanban. A collection HAS MANY
+ * boards (its ordered columns); a task's lifecycle state is *which board it sits
+ * in* (`TaskRow.boardId`). Each board owns its Flows line style and a `isDone`
+ * flag marking the completion column (drives `completedAt`, overdue, and the
+ * Flows "done" markers). Visibility/editability is inherited from the collection.
+ */
+export interface Board {
+  id: string;
+  workspaceId: string;
+  collectionId: string;
+  name: string;
+  /** Flows trunk stroke pattern for tasks in this state; see lib/tasks/flow-line-styles.ts */
+  lineStyle: FlowLineStyle;
+  /** order within its collection's columns */
+  position: number;
+  /** true = the completion column; entering it sets the task's completedAt */
+  isDone: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface EventRow {
@@ -197,7 +216,8 @@ export interface TaskRow {
   isPrivate: boolean;
   /** per-item color override (hex); null = derive from category/owner */
   color: string | null;
-  status: TaskStatus;
+  /** which board (column/state) the task sits in; null = no collection/board */
+  boardId: string | null;
   /** 0..3 priority; null = none */
   priority: number | null;
   /** optional deadline as a zone-free calendar date ("yyyy-MM-dd"); overdue is judged in the viewer's zone */
@@ -206,11 +226,11 @@ export interface TaskRow {
   startDate: string | null;
   /** true = a point-in-time task; Flows renders it as a single moment marker, not a span */
   isMilestone: boolean;
-  /** order within its status column / among siblings */
+  /** order within its board column / among siblings */
   position: number;
   /** parent only: subtasks must be completed in order */
   sequential: boolean;
-  /** set when status -> done, epoch ms */
+  /** set when the task enters a done-board, epoch ms */
   completedAt: number | null;
   /** optimization attributes (energy/flexibility/...); jsonb bag, see lib/attributes/schema.ts */
   attributes: ItemAttributes;
@@ -219,17 +239,19 @@ export interface TaskRow {
 }
 
 /**
- * One recorded task status transition. Append-only history behind the Flows
- * view; written by a DB trigger, never by the client. `fromStatus` is null for
- * the creation event (and for backfilled completions, where the prior status
- * was never recorded).
+ * One recorded task board (state) transition. Append-only history behind the
+ * Flows view; written by a DB trigger, never by the client. `fromBoardId` is null
+ * for the creation event (and for events of null-collection tasks). `toIsDone` is
+ * denormalized from the destination board so Flows can classify a Done node
+ * without a board lookup (boards may be renamed/reordered later).
  */
 export interface TaskStatusEvent {
   id: string;
   taskId: string;
   workspaceId: string;
-  fromStatus: TaskStatus | null;
-  toStatus: TaskStatus;
+  fromBoardId: string | null;
+  toBoardId: string | null;
+  toIsDone: boolean;
   changedBy: string | null;
   changedAt: number;
 }

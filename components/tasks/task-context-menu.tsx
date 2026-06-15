@@ -28,7 +28,7 @@ export function TaskContextMenu({
 }) {
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
-  const done = task.status === "done";
+  const done = task.completedAt != null;
   return (
     <ItemContextMenu
       title={task.title}

@@ -129,12 +129,27 @@
     "startDateLabel": "Start date",
     "milestoneLabel": "Milestone",
     "milestoneHint": "A point in time, not a span. Shows as a single marker in Flows.",
-    "statusLabel": "Status",
+    "columnLabel": "Column",
     "privateLabel": "Private",
     "privateHint": "Only you can see this task.",
     "optimizationDetails": "Optimization details",
     "deleteTitle": "Delete this task?",
     "deleteDescription": "This removes the task, its subtasks, and any blocks it placed on the calendar."
+  },
+  "boardEditor": {
+    "createTitle": "New column",
+    "editTitle": "Edit column",
+    "nameLabel": "Name",
+    "namePlaceholder": "Column name",
+    "lineStyleLabel": "Flows line style",
+    "lineStyleHint": "How tasks in this state are drawn in the Flows view.",
+    "isDoneLabel": "Completion column",
+    "isDoneHint": "Moving a task here marks it done.",
+    "add": "Add column",
+    "addColumn": "Add column",
+    "columnMenu": "Options for {name}",
+    "editColumn": "Edit column",
+    "deleteColumn": "Delete column"
   },
   "card": {
     "markDone": "Mark as done",

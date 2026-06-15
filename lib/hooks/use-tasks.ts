@@ -33,10 +33,10 @@ export function useTasks(workspaceId: string | undefined): {
       sb,
       workspaceId,
       (change) => {
-        // Collection changes alter the switcher / which tasks are in scope, and
-        // collections live in the workspace bundle — refresh it so the other
-        // member sees new/removed collections live.
-        if (change.table === "collections") {
+        // Collection/board changes alter the switcher / columns / which tasks are
+        // in scope, and both live in the workspace bundle — refresh it so the
+        // other member sees new/removed collections and columns live.
+        if (change.table === "collections" || change.table === "boards") {
           qc.invalidateQueries({ queryKey: qk.workspace });
           return;
         }

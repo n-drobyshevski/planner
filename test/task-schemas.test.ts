@@ -4,11 +4,16 @@ import {
   taskPatchSchema,
   collectionInputSchema,
   collectionPatchSchema,
+  boardInputSchema,
+  boardPatchSchema,
+  boardFormSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
 
 const WS = "11111111-1111-4111-8111-111111111111";
 const ME = "22222222-2222-4222-8222-222222222222";
+const BOARD = "33333333-3333-4333-8333-333333333333";
+const COLLECTION = "44444444-4444-4444-8444-444444444444";
 
 const base = {
   workspaceId: WS,
@@ -31,7 +36,7 @@ describe("taskInputSchema", () => {
       description: "fragile stuff first",
       isPrivate: true,
       color: "peach",
-      status: "done",
+      boardId: BOARD,
       priority: 2,
       dueDate: "2026-06-13",
       position: 1.5,
@@ -74,27 +79,19 @@ describe("taskInputSchema", () => {
     expect(taskInputSchema.safeParse({ ...base, priority: 0 }).success).toBe(true);
   });
 
-  it("enforces the done <-> completedAt coupling", () => {
-    expect(
-      taskInputSchema.safeParse({ ...base, status: "done", completedAt: null }).success,
-    ).toBe(false);
-    expect(
-      taskInputSchema.safeParse({ ...base, status: "todo", completedAt: Date.now() }).success,
-    ).toBe(false);
-    expect(
-      taskInputSchema.safeParse({ ...base, status: "done", completedAt: Date.now() }).success,
-    ).toBe(true);
-  });
-
-  it("treats a missing status as todo for the coupling", () => {
-    expect(taskInputSchema.safeParse({ ...base, completedAt: Date.now() }).success).toBe(false);
+  it("accepts a board id (the column) and a null board", () => {
+    expect(taskInputSchema.safeParse({ ...base, boardId: BOARD }).success).toBe(true);
+    expect(taskInputSchema.safeParse({ ...base, boardId: null }).success).toBe(true);
+    expect(taskInputSchema.safeParse({ ...base, boardId: "nope" }).success).toBe(false);
   });
 });
 
 describe("taskPatchSchema", () => {
   it("accepts a partial patch", () => {
-    expect(taskPatchSchema.safeParse({ status: "in_progress" }).success).toBe(true);
+    expect(taskPatchSchema.safeParse({ boardId: BOARD }).success).toBe(true);
     expect(taskPatchSchema.safeParse({ position: 3.25 }).success).toBe(true);
+    // completedAt is normalized server-side from the board, so it stands alone.
+    expect(taskPatchSchema.safeParse({ completedAt: Date.now() }).success).toBe(true);
   });
 
   it("strips workspace/owner moves", () => {
@@ -102,23 +99,45 @@ describe("taskPatchSchema", () => {
     expect("workspaceId" in r).toBe(false);
   });
 
-  it("leaves the lone-field coupling to the DB trigger", () => {
-    // Only one of status/completedAt present: the normalization trigger fixes it.
-    expect(taskPatchSchema.safeParse({ status: "done" }).success).toBe(true);
-    expect(taskPatchSchema.safeParse({ completedAt: Date.now() }).success).toBe(true);
-  });
-
-  it("rejects a contradictory status + completedAt pair", () => {
-    expect(
-      taskPatchSchema.safeParse({ status: "done", completedAt: null }).success,
-    ).toBe(false);
-    expect(
-      taskPatchSchema.safeParse({ status: "todo", completedAt: Date.now() }).success,
-    ).toBe(false);
-  });
-
   it("rejects an empty title in a patch", () => {
     expect(taskPatchSchema.safeParse({ title: "" }).success).toBe(false);
+  });
+});
+
+describe("board schemas", () => {
+  it("accepts a board input with name + line style + done flag", () => {
+    expect(
+      boardInputSchema.safeParse({
+        workspaceId: WS,
+        collectionId: COLLECTION,
+        name: "In Progress",
+        lineStyle: "dashed",
+        position: 1,
+        isDone: false,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an unnamed board and an unknown line style", () => {
+    expect(
+      boardInputSchema.safeParse({ workspaceId: WS, collectionId: COLLECTION, name: " " }).success,
+    ).toBe(false);
+    expect(
+      boardInputSchema.safeParse({
+        workspaceId: WS,
+        collectionId: COLLECTION,
+        name: "X",
+        lineStyle: "zigzag",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a partial board patch and the board form shape", () => {
+    expect(boardPatchSchema.safeParse({ isDone: true }).success).toBe(true);
+    expect(boardPatchSchema.safeParse({}).success).toBe(true);
+    expect(
+      boardFormSchema.safeParse({ name: "Done", lineStyle: "solid", isDone: true }).success,
+    ).toBe(true);
   });
 });
 

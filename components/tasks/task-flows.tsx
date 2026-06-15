@@ -49,8 +49,8 @@ export interface TaskFlowsProps {
   childrenByParent: Map<string | null, TaskRow[]>;
   eventsByTask: Map<string, TaskStatusEvent[]>;
   colorOf: (t: TaskRow) => string;
-  /** the active collection's Flows line style, applied to every trunk/branch stroke */
-  lineStyle?: FlowLineStyle;
+  /** the Flows line style for a task, resolved from its board (state). */
+  lineStyleOf: (t: TaskRow) => FlowLineStyle;
   members: Map<string, Member>;
   currentMemberId: string | null;
   actions: TaskActions;
@@ -67,7 +67,7 @@ export function TaskFlows({
   childrenByParent,
   eventsByTask,
   colorOf,
-  lineStyle = "solid",
+  lineStyleOf,
   members,
   currentMemberId,
   actions,
@@ -250,7 +250,7 @@ export function TaskFlows({
     const when = formatWeekdayDayMonth(seg.startMs, timeZone, locale);
     if (seg.milestone) {
       const key =
-        seg.task.status === "done" ? "done" : seg.startMs > nowMs ? "upcoming" : "moment";
+        seg.task.completedAt != null ? "done" : seg.startMs > nowMs ? "upcoming" : "moment";
       return `${seg.task.title}: ${t(`flows.milestone.${key}`)} · ${when}`;
     }
     return `${seg.task.title}: ${t("flows.plannedStart")} · ${when}`;
@@ -433,7 +433,7 @@ export function TaskFlows({
                         onClick={() => actions.open(branch.task)}
                         className={cn(
                           "absolute truncate pl-9 pr-2 text-left text-xs text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                          branch.task.status === "done" && "line-through",
+                          branch.task.completedAt != null && "line-through",
                         )}
                         style={{ left: 0, top: subTop, width: G.gutterWidth, height: G.subRowHeight }}
                       >
@@ -471,7 +471,7 @@ export function TaskFlows({
             nowMs={nowMs}
             gridMs={gridMs}
             colorOf={colorOf}
-            lineStyle={lineStyle}
+            lineStyleOf={lineStyleOf}
             currentMemberId={currentMemberId}
             nodeLabel={nodeLabel}
             segmentLabel={segmentLabel}

@@ -13,35 +13,37 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { positionBetween } from "@/lib/tasks/ordering";
 import { useOptimisticOrder } from "@/lib/hooks/use-optimistic-order";
-import type { TaskRow, TaskStatus } from "@/lib/types";
+import type { TaskRow, Board } from "@/lib/types";
 
-/** Card ids per status column, in display order. */
-export type Columns = Record<TaskStatus, string[]>;
+/** Card ids per board column (keyed by board id), in display order. */
+export type Columns = Record<string, string[]>;
 
-export const isColumn = (id: string): id is TaskStatus =>
-  id === "todo" || id === "in_progress" || id === "done";
-
-function buildColumns(tasks: TaskRow[]): Columns {
-  const cols: Columns = { todo: [], in_progress: [], done: [] };
+function buildColumns(tasks: TaskRow[], boards: Board[]): Columns {
+  const cols: Columns = {};
+  for (const b of boards) cols[b.id] = [];
   const sorted = [...tasks].sort(
     (a, b) => a.position - b.position || a.createdAt - b.createdAt,
   );
-  for (const t of sorted) cols[t.status].push(t.id);
+  for (const t of sorted) {
+    if (t.boardId && cols[t.boardId]) cols[t.boardId].push(t.id);
+  }
   return cols;
 }
 
 /**
  * Drag state + handlers for the kanban board: column membership is kept as an
  * optimistic local copy (resynced from the tasks prop unless a drag is live),
- * and a completed drop reports the moved task's new column + fractional
- * position via `onMove`.
+ * and a completed drop reports the moved task's new board column + fractional
+ * position via `onMove`. Columns are the active collection's boards (ordered).
  */
 export function useBoardDnd(
   tasks: TaskRow[],
-  onMove: (t: TaskRow, status: TaskStatus, position: number) => void,
+  boards: Board[],
+  onMove: (t: TaskRow, boardId: string, position: number) => void,
 ) {
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
-  const source = useMemo(() => buildColumns(tasks), [tasks]);
+  const boardIds = useMemo(() => new Set(boards.map((b) => b.id)), [boards]);
+  const source = useMemo(() => buildColumns(tasks, boards), [tasks, boards]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [items, setItems] = useOptimisticOrder(source, activeId !== null);
 
@@ -53,11 +55,11 @@ export function useBoardDnd(
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const findContainer = (id: string): TaskStatus | null => {
+  const isColumn = (id: string): boolean => boardIds.has(id);
+
+  const findContainer = (id: string): string | null => {
     if (isColumn(id)) return id;
-    return (Object.keys(items) as TaskStatus[]).find((c) =>
-      items[c].includes(id),
-    ) ?? null;
+    return Object.keys(items).find((c) => items[c].includes(id)) ?? null;
   };
 
   function onDragStart(e: DragStartEvent) {

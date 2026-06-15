@@ -56,7 +56,7 @@ import { AttributeFields } from "@/components/shared/attribute-fields";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { taskFormSchema, type TaskFormValues } from "@/lib/tasks/schemas";
 import { parseAttributes, hasAnyAttribute } from "@/lib/attributes/schema";
-import type { Category, Member, TaskRow, TaskStatus } from "@/lib/types";
+import type { Board, Category, Member, TaskRow } from "@/lib/types";
 import type { TaskInput } from "@/lib/supabase/mappers";
 
 export interface TaskDialogProps {
@@ -67,6 +67,8 @@ export interface TaskDialogProps {
   currentMemberId: string;
   /** Collection the new task is filed under (create mode). */
   collectionId?: string | null;
+  /** The collection's columns (ordered), for the board picker + completion. */
+  boards: Board[];
   members: Member[];
   categories: Category[];
   task?: TaskRow | null;
@@ -74,8 +76,8 @@ export interface TaskDialogProps {
   subtasks?: TaskRow[];
   /** create mode: file the new task under this parent (inherits its context). */
   createParent?: TaskRow | null;
-  /** status column the create was initiated from */
-  defaultStatus?: TaskStatus;
+  /** board column the create was initiated from */
+  defaultBoardId?: string;
   /** open the Schedule dialog for this task (edit mode only) */
   onSchedule?: () => void;
   /** create mode: fired after the new task is successfully inserted. */
@@ -104,13 +106,23 @@ export function TaskDialog(props: TaskDialogProps) {
   // Auto-expand "More options" when editing a task that already uses any of the
   // fields tucked behind it, so nothing stays hidden; collapsed for quick adds.
   const [showMore, setShowMore] = useState(
-    () =>
-      defaults.status !== "todo" || defaults.isMilestone || defaults.isPrivate,
+    () => defaults.isMilestone || defaults.isPrivate,
   );
 
   const usableCategories = categories.filter(
     (c) => c.ownerId === null || c.ownerId === currentMemberId,
   );
+
+  // The chosen column, else the parent's, else the create default, else the first.
+  function resolveBoardId(values: TaskFormValues): string | null {
+    return (
+      values.boardId ||
+      props.createParent?.boardId ||
+      props.defaultBoardId ||
+      props.boards[0]?.id ||
+      null
+    );
+  }
 
   function buildPayload(values: TaskFormValues) {
     return {
@@ -123,7 +135,6 @@ export function TaskDialog(props: TaskDialogProps) {
       dueDate: values.dueDate || null,
       startDate: values.startDate || null,
       isMilestone: values.isMilestone,
-      status: values.status,
       attributes: values.attributes,
     };
   }
@@ -138,6 +149,12 @@ export function TaskDialog(props: TaskDialogProps) {
 
   async function onValid(values: TaskFormValues) {
     const payload = buildPayload(values);
+    const boardId = resolveBoardId(values);
+    // Completion follows the chosen column's is_done; the server trigger sets it
+    // authoritatively, this is the optimistic value.
+    const done = boardId
+      ? props.boards.find((b) => b.id === boardId)?.isDone ?? false
+      : false;
 
     if (mode === "create") {
       const input: TaskInput = {
@@ -149,7 +166,8 @@ export function TaskDialog(props: TaskDialogProps) {
         parentId: props.createParent?.id ?? null,
         position: Date.now(), // new tasks sort to the bottom of their column
         ...payload,
-        completedAt: payload.status === "done" ? Date.now() : null,
+        boardId,
+        completedAt: done ? Date.now() : null,
       };
       if (await mutations.create(input)) {
         props.onCreated?.();
@@ -158,12 +176,9 @@ export function TaskDialog(props: TaskDialogProps) {
       return;
     }
     if (!task) return;
-    const completedAt =
-      payload.status === "done"
-        ? task.completedAt ?? Date.now()
-        : null;
+    const completedAt = done ? task.completedAt ?? Date.now() : null;
     // The payload is TaskRow-shaped, so it doubles as the optimistic row patch.
-    const rowPatch = { ...payload, completedAt };
+    const rowPatch = { ...payload, boardId, completedAt };
     close();
     void mutations.update(task.id, rowPatch, undefined, rowPatch);
   }
@@ -360,22 +375,28 @@ export function TaskDialog(props: TaskDialogProps) {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <FieldSection className="pt-4">
-                  {mode === "edit" && (
-                    <form.Field name="status">
+                  {props.boards.length > 0 && (
+                    <form.Field name="boardId">
                       {(field) => (
                         <Field>
-                          <FieldLabel>{t("taskDialog.statusLabel")}</FieldLabel>
-                          <ToggleGroup
-                            type="single"
-                            variant="outline"
-                            value={field.state.value}
-                            onValueChange={(v) => v && field.handleChange(v as TaskStatus)}
-                            className="justify-start"
+                          <FieldLabel htmlFor="task-board">{t("taskDialog.columnLabel")}</FieldLabel>
+                          <Select
+                            value={field.state.value || props.boards[0].id}
+                            onValueChange={field.handleChange}
                           >
-                            <ToggleGroupItem value="todo">{t("status.todo")}</ToggleGroupItem>
-                            <ToggleGroupItem value="in_progress">{t("status.inProgress")}</ToggleGroupItem>
-                            <ToggleGroupItem value="done">{t("status.done")}</ToggleGroupItem>
-                          </ToggleGroup>
+                            <SelectTrigger id="task-board">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {props.boards.map((b) => (
+                                  <SelectItem key={b.id} value={b.id}>
+                                    {b.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
                         </Field>
                       )}
                     </form.Field>
@@ -537,7 +558,7 @@ export function TaskDialog(props: TaskDialogProps) {
 }
 
 function buildInitial(props: TaskDialogProps): TaskFormValues {
-  const { mode, task, defaultStatus, createParent } = props;
+  const { mode, task, defaultBoardId, createParent } = props;
   if (mode === "edit" && task) {
     return {
       title: task.title,
@@ -549,7 +570,7 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
       dueDate: task.dueDate ?? "",
       startDate: task.startDate ?? "",
       isMilestone: task.isMilestone,
-      status: task.status,
+      boardId: task.boardId ?? "",
       attributes: parseAttributes(task.attributes),
     };
   }
@@ -565,7 +586,7 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
     dueDate: "",
     startDate: "",
     isMilestone: false,
-    status: defaultStatus ?? "todo",
+    boardId: createParent?.boardId ?? defaultBoardId ?? "",
     attributes: {},
   };
 }

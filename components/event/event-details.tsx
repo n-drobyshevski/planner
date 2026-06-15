@@ -185,7 +185,7 @@ export function EventDetails({
             {task && (
               <Row icon={taskDone ? CheckCircle2 : Circle}>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>{t("details.taskStatusLine", { status: t(`taskStatus.${task.status}`) })}</span>
+                  <span>{t("details.taskStatusLine", { status: t(`taskStatus.${taskDone ? "done" : "open"}`) })}</span>
                   {task.dueDate != null && (
                     <span className="text-muted-foreground tabular-nums">
                       {t("details.due", { date: formatDayMonthToken(task.dueDate, locale) })}

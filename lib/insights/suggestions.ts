@@ -455,7 +455,7 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     const startOfToday = dateInputToMs(dateKeyInZone(now, timeZone), timeZone);
     const candidates = input.tasks
       .filter((task) => {
-        if (task.parentId !== null || task.status === "done") return false;
+        if (task.parentId !== null || task.completedAt != null) return false;
         if (task.priority !== 3 || task.dueDate === null) return false;
         const dueMs = dateInputToMs(task.dueDate, timeZone);
         if (dueMs < startOfToday || dueMs >= startOfToday + DUE_HORIZON_MS) return false;

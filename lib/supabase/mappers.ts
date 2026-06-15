@@ -13,6 +13,7 @@ import type {
   InsightsPrefs,
   InsightsView,
   Collection,
+  Board,
   SleepLog,
   TaskRow,
   TaskStatusEvent,
@@ -215,8 +216,21 @@ export function mapCollection(r: Row): Collection {
     ownerId: (r.owner_id as string | null) ?? null,
     name: r.name as string,
     color: r.color as string,
-    lineStyle: asFlowLineStyle(r.line_style as string | null),
     sortOrder: (r.sort_order as number) ?? 0,
+  };
+}
+
+export function mapBoard(r: Row): Board {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    collectionId: r.collection_id as string,
+    name: r.name as string,
+    lineStyle: asFlowLineStyle(r.line_style as string | null),
+    position: (r.position as number) ?? 0,
+    isDone: Boolean(r.is_done),
+    createdAt: toMs(r.created_at),
+    updatedAt: toMs(r.updated_at),
   };
 }
 
@@ -261,7 +275,7 @@ export function mapTask(r: Row): TaskRow {
     description: (r.description as string | null) ?? null,
     isPrivate: Boolean(r.is_private),
     color: (r.color as string | null) ?? null,
-    status: r.status as TaskRow["status"],
+    boardId: (r.board_id as string | null) ?? null,
     priority: (r.priority as number | null) ?? null,
     dueDate: (r.due_date as string | null) ?? null,
     startDate: (r.start_date as string | null) ?? null,
@@ -280,8 +294,9 @@ export function mapStatusEvent(r: Row): TaskStatusEvent {
     id: r.id as string,
     taskId: r.task_id as string,
     workspaceId: r.workspace_id as string,
-    fromStatus: (r.from_status as TaskStatusEvent["fromStatus"]) ?? null,
-    toStatus: r.to_status as TaskStatusEvent["toStatus"],
+    fromBoardId: (r.from_board_id as string | null) ?? null,
+    toBoardId: (r.to_board_id as string | null) ?? null,
+    toIsDone: Boolean(r.to_is_done),
     changedBy: (r.changed_by as string | null) ?? null,
     changedAt: toMs(r.changed_at),
   };
@@ -393,7 +408,7 @@ export interface TaskInput {
   description?: string | null;
   isPrivate?: boolean;
   color?: string | null;
-  status?: TaskRow["status"];
+  boardId?: string | null;
   priority?: number | null;
   /** zone-free calendar date ("yyyy-MM-dd") */
   dueDate?: string | null;
@@ -420,7 +435,7 @@ export function taskInputToRow(input: TaskInput): Row {
     description: input.description ?? null,
     is_private: input.isPrivate ?? false,
     color: input.color ?? null,
-    status: input.status ?? "todo",
+    board_id: input.boardId ?? null,
     priority: input.priority ?? null,
     due_date: input.dueDate ?? null,
     start_date: input.startDate ?? null,
@@ -443,7 +458,7 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("description" in patch) row.description = patch.description ?? null;
   if ("isPrivate" in patch) row.is_private = patch.isPrivate ?? false;
   if ("color" in patch) row.color = patch.color ?? null;
-  if ("status" in patch) row.status = patch.status;
+  if ("boardId" in patch) row.board_id = patch.boardId ?? null;
   if ("priority" in patch) row.priority = patch.priority ?? null;
   if ("dueDate" in patch) row.due_date = patch.dueDate ?? null;
   if ("startDate" in patch) row.start_date = patch.startDate ?? null;
@@ -452,5 +467,38 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("sequential" in patch) row.sequential = patch.sequential;
   if ("completedAt" in patch) row.completed_at = toIsoOrNull(patch.completedAt ?? null);
   if ("attributes" in patch) row.attributes = patch.attributes ?? {};
+  return row;
+}
+
+// --- Boards ----------------------------------------------------------------
+
+/** Fields accepted when creating a board (one column/state of a collection). */
+export interface BoardInput {
+  workspaceId: string;
+  collectionId: string;
+  name: string;
+  lineStyle?: Board["lineStyle"];
+  position?: number;
+  isDone?: boolean;
+}
+
+export function boardInputToRow(input: BoardInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    collection_id: input.collectionId,
+    name: input.name,
+    line_style: input.lineStyle ?? "solid",
+    position: input.position ?? 0,
+    is_done: input.isDone ?? false,
+  };
+}
+
+/** Partial board patch -> snake_case row patch for UPDATE. */
+export function boardPatchToRow(patch: Partial<BoardInput>): Row {
+  const row: Row = {};
+  if ("name" in patch) row.name = patch.name;
+  if ("lineStyle" in patch) row.line_style = patch.lineStyle;
+  if ("position" in patch) row.position = patch.position;
+  if ("isDone" in patch) row.is_done = patch.isDone;
   return row;
 }

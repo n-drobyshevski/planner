@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DndContext, DragOverlay, closestCorners } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { m, AnimatePresence } from "motion/react";
-import { ListChecks } from "lucide-react";
+import { ListChecks, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { tween, tweenFast } from "@/lib/motion";
 import {
@@ -14,60 +14,84 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Button } from "@/components/ui/button";
 import { TaskCard } from "./task-card";
 import { Column, SortableCard, EmptyColumn } from "./board-column";
+import { BoardColumnMenu } from "./board-column-menu";
+import { BoardEditorDialog } from "./board-editor-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useBoardDnd } from "@/lib/hooks/use-board-dnd";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipe } from "@/hooks/use-swipe";
 import type { TaskActions } from "./task-actions";
-import type { Member, TaskRow, TaskStatus } from "@/lib/types";
-
-const COLUMNS: { status: TaskStatus; statusKey: string }[] = [
-  { status: "todo", statusKey: "status.todo" },
-  { status: "in_progress", statusKey: "status.inProgress" },
-  { status: "done", statusKey: "status.done" },
-];
+import type { Board, Member, TaskRow } from "@/lib/types";
 
 export interface TaskBoardProps {
   tasks: TaskRow[]; // top-level tasks only
+  /** the active collection's columns, ordered by position */
+  boards: Board[];
+  collectionId: string;
+  workspaceId: string;
   colorOf: (t: TaskRow) => string;
   members: Map<string, Member>;
   progressOf?: (t: TaskRow) => { done: number; total: number } | null;
   actions: TaskActions;
 }
 
-export function TaskBoard({ tasks, colorOf, members, progressOf, actions }: TaskBoardProps) {
+export function TaskBoard({
+  tasks,
+  boards,
+  collectionId,
+  workspaceId,
+  colorOf,
+  members,
+  progressOf,
+  actions,
+}: TaskBoardProps) {
   const t = useTranslations("tasks");
-  const { byId, items, activeTask, sensors, onDragStart, onDragEnd } =
-    useBoardDnd(tasks, actions.move);
-  const [activeStatus, setActiveStatus] = useState<TaskStatus>("todo");
+  const { byId, items, activeTask, sensors, onDragStart, onDragEnd } = useBoardDnd(
+    tasks,
+    boards,
+    actions.move,
+  );
+  const [addingColumn, setAddingColumn] = useState(false);
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const isMobile = useIsMobile();
-  const statusOrder: TaskStatus[] = ["todo", "in_progress", "done"];
+
+  // The mobile single-column view tracks an active board id, clamped to the
+  // current set (boards can be added/removed/reordered).
+  const mobileBoard =
+    boards.find((b) => b.id === activeBoardId) ?? boards[0] ?? null;
   const swipe = useSwipe({
     enabled: isMobile,
-    onSwipeLeft: () =>
-      setActiveStatus((s) => statusOrder[Math.min(statusOrder.indexOf(s) + 1, 2)]),
-    onSwipeRight: () =>
-      setActiveStatus((s) => statusOrder[Math.max(statusOrder.indexOf(s) - 1, 0)]),
+    onSwipeLeft: () => {
+      const i = boards.findIndex((b) => b.id === mobileBoard?.id);
+      const next = boards[Math.min(i + 1, boards.length - 1)];
+      if (next) setActiveBoardId(next.id);
+    },
+    onSwipeRight: () => {
+      const i = boards.findIndex((b) => b.id === mobileBoard?.id);
+      const prev = boards[Math.max(i - 1, 0)];
+      if (prev) setActiveBoardId(prev.id);
+    },
   });
 
-  const renderColumn = (col: { status: TaskStatus; statusKey: string }) => (
+  const renderColumn = (board: Board) => (
     <Column
-      key={col.status}
-      status={col.status}
-      title={t(col.statusKey)}
-      count={items[col.status].length}
-      onNew={() => actions.create(col.status)}
+      key={board.id}
+      board={board}
+      count={items[board.id]?.length ?? 0}
+      onNew={() => actions.create(board.id)}
+      menu={<BoardColumnMenu board={board} workspaceId={workspaceId} />}
     >
       <SortableContext
-        items={items[col.status]}
+        items={items[board.id] ?? []}
         strategy={verticalListSortingStrategy}
       >
-        {items[col.status].length === 0 ? (
+        {(items[board.id]?.length ?? 0) === 0 ? (
           <EmptyColumn />
         ) : (
-          items[col.status].map((id) => {
+          (items[board.id] ?? []).map((id) => {
             const task = byId.get(id);
             if (!task) return null;
             return (
@@ -100,47 +124,55 @@ export function TaskBoard({ tasks, colorOf, members, progressOf, actions }: Task
         <div className="flex h-full flex-col gap-3 p-3">
           <ToggleGroup
             type="single"
-            value={activeStatus}
-            onValueChange={(v) => v && setActiveStatus(v as TaskStatus)}
+            value={mobileBoard?.id ?? ""}
+            onValueChange={(v) => v && setActiveBoardId(v)}
             variant="outline"
             size="sm"
-            className="w-full"
+            className="w-full overflow-x-auto"
           >
-            {COLUMNS.map((c) => (
-              <ToggleGroupItem key={c.status} value={c.status} className="flex-1">
-                {t(c.statusKey)}
+            {boards.map((b) => (
+              <ToggleGroupItem key={b.id} value={b.id} className="flex-1">
+                {b.name}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
           <div className="relative min-h-0 flex-1" {...swipe}>
-            {/* Crossfade the swapped column instead of an instant cut.
-                `initial={false}` paints the first column at once; only the swap
-                (toggle or swipe) animates. Column swaps never happen mid-drag,
-                so this doesn't interfere with dnd-kit. */}
             <AnimatePresence mode="wait" initial={false}>
               <m.div
-                key={activeStatus}
+                key={mobileBoard?.id ?? "none"}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1, transition: tween }}
                 exit={{ opacity: 0, transition: tweenFast }}
                 className="h-full"
               >
-                {renderColumn(COLUMNS.find((c) => c.status === activeStatus)!)}
+                {mobileBoard ? renderColumn(mobileBoard) : null}
               </m.div>
             </AnimatePresence>
           </div>
         </div>
       ) : (
-        <div className="grid h-full grid-cols-1 gap-3 overflow-x-auto p-3 sm:grid-cols-3 sm:p-4">
-          {COLUMNS.map(renderColumn)}
+        <div className="flex h-full gap-3 overflow-x-auto p-3 sm:p-4">
+          {boards.map((board) => (
+            <div key={board.id} className="min-w-64 flex-1 basis-64">
+              {renderColumn(board)}
+            </div>
+          ))}
+          <div className="shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setAddingColumn(true)}
+            >
+              <Plus data-icon="inline-start" />
+              {t("boardEditor.addColumn")}
+            </Button>
+          </div>
         </div>
       )}
 
       <DragOverlay>
         {activeTask ? (
-          // The grabbed card lifts (subtle scale) above the board while dragging;
-          // shadow-soft-lg reinforces the depth. reducedMotion="user" (provider)
-          // drops the scale for users who ask for it.
           <m.div initial={{ scale: 1 }} animate={{ scale: 1.03 }} transition={tweenFast}>
             <TaskCard
               task={activeTask}
@@ -157,6 +189,15 @@ export function TaskBoard({ tasks, colorOf, members, progressOf, actions }: Task
           </m.div>
         ) : null}
       </DragOverlay>
+
+      <BoardEditorDialog
+        open={addingColumn}
+        onOpenChange={setAddingColumn}
+        mode="create"
+        workspaceId={workspaceId}
+        collectionId={collectionId}
+        newPosition={(boards[boards.length - 1]?.position ?? -1) + 1}
+      />
     </DndContext>
   );
 }

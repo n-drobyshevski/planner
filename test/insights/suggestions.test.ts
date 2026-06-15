@@ -69,7 +69,7 @@ function task(over: Partial<TaskRow> = {}): TaskRow {
     description: null,
     isPrivate: false,
     color: null,
-    status: "todo",
+    boardId: null,
     priority: 3,
     dueDate: null,
     startDate: null,
@@ -353,7 +353,7 @@ describe("rule: unscheduled-task", () => {
   it("excludes done/low-priority/overdue/subtask/far-future candidates", () => {
     const input = makeInput();
     input.tasks = [
-      task({ dueDate: dueSoon, status: "done", completedAt: input.now }),
+      task({ dueDate: dueSoon, completedAt: input.now }),
       task({ dueDate: dueSoon, priority: 2 }),
       task({ dueDate: "2026-06-03" }), // overdue (before "now" Jun 4)
       task({ dueDate: dueSoon, parentId: "parent" }),

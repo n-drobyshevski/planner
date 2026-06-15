@@ -7,7 +7,7 @@
 // Subtasks are *branches* that diverge from the trunk at their own creation and
 // merge back at completion. *Nodes* sit at each recorded status transition.
 
-import type { TaskRow, TaskStatus, TaskStatusEvent } from "@/lib/types";
+import type { TaskRow, TaskStatusEvent } from "@/lib/types";
 import { dateInputToUtcMs } from "@/lib/datetime/local";
 
 export const DAY_MS = 86_400_000;
@@ -18,8 +18,6 @@ export type FlowNodeKind = "created" | "started" | "done" | "reopened" | "due";
 export interface FlowNode {
   ms: number;
   kind: FlowNodeKind;
-  /** the status entered at this node; null for a `due` marker */
-  status: TaskStatus | null;
   /** a `due` marker that has passed while the task is still open */
   overdue?: boolean;
 }
@@ -38,7 +36,7 @@ export interface FlowSegment {
 export interface FlowLane extends FlowSegment {
   /** subtask branches, in sibling order */
   branches: FlowSegment[];
-  /** convenience: status === "done" (drives dimming) */
+  /** convenience: completedAt != null (drives dimming) */
   done: boolean;
 }
 
@@ -58,15 +56,17 @@ export const FLOW_GEOM = {
 } as const;
 
 /**
- * Classify a transition. `done` is checked before the null-`fromStatus` rule so
- * the backfilled completion event (recorded with from_status null because the
- * prior status was never known) reads as a Done node, not a creation node.
+ * Classify a transition. `done` (entering a completion column) is checked first
+ * so a backfilled completion event (recorded with from_board_id null because the
+ * prior board was never known) reads as a Done node, not a creation node. With
+ * user-defined columns we can't tell "started" from "reopened" purely (that would
+ * need the source column's is_done, which isn't recorded), so every non-done,
+ * non-creation move reads as "started".
  */
 function nodeKindOf(ev: TaskStatusEvent): FlowNodeKind {
-  if (ev.toStatus === "done") return "done";
-  if (ev.fromStatus === null) return "created";
-  if (ev.toStatus === "in_progress") return "started";
-  return "reopened"; // -> todo from a later status
+  if (ev.toIsDone) return "done";
+  if (ev.fromBoardId === null) return "created";
+  return "started";
 }
 
 const byMs = (a: { ms: number }, b: { ms: number }) => a.ms - b.ms;
@@ -82,12 +82,11 @@ function buildSegment(
   const nodes: FlowNode[] = evs.map((ev) => ({
     ms: ev.changedAt,
     kind: nodeKindOf(ev),
-    status: ev.toStatus,
   }));
   // Defensive: a task with no recorded history (shouldn't happen post-backfill)
   // still gets a birth node so its lane renders.
   if (nodes.length === 0) {
-    nodes.push({ ms: task.createdAt, kind: "created", status: task.status });
+    nodes.push({ ms: task.createdAt, kind: "created" });
   }
 
   // Left anchor: the explicit planned start (zone-free date -> UTC midnight) when
@@ -99,7 +98,7 @@ function buildSegment(
     ? plannedStart
     : Math.min(plannedStart, firstActivity ?? plannedStart);
 
-  const done = task.status === "done";
+  const done = task.completedAt != null;
   let endMs: number | null = null;
   if (done) {
     const lastDone = nodes.reduce<number | null>(
@@ -115,7 +114,6 @@ function buildSegment(
     nodes.push({
       ms: dueMs,
       kind: "due",
-      status: null,
       overdue: !done && dueMs < nowMs,
     });
   }
@@ -143,7 +141,7 @@ export function buildFlowLanes(args: {
     const branches = children.map((c) =>
       buildSegment(c, eventsByTask.get(c.id), nowMs),
     );
-    return { ...trunk, branches, done: task.status === "done" };
+    return { ...trunk, branches, done: task.completedAt != null };
   });
 
   return lanes.sort((a, b) => {

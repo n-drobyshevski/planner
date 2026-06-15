@@ -92,7 +92,7 @@ export function computeForecast(input: ForecastInput): Forecast {
   }
   const dueUnscheduled = input.tasks
     .filter((t) => {
-      if (t.parentId !== null || t.status === "done" || t.dueDate === null) return false;
+      if (t.parentId !== null || t.completedAt != null || t.dueDate === null) return false;
       const dueMs = dateInputToMs(t.dueDate, timeZone);
       if (dueMs < futureWindow.start || dueMs >= futureWindow.end) return false;
       return !scheduledTaskIds.has(t.id);
