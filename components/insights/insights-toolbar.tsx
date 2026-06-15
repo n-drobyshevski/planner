@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToolbarSlot } from "@/components/toolbar-slots";
 import { MobileAccountSection } from "@/components/mobile-account-section";
+import { useAccountSwitch } from "@/components/account-switch";
 import { PeriodSelector } from "./period-selector";
 import { granularityChoices, type Granularity, type PeriodState, type ResolvedPeriod } from "@/lib/insights/period";
 import type { Member } from "@/lib/types";
@@ -103,7 +104,9 @@ function InsightsMobileMenu({
   current: Member | null;
 }) {
   const t = useTranslations("insights");
+  const { switchable, onSelectSwitch, pending, dialog } = useAccountSwitch();
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -127,8 +130,15 @@ function InsightsMobileMenu({
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
-        <MobileAccountSection current={current} />
+        <MobileAccountSection
+          current={current}
+          switchable={switchable}
+          onSelectSwitch={onSelectSwitch}
+          pending={pending}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
+    {dialog}
+    </>
   );
 }

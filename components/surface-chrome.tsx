@@ -18,8 +18,7 @@ import { SURFACE_PATHS } from "@/lib/surfaces";
 function ToolbarUser() {
   const { data } = useWorkspace();
   const current = data?.currentMember ?? null;
-  const others = (data?.members ?? []).filter((m) => m.id !== current?.id);
-  return <ToolbarUserMenu current={current} others={others} />;
+  return <ToolbarUserMenu current={current} />;
 }
 
 /**

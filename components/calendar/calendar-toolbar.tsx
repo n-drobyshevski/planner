@@ -32,6 +32,7 @@ import { DEFAULT_HOUR_PX } from "@/lib/datetime/zoom-math";
 import { ViewSwitcher } from "./view-switcher";
 import { ToolbarSlot } from "@/components/toolbar-slots";
 import { MobileAccountSection } from "@/components/mobile-account-section";
+import { useAccountSwitch } from "@/components/account-switch";
 import type { CalendarView } from "@/lib/types";
 import type { Member } from "@/lib/types";
 import type { WorkspaceData } from "@/lib/hooks/use-workspace";
@@ -234,8 +235,10 @@ function CalendarMobileMenu({
   const hourPx = useUiStore((s) => s.hourPx);
   const setHourPx = useUiStore((s) => s.setHourPx);
   const zoomed = timeGridView && hourPx !== DEFAULT_HOUR_PX;
+  const { switchable, onSelectSwitch, pending, dialog } = useAccountSwitch();
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -291,8 +294,15 @@ function CalendarMobileMenu({
           </DropdownMenuItem>
         )}
 
-        <MobileAccountSection current={current} />
+        <MobileAccountSection
+          current={current}
+          switchable={switchable}
+          onSelectSwitch={onSelectSwitch}
+          pending={pending}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
+    {dialog}
+    </>
   );
 }
