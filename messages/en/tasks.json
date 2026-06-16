@@ -266,8 +266,14 @@
   "backlog": {
     "tasks": "Tasks",
     "insights": "Insights",
-    "scheduleHint": "Drag onto the week or day grid to schedule, or use Schedule for options.",
-    "empty": "No open tasks. Everything’s scheduled or done. 🎉",
+    "scheduleHint": "Drag a task onto the grid to schedule it.",
+    "groupOverdue": "Overdue",
+    "groupThisWeek": "This week",
+    "groupLater": "Later",
+    "groupNoDate": "No date",
+    "empty": "You’re all caught up 🎉",
+    "emptyHint": "New tasks land here, ready to drag onto your calendar.",
+    "openCount": "{count, plural, one {# open task} other {# open tasks}}",
     "schedule": "Schedule {title}",
     "sheetDescription": "Tap Schedule to place a task on your calendar."
   },

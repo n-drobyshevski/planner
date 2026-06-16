@@ -15,7 +15,7 @@ import { ItemMenuButton, type MenuableProps } from "@/components/shared/item-con
 import { useUiStore } from "@/stores/ui-store";
 import type { Member, TaskRow } from "@/lib/types";
 
-const PRIORITY: Record<number, { labelKey: string; variant: "destructive" | "secondary" | "outline" }> = {
+export const PRIORITY: Record<number, { labelKey: string; variant: "destructive" | "secondary" | "outline" }> = {
   3: { labelKey: "priority.high", variant: "destructive" },
   2: { labelKey: "priority.medium", variant: "secondary" },
   1: { labelKey: "priority.low", variant: "outline" },
