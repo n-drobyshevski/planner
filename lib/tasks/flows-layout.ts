@@ -7,13 +7,23 @@
 // Subtasks are *branches* that diverge from the trunk at their own creation and
 // merge back at completion. *Nodes* sit at each recorded status transition.
 
-import type { TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { EventRow, TaskRow, TaskStatusEvent } from "@/lib/types";
 import { dateInputToUtcMs } from "@/lib/datetime/local";
 
 export const DAY_MS = 86_400_000;
 
-/** Node kinds rendered on a trunk/branch. `due` is a deadline marker, not a transition. */
-export type FlowNodeKind = "created" | "started" | "done" | "reopened" | "due";
+/**
+ * Node kinds rendered on a trunk/branch. `due` is a deadline marker, not a
+ * transition; `scheduled` marks a calendar block linked to the task (booked
+ * time) and is likewise not a status transition.
+ */
+export type FlowNodeKind =
+  | "created"
+  | "started"
+  | "done"
+  | "reopened"
+  | "due"
+  | "scheduled";
 
 export interface FlowNode {
   ms: number;
@@ -76,6 +86,7 @@ function buildSegment(
   task: TaskRow,
   events: TaskStatusEvent[] | undefined,
   nowMs: number,
+  blocks?: EventRow[],
 ): FlowSegment {
   const evs = (events ?? []).slice().sort((a, b) => a.changedAt - b.changedAt);
 
@@ -117,6 +128,14 @@ function buildSegment(
       overdue: !done && dueMs < nowMs,
     });
   }
+
+  // Scheduled markers: one per linked calendar block, at the block's start.
+  // Non-destructive — they never move the planned span (startMs/endMs); they
+  // just record "this task is booked then". `flowsWindow` visits every node, so
+  // a future block still extends the window and keeps the lane in view.
+  for (const block of blocks ?? []) {
+    nodes.push({ ms: block.start, kind: "scheduled" });
+  }
   nodes.sort(byMs);
 
   return { task, startMs, endMs, nodes, milestone: task.isMilestone };
@@ -131,15 +150,22 @@ export function buildFlowLanes(args: {
   topLevel: TaskRow[];
   childrenByParent: Map<string | null, TaskRow[]>;
   eventsByTask: Map<string, TaskStatusEvent[]>;
+  /** task id -> its linked calendar blocks, for scheduled-block markers */
+  blocksByTask?: Map<string, EventRow[]>;
   nowMs: number;
 }): FlowLane[] {
-  const { topLevel, childrenByParent, eventsByTask, nowMs } = args;
+  const { topLevel, childrenByParent, eventsByTask, blocksByTask, nowMs } = args;
 
   const lanes: FlowLane[] = topLevel.map((task) => {
-    const trunk = buildSegment(task, eventsByTask.get(task.id), nowMs);
+    const trunk = buildSegment(
+      task,
+      eventsByTask.get(task.id),
+      nowMs,
+      blocksByTask?.get(task.id),
+    );
     const children = childrenByParent.get(task.id) ?? [];
     const branches = children.map((c) =>
-      buildSegment(c, eventsByTask.get(c.id), nowMs),
+      buildSegment(c, eventsByTask.get(c.id), nowMs, blocksByTask?.get(c.id)),
     );
     return { ...trunk, branches, done: task.completedAt != null };
   });

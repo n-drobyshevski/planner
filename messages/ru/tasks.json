@@ -29,7 +29,8 @@
       "done": "Готово",
       "reopened": "Возобновлено",
       "due": "Срок",
-      "overdue": "Просрочено"
+      "overdue": "Просрочено",
+      "scheduled": "Запланировано"
     },
     "zoom": {
       "label": "Масштаб времени",
@@ -114,6 +115,14 @@
     "createTitle": "Новая задача",
     "subtaskTitle": "Добавить подзадачу",
     "editTitle": "Изменить задачу",
+    "itemType": "Тип элемента",
+    "kindEvent": "Событие",
+    "kindContext": "Контекст",
+    "kindTask": "Задача",
+    "collectionLabel": "Коллекция",
+    "scheduleOnCalendarLabel": "Запланировать в календаре",
+    "scheduleOnCalendarHint": "Выключено — задача попадёт только в список. Включите, чтобы также добавить блок времени.",
+    "scheduleOnCalendarAt": "Добавит блок времени: {when}.",
     "titleLabel": "Название",
     "titlePlaceholder": "Что нужно сделать?",
     "notesLabel": "Заметки",

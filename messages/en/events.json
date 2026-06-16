@@ -26,6 +26,7 @@
     "itemType": "Item type",
     "kindEvent": "Event",
     "kindContext": "Context",
+    "kindTask": "Task",
     "readOnly": "Read-only · {owner}",
     "readOnlyOwner": "{name}'s calendar",
     "readOnlyOther": "another calendar",

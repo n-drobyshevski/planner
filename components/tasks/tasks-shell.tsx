@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskStatusEvents } from "@/lib/hooks/use-task-status-events";
+import { useTaskBlocks } from "@/lib/hooks/use-task-blocks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
 import { resolveTaskColor } from "@/lib/tasks/colors";
@@ -35,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { TaskActions } from "./task-actions";
-import type { TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { EventRow, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 // Defer the task/schedule dialogs out of the initial /tasks JS (both portaled →
 // null fallback, no layout cost). Warmed on idle via useIdlePreload so the
@@ -109,6 +110,8 @@ export function TasksShell({
   // Status-change history powers the Flows view; it loads alongside tasks and
   // its own loading state gates only that view's skeleton.
   const { events, isLoading: eventsLoading } = useTaskStatusEvents(workspaceId);
+  // Task-linked calendar blocks power the Flows view's scheduled markers.
+  const { blocks, isLoading: blocksLoading } = useTaskBlocks(workspaceId);
   const mutations = useTaskMutations(workspaceId);
 
   const members = workspace.data?.members ?? [];
@@ -183,6 +186,17 @@ export function TasksShell({
     }
     return map;
   }, [events]);
+  // Linked calendar blocks grouped by task id, for the Flows scheduled markers.
+  const blocksByTask = useMemo(() => {
+    const map = new Map<string, EventRow[]>();
+    for (const b of blocks) {
+      if (!b.taskId) continue;
+      const arr = map.get(b.taskId);
+      if (arr) arr.push(b);
+      else map.set(b.taskId, [b]);
+    }
+    return map;
+  }, [blocks]);
   const progressFor = (t: TaskRow) => {
     const c = childrenByParent.get(t.id) ?? [];
     return c.length ? progressOf(c) : null;
@@ -304,13 +318,14 @@ export function TasksShell({
                       tasks={topLevel}
                       childrenByParent={childrenByParent}
                       eventsByTask={eventsByTask}
+                      blocksByTask={blocksByTask}
                       colorOf={colorOf}
                       lineStyleOf={lineStyleOf}
                       members={memberMap}
                       currentMemberId={workspace.data?.currentMember?.id ?? null}
                       actions={actions}
                       expandLane={expandLane}
-                      loading={eventsLoading}
+                      loading={eventsLoading || blocksLoading}
                     />
                   ) : view === "board" ? (
                     <TaskBoard

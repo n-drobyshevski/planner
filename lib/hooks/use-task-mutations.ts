@@ -153,6 +153,33 @@ export function useTaskMutations(workspaceId: string | undefined) {
         undo: (row) => inverse(t("undoLabel.create"), () => m.deleteTask(sb, row.id)),
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       }),
+
+    /**
+     * Create a task AND immediately schedule it as one calendar block — used by
+     * the calendar's "new task" flow when the user opts to place it on the grid.
+     * The block links back via task_id, so it shows on the calendar and as a
+     * scheduled marker in Flows. Undo deletes the task; the events cascade-delete
+     * with it (FK on delete cascade), and `alsoEvents` refreshes both surfaces.
+     */
+    createWithBlock: (
+      input: TaskInput,
+      segment: { start: number; end: number; title?: string },
+      timeZone: string,
+    ) =>
+      run(
+        (async () => {
+          const task = await m.createTask(sb, input);
+          const events = await m.scheduleTaskBlocks(sb, task, [segment], timeZone);
+          return { task, events };
+        })(),
+        t("taskCreated"),
+        {
+          alsoEvents: true,
+          apply: ({ task }) => setTasks((old) => upsertTask(old, task)),
+          undo: ({ task }) =>
+            inverse(t("undoLabel.create"), () => m.deleteTask(sb, task.id), true),
+        },
+      ),
     update: (
       id: string,
       patch: Partial<TaskInput>,

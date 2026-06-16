@@ -129,6 +129,27 @@ export async function fetchTasks(
 }
 
 /**
+ * Every task-linked calendar block in the workspace (events with a non-null
+ * task_id), for the Flows view's scheduled-block markers. Un-windowed like
+ * fetchTasks — task blocks are non-recurring and few, so the whole set is one
+ * cache entry. RLS only returns blocks the viewer can see (a partner's private
+ * blocks never come back).
+ */
+export async function fetchTaskBlocks(
+  sb: SupabaseClient,
+  workspaceId: string,
+): Promise<EventRow[]> {
+  const { data, error } = await sb
+    .from("events")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .not("task_id", "is", null)
+    .order("starts_at");
+  if (error) throw error;
+  return (data ?? []).map(mapEvent);
+}
+
+/**
  * The full status-change history for the workspace, oldest first. Append-only
  * and tiny (a handful of rows per task), so it's a single un-windowed cache
  * entry like fetchTasks. RLS only returns events for tasks the viewer can see.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import {
   ResponsiveDialog,
@@ -49,14 +49,16 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { Trash2, CalendarPlus, ChevronDown } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import { SubtaskEditor } from "./subtask-editor";
 import { AttributeFields } from "@/components/shared/attribute-fields";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { taskFormSchema, type TaskFormValues } from "@/lib/tasks/schemas";
 import { parseAttributes, hasAnyAttribute } from "@/lib/attributes/schema";
-import type { Board, Category, Member, TaskRow } from "@/lib/types";
+import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
+import { formatTime, formatWeekdayDayMonth } from "@/lib/datetime/format";
+import type { Board, Category, Collection, Member, TaskRow } from "@/lib/types";
 import type { TaskInput } from "@/lib/supabase/mappers";
 
 export interface TaskDialogProps {
@@ -69,6 +71,29 @@ export interface TaskDialogProps {
   collectionId?: string | null;
   /** The collection's columns (ordered), for the board picker + completion. */
   boards: Board[];
+  /**
+   * When provided (e.g. opened from the calendar), the dialog shows a Collection
+   * picker so the task's destination is chosen in-dialog; the board picker then
+   * re-derives from `allBoards` filtered to the chosen collection.
+   */
+  collections?: Collection[];
+  /** All workspace boards — required alongside `collections` to drive the picker. */
+  allBoards?: Board[];
+  /** Initial collection selection when the Collection picker is shown. */
+  defaultCollectionId?: string | null;
+  /**
+   * When provided (calendar create), an optional "Schedule on calendar" switch
+   * appears; if enabled, the new task is also placed as a block at this slot.
+   */
+  defaultSchedule?: { start: number; end: number };
+  /**
+   * Create mode: switch the create surface to another item kind (Event /
+   * Context). When set, a 3-way type toggle is shown in the header. The current
+   * title is passed along so it survives the swap.
+   */
+  onKindChange?: (kind: "event" | "context" | "task", title?: string) => void;
+  /** Create mode: seed the title (e.g. carried over when switching item kind). */
+  defaultTitle?: string;
   members: Member[];
   categories: Category[];
   task?: TaskRow | null;
@@ -113,13 +138,36 @@ export function TaskDialog(props: TaskDialogProps) {
     (c) => c.ownerId === null || c.ownerId === currentMemberId,
   );
 
+  // When a Collection picker is offered (calendar create), the destination
+  // collection is chosen in-dialog and the board picker follows it. Elsewhere
+  // (tasks surface) the collection is fixed by the opener and `props.boards` is
+  // used as-is.
+  const showCollectionPicker =
+    mode === "create" && !props.createParent && Boolean(props.collections?.length);
+  const [collectionId, setCollectionId] = useState<string | null>(
+    props.defaultCollectionId ?? props.collectionId ?? null,
+  );
+  const effectiveBoards = useMemo(() => {
+    if (showCollectionPicker && props.allBoards) {
+      return props.allBoards
+        .filter((b) => b.collectionId === collectionId)
+        .sort((a, b) => a.position - b.position);
+    }
+    return props.boards;
+  }, [showCollectionPicker, props.allBoards, props.boards, collectionId]);
+
+  // Optional "place on the calendar" toggle, only when a slot is supplied.
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const timeZone = useViewerTimeZone();
+  const locale = useLocale();
+
   // The chosen column, else the parent's, else the create default, else the first.
   function resolveBoardId(values: TaskFormValues): string | null {
     return (
       values.boardId ||
       props.createParent?.boardId ||
       props.defaultBoardId ||
-      props.boards[0]?.id ||
+      effectiveBoards[0]?.id ||
       null
     );
   }
@@ -153,7 +201,7 @@ export function TaskDialog(props: TaskDialogProps) {
     // Completion follows the chosen column's is_done; the server trigger sets it
     // authoritatively, this is the optimistic value.
     const done = boardId
-      ? props.boards.find((b) => b.id === boardId)?.isDone ?? false
+      ? effectiveBoards.find((b) => b.id === boardId)?.isDone ?? false
       : false;
 
     if (mode === "create") {
@@ -162,14 +210,27 @@ export function TaskDialog(props: TaskDialogProps) {
         // A subtask stays under its parent's owner (matching the inline
         // SubtaskEditor) so the subtree's ownership/privacy stays coherent.
         ownerId: props.createParent?.ownerId ?? currentMemberId,
-        collectionId: props.createParent?.collectionId ?? props.collectionId ?? null,
+        collectionId:
+          props.createParent?.collectionId ??
+          (showCollectionPicker ? collectionId : props.collectionId) ??
+          null,
         parentId: props.createParent?.id ?? null,
         position: Date.now(), // new tasks sort to the bottom of their column
         ...payload,
         boardId,
         completedAt: done ? Date.now() : null,
       };
-      if (await mutations.create(input)) {
+      // When the slot's "Schedule on calendar" switch is on, create + place a
+      // block in one undoable step; otherwise the task only lands in the list.
+      const ok =
+        props.defaultSchedule && scheduleOn
+          ? await mutations.createWithBlock(
+              input,
+              { start: props.defaultSchedule.start, end: props.defaultSchedule.end },
+              timeZone,
+            )
+          : await mutations.create(input);
+      if (ok) {
         props.onCreated?.();
         onOpenChange(false);
       }
@@ -195,11 +256,32 @@ export function TaskDialog(props: TaskDialogProps) {
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>
-              {mode === "create"
-                ? t(props.createParent ? "taskDialog.subtaskTitle" : "taskDialog.createTitle")
-                : t("taskDialog.editTitle")}
-            </ResponsiveDialogTitle>
+            <div className="flex items-center justify-between gap-3">
+              <ResponsiveDialogTitle>
+                {mode === "create"
+                  ? t(props.createParent ? "taskDialog.subtaskTitle" : "taskDialog.createTitle")
+                  : t("taskDialog.editTitle")}
+              </ResponsiveDialogTitle>
+              {mode === "create" && props.onKindChange && (
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value="task"
+                  onValueChange={(v) =>
+                    v &&
+                    v !== "task" &&
+                    props.onKindChange?.(v as "event" | "context", form.state.values.title)
+                  }
+                  aria-label={t("taskDialog.itemType")}
+                  className="shrink-0"
+                >
+                  <ToggleGroupItem value="event">{t("taskDialog.kindEvent")}</ToggleGroupItem>
+                  <ToggleGroupItem value="context">{t("taskDialog.kindContext")}</ToggleGroupItem>
+                  <ToggleGroupItem value="task">{t("taskDialog.kindTask")}</ToggleGroupItem>
+                </ToggleGroup>
+              )}
+            </div>
           </ResponsiveDialogHeader>
 
           <ResponsiveDialogBody>
@@ -229,6 +311,36 @@ export function TaskDialog(props: TaskDialogProps) {
                 );
               }}
             </form.Field>
+
+            {showCollectionPicker && (
+              <Field>
+                <FieldLabel htmlFor="task-collection">
+                  {t("taskDialog.collectionLabel")}
+                </FieldLabel>
+                <Select
+                  value={collectionId ?? ""}
+                  onValueChange={(v) => {
+                    setCollectionId(v);
+                    // The old board belongs to the previous collection; clear it
+                    // so resolveBoardId falls back to the new collection's first.
+                    form.setFieldValue("boardId", "");
+                  }}
+                >
+                  <SelectTrigger id="task-collection">
+                    <SelectValue placeholder={t("taskDialog.collectionLabel")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {(props.collections ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
 
             <form.Field name="description">
               {(field) => (
@@ -357,6 +469,35 @@ export function TaskDialog(props: TaskDialogProps) {
               </form.Field>
             </FieldSection>
 
+            {/* Optional calendar placement, shown only when the dialog was opened
+                from a calendar slot. Off by default: a new task lands in the list,
+                and the user opts in to also book the slot as a linked block. */}
+            {mode === "create" && props.defaultSchedule && (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="task-schedule">
+                    {t("taskDialog.scheduleOnCalendarLabel")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {scheduleOn
+                      ? t("taskDialog.scheduleOnCalendarAt", {
+                          when: `${formatWeekdayDayMonth(
+                            props.defaultSchedule.start,
+                            timeZone,
+                            locale,
+                          )} · ${formatTime(props.defaultSchedule.start, timeZone)}`,
+                        })
+                      : t("taskDialog.scheduleOnCalendarHint")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="task-schedule"
+                  checked={scheduleOn}
+                  onCheckedChange={setScheduleOn}
+                />
+              </Field>
+            )}
+
             {/* More options — status (edit only) and the two flags tucked behind
                 progressive disclosure so the form mirrors the Event dialog. */}
             <Collapsible open={showMore} onOpenChange={setShowMore}>
@@ -375,13 +516,13 @@ export function TaskDialog(props: TaskDialogProps) {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <FieldSection className="pt-4">
-                  {props.boards.length > 0 && (
+                  {effectiveBoards.length > 0 && (
                     <form.Field name="boardId">
                       {(field) => (
                         <Field>
                           <FieldLabel htmlFor="task-board">{t("taskDialog.columnLabel")}</FieldLabel>
                           <Select
-                            value={field.state.value || props.boards[0].id}
+                            value={field.state.value || effectiveBoards[0].id}
                             onValueChange={field.handleChange}
                           >
                             <SelectTrigger id="task-board">
@@ -389,7 +530,7 @@ export function TaskDialog(props: TaskDialogProps) {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
-                                {props.boards.map((b) => (
+                                {effectiveBoards.map((b) => (
                                   <SelectItem key={b.id} value={b.id}>
                                     {b.name}
                                   </SelectItem>
@@ -577,7 +718,7 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
   // A subtask inherits its parent's assignee, context, and privacy (matching
   // the inline SubtaskEditor); a plain top-level task starts unset.
   return {
-    title: "",
+    title: props.defaultTitle ?? "",
     description: "",
     assigneeId: createParent?.assigneeId ?? "none",
     categoryId: createParent?.categoryId ?? "none",

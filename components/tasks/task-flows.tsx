@@ -32,7 +32,7 @@ import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import { FlowTrack } from "./flows/flow-track";
 import { FlowRowMenu } from "./flows/flow-row-menu";
 import type { TaskActions } from "./task-actions";
-import type { Member, TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { EventRow, Member, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 const G = FLOW_GEOM;
 const ZOOM = { month: 9, week: 26, day: 80 } as const;
@@ -48,6 +48,8 @@ export interface TaskFlowsProps {
   tasks: TaskRow[]; // top-level tasks only
   childrenByParent: Map<string | null, TaskRow[]>;
   eventsByTask: Map<string, TaskStatusEvent[]>;
+  /** task id -> its linked calendar blocks, for scheduled-block markers */
+  blocksByTask: Map<string, EventRow[]>;
   colorOf: (t: TaskRow) => string;
   /** the Flows line style for a task, resolved from its board (state). */
   lineStyleOf: (t: TaskRow) => FlowLineStyle;
@@ -66,6 +68,7 @@ export function TaskFlows({
   tasks,
   childrenByParent,
   eventsByTask,
+  blocksByTask,
   colorOf,
   lineStyleOf,
   members,
@@ -110,8 +113,9 @@ export function TaskFlows({
   const [canvasH, setCanvasH] = useState(0);
 
   const lanes = useMemo(
-    () => buildFlowLanes({ topLevel: tasks, childrenByParent, eventsByTask, nowMs }),
-    [tasks, childrenByParent, eventsByTask, nowMs],
+    () =>
+      buildFlowLanes({ topLevel: tasks, childrenByParent, eventsByTask, blocksByTask, nowMs }),
+    [tasks, childrenByParent, eventsByTask, blocksByTask, nowMs],
   );
   // The data window is the meaningful extent; the render window pads each side
   // by half the visible track so any point (incl. "now") can be scrolled to the

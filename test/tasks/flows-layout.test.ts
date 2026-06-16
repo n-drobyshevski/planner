@@ -7,7 +7,7 @@ import {
   xForTime,
   FLOW_GEOM,
 } from "@/lib/tasks/flows-layout";
-import type { TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { EventRow, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 const T0 = Date.UTC(2026, 5, 1); // Mon 1 Jun 2026 UTC
 const now = T0 + 10 * DAY_MS;
@@ -50,6 +50,35 @@ function ev(over: Partial<TaskStatusEvent>): TaskStatusEvent {
     toIsDone: false,
     changedBy: "me",
     changedAt: T0,
+    ...over,
+  };
+}
+
+function block(over: Partial<EventRow>): EventRow {
+  return {
+    id: "blk",
+    workspaceId: "w",
+    ownerId: "me",
+    categoryId: null,
+    title: "blk",
+    description: null,
+    location: null,
+    isPrivate: false,
+    isShared: false,
+    color: null,
+    kind: "event",
+    allDay: false,
+    inactive: false,
+    status: "confirmed",
+    start: T0,
+    end: T0 + 3_600_000,
+    timeZone: "UTC",
+    rrule: null,
+    recurrenceEndsAt: null,
+    taskId: "t",
+    attributes: {},
+    createdAt: T0,
+    updatedAt: T0,
     ...over,
   };
 }
@@ -136,6 +165,54 @@ describe("buildFlowLanes", () => {
     const [lane] = buildFlowLanes({ topLevel: [tk], childrenByParent: noChildren, eventsByTask: events, nowMs: now });
     expect(lane.milestone).toBe(true);
     expect(lane.startMs).toBe(Date.UTC(2026, 5, 20));
+  });
+
+  it("adds a scheduled node per linked block without moving the planned span", () => {
+    const tk = task({ id: "sch", startDate: "2026-06-03", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["sch", [ev({ taskId: "sch", changedAt: T0 })]],
+    ]);
+    const blocks = new Map<string, EventRow[]>([
+      [
+        "sch",
+        [
+          block({ id: "b1", taskId: "sch", start: T0 + 4 * DAY_MS }),
+          block({ id: "b2", taskId: "sch", start: T0 + 6 * DAY_MS }),
+        ],
+      ],
+    ]);
+    const [lane] = buildFlowLanes({
+      topLevel: [tk],
+      childrenByParent: noChildren,
+      eventsByTask: events,
+      blocksByTask: blocks,
+      nowMs: now,
+    });
+    const scheduled = lane.nodes.filter((n) => n.kind === "scheduled");
+    expect(scheduled.map((n) => n.ms)).toEqual([T0 + 4 * DAY_MS, T0 + 6 * DAY_MS]);
+    // planned start stays put (3 Jun); blocks never move the span left edge
+    expect(lane.startMs).toBe(Date.UTC(2026, 5, 3));
+  });
+
+  it("includes a scheduled marker on a future, not-yet-started task and extends the window", () => {
+    const tk = task({ id: "future", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["future", [ev({ taskId: "future", changedAt: T0 })]],
+    ]);
+    const blocks = new Map<string, EventRow[]>([
+      ["future", [block({ id: "fb", taskId: "future", start: Date.UTC(2026, 6, 15) })]],
+    ]);
+    const lanes = buildFlowLanes({
+      topLevel: [tk],
+      childrenByParent: noChildren,
+      eventsByTask: events,
+      blocksByTask: blocks,
+      nowMs: now,
+    });
+    expect(lanes[0].nodes.some((n) => n.kind === "scheduled")).toBe(true);
+    const { t1 } = flowsWindow(lanes, now, { lookbackDays: 90, padDays: 1 });
+    // window reaches the future block (15 Jul), not just clamped near `now` (11 Jun)
+    expect(t1).toBeGreaterThanOrEqual(Date.UTC(2026, 6, 15));
   });
 
   it("attaches subtasks as branches and sorts open lanes before done", () => {

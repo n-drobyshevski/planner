@@ -29,7 +29,8 @@
       "done": "Done",
       "reopened": "Reopened",
       "due": "Due",
-      "overdue": "Overdue"
+      "overdue": "Overdue",
+      "scheduled": "Scheduled"
     },
     "zoom": {
       "label": "Time scale",
@@ -114,6 +115,14 @@
     "createTitle": "New task",
     "subtaskTitle": "Add subtask",
     "editTitle": "Edit task",
+    "itemType": "Item type",
+    "kindEvent": "Event",
+    "kindContext": "Context",
+    "kindTask": "Task",
+    "collectionLabel": "Collection",
+    "scheduleOnCalendarLabel": "Schedule on calendar",
+    "scheduleOnCalendarHint": "Off — the task lands in the list only. Turn on to also place a time block.",
+    "scheduleOnCalendarAt": "Places a time block at {when}.",
     "titleLabel": "Title",
     "titlePlaceholder": "What needs doing?",
     "notesLabel": "Notes",

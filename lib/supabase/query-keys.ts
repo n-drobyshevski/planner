@@ -11,6 +11,14 @@ export const qk = {
     ["events", workspaceId, start, end] as const,
   /** Match-all prefix for invalidating every window query on realtime change. */
   eventsAll: (workspaceId: string) => ["events", workspaceId] as const,
+  /**
+   * Task-linked calendar blocks (events with task_id), un-windowed — for the
+   * Flows view's scheduled-block markers. Keyed UNDER the `["events", id]`
+   * prefix so the existing eventsAll invalidation (schedule / create / delete /
+   * move) refreshes it automatically.
+   */
+  taskBlocks: (workspaceId: string) =>
+    ["events", workspaceId, "task-blocks"] as const,
   /** All tasks (+ subtasks) in the workspace; not windowed. */
   tasks: (workspaceId: string) => ["tasks", workspaceId] as const,
   /** Append-only task status-change history for the workspace; not windowed. */
