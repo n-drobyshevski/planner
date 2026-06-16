@@ -111,6 +111,12 @@ export function CalendarToolbar({
             {workspace?.workspaceName ?? "Planner"}
           </span>
         </div>
+      </ToolbarSlot>
+
+      <ToolbarSlot name="center">
+        {/* Phones only: Filters sits right of the AppNav surface switcher (which
+            the chrome renders between the leading and center slots), so the row
+            reads switcher · filters · label. */}
         <Button
           variant="ghost"
           size="icon"
@@ -120,9 +126,6 @@ export function CalendarToolbar({
         >
           <SlidersHorizontal />
         </Button>
-      </ToolbarSlot>
-
-      <ToolbarSlot name="center">
         <Button
           variant="outline"
           size="sm"
