@@ -52,8 +52,15 @@
     "menu": {
       "center": "Center on timeline",
       "addSubtask": "Add subtask",
+      "addCheckpoint": "Add milestone",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all"
+    },
+    "checkpoint": {
+      "label": "Milestone",
+      "untitled": "Untitled milestone",
+      "reached": "Milestone reached",
+      "upcoming": "Upcoming milestone"
     },
     "display": {
       "label": "Display options",
@@ -103,6 +110,27 @@
       "emptyBody": "No tasks match the current filters.",
       "clear": "Clear filters"
     }
+  },
+  "checkpointDialog": {
+    "createTitle": "Add milestone",
+    "editTitle": "Edit milestone",
+    "onFlow": "On {title}",
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g. Beta freeze",
+    "dateLabel": "Date",
+    "shapeLabel": "Marker",
+    "colorLabel": "Color",
+    "reachedLabel": "Reached",
+    "reachedHint": "Mark the milestone as hit.",
+    "shapes": {
+      "flag": "Flag",
+      "diamond": "Diamond",
+      "star": "Star",
+      "dot": "Dot",
+      "triangle": "Triangle"
+    },
+    "deleteTitle": "Delete milestone?",
+    "deleteDescription": "This removes the milestone from the flow. You can undo it right after."
   },
   "board": {
     "addTaskTo": "Add task to {title}",

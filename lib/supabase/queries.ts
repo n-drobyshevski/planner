@@ -12,6 +12,7 @@ import type {
   SleepLog,
   TaskRow,
   TaskStatusEvent,
+  TaskCheckpoint,
   TimeWindow,
 } from "@/lib/types";
 import {
@@ -27,6 +28,7 @@ import {
   mapSleepLog,
   mapTask,
   mapStatusEvent,
+  mapCheckpoint,
 } from "./mappers";
 
 export interface WorkspaceBundle {
@@ -165,6 +167,25 @@ export async function fetchTaskStatusEvents(
     .order("changed_at");
   if (error) throw error;
   return (data ?? []).map(mapStatusEvent);
+}
+
+/**
+ * All flow checkpoints for the workspace, ordered by date then position. Tiny
+ * and un-windowed like the status history; RLS only returns checkpoints for
+ * tasks the viewer can see (a private task's checkpoints never come back).
+ */
+export async function fetchTaskCheckpoints(
+  sb: SupabaseClient,
+  workspaceId: string,
+): Promise<TaskCheckpoint[]> {
+  const { data, error } = await sb
+    .from("task_checkpoints")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("at_date")
+    .order("position");
+  if (error) throw error;
+  return (data ?? []).map(mapCheckpoint);
 }
 
 /**

@@ -256,6 +256,35 @@ export interface TaskStatusEvent {
   changedAt: number;
 }
 
+/** A small set of marker shapes for a checkpoint. Shape carries meaning so the
+ *  marker never relies on color alone (design system). Mirror the DB CHECK and
+ *  the Zod enum in lib/tasks/schemas.ts. */
+export type CheckpointShape = "flag" | "diamond" | "star" | "dot" | "triangle";
+
+/**
+ * A flow milestone *checkpoint*: a user-placed marker at a date along a top-level
+ * task's trunk in the Flows view. A task HAS MANY checkpoints. Distinct from
+ * `TaskRow.isMilestone` (a whole-task point-lane). `atDate` is a zone-free
+ * calendar-date token ("yyyy-MM-dd"), like dueDate/startDate. `color` null =
+ * inherit the flow's resolved color. `reached` is the authoritative done flag;
+ * `reachedAt` is the epoch-ms stamp it was set, or null.
+ */
+export interface TaskCheckpoint {
+  id: string;
+  taskId: string;
+  workspaceId: string;
+  title: string;
+  atDate: string; // "yyyy-MM-dd"
+  reached: boolean;
+  reachedAt: number | null;
+  color: string | null; // hex override; null = inherit flow color
+  shape: CheckpointShape;
+  position: number;
+  createdBy: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface OverrideRow {
   id: string;
   workspaceId: string;

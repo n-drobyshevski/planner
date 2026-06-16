@@ -14,6 +14,7 @@ import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskStatusEvents } from "@/lib/hooks/use-task-status-events";
 import { useTaskBlocks } from "@/lib/hooks/use-task-blocks";
+import { useTaskCheckpoints } from "@/lib/hooks/use-task-checkpoints";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
 import { useFlowsDisplay } from "@/lib/hooks/use-flows-display";
@@ -36,7 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { TaskActions } from "./task-actions";
-import type { EventRow, TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { EventRow, TaskCheckpoint, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 // Defer the task/schedule dialogs out of the initial /tasks JS (both portaled →
 // null fallback, no layout cost). Warmed on idle via useIdlePreload so the
@@ -47,6 +48,12 @@ const TaskDialog = dynamic(loadTaskDialog, { ssr: false, loading: () => null });
 const loadScheduleTaskDialog = () =>
   import("./schedule-task-dialog").then((m) => m.ScheduleTaskDialog);
 const ScheduleTaskDialog = dynamic(loadScheduleTaskDialog, {
+  ssr: false,
+  loading: () => null,
+});
+const loadCheckpointDialog = () =>
+  import("./checkpoint-dialog").then((m) => m.CheckpointDialog);
+const CheckpointDialog = dynamic(loadCheckpointDialog, {
   ssr: false,
   loading: () => null,
 });
@@ -61,6 +68,7 @@ const TaskFlows = dynamic(loadTaskFlows, { ssr: false, loading: () => null });
 const OVERLAY_PRELOADS = [
   loadTaskDialog,
   loadScheduleTaskDialog,
+  loadCheckpointDialog,
   loadTaskFlows,
 ];
 
@@ -119,6 +127,8 @@ export function TasksShell({
   const { events, isLoading: eventsLoading } = useTaskStatusEvents(workspaceId);
   // Task-linked calendar blocks power the Flows view's scheduled markers.
   const { blocks, isLoading: blocksLoading } = useTaskBlocks(workspaceId);
+  // Milestone checkpoints power the Flows view's per-flow markers.
+  const { checkpoints } = useTaskCheckpoints(workspaceId);
   const mutations = useTaskMutations(workspaceId);
 
   const members = workspace.data?.members ?? [];
@@ -222,6 +232,16 @@ export function TasksShell({
     }
     return map;
   }, [blocks]);
+  // Checkpoints grouped by task id, for the Flows per-flow milestone markers.
+  const checkpointsByTask = useMemo(() => {
+    const map = new Map<string, TaskCheckpoint[]>();
+    for (const c of checkpoints) {
+      const arr = map.get(c.taskId);
+      if (arr) arr.push(c);
+      else map.set(c.taskId, [c]);
+    }
+    return map;
+  }, [checkpoints]);
   const progressFor = (t: TaskRow) => {
     const c = childrenByParent.get(t.id) ?? [];
     return c.length ? progressOf(c) : null;
@@ -246,7 +266,24 @@ export function TasksShell({
     changeColor: (t, color) =>
       void mutations.update(t.id, { color }, { color: t.color }, { color }),
     remove: (t) => dialogs.openDelete(t),
+    addCheckpoint: (t, atDate) => dialogs.openCreateCheckpoint(t.id, atDate),
+    openCheckpoint: (checkpointId) => dialogs.openEditCheckpoint(checkpointId),
   };
+
+  // The checkpoint editor's target, resolved from the live list (edit) or the
+  // flow it's being added to (create), like editingTask/creatingParent above.
+  const checkpointEditor = dialogs.checkpointEditor;
+  const editingCheckpoint =
+    checkpointEditor?.mode === "edit"
+      ? (checkpoints.find((c) => c.id === checkpointEditor.checkpointId) ?? null)
+      : null;
+  const checkpointTaskId =
+    checkpointEditor?.mode === "create"
+      ? checkpointEditor.taskId
+      : (editingCheckpoint?.taskId ?? null);
+  const checkpointFlow = checkpointTaskId
+    ? (tasks.find((t) => t.id === checkpointTaskId) ?? null)
+    : null;
 
   // The parent a create-as-subtask was launched from (Flows "Add subtask").
   // Resolved from the live task set so the dialog can inherit its collection,
@@ -335,6 +372,7 @@ export function TasksShell({
                     childrenByParent={childrenByParent}
                     eventsByTask={eventsByTask}
                     blocksByTask={blocksByTask}
+                    checkpointsByTask={checkpointsByTask}
                     colorOf={colorOf}
                     lineStyleOf={lineStyleOf}
                     members={memberMap}
@@ -414,6 +452,27 @@ export function TasksShell({
                 ? () => dialogs.scheduleFromEditor(editingTask)
                 : undefined
             }
+          />
+        )}
+
+      {checkpointEditor &&
+        workspace.data?.currentMember &&
+        checkpointFlow &&
+        (checkpointEditor.mode === "create" || editingCheckpoint) && (
+          <CheckpointDialog
+            open
+            onOpenChange={(o) => {
+              if (!o) dialogs.closeCheckpoint();
+            }}
+            mode={checkpointEditor.mode}
+            workspaceId={workspace.data.workspaceId}
+            currentMemberId={workspace.data.currentMember.id}
+            taskId={checkpointFlow.id}
+            taskTitle={checkpointFlow.title}
+            defaultAtDate={
+              checkpointEditor.mode === "create" ? checkpointEditor.atDate : undefined
+            }
+            checkpoint={editingCheckpoint}
           />
         )}
 

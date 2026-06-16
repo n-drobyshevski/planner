@@ -7,7 +7,13 @@
 // Subtasks are *branches* that diverge from the trunk at their own creation and
 // merge back at completion. *Nodes* sit at each recorded status transition.
 
-import type { EventRow, TaskRow, TaskStatusEvent } from "@/lib/types";
+import type {
+  CheckpointShape,
+  EventRow,
+  TaskCheckpoint,
+  TaskRow,
+  TaskStatusEvent,
+} from "@/lib/types";
 import { dateInputToUtcMs } from "@/lib/datetime/local";
 
 export const DAY_MS = 86_400_000;
@@ -32,6 +38,23 @@ export interface FlowNode {
   overdue?: boolean;
 }
 
+/**
+ * A user-placed milestone checkpoint on a segment's trunk — its own overlay,
+ * separate from `nodes` because it carries identity (id/title/reached/color/
+ * shape) and opens the checkpoint editor, not the task. `ms` is the at_date
+ * resolved to UTC midnight.
+ */
+export interface FlowCheckpoint {
+  id: string;
+  ms: number;
+  title: string;
+  reached: boolean;
+  shape: CheckpointShape;
+  /** hex/swatch override; null = inherit the lane color */
+  color: string | null;
+  taskId: string;
+}
+
 /** A trunk or a single subtask branch — one task's span and its nodes. */
 export interface FlowSegment {
   task: TaskRow;
@@ -41,6 +64,8 @@ export interface FlowSegment {
   nodes: FlowNode[];
   /** point-in-time task: render a single moment marker at `startMs`, no span line */
   milestone: boolean;
+  /** user-placed milestone checkpoints on this trunk, sorted by ms (default []) */
+  checkpoints: FlowCheckpoint[];
 }
 
 export interface FlowLane extends FlowSegment {
@@ -88,6 +113,7 @@ function buildSegment(
   events: TaskStatusEvent[] | undefined,
   nowMs: number,
   blocks?: EventRow[],
+  checkpoints?: TaskCheckpoint[],
 ): FlowSegment {
   const evs = (events ?? []).slice().sort((a, b) => a.changedAt - b.changedAt);
 
@@ -139,7 +165,21 @@ function buildSegment(
   }
   nodes.sort(byMs);
 
-  return { task, startMs, endMs, nodes, milestone: task.isMilestone };
+  // User-placed checkpoints: an independent overlay on the trunk, sorted by date
+  // (then position, preserved from the query order). Resolved to UTC midnight so
+  // they land on the same day gridline for every viewer, like due/start.
+  const points: FlowCheckpoint[] = (checkpoints ?? []).map((c) => ({
+    id: c.id,
+    ms: dateInputToUtcMs(c.atDate),
+    title: c.title,
+    reached: c.reached,
+    shape: c.shape,
+    color: c.color,
+    taskId: c.taskId,
+  }));
+  points.sort(byMs);
+
+  return { task, startMs, endMs, nodes, milestone: task.isMilestone, checkpoints: points };
 }
 
 /**
@@ -153,9 +193,12 @@ export function buildFlowLanes(args: {
   eventsByTask: Map<string, TaskStatusEvent[]>;
   /** task id -> its linked calendar blocks, for scheduled-block markers */
   blocksByTask?: Map<string, EventRow[]>;
+  /** task id -> its milestone checkpoints (top-level lanes only in v1) */
+  checkpointsByTask?: Map<string, TaskCheckpoint[]>;
   nowMs: number;
 }): FlowLane[] {
-  const { topLevel, childrenByParent, eventsByTask, blocksByTask, nowMs } = args;
+  const { topLevel, childrenByParent, eventsByTask, blocksByTask, checkpointsByTask, nowMs } =
+    args;
 
   const lanes: FlowLane[] = topLevel.map((task) => {
     const trunk = buildSegment(
@@ -163,8 +206,11 @@ export function buildFlowLanes(args: {
       eventsByTask.get(task.id),
       nowMs,
       blocksByTask?.get(task.id),
+      checkpointsByTask?.get(task.id),
     );
     const children = childrenByParent.get(task.id) ?? [];
+    // Branches don't carry checkpoints in v1 (the menu offers them on trunks
+    // only); they get an empty checkpoint overlay.
     const branches = children.map((c) =>
       buildSegment(c, eventsByTask.get(c.id), nowMs, blocksByTask?.get(c.id)),
     );
@@ -202,6 +248,12 @@ export function flowsWindow(
       min = Math.min(min, n.ms);
       max = Math.max(max, n.ms);
     }
+    // A checkpoint can sit far in the future/past; include it so its lane and
+    // marker stay reachable (mirrors the node loop above).
+    for (const c of s.checkpoints) {
+      min = Math.min(min, c.ms);
+      max = Math.max(max, c.ms);
+    }
   };
   for (const lane of lanes) {
     visit(lane);
@@ -221,6 +273,11 @@ export function flowsWindow(
 /** Map a timestamp to an x offset (px) within the graph track. */
 export function xForTime(ms: number, t0: number, pxPerDay: number): number {
   return ((ms - t0) / DAY_MS) * pxPerDay;
+}
+
+/** Inverse of `xForTime`: an x offset (px) within the track back to a timestamp. */
+export function timeForX(x: number, t0: number, pxPerDay: number): number {
+  return t0 + (x / pxPerDay) * DAY_MS;
 }
 
 export interface LaidOutLane {

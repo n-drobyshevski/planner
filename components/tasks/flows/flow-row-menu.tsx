@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Circle,
   Crosshair,
+  Flag,
   ListPlus,
   UnfoldVertical,
   FoldVertical,
@@ -32,6 +33,7 @@ export function FlowRowMenu({
   onDelete,
   onChangeColor,
   onAddSubtask,
+  onAddCheckpoint,
   onExpandAll,
   onCollapseAll,
   children,
@@ -45,6 +47,8 @@ export function FlowRowMenu({
   onChangeColor: (color: string | null) => void;
   /** Top-level lanes only: create a child task under this one. */
   onAddSubtask?: () => void;
+  /** Top-level lanes only: add a milestone checkpoint to this flow. */
+  onAddCheckpoint?: () => void;
   /** Top-level lanes only: expand/collapse every lane with subtasks. */
   onExpandAll?: () => void;
   onCollapseAll?: () => void;
@@ -65,6 +69,9 @@ export function FlowRowMenu({
   ];
   if (onAddSubtask) {
     actions.push({ label: t("flows.menu.addSubtask"), icon: ListPlus, onSelect: onAddSubtask });
+  }
+  if (onAddCheckpoint) {
+    actions.push({ label: t("flows.menu.addCheckpoint"), icon: Flag, onSelect: onAddCheckpoint });
   }
   if (onExpandAll && onCollapseAll) {
     actions.push(

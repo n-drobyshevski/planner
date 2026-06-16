@@ -19,4 +19,8 @@ export interface TaskActions {
   changeColor: (t: TaskRow, color: string | null) => void;
   /** Ask to delete (opens the confirm dialog). */
   remove: (t: TaskRow) => void;
+  /** Open the checkpoint editor to add a milestone to this flow (optional date). */
+  addCheckpoint: (t: TaskRow, atDate?: string) => void;
+  /** Open the checkpoint editor in edit mode for an existing marker. */
+  openCheckpoint: (checkpointId: string) => void;
 }
