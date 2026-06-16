@@ -72,6 +72,10 @@ const ScheduleTaskDialog = dynamic(loadScheduleTaskDialog, {
   ssr: false,
   loading: () => null,
 });
+const TaskDialog = dynamic(
+  () => import("@/components/tasks/task-dialog").then((m) => m.TaskDialog),
+  { ssr: false, loading: () => null },
+);
 const CalendarFiltersSheet = dynamic(
   () =>
     import("@/components/sidebar/calendar-filters-sheet").then(
@@ -90,9 +94,13 @@ const OVERLAY_PRELOADS = [loadEventDialog, loadScheduleTaskDialog];
 type EditorState =
   | {
       mode: "create";
+      /** which create surface to show: an event/context dialog, or the task dialog */
+      kind: "event" | "context" | "task";
       defaultStart: number;
       defaultEnd: number;
       defaultCategoryId: string | null;
+      /** title carried across a kind swap so typed input isn't lost */
+      title?: string;
     }
   | { mode: "edit"; event: EventRow; occurrence: Occurrence };
 
@@ -339,6 +347,12 @@ export function CalendarShell({
     [tasks],
   );
   const childrenByParent = useMemo(() => groupByParent(tasks), [tasks]);
+  // Default destination for a task created from the calendar: the shared
+  // collection if there is one, else the first. The dialog's picker can change it.
+  const defaultTaskCollectionId = useMemo(() => {
+    const cols = workspace.data?.collections ?? [];
+    return (cols.find((c) => c.ownerId === null) ?? cols[0])?.id ?? null;
+  }, [workspace.data?.collections]);
   // The backlog rail is for scheduling your OWN tasks; others' tasks (now
   // returned by RLS as non-private) aren't schedulable from here.
   const backlogTasks = (childrenByParent.get(null) ?? []).filter(
@@ -413,6 +427,7 @@ export function CalendarShell({
     const ctx = enclosingContext(contextOccs, start);
     setEditor({
       mode: "create",
+      kind: "event",
       defaultStart: start,
       defaultEnd: end,
       defaultCategoryId: ctx?.categoryId ?? null,
@@ -422,6 +437,10 @@ export function CalendarShell({
   function createOnDay(dayMs: number) {
     const s = defaultStartOnDay(dayMs, viewerTimeZone);
     onCreateRange(s, s + 3_600_000);
+  }
+  /** Swap the create surface between event/context/task, carrying the title. */
+  function onCreateKindChange(kind: "event" | "context" | "task", title?: string) {
+    setEditor((prev) => (prev && prev.mode === "create" ? { ...prev, kind, title } : prev));
   }
   /** Assign an item to a Context (categoryId), or clear it (null). Series-level. */
   function onAssignCategory(occ: Occurrence, categoryId: string | null) {
@@ -1071,7 +1090,34 @@ export function CalendarShell({
         />
       )}
 
-      {editor && workspace.data?.currentMember && (
+      {editor &&
+        editor.mode === "create" &&
+        editor.kind === "task" &&
+        workspace.data?.currentMember && (
+          <TaskDialog
+            open
+            onOpenChange={(o) => {
+              if (!o) setEditor(null);
+            }}
+            mode="create"
+            workspaceId={workspace.data.workspaceId}
+            currentMemberId={workspace.data.currentMember.id}
+            boards={[]}
+            collections={workspace.data.collections}
+            allBoards={workspace.data.boards}
+            defaultCollectionId={defaultTaskCollectionId}
+            categories={workspace.data.categories}
+            members={workspace.data.members}
+            defaultSchedule={{ start: editor.defaultStart, end: editor.defaultEnd }}
+            defaultTitle={editor.title}
+            onKindChange={onCreateKindChange}
+            onCreated={() => setEditor(null)}
+          />
+        )}
+
+      {editor &&
+        !(editor.mode === "create" && editor.kind === "task") &&
+        workspace.data?.currentMember && (
         <EventDialog
           open
           onOpenChange={(o) => {
@@ -1086,6 +1132,11 @@ export function CalendarShell({
           defaultStart={editor.mode === "create" ? editor.defaultStart : undefined}
           defaultEnd={editor.mode === "create" ? editor.defaultEnd : undefined}
           defaultCategoryId={editor.mode === "create" ? editor.defaultCategoryId : undefined}
+          defaultKind={
+            editor.mode === "create" && editor.kind !== "task" ? editor.kind : undefined
+          }
+          defaultTitle={editor.mode === "create" ? editor.title : undefined}
+          onKindChange={editor.mode === "create" ? onCreateKindChange : undefined}
           readOnly={editor.mode === "edit" && !canEdit(editor.occurrence, viewerId)}
           ownerName={
             editor.mode === "edit"

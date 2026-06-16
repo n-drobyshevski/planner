@@ -98,6 +98,17 @@ export interface EventDialogProps {
   readOnly?: boolean;
   /** Owner's name, shown in the read-only banner. */
   ownerName?: string;
+  /**
+   * Create mode: switch the create surface to another item kind. When set, the
+   * type toggle gains a "Task" option; choosing it calls this so the parent can
+   * swap to the task dialog (a task isn't an event row). The current title is
+   * passed along so it survives the swap.
+   */
+  onKindChange?: (kind: "event" | "context" | "task", title?: string) => void;
+  /** Create mode: which item kind to open in (event | context). Default "event". */
+  defaultKind?: EventKind;
+  /** Create mode: seed the title (e.g. carried over when switching item kind). */
+  defaultTitle?: string;
 }
 
 export function EventDialog(props: EventDialogProps) {
@@ -364,12 +375,24 @@ export function EventDialog(props: EventDialogProps) {
                               variant="outline"
                               size="sm"
                               value={field.state.value}
-                              onValueChange={(v) => v && field.handleChange(v as EventKind)}
+                              onValueChange={(v) => {
+                                if (!v) return;
+                                // "task" isn't an event row — hand off to the parent
+                                // to swap dialogs instead of touching the form field.
+                                if (v === "task") {
+                                  props.onKindChange?.("task", form.state.values.title);
+                                  return;
+                                }
+                                field.handleChange(v as EventKind);
+                              }}
                               aria-label={t("dialog.itemType")}
                               className="shrink-0"
                             >
                               <ToggleGroupItem value="event">{t("dialog.kindEvent")}</ToggleGroupItem>
                               <ToggleGroupItem value="context">{t("dialog.kindContext")}</ToggleGroupItem>
+                              {props.onKindChange && (
+                                <ToggleGroupItem value="task">{t("dialog.kindTask")}</ToggleGroupItem>
+                              )}
                             </ToggleGroup>
                           )}
                         </form.Field>
@@ -846,7 +869,7 @@ function recurrenceEndsAt(form: RecurrenceForm | null): number | null {
 }
 
 function buildInitial(props: EventDialogProps, timeZone: string): EventFormValues {
-  const { mode, event, occurrence, defaultStart, defaultEnd, defaultCategoryId } = props;
+  const { mode, event, occurrence, defaultStart, defaultEnd, defaultCategoryId, defaultKind, defaultTitle } = props;
   if (mode === "edit" && event && occurrence) {
     // All-day events are floating dates anchored to UTC midnight: read their
     // date in UTC so the picker shows the same calendar date for every viewer.
@@ -875,8 +898,8 @@ function buildInitial(props: EventDialogProps, timeZone: string): EventFormValue
   const start = defaultStart ?? ceilToStep(Date.now(), 30);
   const end = defaultEnd ?? start + 3_600_000;
   return {
-    itemKind: "event",
-    title: "",
+    itemKind: defaultKind ?? "event",
+    title: defaultTitle ?? "",
     description: "",
     location: "",
     allDay: false,

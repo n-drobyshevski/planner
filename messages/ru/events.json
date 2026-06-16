@@ -26,6 +26,7 @@
     "itemType": "Тип элемента",
     "kindEvent": "Событие",
     "kindContext": "Контекст",
+    "kindTask": "Задача",
     "readOnly": "Только для чтения · {owner}",
     "readOnlyOwner": "Календарь: {name}",
     "readOnlyOther": "другой календарь",

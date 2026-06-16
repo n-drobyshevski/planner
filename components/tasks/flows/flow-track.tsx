@@ -16,8 +16,8 @@
 import { useState, type ReactNode } from "react";
 import type {
   FlowNode,
+  FlowRow,
   FlowSegment,
-  LaidOutLane,
 } from "@/lib/tasks/flows-layout";
 import { FLOW_GEOM, xForTime } from "@/lib/tasks/flows-layout";
 import {
@@ -33,7 +33,7 @@ const ELBOW = 12; // horizontal run of a branch diverge/merge curve
 const DOTS = "2 2.5"; // dash pattern for "planned / not yet real" strokes
 
 export interface FlowTrackProps {
-  rows: LaidOutLane[];
+  rows: FlowRow[];
   /** full canvas height — fills the viewport so gridlines/now-line run the whole height */
   height: number;
   t0: number;
@@ -107,7 +107,31 @@ export function FlowTrack({
             />
           );
         })}
-        {rows.map(({ lane, top, branchRows }) => {
+        {rows.map((row) => {
+          // A group-by section band: a faint full-width tint + a divider under
+          // it, aligned to the gutter's header row by sharing `top`/`height`.
+          if (row.kind === "group") {
+            return (
+              <g key={`group-${row.key}`} aria-hidden>
+                <rect
+                  x={0}
+                  y={row.top}
+                  width={trackWidth}
+                  height={row.height}
+                  fill="var(--muted)"
+                  opacity={0.35}
+                />
+                <line
+                  x1={0}
+                  y1={row.top + row.height}
+                  x2={trackWidth}
+                  y2={row.top + row.height}
+                  stroke="var(--border)"
+                />
+              </g>
+            );
+          }
+          const { lane, top, branchRows } = row;
           const color = colorOf(lane.task);
           const mine = lane.task.ownerId === currentMemberId;
           const trunkY = top + G.laneHeight / 2;
@@ -120,11 +144,18 @@ export function FlowTrack({
           // A not-yet-started task with a future start has no elapsed span to draw.
           const planned = !lane.milestone && isFuture && lane.endMs === null;
           const endX = x(lane.endMs ?? Math.min(nowMs, t1));
+          // How far an open line reaches into the future: the furthest booked block
+          // or deadline ahead of now (else just `now`). Drives the grayed, dotted
+          // "planned ahead" extension past the now-line.
+          const reach = lane.endMs === null ? futureReachMs(lane, nowMs) : nowMs;
+          const reachX = x(Math.min(reach, t1));
+          const hasFuture = reach > nowMs;
           // A milestone / planned-start segment carries its status in the marker,
-          // so only a `due` marker is drawn as a node; a real span shows them all.
+          // so only deadline (`due`) and scheduled-block markers are drawn as
+          // nodes; a real span shows every node.
           const trunkNodes =
             lane.milestone || planned
-              ? lane.nodes.filter((n) => n.kind === "due")
+              ? lane.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
               : lane.nodes;
           return (
             <g key={lane.task.id} opacity={lane.done ? 0.55 : 1}>
@@ -144,7 +175,15 @@ export function FlowTrack({
                 </>
               ) : planned ? (
                 <>
-                  <DottedLead x1={nowX} x2={startX} y={trunkY} color={color} mine={mine} />
+                  {/* lead reaches the furthest of the planned start and any booked
+                      block / deadline ahead, so those markers connect too */}
+                  <DottedLead
+                    x1={nowX}
+                    x2={Math.max(startX, reachX)}
+                    y={trunkY}
+                    color={color}
+                    mine={mine}
+                  />
                   <PlannedStartRing cx={startX} cy={trunkY} color={color} mine={mine} />
                 </>
               ) : (
@@ -172,10 +211,21 @@ export function FlowTrack({
                       strokeLinecap="round"
                     />
                   )}
-                  {/* open-task cap: a soft chevron at the now end */}
-                  {lane.endMs === null && (
-                    <OpenCap x={endX} y={trunkY} color={color} mine={mine} />
-                  )}
+                  {/* open end: a grayed, dotted continuation out to the next booked
+                      block / deadline ahead, else a soft "still open" chevron at now */}
+                  {lane.endMs === null &&
+                    (hasFuture ? (
+                      <FutureExtension
+                        x1={nowX}
+                        x2={reachX}
+                        y={trunkY}
+                        color={color}
+                        mine={mine}
+                        width={G.trunkWidth}
+                      />
+                    ) : (
+                      <OpenCap x={endX} y={trunkY} color={color} mine={mine} />
+                    ))}
                 </>
               )}
               {/* subtask branches (only present when the lane is expanded), each
@@ -205,7 +255,7 @@ export function FlowTrack({
               {/* branch nodes (a milestone branch carries its status in its marker) */}
               {branchRows.map(({ branch, subTop }) =>
                 (branch.milestone
-                  ? branch.nodes.filter((n) => n.kind === "due")
+                  ? branch.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
                   : branch.nodes
                 ).map((n, i) => (
                   <NodeShape
@@ -236,7 +286,9 @@ export function FlowTrack({
       )}
 
       {/* interactive hit-targets (focus ring + tooltip + open) */}
-      {rows.map(({ lane, top, branchRows }) => {
+      {rows.map((row) => {
+        if (row.kind !== "lane") return null;
+        const { lane, top, branchRows } = row;
         const trunkY = top + G.laneHeight / 2;
         const hits: ReactNode[] = [];
         const planned = !lane.milestone && lane.startMs > nowMs && lane.endMs === null;
@@ -245,7 +297,7 @@ export function FlowTrack({
         }
         const trunkNodes =
           lane.milestone || planned
-            ? lane.nodes.filter((n) => n.kind === "due")
+            ? lane.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
             : lane.nodes;
         trunkNodes.forEach((n, i) => hits.push(renderHit(lane.task, n, x(n.ms), trunkY, i)));
         branchRows.forEach(({ branch, subTop }) => {
@@ -258,7 +310,7 @@ export function FlowTrack({
           }
           const bNodes =
             branch.milestone || bPlanned
-              ? branch.nodes.filter((n) => n.kind === "due")
+              ? branch.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
               : branch.nodes;
           bNodes.forEach((n, i) => hits.push(renderHit(branch.task, n, x(n.ms), subY, i)));
         });
@@ -380,6 +432,11 @@ function Branch({
   }
 
   const mergeX = x(branch.endMs ?? Math.min(nowMs, t1));
+  // A still-open branch reaches its next booked block / deadline ahead, the same
+  // way a trunk does (see <FutureExtension>).
+  const reach = open ? futureReachMs(branch, nowMs) : nowMs;
+  const hasFuture = open && reach > nowMs;
+  const reachX = x(Math.min(reach, t1));
   // Diverge: trunk -> sub-row via a short S-curve; run flat; merge back (or cap).
   const d = [
     diverge,
@@ -401,8 +458,73 @@ function Branch({
         strokeDasharray={dasharray}
         strokeLinecap="round"
       />
-      {open && <OpenCap x={mergeX} y={subY} color={color} mine={mine} small />}
+      {hasFuture ? (
+        <FutureExtension
+          x1={mergeX}
+          x2={reachX}
+          y={subY}
+          color={color}
+          mine={mine}
+          width={G.branchWidth}
+        />
+      ) : (
+        open && <OpenCap x={mergeX} y={subY} color={color} mine={mine} small />
+      )}
     </>
+  );
+}
+
+/**
+ * How far an open line should reach into the future: the furthest scheduled block
+ * or deadline ahead of `now`, or `now` itself when nothing is booked ahead. Past /
+ * overdue markers (ms <= now) never extend the line — they already sit on the
+ * solid span behind the now-line.
+ */
+function futureReachMs(seg: FlowSegment, nowMs: number): number {
+  let reach = nowMs;
+  for (const n of seg.nodes) {
+    if ((n.kind === "scheduled" || n.kind === "due") && n.ms > reach) {
+      reach = n.ms;
+    }
+  }
+  return reach;
+}
+
+/**
+ * The grayed, dotted continuation of an open line past the now-line, out to its
+ * next booked block / deadline. Same weight as the line it continues (so it reads
+ * as the same line, not a separate thread) but low-opacity and dotted — the
+ * calendar's "pencilled in / not yet real" language. The terracotta now-line
+ * divides this future portion from the solid, real span behind it.
+ */
+function FutureExtension({
+  x1,
+  x2,
+  y,
+  color,
+  mine,
+  width,
+}: {
+  x1: number;
+  x2: number;
+  y: number;
+  color: string;
+  mine: boolean;
+  width: number;
+}) {
+  if (x2 - x1 < 1) return null;
+  return (
+    <line
+      x1={x1}
+      y1={y}
+      x2={x2}
+      y2={y}
+      stroke={color}
+      strokeWidth={width}
+      strokeOpacity={mine ? 0.4 : 0.26}
+      strokeDasharray={DOTS}
+      strokeLinecap="round"
+    />
   );
 }
 
@@ -556,7 +678,9 @@ function OpenCap({
 /**
  * Status node. Shape carries meaning so it never relies on color alone:
  *   created = hollow ring · started = solid dot · done = solid dot + check ·
- *   reopened = ring + dash · due = hollow diamond (overdue = filled + "!").
+ *   reopened = ring + dash · due = hollow diamond (overdue = filled + "!") ·
+ *   scheduled = small rounded square (a booked-time "tile", distinct from the
+ *   diamond/ring/dot above).
  */
 function NodeShape({
   node,
@@ -600,6 +724,23 @@ function NodeShape({
           </text>
         )}
       </g>
+    );
+  }
+
+  if (node.kind === "scheduled") {
+    // A booked-time tile: rounded square, lane-colored outline on the card fill.
+    const s = r * 1.7;
+    return (
+      <rect
+        x={cx - s / 2}
+        y={cy - s / 2}
+        width={s}
+        height={s}
+        rx={1.5}
+        fill={card}
+        stroke={color}
+        strokeWidth={2}
+      />
     );
   }
 

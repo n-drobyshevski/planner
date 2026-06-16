@@ -153,6 +153,33 @@ export function useTaskMutations(workspaceId: string | undefined) {
         undo: (row) => inverse(t("undoLabel.create"), () => m.deleteTask(sb, row.id)),
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       }),
+
+    /**
+     * Create a task AND immediately schedule it as one calendar block — used by
+     * the calendar's "new task" flow when the user opts to place it on the grid.
+     * The block links back via task_id, so it shows on the calendar and as a
+     * scheduled marker in Flows. Undo deletes the task; the events cascade-delete
+     * with it (FK on delete cascade), and `alsoEvents` refreshes both surfaces.
+     */
+    createWithBlock: (
+      input: TaskInput,
+      segment: { start: number; end: number; title?: string },
+      timeZone: string,
+    ) =>
+      run(
+        (async () => {
+          const task = await m.createTask(sb, input);
+          const events = await m.scheduleTaskBlocks(sb, task, [segment], timeZone);
+          return { task, events };
+        })(),
+        t("taskCreated"),
+        {
+          alsoEvents: true,
+          apply: ({ task }) => setTasks((old) => upsertTask(old, task)),
+          undo: ({ task }) =>
+            inverse(t("undoLabel.create"), () => m.deleteTask(sb, task.id), true),
+        },
+      ),
     update: (
       id: string,
       patch: Partial<TaskInput>,
@@ -199,6 +226,26 @@ export function useTaskMutations(workspaceId: string | undefined) {
           inverse(t("undoLabel.move"), () => m.updateTask(sb, task.id, prev, row.updatedAt)),
         optimistic: () =>
           patchTaskCache(task.id, (t) => ({ ...t, ...patch, completedAt: nextCompletedAt })),
+        apply: (row) => setTasks((old) => upsertTask(old, row)),
+      });
+    },
+
+    /**
+     * Persist a Flows-side-panel manual reorder. The lane order is a presentation
+     * concern independent of the per-board `position`, so it lives in the task's
+     * `attributes` bag (`flowPos`, a fractional rank) — no schema change, and the
+     * loose attributes round-trip keeps it across edits and the other member's
+     * realtime. A single row write per drop.
+     */
+    reorderFlow: (task: TaskRow, flowPos: number) => {
+      const nextAttrs = { ...task.attributes, flowPos };
+      const prevAttrs = task.attributes;
+      return run(m.updateTask(sb, task.id, { attributes: nextAttrs }), t("taskMoved"), {
+        undo: (row) =>
+          inverse(t("undoLabel.move"), () =>
+            m.updateTask(sb, task.id, { attributes: prevAttrs }, row.updatedAt),
+          ),
+        optimistic: () => patchTaskCache(task.id, (tk) => ({ ...tk, attributes: nextAttrs })),
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       });
     },

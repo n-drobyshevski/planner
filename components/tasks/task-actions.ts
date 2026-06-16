@@ -10,6 +10,8 @@ export interface TaskActions {
   toggleDone: (t: TaskRow) => void;
   /** Persist a drag: new board column + fractional position. */
   move: (t: TaskRow, boardId: string, position: number) => void;
+  /** Persist a Flows lane reorder: a fractional global order key (attributes.flowPos). */
+  reorderFlow: (t: TaskRow, flowPos: number) => void;
   /** Open the create dialog, optionally seeded with a board column. */
   create: (boardId?: string) => void;
   /** Open the create dialog seeded to file the new task under `parent`. */

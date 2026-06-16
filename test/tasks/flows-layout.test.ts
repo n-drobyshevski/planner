@@ -7,7 +7,7 @@ import {
   xForTime,
   FLOW_GEOM,
 } from "@/lib/tasks/flows-layout";
-import type { TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { EventRow, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 const T0 = Date.UTC(2026, 5, 1); // Mon 1 Jun 2026 UTC
 const now = T0 + 10 * DAY_MS;
@@ -50,6 +50,35 @@ function ev(over: Partial<TaskStatusEvent>): TaskStatusEvent {
     toIsDone: false,
     changedBy: "me",
     changedAt: T0,
+    ...over,
+  };
+}
+
+function block(over: Partial<EventRow>): EventRow {
+  return {
+    id: "blk",
+    workspaceId: "w",
+    ownerId: "me",
+    categoryId: null,
+    title: "blk",
+    description: null,
+    location: null,
+    isPrivate: false,
+    isShared: false,
+    color: null,
+    kind: "event",
+    allDay: false,
+    inactive: false,
+    status: "confirmed",
+    start: T0,
+    end: T0 + 3_600_000,
+    timeZone: "UTC",
+    rrule: null,
+    recurrenceEndsAt: null,
+    taskId: "t",
+    attributes: {},
+    createdAt: T0,
+    updatedAt: T0,
     ...over,
   };
 }
@@ -138,6 +167,54 @@ describe("buildFlowLanes", () => {
     expect(lane.startMs).toBe(Date.UTC(2026, 5, 20));
   });
 
+  it("adds a scheduled node per linked block without moving the planned span", () => {
+    const tk = task({ id: "sch", startDate: "2026-06-03", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["sch", [ev({ taskId: "sch", changedAt: T0 })]],
+    ]);
+    const blocks = new Map<string, EventRow[]>([
+      [
+        "sch",
+        [
+          block({ id: "b1", taskId: "sch", start: T0 + 4 * DAY_MS }),
+          block({ id: "b2", taskId: "sch", start: T0 + 6 * DAY_MS }),
+        ],
+      ],
+    ]);
+    const [lane] = buildFlowLanes({
+      topLevel: [tk],
+      childrenByParent: noChildren,
+      eventsByTask: events,
+      blocksByTask: blocks,
+      nowMs: now,
+    });
+    const scheduled = lane.nodes.filter((n) => n.kind === "scheduled");
+    expect(scheduled.map((n) => n.ms)).toEqual([T0 + 4 * DAY_MS, T0 + 6 * DAY_MS]);
+    // planned start stays put (3 Jun); blocks never move the span left edge
+    expect(lane.startMs).toBe(Date.UTC(2026, 5, 3));
+  });
+
+  it("includes a scheduled marker on a future, not-yet-started task and extends the window", () => {
+    const tk = task({ id: "future", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["future", [ev({ taskId: "future", changedAt: T0 })]],
+    ]);
+    const blocks = new Map<string, EventRow[]>([
+      ["future", [block({ id: "fb", taskId: "future", start: Date.UTC(2026, 6, 15) })]],
+    ]);
+    const lanes = buildFlowLanes({
+      topLevel: [tk],
+      childrenByParent: noChildren,
+      eventsByTask: events,
+      blocksByTask: blocks,
+      nowMs: now,
+    });
+    expect(lanes[0].nodes.some((n) => n.kind === "scheduled")).toBe(true);
+    const { t1 } = flowsWindow(lanes, now, { lookbackDays: 90, padDays: 1 });
+    // window reaches the future block (15 Jul), not just clamped near `now` (11 Jun)
+    expect(t1).toBeGreaterThanOrEqual(Date.UTC(2026, 6, 15));
+  });
+
   it("attaches subtasks as branches and sorts open lanes before done", () => {
     const open = task({ id: "open", createdAt: T0 + DAY_MS });
     const done = task({ id: "done", completedAt: T0 + 2 * DAY_MS, createdAt: T0 });
@@ -183,6 +260,11 @@ describe("flowsWindow + xForTime", () => {
 });
 
 describe("layoutRows", () => {
+  // The implicit no-grouping group: a single headerless bucket of lanes.
+  const flat = (lanes: ReturnType<typeof buildFlowLanes>) => [
+    { key: "all", label: "", lanes, header: false },
+  ];
+
   it("reserves a sub-row per branch only when expanded", () => {
     const parent = task({ id: "p" });
     const child = task({ id: "k", parentId: "p" });
@@ -193,12 +275,49 @@ describe("layoutRows", () => {
     ]);
     const lanes = buildFlowLanes({ topLevel: [parent], childrenByParent: children, eventsByTask: events, nowMs: now });
 
-    const collapsed = layoutRows(lanes, new Set());
+    const collapsed = layoutRows(flat(lanes), new Set());
     expect(collapsed.totalHeight).toBe(FLOW_GEOM.laneHeight);
-    expect(collapsed.rows[0].branchRows).toHaveLength(0);
+    const c0 = collapsed.rows[0];
+    expect(c0.kind).toBe("lane");
+    if (c0.kind === "lane") expect(c0.branchRows).toHaveLength(0);
 
-    const open = layoutRows(lanes, new Set(["p"]));
+    const open = layoutRows(flat(lanes), new Set(["p"]));
     expect(open.totalHeight).toBe(FLOW_GEOM.laneHeight + FLOW_GEOM.subRowHeight);
-    expect(open.rows[0].branchRows).toHaveLength(1);
+    const o0 = open.rows[0];
+    if (o0.kind === "lane") expect(o0.branchRows).toHaveLength(1);
+  });
+
+  it("a headerless group is identical to the ungrouped baseline (no group rows)", () => {
+    const lanes = buildFlowLanes({
+      topLevel: [task({ id: "a" }), task({ id: "b" })],
+      childrenByParent: noChildren,
+      eventsByTask: new Map(),
+      nowMs: now,
+    });
+    const { rows, totalHeight } = layoutRows(flat(lanes), new Set());
+    expect(rows.every((r) => r.kind === "lane")).toBe(true);
+    expect(totalHeight).toBe(2 * FLOW_GEOM.laneHeight);
+  });
+
+  it("emits a header row per group and offsets the lanes below it", () => {
+    const lanes = buildFlowLanes({
+      topLevel: [task({ id: "a" }), task({ id: "b" })],
+      childrenByParent: noChildren,
+      eventsByTask: new Map(),
+      nowMs: now,
+    });
+    const groups = [
+      { key: "g1", label: "To Do", lanes: [lanes[0]], header: true },
+      { key: "g2", label: "Done", lanes: [lanes[1]], header: true },
+    ];
+    const { rows, totalHeight } = layoutRows(groups, new Set());
+    expect(rows.map((r) => r.kind)).toEqual(["group", "lane", "group", "lane"]);
+    expect(rows[0].top).toBe(0);
+    expect(rows[1].top).toBe(FLOW_GEOM.groupHeaderHeight);
+    // second header sits below the first header + its one lane
+    expect(rows[2].top).toBe(FLOW_GEOM.groupHeaderHeight + FLOW_GEOM.laneHeight);
+    expect(totalHeight).toBe(2 * FLOW_GEOM.groupHeaderHeight + 2 * FLOW_GEOM.laneHeight);
+    const header = rows[0];
+    if (header.kind === "group") expect(header.count).toBe(1);
   });
 });
