@@ -130,8 +130,6 @@
     "makePersonal": "Make personal"
   },
   "breadcrumb": {
-    "label": "Collection",
-    "root": "Tasks",
     "manageCollection": "Manage “{name}”"
   },
   "flowLineStyle": {

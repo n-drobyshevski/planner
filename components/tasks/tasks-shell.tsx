@@ -23,7 +23,6 @@ import { combineDateTime } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TasksToolbar, type TasksView } from "./tasks-toolbar";
 import { TaskBoard } from "./task-board";
-import { CollectionBreadcrumb } from "./collection-breadcrumb";
 import { TaskList } from "./task-list";
 import { LoadError } from "@/components/shared/load-error";
 import {
@@ -59,7 +58,11 @@ const loadTaskFlows = () => import("./task-flows").then((m) => m.TaskFlows);
 const TaskFlows = dynamic(loadTaskFlows, { ssr: false, loading: () => null });
 
 /** Overlays + the Flows view, warmed during idle so their first open is instant. */
-const OVERLAY_PRELOADS = [loadTaskDialog, loadScheduleTaskDialog, loadTaskFlows];
+const OVERLAY_PRELOADS = [
+  loadTaskDialog,
+  loadScheduleTaskDialog,
+  loadTaskFlows,
+];
 
 export function TasksShell({
   initialView,
@@ -80,7 +83,10 @@ export function TasksShell({
   // One-shot signal telling the Flows view to expand a lane after a subtask was
   // added to it from that view's context menu. The bumping `key` lets Flows act
   // on each add even when the same parent is targeted twice.
-  const [expandLane, setExpandLane] = useState<{ id: string; key: number } | null>(null);
+  const [expandLane, setExpandLane] = useState<{
+    id: string;
+    key: number;
+  } | null>(null);
   const dialogs = useTaskDialogs();
   const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
@@ -125,8 +131,14 @@ export function TasksShell({
     () => workspace.data?.boards ?? [],
     [workspace.data?.boards],
   );
-  const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
-  const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const memberMap = useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members],
+  );
+  const catMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories],
+  );
   const colorOf = (t: TaskRow) => resolveTaskColor(t, catMap, memberMap);
 
   // The active collection: the URL/selected one if it still exists, else the
@@ -135,7 +147,9 @@ export function TasksShell({
   // reads `activeCollection?.id`, so creation and filtering stay correct without
   // an effect.
   const activeCollection =
-    collections.find((c) => c.id === activeCollectionId) ?? collections[0] ?? null;
+    collections.find((c) => c.id === activeCollectionId) ??
+    collections[0] ??
+    null;
 
   // Flows side-panel display settings (filter / group / sort), persisted per
   // collection. DnD order persists server-side via the move mutation.
@@ -177,10 +191,14 @@ export function TasksShell({
   );
   const lineStyleOf = useMemo(() => {
     const byId = new Map(allBoards.map((b) => [b.id, b.lineStyle]));
-    return (t: TaskRow) => (t.boardId ? byId.get(t.boardId) ?? "solid" : "solid");
+    return (t: TaskRow) =>
+      t.boardId ? (byId.get(t.boardId) ?? "solid") : "solid";
   }, [allBoards]);
 
-  const childrenByParent = useMemo(() => groupByParent(collectionTasks), [collectionTasks]);
+  const childrenByParent = useMemo(
+    () => groupByParent(collectionTasks),
+    [collectionTasks],
+  );
   const topLevel = childrenByParent.get(null) ?? [];
 
   // Status events grouped by task id, for the Flows view's per-lane timelines.
@@ -211,10 +229,10 @@ export function TasksShell({
   const editorState = dialogs.editor;
   const editingTask =
     editorState?.mode === "edit"
-      ? tasks.find((t) => t.id === editorState.taskId) ?? null
+      ? (tasks.find((t) => t.id === editorState.taskId) ?? null)
       : null;
   const editingSubtasks = editingTask
-    ? childrenByParent.get(editingTask.id) ?? []
+    ? (childrenByParent.get(editingTask.id) ?? [])
     : [];
 
   // One grouped prop for the views instead of a six-way handler drill.
@@ -235,7 +253,7 @@ export function TasksShell({
   // privacy, and context, and file the new row under it.
   const creatingParent =
     editorState?.mode === "create" && editorState.parentId
-      ? tasks.find((t) => t.id === editorState.parentId) ?? null
+      ? (tasks.find((t) => t.id === editorState.parentId) ?? null)
       : null;
 
   function syncUrl(v: TasksView, collectionId: string | null) {
@@ -278,14 +296,16 @@ export function TasksShell({
         activeCollectionId={activeCollection?.id ?? null}
         onCollectionChange={changeCollection}
         taskCountByCollection={taskCountByCollection}
-        collectionCount={collections.length}
       />
 
       <main className="min-h-0 flex-1 overflow-hidden">
         {!mounted ? (
           <div className="h-full" />
         ) : error ? (
-          <LoadError subject="tasks" onRetry={() => void qc.invalidateQueries()} />
+          <LoadError
+            subject="tasks"
+            onRetry={() => void qc.invalidateQueries()}
+          />
         ) : loading ? (
           <Centered>
             <Spinner className="size-5" />
@@ -293,77 +313,64 @@ export function TasksShell({
         ) : !activeCollection ? (
           <Centered>{t("collection.noCollectionsYet")}</Centered>
         ) : (
-          // The breadcrumb is the collection control across every view, so it
-          // lives above the crossfade and stays put while the board/list/flows
-          // representations swap below it.
-          <div className="flex h-full flex-col">
-            {workspace.data?.currentMember && (
-              <CollectionBreadcrumb
-                collections={collections}
-                activeCollectionId={activeCollection.id}
-                onActiveCollectionChange={changeCollection}
-                taskCountByCollection={taskCountByCollection}
-                workspaceId={workspace.data.workspaceId}
-                currentMemberId={workspace.data.currentMember.id}
-              />
-            )}
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {/* Crossfade the board/list swap instead of an instant cut.
-                  `initial={false}` paints the first view at once; only the
-                  manual switch animates. The swap is a deliberate user action,
-                  so the brief mode="wait" exit→enter never interrupts work. */}
-              <AnimatePresence mode="wait" initial={false}>
-                <m.div
-                  key={view}
-                  variants={fade}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  className="h-full"
-                >
-                  {view === "flows" && !isMobile ? (
-                    <TaskFlows
-                      tasks={topLevel}
-                      childrenByParent={childrenByParent}
-                      eventsByTask={eventsByTask}
-                      blocksByTask={blocksByTask}
-                      colorOf={colorOf}
-                      lineStyleOf={lineStyleOf}
-                      members={memberMap}
-                      currentMemberId={workspace.data?.currentMember?.id ?? null}
-                      actions={actions}
-                      boards={activeBoards}
-                      categories={categories}
-                      display={flowsDisplay}
-                      onDisplayChange={setFlowsDisplay}
-                      onResetDisplay={resetFlowsDisplay}
-                      expandLane={expandLane}
-                      loading={eventsLoading || blocksLoading}
-                    />
-                  ) : view === "board" ? (
-                    <TaskBoard
-                      tasks={topLevel}
-                      boards={activeBoards}
-                      collectionId={activeCollection?.id ?? ""}
-                      workspaceId={workspace.data?.workspaceId ?? ""}
-                      colorOf={colorOf}
-                      members={memberMap}
-                      progressOf={progressFor}
-                      actions={actions}
-                    />
-                  ) : (
-                    <TaskList
-                      tasks={topLevel}
-                      boards={activeBoards}
-                      colorOf={colorOf}
-                      members={memberMap}
-                      progressOf={progressFor}
-                      actions={actions}
-                    />
-                  )}
-                </m.div>
-              </AnimatePresence>
-            </div>
+          // The collection control now lives in the app header (the toolbar
+          // center slot), so the body is just the crossfaded board/list/flows.
+          <div className="h-full overflow-hidden">
+            {/* Crossfade the board/list swap instead of an instant cut.
+                `initial={false}` paints the first view at once; only the
+                manual switch animates. The swap is a deliberate user action,
+                so the brief mode="wait" exit→enter never interrupts work. */}
+            <AnimatePresence mode="wait" initial={false}>
+              <m.div
+                key={view}
+                variants={fade}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="h-full"
+              >
+                {view === "flows" && !isMobile ? (
+                  <TaskFlows
+                    tasks={topLevel}
+                    childrenByParent={childrenByParent}
+                    eventsByTask={eventsByTask}
+                    blocksByTask={blocksByTask}
+                    colorOf={colorOf}
+                    lineStyleOf={lineStyleOf}
+                    members={memberMap}
+                    currentMemberId={workspace.data?.currentMember?.id ?? null}
+                    actions={actions}
+                    boards={activeBoards}
+                    categories={categories}
+                    display={flowsDisplay}
+                    onDisplayChange={setFlowsDisplay}
+                    onResetDisplay={resetFlowsDisplay}
+                    expandLane={expandLane}
+                    loading={eventsLoading || blocksLoading}
+                  />
+                ) : view === "board" ? (
+                  <TaskBoard
+                    tasks={topLevel}
+                    boards={activeBoards}
+                    collectionId={activeCollection?.id ?? ""}
+                    workspaceId={workspace.data?.workspaceId ?? ""}
+                    colorOf={colorOf}
+                    members={memberMap}
+                    progressOf={progressFor}
+                    actions={actions}
+                  />
+                ) : (
+                  <TaskList
+                    tasks={topLevel}
+                    boards={activeBoards}
+                    colorOf={colorOf}
+                    members={memberMap}
+                    progressOf={progressFor}
+                    actions={actions}
+                  />
+                )}
+              </m.div>
+            </AnimatePresence>
           </div>
         )}
       </main>
@@ -385,7 +392,9 @@ export function TasksShell({
             categories={categories}
             task={editingTask}
             subtasks={editingSubtasks}
-            createParent={dialogs.editor.mode === "create" ? creatingParent : null}
+            createParent={
+              dialogs.editor.mode === "create" ? creatingParent : null
+            }
             onCreated={
               creatingParent
                 ? () =>
@@ -395,7 +404,11 @@ export function TasksShell({
                     }))
                 : undefined
             }
-            defaultBoardId={dialogs.editor.mode === "create" ? dialogs.editor.boardId : undefined}
+            defaultBoardId={
+              dialogs.editor.mode === "create"
+                ? dialogs.editor.boardId
+                : undefined
+            }
             onSchedule={
               editingTask
                 ? () => dialogs.scheduleFromEditor(editingTask)
@@ -421,7 +434,10 @@ export function TasksShell({
         />
       )}
 
-      <AlertDialog open={dialogs.deleting !== null} onOpenChange={(o) => !o && dialogs.closeDelete()}>
+      <AlertDialog
+        open={dialogs.deleting !== null}
+        onOpenChange={(o) => !o && dialogs.closeDelete()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("taskDialog.deleteTitle")}</AlertDialogTitle>
@@ -433,7 +449,8 @@ export function TasksShell({
             <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (dialogs.deleting) void mutations.remove(dialogs.deleting.id);
+                if (dialogs.deleting)
+                  void mutations.remove(dialogs.deleting.id);
                 dialogs.closeDelete();
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

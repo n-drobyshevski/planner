@@ -130,8 +130,6 @@
     "makePersonal": "Сделать личной"
   },
   "breadcrumb": {
-    "label": "Коллекция",
-    "root": "Задачи",
     "manageCollection": "Управление «{name}»"
   },
   "flowLineStyle": {
