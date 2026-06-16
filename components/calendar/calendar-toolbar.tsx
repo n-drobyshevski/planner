@@ -93,16 +93,9 @@ export function CalendarToolbar({
   return (
     <>
       <ToolbarSlot name="leading">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("toolbar.toggleSidebar")}
-          title={t("toolbar.toggleSidebarTitle")}
-          onClick={onToggleSidebar}
-          className="hidden md:inline-flex"
-        >
-          <PanelLeft />
-        </Button>
+        <div className="hidden md:contents">
+          <ViewSwitcher view={view} onViewChange={onViewChange} />
+        </div>
         <div className="hidden items-center gap-2 md:flex">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <CalendarDays className="size-4" />
@@ -160,9 +153,16 @@ export function CalendarToolbar({
             <Minimize2 />
           </Button>
         )}
-        <div className="hidden md:contents">
-          <ViewSwitcher view={view} onViewChange={onViewChange} />
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t("toolbar.toggleSidebar")}
+          title={t("toolbar.toggleSidebarTitle")}
+          onClick={onToggleSidebar}
+          className="hidden md:inline-flex"
+        >
+          <PanelLeft />
+        </Button>
         <Button size="sm" onClick={onNewEvent} className="hidden md:inline-flex">
           <Plus data-icon="inline-start" />
           {t("toolbar.new")}
