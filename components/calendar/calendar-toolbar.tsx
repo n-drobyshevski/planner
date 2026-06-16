@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  CalendarDays,
   CalendarCheck,
   PanelLeft,
   PanelRight,
@@ -95,14 +94,6 @@ export function CalendarToolbar({
       <ToolbarSlot name="leading">
         <div className="hidden md:contents">
           <ViewSwitcher view={view} onViewChange={onViewChange} />
-        </div>
-        <div className="hidden items-center gap-2 md:flex">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <CalendarDays className="size-4" />
-          </span>
-          <span className="hidden font-heading text-sm font-semibold lg:inline">
-            {workspace?.workspaceName ?? "Planner"}
-          </span>
         </div>
       </ToolbarSlot>
 
