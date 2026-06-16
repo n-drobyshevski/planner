@@ -63,8 +63,8 @@ export function SurfaceChrome({ children }: { children: React.ReactNode }) {
           {...surfaceSwipe}
           className="flex min-h-toolbar flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-3 pt-safe pb-2 sm:px-4"
         >
-          <SlotTarget name="leading" />
           <AppNav />
+          <SlotTarget name="leading" />
           <SlotTarget name="center" />
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <SlotTarget name="trailing" />

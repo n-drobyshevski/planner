@@ -47,7 +47,7 @@ const VIEW_OPTIONS: { value: CalendarView; labelKey: string }[] = [
 /**
  * Calendar controls, portaled into the shared surface header (SurfaceChrome
  * owns the <header>, AppNav, swipe, and the desktop user menu). One responsive
- * sequence: desktop shows sidebar toggle · brand · period nav · label · view
+ * sequence: desktop shows brand · sidebar toggle · period nav · label · view
  * switcher · actions; below `md` everything but Filters, the label, New and
  * the `⋯` menu hides, and the collapsed controls live in the `⋯` menu.
  */
