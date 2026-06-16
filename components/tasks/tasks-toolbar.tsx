@@ -36,7 +36,6 @@ export function TasksToolbar({
   activeCollectionId,
   onCollectionChange,
   taskCountByCollection,
-  collectionCount,
 }: {
   view: TasksView;
   onViewChange: (v: TasksView) => void;
@@ -45,26 +44,16 @@ export function TasksToolbar({
   activeCollectionId: string | null;
   onCollectionChange: (collectionId: string) => void;
   taskCountByCollection: Map<string, number>;
-  /** Number of collections — drives whether the switcher shows. */
-  collectionCount: number;
 }) {
   const t = useTranslations("tasks");
-  // The in-view breadcrumb owns collection switching/managing in every view, so
-  // the toolbar switcher would be a redundant second control — hide it. The lone
-  // exception is the no-collections empty state, where the switcher is the only
-  // "New collection" entry point (the breadcrumb needs an active collection to
-  // render).
-  const showSwitcher = collectionCount === 0;
   return (
     <>
       <ToolbarSlot name="center">
-        {showSwitcher && (
-          <CollectionSwitcher
-            activeCollectionId={activeCollectionId}
-            onActiveCollectionChange={onCollectionChange}
-            taskCountByCollection={taskCountByCollection}
-          />
-        )}
+        <CollectionSwitcher
+          activeCollectionId={activeCollectionId}
+          onActiveCollectionChange={onCollectionChange}
+          taskCountByCollection={taskCountByCollection}
+        />
       </ToolbarSlot>
       <ToolbarSlot name="trailing">
         <ToggleGroup
@@ -118,35 +107,39 @@ function TasksMobileMenu({
   const { switchable, onSelectSwitch, pending, dialog } = useAccountSwitch();
   return (
     <>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("toolbar.moreOptions")}
-          className="md:hidden"
-        >
-          <MoreVertical />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>{t("toolbar.view")}</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={view}
-          onValueChange={(v) => v && onViewChange(v as TasksView)}
-        >
-          <DropdownMenuRadioItem value="board">{t("toolbar.board")}</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="list">{t("toolbar.list")}</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-        <MobileAccountSection
-          current={current}
-          switchable={switchable}
-          onSelectSwitch={onSelectSwitch}
-          pending={pending}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
-    {dialog}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("toolbar.moreOptions")}
+            className="md:hidden"
+          >
+            <MoreVertical />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>{t("toolbar.view")}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={view}
+            onValueChange={(v) => v && onViewChange(v as TasksView)}
+          >
+            <DropdownMenuRadioItem value="board">
+              {t("toolbar.board")}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="list">
+              {t("toolbar.list")}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <MobileAccountSection
+            current={current}
+            switchable={switchable}
+            onSelectSwitch={onSelectSwitch}
+            pending={pending}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {dialog}
     </>
   );
 }
