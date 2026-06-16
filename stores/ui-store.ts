@@ -58,7 +58,7 @@ interface UiState {
 export const useUiStore = create<UiState>((set) => ({
   selectedEventKey: null,
   selectedEventKeys: new Set(),
-  sidebarOpen: true,
+  sidebarOpen: false,
   hiddenCategoryIds: new Set(),
   overlayMemberIds: new Set(),
   ownCalendarHidden: false,
