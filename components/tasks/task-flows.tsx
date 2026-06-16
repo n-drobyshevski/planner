@@ -38,6 +38,7 @@ import {
   flowsWindow,
   layoutRows,
   xForTime,
+  type FlowCheckpoint,
   type FlowLane,
   type FlowNode,
   type FlowSegment,
@@ -57,7 +58,16 @@ import { FlowTrack } from "./flows/flow-track";
 import { FlowRowMenu } from "./flows/flow-row-menu";
 import { FlowsDisplayMenu } from "./flows/flows-display-menu";
 import type { TaskActions } from "./task-actions";
-import type { Board, Category, EventRow, Member, TaskRow, TaskStatusEvent } from "@/lib/types";
+import { msToDateInput } from "@/lib/datetime/local";
+import type {
+  Board,
+  Category,
+  EventRow,
+  Member,
+  TaskCheckpoint,
+  TaskRow,
+  TaskStatusEvent,
+} from "@/lib/types";
 
 const G = FLOW_GEOM;
 const ZOOM = { month: 9, week: 26, day: 80 } as const;
@@ -75,6 +85,8 @@ export interface TaskFlowsProps {
   eventsByTask: Map<string, TaskStatusEvent[]>;
   /** task id -> its linked calendar blocks, for scheduled-block markers */
   blocksByTask: Map<string, EventRow[]>;
+  /** task id -> its milestone checkpoints (top-level lanes only) */
+  checkpointsByTask: Map<string, TaskCheckpoint[]>;
   colorOf: (t: TaskRow) => string;
   /** the Flows line style for a task, resolved from its board (state). */
   lineStyleOf: (t: TaskRow) => FlowLineStyle;
@@ -102,6 +114,7 @@ export function TaskFlows({
   childrenByParent,
   eventsByTask,
   blocksByTask,
+  checkpointsByTask,
   colorOf,
   lineStyleOf,
   members,
@@ -152,8 +165,15 @@ export function TaskFlows({
 
   const lanes = useMemo(
     () =>
-      buildFlowLanes({ topLevel: tasks, childrenByParent, eventsByTask, blocksByTask, nowMs }),
-    [tasks, childrenByParent, eventsByTask, blocksByTask, nowMs],
+      buildFlowLanes({
+        topLevel: tasks,
+        childrenByParent,
+        eventsByTask,
+        blocksByTask,
+        checkpointsByTask,
+        nowMs,
+      }),
+    [tasks, childrenByParent, eventsByTask, blocksByTask, checkpointsByTask, nowMs],
   );
 
   // Lookups + localized bucket labels the grouping needs (pure data; the
@@ -363,6 +383,25 @@ export function TaskFlows({
     return `${seg.task.title}: ${t("flows.plannedStart")} · ${when}`;
   }
 
+  /** Localized tooltip / accessible name for a checkpoint marker. */
+  function checkpointLabel(cp: FlowCheckpoint, task: TaskRow): string {
+    const when = formatWeekdayDayMonth(cp.ms, timeZone, locale);
+    const title = cp.title.trim() || t("flows.checkpoint.untitled");
+    const state = cp.reached
+      ? t("flows.checkpoint.reached")
+      : cp.ms > nowMs
+        ? t("flows.checkpoint.upcoming")
+        : t("flows.checkpoint.label");
+    return `${task.title}: ${title} · ${state} · ${when}`;
+  }
+
+  /** Default date for a checkpoint added from a lane's row menu: the lane's
+   *  mid-span, but never before today (a fresh lane defaults to ~now). */
+  function defaultCheckpointDate(lane: FlowLane): string {
+    const mid = (lane.startMs + (lane.endMs ?? nowMs)) / 2;
+    return msToDateInput(Math.max(mid, nowMs), timeZone);
+  }
+
   if (loading) return <FlowsSkeleton />;
 
   if (tasks.length === 0) {
@@ -517,6 +556,9 @@ export function TaskFlows({
                       t={t}
                       actions={actions}
                       scrollToTask={scrollToTask}
+                      addCheckpoint={() =>
+                        actions.addCheckpoint(row.lane.task, defaultCheckpointDate(row.lane))
+                      }
                       toggle={toggle}
                       anyExpandable={anyExpandable}
                       expandAll={expandAll}
@@ -575,9 +617,16 @@ export function TaskFlows({
             colorOf={colorOf}
             lineStyleOf={lineStyleOf}
             currentMemberId={currentMemberId}
+            timeZone={timeZone}
             nodeLabel={nodeLabel}
             segmentLabel={segmentLabel}
+            checkpointLabel={checkpointLabel}
             onOpenTask={actions.open}
+            onOpenCheckpoint={(cp) => actions.openCheckpoint(cp.id)}
+            onCanvasPlace={(taskId, atDate) => {
+              const task = tasks.find((t) => t.id === taskId);
+              if (task) actions.addCheckpoint(task, atDate);
+            }}
           />
         </div>
       </div>
@@ -624,6 +673,7 @@ function GutterLaneRow({
   t,
   actions,
   scrollToTask,
+  addCheckpoint,
   toggle,
   anyExpandable,
   expandAll,
@@ -635,6 +685,7 @@ function GutterLaneRow({
   t: Translator;
   actions: TaskActions;
   scrollToTask: (id: string) => void;
+  addCheckpoint: () => void;
   toggle: (id: string) => void;
   anyExpandable: boolean;
   expandAll: () => void;
@@ -712,6 +763,7 @@ function GutterLaneRow({
           onDelete={() => actions.remove(lane.task)}
           onChangeColor={(c) => actions.changeColor(lane.task, c)}
           onAddSubtask={() => actions.addSubtask(lane.task)}
+          onAddCheckpoint={addCheckpoint}
           onExpandAll={anyExpandable ? expandAll : undefined}
           onCollapseAll={anyExpandable ? collapseAll : undefined}
         >

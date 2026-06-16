@@ -17,6 +17,7 @@ import type {
   SleepLog,
   TaskRow,
   TaskStatusEvent,
+  TaskCheckpoint,
   AppLocale,
   ThemePreference,
   AccentId,
@@ -302,6 +303,24 @@ export function mapStatusEvent(r: Row): TaskStatusEvent {
   };
 }
 
+export function mapCheckpoint(r: Row): TaskCheckpoint {
+  return {
+    id: r.id as string,
+    taskId: r.task_id as string,
+    workspaceId: r.workspace_id as string,
+    title: (r.title as string | null) ?? "",
+    atDate: r.at_date as string, // zone-free yyyy-mm-dd token, verbatim
+    reached: Boolean(r.reached),
+    reachedAt: toMsOrNull(r.reached_at),
+    color: (r.color as string | null) ?? null,
+    shape: (r.shape as TaskCheckpoint["shape"] | null) ?? "flag",
+    position: (r.position as number) ?? 0,
+    createdBy: (r.created_by as string | null) ?? null,
+    createdAt: toMs(r.created_at),
+    updatedAt: toMs(r.updated_at),
+  };
+}
+
 export function mapOverride(r: Row): OverrideRow {
   return {
     id: r.id as string,
@@ -500,5 +519,50 @@ export function boardPatchToRow(patch: Partial<BoardInput>): Row {
   if ("lineStyle" in patch) row.line_style = patch.lineStyle;
   if ("position" in patch) row.position = patch.position;
   if ("isDone" in patch) row.is_done = patch.isDone;
+  return row;
+}
+
+// --- Checkpoints -----------------------------------------------------------
+
+/** Fields accepted when creating a flow checkpoint (domain shape). */
+export interface CheckpointInput {
+  workspaceId: string;
+  taskId: string;
+  title?: string;
+  /** zone-free calendar date ("yyyy-MM-dd") */
+  atDate: string;
+  reached?: boolean;
+  reachedAt?: number | null;
+  color?: string | null;
+  shape?: TaskCheckpoint["shape"];
+  position?: number;
+  createdBy?: string | null;
+}
+
+export function checkpointInputToRow(input: CheckpointInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    task_id: input.taskId,
+    title: input.title ?? "",
+    at_date: input.atDate,
+    reached: input.reached ?? false,
+    reached_at: toIsoOrNull(input.reachedAt ?? null),
+    color: input.color ?? null,
+    shape: input.shape ?? "flag",
+    position: input.position ?? 0,
+    created_by: input.createdBy ?? null,
+  };
+}
+
+/** Partial checkpoint patch -> snake_case row patch for UPDATE. */
+export function checkpointPatchToRow(patch: Partial<CheckpointInput>): Row {
+  const row: Row = {};
+  if ("title" in patch) row.title = patch.title ?? "";
+  if ("atDate" in patch) row.at_date = patch.atDate;
+  if ("reached" in patch) row.reached = patch.reached ?? false;
+  if ("reachedAt" in patch) row.reached_at = toIsoOrNull(patch.reachedAt ?? null);
+  if ("color" in patch) row.color = patch.color ?? null;
+  if ("shape" in patch) row.shape = patch.shape;
+  if ("position" in patch) row.position = patch.position;
   return row;
 }

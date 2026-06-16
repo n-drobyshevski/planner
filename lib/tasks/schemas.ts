@@ -79,6 +79,55 @@ export const taskFormSchema = z.object({
 });
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
 
+// --- Checkpoints -----------------------------------------------------------
+
+/** Marker shapes; the single source of truth mirrored by the DB CHECK + the
+ *  CheckpointShape union in lib/types.ts. */
+export const checkpointShapeSchema = z.enum([
+  "flag",
+  "diamond",
+  "star",
+  "dot",
+  "triangle",
+]);
+
+const checkpointTitleSchema = z
+  .string()
+  .trim()
+  .max(200, "Keep the title under 200 characters.");
+
+const checkpointInputBase = z.object({
+  workspaceId: z.uuid(),
+  taskId: z.uuid(),
+  title: checkpointTitleSchema.optional(),
+  atDate: z.iso.date("Pick a date."),
+  reached: z.boolean().optional(),
+  reachedAt: z.number().int().nullable().optional(),
+  color: z.string().min(1).nullable().optional(),
+  shape: checkpointShapeSchema.optional(),
+  position: z.number().finite().optional(),
+  createdBy: nullableUuid.optional(),
+});
+
+export const checkpointInputSchema = checkpointInputBase;
+
+/** Update payload: any subset, but never workspace/task (a checkpoint doesn't
+ *  move between tasks or workspaces). */
+export const checkpointPatchSchema = checkpointInputBase
+  .omit({ workspaceId: true, taskId: true })
+  .partial();
+
+/** The checkpoint editor dialog's field shape. `title` allows empty (an
+ *  untitled, click-placed checkpoint); `color` null = inherit the flow color. */
+export const checkpointFormSchema = z.object({
+  title: checkpointTitleSchema,
+  atDate: z.iso.date("Pick a date."),
+  reached: z.boolean(),
+  color: z.string().min(1).nullable(),
+  shape: checkpointShapeSchema,
+});
+export type CheckpointFormValues = z.infer<typeof checkpointFormSchema>;
+
 const collectionNameSchema = z
   .string()
   .trim()

@@ -52,6 +52,7 @@ function lane(over: Partial<TaskRow> & { startMs?: number; endMs?: number | null
     endMs: endMs ?? null,
     nodes: [],
     milestone: t.isMilestone,
+    checkpoints: [],
     branches: [],
     done: t.completedAt != null,
   };

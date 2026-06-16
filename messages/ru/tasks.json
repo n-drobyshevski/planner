@@ -52,8 +52,15 @@
     "menu": {
       "center": "Центрировать на шкале",
       "addSubtask": "Добавить подзадачу",
+      "addCheckpoint": "Добавить веху",
       "expandAll": "Развернуть все",
       "collapseAll": "Свернуть все"
+    },
+    "checkpoint": {
+      "label": "Веха",
+      "untitled": "Веха без названия",
+      "reached": "Веха достигнута",
+      "upcoming": "Предстоящая веха"
     },
     "display": {
       "label": "Параметры отображения",
@@ -103,6 +110,27 @@
       "emptyBody": "Под текущие фильтры не подходит ни одна задача.",
       "clear": "Сбросить фильтры"
     }
+  },
+  "checkpointDialog": {
+    "createTitle": "Добавить веху",
+    "editTitle": "Изменить веху",
+    "onFlow": "В потоке «{title}»",
+    "titleLabel": "Название",
+    "titlePlaceholder": "напр. Заморозка бета-версии",
+    "dateLabel": "Дата",
+    "shapeLabel": "Маркер",
+    "colorLabel": "Цвет",
+    "reachedLabel": "Достигнута",
+    "reachedHint": "Отметить веху как пройденную.",
+    "shapes": {
+      "flag": "Флаг",
+      "diamond": "Ромб",
+      "star": "Звезда",
+      "dot": "Точка",
+      "triangle": "Треугольник"
+    },
+    "deleteTitle": "Удалить веху?",
+    "deleteDescription": "Веха будет убрана из потока. Сразу после можно отменить."
   },
   "board": {
     "addTaskTo": "Добавить задачу в «{title}»",

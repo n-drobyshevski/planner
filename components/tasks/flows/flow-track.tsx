@@ -13,18 +13,21 @@
 // Future / not-yet-real markers borrow the calendar's dotted = "pencilled in"
 // language; ownership reads as filled (mine) vs outlined (a partner's).
 
-import { useState, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import type {
+  FlowCheckpoint,
   FlowNode,
   FlowRow,
   FlowSegment,
 } from "@/lib/tasks/flows-layout";
-import { FLOW_GEOM, xForTime } from "@/lib/tasks/flows-layout";
+import { FLOW_GEOM, xForTime, timeForX } from "@/lib/tasks/flows-layout";
 import {
   lineStyleStroke,
   wavePath,
   type FlowLineStyle,
 } from "@/lib/tasks/flow-line-styles";
+import { toPaletteColor } from "@/lib/theme/appearance";
+import { msToDateInput } from "@/lib/datetime/local";
 import type { TaskRow } from "@/lib/types";
 
 const G = FLOW_GEOM;
@@ -47,11 +50,19 @@ export interface FlowTrackProps {
   /** the Flows line style for a task, resolved from its board (state). */
   lineStyleOf: (t: TaskRow) => FlowLineStyle;
   currentMemberId: string | null;
+  /** viewer's IANA zone — maps a canvas click x to a zone-correct date token */
+  timeZone: string;
   /** localized tooltip / aria text for a node */
   nodeLabel: (node: FlowNode, task: TaskRow) => string;
   /** localized tooltip / aria text for a milestone or planned-start marker */
   segmentLabel: (seg: FlowSegment) => string;
+  /** localized tooltip / aria text for a checkpoint marker */
+  checkpointLabel: (cp: FlowCheckpoint, task: TaskRow) => string;
   onOpenTask: (t: TaskRow) => void;
+  /** open the checkpoint editor for an existing marker */
+  onOpenCheckpoint: (cp: FlowCheckpoint) => void;
+  /** click on empty trunk at a date: place a new checkpoint there (create mode) */
+  onCanvasPlace: (taskId: string, atDate: string) => void;
 }
 
 interface Hover {
@@ -72,19 +83,43 @@ export function FlowTrack({
   colorOf,
   lineStyleOf,
   currentMemberId,
+  timeZone,
   nodeLabel,
   segmentLabel,
+  checkpointLabel,
   onOpenTask,
+  onOpenCheckpoint,
+  onCanvasPlace,
 }: FlowTrackProps) {
   const [hover, setHover] = useState<Hover | null>(null);
   const x = (ms: number) => xForTime(ms, t0, pxPerDay);
   const nowX = x(Math.min(nowMs, t1));
+
+  // Click on empty trunk → place a checkpoint at that date. A click that landed
+  // on a node/marker/checkpoint hit-button is ignored (that button opens/edits
+  // instead); only a band centered on a lane's trunk line (not the row's edges
+  // or the branch area below) accepts a placement, so it reads as "click the
+  // trunk", not "click anywhere".
+  function onTrackClick(e: MouseEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest("button")) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    for (const row of rows) {
+      if (row.kind !== "lane") continue;
+      const trunkY = row.top + G.laneHeight / 2;
+      if (Math.abs(py - trunkY) > HIT / 2) continue; // not on this lane's trunk band
+      onCanvasPlace(row.lane.task.id, msToDateInput(timeForX(px, t0, pxPerDay), timeZone));
+      return;
+    }
+  }
 
   return (
     <div
       className="relative shrink-0"
       style={{ width: trackWidth, height }}
       onMouseLeave={() => setHover(null)}
+      onClick={onTrackClick}
     >
       <svg
         width={trackWidth}
@@ -252,6 +287,19 @@ export function FlowTrack({
               {trunkNodes.map((n, i) => (
                 <NodeShape key={i} node={n} cx={x(n.ms)} cy={trunkY} color={color} />
               ))}
+              {/* user-placed checkpoints — an independent overlay drawn on the
+                  trunk regardless of the lane archetype (span / milestone / planned) */}
+              {lane.checkpoints.map((cp) => (
+                <CheckpointMarker
+                  key={cp.id}
+                  cp={cp}
+                  cx={x(cp.ms)}
+                  cy={trunkY}
+                  laneColor={color}
+                  mine={mine}
+                  nowMs={nowMs}
+                />
+              ))}
               {/* branch nodes (a milestone branch carries its status in its marker) */}
               {branchRows.map(({ branch, subTop }) =>
                 (branch.milestone
@@ -300,6 +348,15 @@ export function FlowTrack({
             ? lane.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
             : lane.nodes;
         trunkNodes.forEach((n, i) => hits.push(renderHit(lane.task, n, x(n.ms), trunkY, i)));
+        // Checkpoint hits last so a marker co-located with a status node wins
+        // the click (it opens the checkpoint editor, not the task).
+        lane.checkpoints.forEach((cp) =>
+          hits.push(
+            hitButton(`cp-${cp.id}`, checkpointLabel(cp, lane.task), x(cp.ms), trunkY, () =>
+              onOpenCheckpoint(cp),
+            ),
+          ),
+        );
         branchRows.forEach(({ branch, subTop }) => {
           const subY = subTop + G.subRowHeight / 2;
           const bPlanned = !branch.milestone && branch.startMs > nowMs && branch.endMs === null;
@@ -346,13 +403,24 @@ export function FlowTrack({
     cy: number,
     key: string,
   ) {
+    return hitButton(`${task.id}-${key}`, text, cx, cy, () => onOpenTask(task));
+  }
+
+  /** A focusable hit-target over a marker: focus ring + hover tooltip + action. */
+  function hitButton(
+    key: string,
+    text: string,
+    cx: number,
+    cy: number,
+    onClick: () => void,
+  ) {
     return (
       <button
-        key={`${task.id}-${key}`}
+        key={key}
         type="button"
         aria-label={text}
         title={text}
-        onClick={() => onOpenTask(task)}
+        onClick={onClick}
         onMouseEnter={() => setHover({ x: cx, y: cy, text })}
         onFocus={() => setHover({ x: cx, y: cy, text })}
         onMouseLeave={() => setHover(null)}
@@ -772,4 +840,130 @@ function NodeShape({
   }
   // started
   return <circle cx={cx} cy={cy} r={r} fill={color} />;
+}
+
+/** A 5-point star path centered at (cx,cy), outer radius R. */
+function starPath(cx: number, cy: number, R: number): string {
+  const inner = R * 0.42;
+  let d = "";
+  for (let i = 0; i < 10; i++) {
+    const ang = ((-90 + i * 36) * Math.PI) / 180;
+    const rad = i % 2 === 0 ? R : inner;
+    d += `${i === 0 ? "M" : "L"} ${(cx + rad * Math.cos(ang)).toFixed(2)} ${(
+      cy +
+      rad * Math.sin(ang)
+    ).toFixed(2)} `;
+  }
+  return d + "Z";
+}
+
+/**
+ * A user-placed milestone checkpoint. Shape carries the type (flag/diamond/star/
+ * dot/triangle), fill carries the reached state (filled = reached, hollow = not),
+ * so the marker never relies on color alone. Color = the per-checkpoint override
+ * or the lane color; ownership dims a partner's marker. A not-yet-reached future
+ * marker dots its outline, borrowing the calendar's "pencilled in" language.
+ */
+function CheckpointMarker({
+  cp,
+  cx,
+  cy,
+  laneColor,
+  mine,
+  nowMs,
+}: {
+  cp: FlowCheckpoint;
+  cx: number;
+  cy: number;
+  laneColor: string;
+  mine: boolean;
+  nowMs: number;
+}) {
+  const color = cp.color ? toPaletteColor(cp.color) : laneColor;
+  const card = "var(--card)";
+  const r = FLOW_GEOM.nodeRadius + 0.5;
+  const future = cp.ms > nowMs && !cp.reached;
+  const fill = cp.reached ? color : card;
+  const common = {
+    fill,
+    stroke: color,
+    strokeWidth: 1.75,
+    strokeOpacity: mine ? 1 : 0.6,
+    ...(future ? { strokeDasharray: DOTS } : {}),
+  } as const;
+
+  let body: ReactNode;
+  switch (cp.shape) {
+    case "diamond": {
+      // Larger than the muted `due` diamond and lane-colored, so the two read apart.
+      const d = r + 1.5;
+      body = (
+        <polygon
+          points={`${cx},${cy - d} ${cx + d},${cy} ${cx},${cy + d} ${cx - d},${cy}`}
+          {...common}
+        />
+      );
+      break;
+    }
+    case "triangle": {
+      const h = r + 1.5;
+      body = (
+        <polygon
+          points={`${cx},${cy - h} ${cx + h * 0.95},${cy + h * 0.75} ${cx - h * 0.95},${cy + h * 0.75}`}
+          strokeLinejoin="round"
+          {...common}
+        />
+      );
+      break;
+    }
+    case "star":
+      body = <path d={starPath(cx, cy, r + 1.5)} strokeLinejoin="round" {...common} />;
+      break;
+    case "dot":
+      body = <circle cx={cx} cy={cy} r={r} {...common} />;
+      break;
+    case "flag":
+    default: {
+      // A pole with a pennant — the canonical "milestone" glyph.
+      const top = cy - r - 2;
+      const bottom = cy + r + 1;
+      body = (
+        <g>
+          <line
+            x1={cx}
+            y1={top}
+            x2={cx}
+            y2={bottom}
+            stroke={color}
+            strokeWidth={1.5}
+            strokeOpacity={mine ? 1 : 0.6}
+            strokeLinecap="round"
+          />
+          <path
+            d={`M ${cx} ${top} L ${cx + r * 1.8} ${top + r * 0.7} L ${cx} ${top + r * 1.4} Z`}
+            {...common}
+          />
+        </g>
+      );
+      break;
+    }
+  }
+
+  return (
+    <g opacity={mine ? 1 : 0.85}>
+      {body}
+      {/* reached check — a second, fill-independent signal on the geometric
+          shapes (the flag's filled pennant already reads reached) */}
+      {cp.reached && cp.shape !== "flag" && (
+        <path
+          d={`M ${cx - r * 0.4} ${cy} l ${r * 0.3} ${r * 0.36} l ${r * 0.55} ${-r * 0.68}`}
+          fill="none"
+          stroke={card}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </g>
+  );
 }

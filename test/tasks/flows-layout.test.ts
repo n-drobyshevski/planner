@@ -5,9 +5,10 @@ import {
   flowsWindow,
   layoutRows,
   xForTime,
+  timeForX,
   FLOW_GEOM,
 } from "@/lib/tasks/flows-layout";
-import type { EventRow, TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { EventRow, TaskCheckpoint, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 const T0 = Date.UTC(2026, 5, 1); // Mon 1 Jun 2026 UTC
 const now = T0 + 10 * DAY_MS;
@@ -77,6 +78,25 @@ function block(over: Partial<EventRow>): EventRow {
     recurrenceEndsAt: null,
     taskId: "t",
     attributes: {},
+    createdAt: T0,
+    updatedAt: T0,
+    ...over,
+  };
+}
+
+function checkpoint(over: Partial<TaskCheckpoint>): TaskCheckpoint {
+  return {
+    id: "cp",
+    taskId: "t",
+    workspaceId: "w",
+    title: "",
+    atDate: "2026-06-10",
+    reached: false,
+    reachedAt: null,
+    color: null,
+    shape: "flag",
+    position: 0,
+    createdBy: "me",
     createdAt: T0,
     updatedAt: T0,
     ...over,
@@ -215,6 +235,37 @@ describe("buildFlowLanes", () => {
     expect(t1).toBeGreaterThanOrEqual(Date.UTC(2026, 6, 15));
   });
 
+  it("attaches checkpoints to a top-level lane, sorted by date, and not to branches", () => {
+    const parent = task({ id: "p", createdAt: T0 });
+    const child = task({ id: "k", parentId: "p", createdAt: T0 });
+    const children = new Map<string | null, TaskRow[]>([["p", [child]]]);
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["p", [ev({ taskId: "p", changedAt: T0 })]],
+      ["k", [ev({ taskId: "k", changedAt: T0 })]],
+    ]);
+    const checkpointsByTask = new Map<string, TaskCheckpoint[]>([
+      [
+        "p",
+        [
+          checkpoint({ id: "c2", taskId: "p", atDate: "2026-06-12" }),
+          checkpoint({ id: "c1", taskId: "p", atDate: "2026-06-05" }),
+        ],
+      ],
+      // a checkpoint keyed to the child is ignored in v1 (trunks only)
+      ["k", [checkpoint({ id: "ck", taskId: "k", atDate: "2026-06-08" })]],
+    ]);
+    const [lane] = buildFlowLanes({
+      topLevel: [parent],
+      childrenByParent: children,
+      eventsByTask: events,
+      checkpointsByTask,
+      nowMs: now,
+    });
+    expect(lane.checkpoints.map((c) => c.id)).toEqual(["c1", "c2"]); // sorted by date
+    expect(lane.checkpoints[0].ms).toBe(Date.UTC(2026, 5, 5));
+    expect(lane.branches[0].checkpoints).toEqual([]);
+  });
+
   it("attaches subtasks as branches and sorts open lanes before done", () => {
     const open = task({ id: "open", createdAt: T0 + DAY_MS });
     const done = task({ id: "done", completedAt: T0 + 2 * DAY_MS, createdAt: T0 });
@@ -256,6 +307,40 @@ describe("flowsWindow + xForTime", () => {
     const { t1 } = flowsWindow(lanes, now, { lookbackDays: 90, padDays: 1 });
     // window reaches past the future start (1 Jul), not just clamped near `now` (11 Jun)
     expect(t1).toBeGreaterThanOrEqual(Date.UTC(2026, 6, 1));
+  });
+
+  it("extends the window to include a far-future and far-past checkpoint", () => {
+    const tk = task({ id: "cp", createdAt: T0 });
+    const events = new Map<string, TaskStatusEvent[]>([
+      ["cp", [ev({ taskId: "cp", changedAt: T0 })]],
+    ]);
+    const checkpointsByTask = new Map<string, TaskCheckpoint[]>([
+      [
+        "cp",
+        [
+          checkpoint({ id: "past", taskId: "cp", atDate: "2026-01-01" }),
+          checkpoint({ id: "future", taskId: "cp", atDate: "2026-09-01" }),
+        ],
+      ],
+    ]);
+    const lanes = buildFlowLanes({
+      topLevel: [tk],
+      childrenByParent: noChildren,
+      eventsByTask: events,
+      checkpointsByTask,
+      nowMs: now,
+    });
+    const { t1 } = flowsWindow(lanes, now, { lookbackDays: 90, padDays: 1 });
+    // right edge reaches the far-future checkpoint (1 Sep), past the now clamp
+    expect(t1).toBeGreaterThanOrEqual(Date.UTC(2026, 8, 1));
+  });
+
+  it("timeForX is the exact inverse of xForTime", () => {
+    const t0 = Date.UTC(2026, 5, 1);
+    const px = 26;
+    for (const ms of [t0, t0 + DAY_MS, t0 + 12.5 * DAY_MS]) {
+      expect(timeForX(xForTime(ms, t0, px), t0, px)).toBeCloseTo(ms, 3);
+    }
   });
 });
 

@@ -6,6 +6,7 @@ import type {
   InsightsView,
   SleepLog,
   TaskRow,
+  TaskCheckpoint,
   Board,
   AppLocale,
   ThemePreference,
@@ -22,6 +23,7 @@ import {
   mapSleepLog,
   mapTask,
   mapBoard,
+  mapCheckpoint,
   categoryGoalInputToRow,
   eventInputToRow,
   eventPatchToRow,
@@ -31,12 +33,15 @@ import {
   taskPatchToRow,
   boardInputToRow,
   boardPatchToRow,
+  checkpointInputToRow,
+  checkpointPatchToRow,
   type CategoryGoalInput,
   type EventInput,
   type InsightsViewInput,
   type SleepLogInput,
   type TaskInput,
   type BoardInput,
+  type CheckpointInput,
 } from "./mappers";
 import {
   editAll,
@@ -51,6 +56,8 @@ import {
   collectionPatchSchema,
   boardInputSchema,
   boardPatchSchema,
+  checkpointInputSchema,
+  checkpointPatchSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
 import { buildRRule, parseRRule } from "@/lib/recurrence/rrule-build";
@@ -141,6 +148,8 @@ export interface DeletedSnapshot {
   tasks: Record<string, unknown>[];
   events: Record<string, unknown>[];
   overrides: Record<string, unknown>[];
+  /** Flow checkpoints of the deleted tasks (cascade-deleted; restored on undo). */
+  checkpoints: Record<string, unknown>[];
 }
 
 /**
@@ -163,7 +172,7 @@ export async function deleteEventDeep(
   if (oErr) throw oErr;
   const { error } = await sb.from("events").delete().eq("id", id);
   if (error) throw error;
-  return { tasks: [], events: events ?? [], overrides: overrides ?? [] };
+  return { tasks: [], events: events ?? [], overrides: overrides ?? [], checkpoints: [] };
 }
 
 /**
@@ -196,12 +205,15 @@ export async function deleteTaskDeep(
   }
 
   const taskIds = tasks.map((t) => t.id as string);
-  const { data: events, error: eErr } = await sb
-    .from("events")
-    .select("*")
-    .in("task_id", taskIds);
-  if (eErr) throw eErr;
-  const eventIds = (events ?? []).map((e) => e.id as string);
+  const [evRes, cpRes] = await Promise.all([
+    sb.from("events").select("*").in("task_id", taskIds),
+    sb.from("task_checkpoints").select("*").in("task_id", taskIds),
+  ]);
+  if (evRes.error) throw evRes.error;
+  if (cpRes.error) throw cpRes.error;
+  const events = evRes.data ?? [];
+  const checkpoints = cpRes.data ?? [];
+  const eventIds = events.map((e) => e.id as string);
   let overrides: Record<string, unknown>[] = [];
   if (eventIds.length > 0) {
     const { data, error: oErr } = await sb
@@ -212,11 +224,12 @@ export async function deleteTaskDeep(
     overrides = data ?? [];
   }
 
-  // Deleting the root cascades to descendant tasks, their linked blocks, and
-  // those blocks' overrides — so one delete clears everything we snapshotted.
+  // Deleting the root cascades to descendant tasks, their linked blocks, those
+  // blocks' overrides, and the tasks' checkpoints — so one delete clears
+  // everything we snapshotted.
   const { error } = await sb.from("tasks").delete().eq("id", id);
   if (error) throw error;
-  return { tasks, events: events ?? [], overrides };
+  return { tasks, events, overrides, checkpoints };
 }
 
 /**
@@ -238,6 +251,10 @@ export async function restoreDeleted(
   }
   if (snap.overrides.length > 0) {
     const { error } = await sb.from("event_overrides").insert(snap.overrides);
+    if (error) throw error;
+  }
+  if (snap.checkpoints.length > 0) {
+    const { error } = await sb.from("task_checkpoints").insert(snap.checkpoints);
     if (error) throw error;
   }
 }
@@ -770,6 +787,65 @@ export async function restoreBoard(
   board: Record<string, unknown>,
 ): Promise<void> {
   const { error } = await sb.from("boards").insert(board);
+  if (error) throw error;
+}
+
+// --- Checkpoints (flow milestones) -----------------------------------------
+
+/** Create a flow checkpoint. Returns the new row so the cache can add it. */
+export async function createCheckpoint(
+  sb: SupabaseClient,
+  input: CheckpointInput,
+): Promise<TaskCheckpoint> {
+  const parsed = parseInput(checkpointInputSchema, input);
+  const { data, error } = await sb
+    .from("task_checkpoints")
+    .insert(checkpointInputToRow(parsed))
+    .select()
+    .single();
+  if (error) throw error;
+  return mapCheckpoint(data);
+}
+
+/** Update a checkpoint; returns the full row so trigger-normalized fields land. */
+export async function updateCheckpoint(
+  sb: SupabaseClient,
+  id: string,
+  patch: Partial<CheckpointInput>,
+): Promise<TaskCheckpoint> {
+  const parsed = parseInput(checkpointPatchSchema, patch);
+  const { data, error } = await sb
+    .from("task_checkpoints")
+    .update(checkpointPatchToRow(parsed))
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapCheckpoint(data);
+}
+
+/** Delete a checkpoint, returning the raw row so the delete is undoable. */
+export async function deleteCheckpoint(
+  sb: SupabaseClient,
+  id: string,
+): Promise<Record<string, unknown>> {
+  const { data, error: selErr } = await sb
+    .from("task_checkpoints")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (selErr) throw selErr;
+  const { error } = await sb.from("task_checkpoints").delete().eq("id", id);
+  if (error) throw error;
+  return data as Record<string, unknown>;
+}
+
+/** Re-insert a deleted checkpoint (undo). */
+export async function restoreCheckpoint(
+  sb: SupabaseClient,
+  checkpoint: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await sb.from("task_checkpoints").insert(checkpoint);
   if (error) throw error;
 }
 
