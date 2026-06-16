@@ -59,6 +59,7 @@ export const FLOW_GEOM = {
   trunkWidth: 2.5,
   branchWidth: 1.5,
   gutterWidth: 272, // left label column (fits the ru zoom labels + Today control)
+  groupHeaderHeight: 28, // a group-by section header band (gutter + canvas)
   rulerHeight: 36,
   minDaySpan: 7,
   defaultLookbackDays: 90,
@@ -231,28 +232,78 @@ export interface LaidOutLane {
   height: number;
 }
 
+/** A laid-out lane row (the discriminated `kind` lets headers share the list). */
+export interface LaneRow extends LaidOutLane {
+  kind: "lane";
+}
+
+/** A group-by section header band, spanning the gutter and the canvas. */
+export interface GroupHeaderRow {
+  kind: "group";
+  key: string;
+  label: string;
+  /** swatch color for the bucket (category only); never the sole signal */
+  color?: string;
+  top: number;
+  height: number;
+  count: number;
+}
+
+export type FlowRow = LaneRow | GroupHeaderRow;
+
 /**
- * Stack lanes into rows. An expanded lane reserves a sub-row per branch beneath
- * its trunk. Returns each lane's vertical box plus the total track height.
+ * One bucket of lanes produced by the display pipeline (lib/tasks/flows-display).
+ * `header: false` is the implicit single bucket used when grouping is off — it
+ * emits no header row, so the ungrouped view is pixel-identical to before.
+ */
+export interface LaneGroup {
+  key: string;
+  label: string;
+  color?: string;
+  lanes: FlowLane[];
+  header: boolean;
+}
+
+/**
+ * Stack groups into rows. Each group optionally opens with a header row, then
+ * stacks its lanes; an expanded lane reserves a sub-row per branch beneath its
+ * trunk. Headers and lanes share one vertical coordinate space, so the gutter
+ * and the SVG canvas (both iterating these rows) stay pixel-aligned. Returns the
+ * flat row list plus the total track height.
  */
 export function layoutRows(
-  lanes: FlowLane[],
+  groups: LaneGroup[],
   expanded: ReadonlySet<string>,
   geom: typeof FLOW_GEOM = FLOW_GEOM,
-): { rows: LaidOutLane[]; totalHeight: number } {
+): { rows: FlowRow[]; totalHeight: number } {
   let y = 0;
-  const rows = lanes.map((lane) => {
-    const top = y;
-    y += geom.laneHeight;
-    const isExpanded = expanded.has(lane.task.id) && lane.branches.length > 0;
-    const branchRows = isExpanded
-      ? lane.branches.map((branch, i) => ({
-          branch,
-          subTop: top + geom.laneHeight + i * geom.subRowHeight,
-        }))
-      : [];
-    if (isExpanded) y += lane.branches.length * geom.subRowHeight;
-    return { lane, top, isExpanded, branchRows, height: y - top };
-  });
+  const rows: FlowRow[] = [];
+  for (const group of groups) {
+    if (group.header) {
+      rows.push({
+        kind: "group",
+        key: group.key,
+        label: group.label,
+        color: group.color,
+        top: y,
+        height: geom.groupHeaderHeight,
+        count: group.lanes.length,
+      });
+      y += geom.groupHeaderHeight;
+    }
+    for (const lane of group.lanes) {
+      const top = y;
+      y += geom.laneHeight;
+      const isExpanded = expanded.has(lane.task.id) && lane.branches.length > 0;
+      const branchRows = isExpanded
+        ? lane.branches.map((branch, i) => ({
+            branch,
+            subTop: top + geom.laneHeight + i * geom.subRowHeight,
+          }))
+        : [];
+      if (isExpanded) y += lane.branches.length * geom.subRowHeight;
+      rows.push({ kind: "lane", lane, top, isExpanded, branchRows, height: y - top });
+    }
+  }
   return { rows, totalHeight: y };
 }

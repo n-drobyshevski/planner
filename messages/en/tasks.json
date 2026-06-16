@@ -54,6 +54,54 @@
       "addSubtask": "Add subtask",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all"
+    },
+    "display": {
+      "label": "Display options",
+      "labelActive": "Display options, {count, plural, one {# filter} other {# filters}} active",
+      "filter": "Filter",
+      "group": "Group by",
+      "sort": "Sort by",
+      "none": "None",
+      "status": "Status",
+      "category": "Category",
+      "priority": "Priority",
+      "direction": "Sort direction",
+      "asc": "Ascending",
+      "desc": "Descending",
+      "noStatus": "No status",
+      "noCategory": "No category",
+      "count": "{shown} of {total}",
+      "reset": "Reset"
+    },
+    "filter": {
+      "priority": "Priority",
+      "state": "State",
+      "all": "All",
+      "open": "Open",
+      "doneState": "Done",
+      "milestone": "Milestone",
+      "milestoneOnly": "Only",
+      "milestoneExclude": "Exclude",
+      "privacy": "Privacy",
+      "private": "Private",
+      "shared": "Shared"
+    },
+    "sort": {
+      "manual": "Manual",
+      "start": "Start date",
+      "due": "Due date",
+      "title": "Title",
+      "priority": "Priority",
+      "created": "Created"
+    },
+    "dnd": {
+      "handle": "Reorder {title}",
+      "disabledHint": "Switch sort to Manual to drag lanes into your own order."
+    },
+    "filtered": {
+      "emptyTitle": "No matching tasks",
+      "emptyBody": "No tasks match the current filters.",
+      "clear": "Clear filters"
     }
   },
   "board": {

@@ -16,6 +16,7 @@ import { useTaskStatusEvents } from "@/lib/hooks/use-task-status-events";
 import { useTaskBlocks } from "@/lib/hooks/use-task-blocks";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
+import { useFlowsDisplay } from "@/lib/hooks/use-flows-display";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent, progressOf } from "@/lib/tasks/tree";
 import { combineDateTime } from "@/lib/datetime/local";
@@ -136,6 +137,12 @@ export function TasksShell({
   const activeCollection =
     collections.find((c) => c.id === activeCollectionId) ?? collections[0] ?? null;
 
+  // Flows side-panel display settings (filter / group / sort), persisted per
+  // collection. DnD order persists server-side via the move mutation.
+  const [flowsDisplay, setFlowsDisplay, resetFlowsDisplay] = useFlowsDisplay(
+    activeCollection?.id ?? null,
+  );
+
   // Only this collection's tasks (subtasks inherit their parent's collection).
   const collectionTasks = useMemo(
     () =>
@@ -215,6 +222,7 @@ export function TasksShell({
     open: (t) => dialogs.openEdit(t.id),
     toggleDone: (t) => void mutations.toggleDone(t),
     move: (t, boardId, position) => void mutations.move(t, boardId, position),
+    reorderFlow: (t, flowPos) => void mutations.reorderFlow(t, flowPos),
     create: (boardId) => dialogs.openCreate(boardId),
     addSubtask: (t) => dialogs.openCreate(undefined, t.id),
     changeColor: (t, color) =>
@@ -324,6 +332,11 @@ export function TasksShell({
                       members={memberMap}
                       currentMemberId={workspace.data?.currentMember?.id ?? null}
                       actions={actions}
+                      boards={activeBoards}
+                      categories={categories}
+                      display={flowsDisplay}
+                      onDisplayChange={setFlowsDisplay}
+                      onResetDisplay={resetFlowsDisplay}
                       expandLane={expandLane}
                       loading={eventsLoading || blocksLoading}
                     />

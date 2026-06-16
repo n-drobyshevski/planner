@@ -231,6 +231,26 @@ export function useTaskMutations(workspaceId: string | undefined) {
     },
 
     /**
+     * Persist a Flows-side-panel manual reorder. The lane order is a presentation
+     * concern independent of the per-board `position`, so it lives in the task's
+     * `attributes` bag (`flowPos`, a fractional rank) — no schema change, and the
+     * loose attributes round-trip keeps it across edits and the other member's
+     * realtime. A single row write per drop.
+     */
+    reorderFlow: (task: TaskRow, flowPos: number) => {
+      const nextAttrs = { ...task.attributes, flowPos };
+      const prevAttrs = task.attributes;
+      return run(m.updateTask(sb, task.id, { attributes: nextAttrs }), t("taskMoved"), {
+        undo: (row) =>
+          inverse(t("undoLabel.move"), () =>
+            m.updateTask(sb, task.id, { attributes: prevAttrs }, row.updatedAt),
+          ),
+        optimistic: () => patchTaskCache(task.id, (tk) => ({ ...tk, attributes: nextAttrs })),
+        apply: (row) => setTasks((old) => upsertTask(old, row)),
+      });
+    },
+
+    /**
      * Toggle the done state (e.g. a checkbox): move the task to its collection's
      * completion column, or back to the first non-done column. No-op when the
      * collection has no suitable board (e.g. a board-less task).

@@ -260,6 +260,11 @@ describe("flowsWindow + xForTime", () => {
 });
 
 describe("layoutRows", () => {
+  // The implicit no-grouping group: a single headerless bucket of lanes.
+  const flat = (lanes: ReturnType<typeof buildFlowLanes>) => [
+    { key: "all", label: "", lanes, header: false },
+  ];
+
   it("reserves a sub-row per branch only when expanded", () => {
     const parent = task({ id: "p" });
     const child = task({ id: "k", parentId: "p" });
@@ -270,12 +275,49 @@ describe("layoutRows", () => {
     ]);
     const lanes = buildFlowLanes({ topLevel: [parent], childrenByParent: children, eventsByTask: events, nowMs: now });
 
-    const collapsed = layoutRows(lanes, new Set());
+    const collapsed = layoutRows(flat(lanes), new Set());
     expect(collapsed.totalHeight).toBe(FLOW_GEOM.laneHeight);
-    expect(collapsed.rows[0].branchRows).toHaveLength(0);
+    const c0 = collapsed.rows[0];
+    expect(c0.kind).toBe("lane");
+    if (c0.kind === "lane") expect(c0.branchRows).toHaveLength(0);
 
-    const open = layoutRows(lanes, new Set(["p"]));
+    const open = layoutRows(flat(lanes), new Set(["p"]));
     expect(open.totalHeight).toBe(FLOW_GEOM.laneHeight + FLOW_GEOM.subRowHeight);
-    expect(open.rows[0].branchRows).toHaveLength(1);
+    const o0 = open.rows[0];
+    if (o0.kind === "lane") expect(o0.branchRows).toHaveLength(1);
+  });
+
+  it("a headerless group is identical to the ungrouped baseline (no group rows)", () => {
+    const lanes = buildFlowLanes({
+      topLevel: [task({ id: "a" }), task({ id: "b" })],
+      childrenByParent: noChildren,
+      eventsByTask: new Map(),
+      nowMs: now,
+    });
+    const { rows, totalHeight } = layoutRows(flat(lanes), new Set());
+    expect(rows.every((r) => r.kind === "lane")).toBe(true);
+    expect(totalHeight).toBe(2 * FLOW_GEOM.laneHeight);
+  });
+
+  it("emits a header row per group and offsets the lanes below it", () => {
+    const lanes = buildFlowLanes({
+      topLevel: [task({ id: "a" }), task({ id: "b" })],
+      childrenByParent: noChildren,
+      eventsByTask: new Map(),
+      nowMs: now,
+    });
+    const groups = [
+      { key: "g1", label: "To Do", lanes: [lanes[0]], header: true },
+      { key: "g2", label: "Done", lanes: [lanes[1]], header: true },
+    ];
+    const { rows, totalHeight } = layoutRows(groups, new Set());
+    expect(rows.map((r) => r.kind)).toEqual(["group", "lane", "group", "lane"]);
+    expect(rows[0].top).toBe(0);
+    expect(rows[1].top).toBe(FLOW_GEOM.groupHeaderHeight);
+    // second header sits below the first header + its one lane
+    expect(rows[2].top).toBe(FLOW_GEOM.groupHeaderHeight + FLOW_GEOM.laneHeight);
+    expect(totalHeight).toBe(2 * FLOW_GEOM.groupHeaderHeight + 2 * FLOW_GEOM.laneHeight);
+    const header = rows[0];
+    if (header.kind === "group") expect(header.count).toBe(1);
   });
 });

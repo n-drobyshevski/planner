@@ -9,15 +9,28 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ChevronRight, CalendarRange, LocateFixed, Plus, CircleDot } from "lucide-react";
+import {
+  ChevronRight,
+  CalendarRange,
+  Filter,
+  GripVertical,
+  LocateFixed,
+  Plus,
+  CircleDot,
+} from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, addDays, addMonths, format } from "date-fns";
 import { tz } from "@date-fns/tz";
+import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { toPaletteColor } from "@/lib/theme/appearance";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { formatTime, formatWeekdayDayMonth } from "@/lib/datetime/format";
+import { ToolbarSlot } from "@/components/toolbar-slots";
 import {
   DAY_MS,
   FLOW_GEOM,
@@ -25,14 +38,26 @@ import {
   flowsWindow,
   layoutRows,
   xForTime,
+  type FlowLane,
   type FlowNode,
   type FlowSegment,
+  type GroupHeaderRow,
+  type LaneRow,
 } from "@/lib/tasks/flows-layout";
+import {
+  filterLanes,
+  flowOrderOf,
+  groupLanes,
+  type FlowsDisplay,
+  type FlowsDisplayCtx,
+} from "@/lib/tasks/flows-display";
+import { useFlowsDnd } from "@/lib/hooks/use-flows-dnd";
 import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import { FlowTrack } from "./flows/flow-track";
 import { FlowRowMenu } from "./flows/flow-row-menu";
+import { FlowsDisplayMenu } from "./flows/flows-display-menu";
 import type { TaskActions } from "./task-actions";
-import type { EventRow, Member, TaskRow, TaskStatusEvent } from "@/lib/types";
+import type { Board, Category, EventRow, Member, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 const G = FLOW_GEOM;
 const ZOOM = { month: 9, week: 26, day: 80 } as const;
@@ -56,6 +81,14 @@ export interface TaskFlowsProps {
   members: Map<string, Member>;
   currentMemberId: string | null;
   actions: TaskActions;
+  /** the active collection's columns (ordered) — for status grouping + filter */
+  boards: Board[];
+  /** the workspace's categories — for category grouping/filter + swatches */
+  categories: Category[];
+  /** filter / group / sort settings (owned + persisted by the shell) */
+  display: FlowsDisplay;
+  onDisplayChange: (next: FlowsDisplay) => void;
+  onResetDisplay: () => void;
   /** Bumped by the shell after a subtask is added here, to auto-expand its lane. */
   expandLane?: { id: string; key: number } | null;
   /** status-event history still loading (tasks may already be ready) */
@@ -74,6 +107,11 @@ export function TaskFlows({
   members,
   currentMemberId,
   actions,
+  boards,
+  categories,
+  display,
+  onDisplayChange,
+  onResetDisplay,
   expandLane,
   loading,
 }: TaskFlowsProps) {
@@ -117,19 +155,84 @@ export function TaskFlows({
       buildFlowLanes({ topLevel: tasks, childrenByParent, eventsByTask, blocksByTask, nowMs }),
     [tasks, childrenByParent, eventsByTask, blocksByTask, nowMs],
   );
+
+  // Lookups + localized bucket labels the grouping needs (pure data; the
+  // pipeline stays unit-testable).
+  const groupCtx = useMemo<FlowsDisplayCtx>(
+    () => ({
+      boardsById: new Map(boards.map((b) => [b.id, b])),
+      boardOrder: new Map(boards.map((b, i) => [b.id, i])),
+      categoriesById: new Map(categories.map((c) => [c.id, c])),
+      labels: {
+        noStatus: t("flows.display.noStatus"),
+        noCategory: t("flows.display.noCategory"),
+        priority: {
+          0: t("priority.none"),
+          1: t("priority.low"),
+          2: t("priority.medium"),
+          3: t("priority.high"),
+        },
+      },
+    }),
+    [boards, categories, t],
+  );
+
+  // filter -> group/sort -> layout. The window derives from the *filtered*
+  // lanes, so hiding lanes recomputes the visible time extent.
+  const filtered = useMemo(() => filterLanes(lanes, display.filter), [lanes, display.filter]);
+
+  // The manual-order anchor: a hand-set `flowPos` if present, else the lane's
+  // baseline index (open-first by time). Drives both the manual sort and the DnD
+  // drop math, so the rendered order and the persisted rank stay consistent.
+  const flowAnchor = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((l, i) => map.set(l.task.id, flowOrderOf(l.task) ?? i));
+    return map;
+  }, [filtered]);
+  const manualAnchor = useCallback(
+    (l: FlowLane) => flowAnchor.get(l.task.id) ?? 0,
+    [flowAnchor],
+  );
+
+  const groups = useMemo(
+    () =>
+      groupLanes(filtered, display.groupBy, display.sortBy, display.sortDir, groupCtx, manualAnchor),
+    [filtered, display.groupBy, display.sortBy, display.sortDir, groupCtx, manualAnchor],
+  );
+
   // The data window is the meaningful extent; the render window pads each side
   // by half the visible track so any point (incl. "now") can be scrolled to the
   // centre. The pad is empty but dated — it reads as scroll/planning slack.
-  const data = useMemo(() => flowsWindow(lanes, nowMs), [lanes, nowMs]);
+  const data = useMemo(() => flowsWindow(filtered, nowMs), [filtered, nowMs]);
   // The canvas viewport IS the track viewport (the gutter is a separate pane).
   const visibleTrack = canvasW;
   const padMs = pxPerDay > 0 ? ((visibleTrack / 2) / pxPerDay) * DAY_MS : 0;
   const t0 = data.t0 - padMs; // render origin (left pad)
   const t1 = data.t1 + padMs; // render right edge (right pad)
   const { rows, totalHeight } = useMemo(
-    () => layoutRows(lanes, expanded),
-    [lanes, expanded],
+    () => layoutRows(groups, expanded),
+    [groups, expanded],
   );
+
+  // Lanes in their current visual order (across groups) — the DnD reorder set.
+  const orderedLanes = useMemo(
+    () => rows.flatMap((r) => (r.kind === "lane" ? [r.lane] : [])),
+    [rows],
+  );
+  // Each lane's group bucket, so a drag reorders only within its own group.
+  const groupByLane = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of groups) for (const l of g.lanes) map.set(l.task.id, g.key);
+    return map;
+  }, [groups]);
+  // Hand-reordering writes a global `flowPos`, so it works in every grouping —
+  // it just needs the manual sort (otherwise the chosen sort owns the order).
+  const canReorder = display.sortBy === "manual";
+  const dnd = useFlowsDnd(orderedLanes, {
+    anchorOf: (id) => flowAnchor.get(id) ?? 0,
+    groupOf: (id) => groupByLane.get(id) ?? "all",
+    onReorder: actions.reorderFlow,
+  });
   const trackWidth = Math.ceil(((t1 - t0) / DAY_MS) * pxPerDay);
   // x of the now-line, pinned to the right edge once now passes the window.
   // Shared by the ruler's "Now" pill and the tick-label collision guard.
@@ -215,9 +318,9 @@ export function TaskFlows({
     syncScroll();
   }
 
-  const anyExpandable = useMemo(() => lanes.some((l) => l.branches.length > 0), [lanes]);
+  const anyExpandable = useMemo(() => filtered.some((l) => l.branches.length > 0), [filtered]);
   const expandAll = () =>
-    setExpanded(new Set(lanes.filter((l) => l.branches.length > 0).map((l) => l.task.id)));
+    setExpanded(new Set(filtered.filter((l) => l.branches.length > 0).map((l) => l.task.id)));
   const collapseAll = () => setExpanded(new Set());
 
   // Centre the now-line once the canvas is measured and there's data — in a
@@ -277,8 +380,43 @@ export function TaskFlows({
     );
   }
 
+  // The Display control (filter / group / sort) is portaled into the shared
+  // header so the cramped 272px gutter corner keeps just zoom + Today.
+  const displayMenu = (
+    <ToolbarSlot name="trailing">
+      <FlowsDisplayMenu
+        display={display}
+        onChange={onDisplayChange}
+        onReset={onResetDisplay}
+        boards={boards}
+        categories={categories}
+        totalCount={tasks.length}
+        filteredCount={orderedLanes.length}
+      />
+    </ToolbarSlot>
+  );
+
+  // Tasks exist, but the filters hide them all — keep the Display menu reachable
+  // so the user can clear the filter without leaving the view.
+  if (orderedLanes.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        {displayMenu}
+        <div className="max-w-sm text-center">
+          <Filter className="mx-auto mb-3 size-6 text-muted-foreground" />
+          <h3 className="text-base font-medium">{t("flows.filtered.emptyTitle")}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{t("flows.filtered.emptyBody")}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={onResetDisplay}>
+            {t("flows.filtered.clear")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
+      {displayMenu}
       {/* Frozen header: zoom controls (corner) + the date ruler */}
       <div className="flex shrink-0 border-b border-border" style={{ height: G.rulerHeight }}>
         <div
@@ -357,97 +495,57 @@ export function TaskFlows({
           style={{ width: G.gutterWidth }}
         >
           <div className="relative" style={{ width: G.gutterWidth, height: fillHeight }}>
-            {rows.map(({ lane, top, isExpanded, branchRows }) => {
-            const ownerColor = members.get(lane.task.ownerId)?.color ?? colorOf(lane.task);
-            const hasChildren = lane.branches.length > 0;
-            return (
-              <div key={lane.task.id}>
-                <div
-                  className={cn(
-                    "absolute flex items-center gap-2 px-2",
-                    lane.done && "opacity-60",
-                  )}
-                  style={{ left: 0, top, width: G.gutterWidth, height: G.laneHeight }}
-                >
-                  {hasChildren ? (
-                    <button
-                      type="button"
-                      aria-label={isExpanded ? t("flows.collapse") : t("flows.expand")}
-                      aria-expanded={isExpanded}
-                      onClick={() => toggle(lane.task.id)}
-                      className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                    >
-                      <ChevronRight
-                        className={cn("size-4 transition-transform", isExpanded && "rotate-90")}
-                      />
-                    </button>
+            <DndContext
+              sensors={dnd.sensors}
+              collisionDetection={closestCenter}
+              autoScroll={false}
+              onDragStart={dnd.onDragStart}
+              onDragEnd={dnd.onDragEnd}
+            >
+              <SortableContext items={dnd.ids} strategy={verticalListSortingStrategy}>
+                {rows.map((row) =>
+                  row.kind === "group" ? (
+                    <GutterGroupHeader key={`group-${row.key}`} row={row} />
                   ) : (
-                    <span className="w-5 shrink-0" aria-hidden />
-                  )}
-                  {lane.task.isMilestone ? (
-                    <CircleDot
-                      className="size-3 shrink-0"
-                      style={{ color: ownerColor }}
-                      aria-label={t("flows.milestone.label")}
+                    <GutterLaneRow
+                      key={row.lane.task.id}
+                      row={row}
+                      canReorder={canReorder}
+                      ownerColor={
+                        members.get(row.lane.task.ownerId)?.color ?? colorOf(row.lane.task)
+                      }
+                      t={t}
+                      actions={actions}
+                      scrollToTask={scrollToTask}
+                      toggle={toggle}
+                      anyExpandable={anyExpandable}
+                      expandAll={expandAll}
+                      collapseAll={collapseAll}
                     />
-                  ) : (
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: ownerColor }}
+                  ),
+                )}
+              </SortableContext>
+              <DragOverlay>
+                {dnd.activeLane ? (
+                  <div className="flex items-center gap-1.5 rounded-md bg-card px-2 py-1.5 text-sm shadow-soft-lg ring-1 ring-border">
+                    <GripVertical
+                      className="size-4 shrink-0 text-muted-foreground/60"
                       aria-hidden
                     />
-                  )}
-                  <FlowRowMenu
-                    task={lane.task}
-                    onOpen={() => actions.open(lane.task)}
-                    onToggleDone={() => actions.toggleDone(lane.task)}
-                    onCenter={() => scrollToTask(lane.task.id)}
-                    onDelete={() => actions.remove(lane.task)}
-                    onChangeColor={(c) => actions.changeColor(lane.task, c)}
-                    onAddSubtask={() => actions.addSubtask(lane.task)}
-                    onExpandAll={anyExpandable ? expandAll : undefined}
-                    onCollapseAll={anyExpandable ? collapseAll : undefined}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => actions.open(lane.task)}
-                      className={cn(
-                        "min-w-0 flex-1 truncate text-left text-sm rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                        lane.done && "line-through",
-                      )}
-                    >
-                      {lane.task.title}
-                    </button>
-                  </FlowRowMenu>
-                </div>
-
-                {isExpanded &&
-                  branchRows.map(({ branch, subTop }) => (
-                    <FlowRowMenu
-                      key={branch.task.id}
-                      task={branch.task}
-                      onOpen={() => actions.open(branch.task)}
-                      onToggleDone={() => actions.toggleDone(branch.task)}
-                      onCenter={() => scrollToTask(branch.task.id)}
-                      onDelete={() => actions.remove(branch.task)}
-                      onChangeColor={(c) => actions.changeColor(branch.task, c)}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => actions.open(branch.task)}
-                        className={cn(
-                          "absolute truncate pl-9 pr-2 text-left text-xs text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                          branch.task.completedAt != null && "line-through",
-                        )}
-                        style={{ left: 0, top: subTop, width: G.gutterWidth, height: G.subRowHeight }}
-                      >
-                        {branch.task.title}
-                      </button>
-                    </FlowRowMenu>
-                  ))}
-              </div>
-            );
-          })}
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor:
+                          members.get(dnd.activeLane.task.ownerId)?.color ??
+                          colorOf(dnd.activeLane.task),
+                      }}
+                      aria-hidden
+                    />
+                    <span className="truncate">{dnd.activeLane.task.title}</span>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
             {/* Add-task affordance, parked in the empty filler below the last lane
                 so it never offsets the gutter/track row alignment. */}
             <button
@@ -483,6 +581,177 @@ export function TaskFlows({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+type Translator = ReturnType<typeof useTranslations>;
+
+/** A group-by section header band in the gutter (mirrors the canvas band). */
+function GutterGroupHeader({ row }: { row: GroupHeaderRow }) {
+  return (
+    <div
+      className="absolute flex items-center gap-2 border-b border-border bg-muted/40 px-2"
+      style={{ left: 0, top: row.top, width: G.gutterWidth, height: G.groupHeaderHeight }}
+    >
+      {row.color && (
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: toPaletteColor(row.color) }}
+          aria-hidden
+        />
+      )}
+      <span className="min-w-0 flex-1 truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+        {row.label}
+      </span>
+      <span className="shrink-0 text-[11px] font-medium text-muted-foreground/70 tabular-nums">
+        {row.count}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * One gutter lane row. A `useSortable` node (disabled unless reordering is
+ * possible) carries the absolute `top` plus the drag transform; the grip handle
+ * is the only drag activator, so the title stays click-to-open. Subtask branch
+ * rows render beneath, outside the sortable node.
+ */
+function GutterLaneRow({
+  row,
+  canReorder,
+  ownerColor,
+  t,
+  actions,
+  scrollToTask,
+  toggle,
+  anyExpandable,
+  expandAll,
+  collapseAll,
+}: {
+  row: LaneRow;
+  canReorder: boolean;
+  ownerColor: string;
+  t: Translator;
+  actions: TaskActions;
+  scrollToTask: (id: string) => void;
+  toggle: (id: string) => void;
+  anyExpandable: boolean;
+  expandAll: () => void;
+  collapseAll: () => void;
+}) {
+  const { lane, top, isExpanded, branchRows } = row;
+  const hasChildren = lane.branches.length > 0;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: lane.task.id,
+    disabled: !canReorder,
+  });
+
+  return (
+    <div>
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "absolute flex items-center gap-1.5 px-2",
+          lane.done && "opacity-60",
+          isDragging && "z-10 opacity-50",
+        )}
+        style={{
+          left: 0,
+          top,
+          width: G.gutterWidth,
+          height: G.laneHeight,
+          transform: CSS.Transform.toString(transform),
+          transition,
+        }}
+      >
+        {canReorder && (
+          <button
+            type="button"
+            aria-label={t("flows.dnd.handle", { title: lane.task.title })}
+            className="grid size-5 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground/40 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-4" />
+          </button>
+        )}
+        {hasChildren ? (
+          <button
+            type="button"
+            aria-label={isExpanded ? t("flows.collapse") : t("flows.expand")}
+            aria-expanded={isExpanded}
+            onClick={() => toggle(lane.task.id)}
+            className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <ChevronRight
+              className={cn("size-4 transition-transform", isExpanded && "rotate-90")}
+            />
+          </button>
+        ) : (
+          <span className="w-5 shrink-0" aria-hidden />
+        )}
+        {lane.task.isMilestone ? (
+          <CircleDot
+            className="size-3 shrink-0"
+            style={{ color: ownerColor }}
+            aria-label={t("flows.milestone.label")}
+          />
+        ) : (
+          <span
+            className="size-2 shrink-0 rounded-full"
+            style={{ backgroundColor: ownerColor }}
+            aria-hidden
+          />
+        )}
+        <FlowRowMenu
+          task={lane.task}
+          onOpen={() => actions.open(lane.task)}
+          onToggleDone={() => actions.toggleDone(lane.task)}
+          onCenter={() => scrollToTask(lane.task.id)}
+          onDelete={() => actions.remove(lane.task)}
+          onChangeColor={(c) => actions.changeColor(lane.task, c)}
+          onAddSubtask={() => actions.addSubtask(lane.task)}
+          onExpandAll={anyExpandable ? expandAll : undefined}
+          onCollapseAll={anyExpandable ? collapseAll : undefined}
+        >
+          <button
+            type="button"
+            onClick={() => actions.open(lane.task)}
+            className={cn(
+              "min-w-0 flex-1 truncate rounded text-left text-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              lane.done && "line-through",
+            )}
+          >
+            {lane.task.title}
+          </button>
+        </FlowRowMenu>
+      </div>
+
+      {isExpanded &&
+        branchRows.map(({ branch, subTop }) => (
+          <FlowRowMenu
+            key={branch.task.id}
+            task={branch.task}
+            onOpen={() => actions.open(branch.task)}
+            onToggleDone={() => actions.toggleDone(branch.task)}
+            onCenter={() => scrollToTask(branch.task.id)}
+            onDelete={() => actions.remove(branch.task)}
+            onChangeColor={(c) => actions.changeColor(branch.task, c)}
+          >
+            <button
+              type="button"
+              onClick={() => actions.open(branch.task)}
+              className={cn(
+                "absolute truncate rounded pr-2 pl-9 text-left text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                branch.task.completedAt != null && "line-through",
+              )}
+              style={{ left: 0, top: subTop, width: G.gutterWidth, height: G.subRowHeight }}
+            >
+              {branch.task.title}
+            </button>
+          </FlowRowMenu>
+        ))}
     </div>
   );
 }

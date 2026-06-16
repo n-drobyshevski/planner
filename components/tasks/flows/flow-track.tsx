@@ -16,8 +16,8 @@
 import { useState, type ReactNode } from "react";
 import type {
   FlowNode,
+  FlowRow,
   FlowSegment,
-  LaidOutLane,
 } from "@/lib/tasks/flows-layout";
 import { FLOW_GEOM, xForTime } from "@/lib/tasks/flows-layout";
 import {
@@ -33,7 +33,7 @@ const ELBOW = 12; // horizontal run of a branch diverge/merge curve
 const DOTS = "2 2.5"; // dash pattern for "planned / not yet real" strokes
 
 export interface FlowTrackProps {
-  rows: LaidOutLane[];
+  rows: FlowRow[];
   /** full canvas height — fills the viewport so gridlines/now-line run the whole height */
   height: number;
   t0: number;
@@ -107,7 +107,31 @@ export function FlowTrack({
             />
           );
         })}
-        {rows.map(({ lane, top, branchRows }) => {
+        {rows.map((row) => {
+          // A group-by section band: a faint full-width tint + a divider under
+          // it, aligned to the gutter's header row by sharing `top`/`height`.
+          if (row.kind === "group") {
+            return (
+              <g key={`group-${row.key}`} aria-hidden>
+                <rect
+                  x={0}
+                  y={row.top}
+                  width={trackWidth}
+                  height={row.height}
+                  fill="var(--muted)"
+                  opacity={0.35}
+                />
+                <line
+                  x1={0}
+                  y1={row.top + row.height}
+                  x2={trackWidth}
+                  y2={row.top + row.height}
+                  stroke="var(--border)"
+                />
+              </g>
+            );
+          }
+          const { lane, top, branchRows } = row;
           const color = colorOf(lane.task);
           const mine = lane.task.ownerId === currentMemberId;
           const trunkY = top + G.laneHeight / 2;
@@ -262,7 +286,9 @@ export function FlowTrack({
       )}
 
       {/* interactive hit-targets (focus ring + tooltip + open) */}
-      {rows.map(({ lane, top, branchRows }) => {
+      {rows.map((row) => {
+        if (row.kind !== "lane") return null;
+        const { lane, top, branchRows } = row;
         const trunkY = top + G.laneHeight / 2;
         const hits: ReactNode[] = [];
         const planned = !lane.milestone && lane.startMs > nowMs && lane.endMs === null;
