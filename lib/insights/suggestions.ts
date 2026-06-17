@@ -107,6 +107,10 @@ export interface Suggestion {
    *  STORAGE key adds the period window, so dismissals reset per period. */
   id: string;
   kind: SuggestionKind;
+  /** Viewer-zone day-start (ms) a day-anchored card refers to, when it has a
+   *  single one. Cards about a day before "today" sort below today/future ones;
+   *  window/category/goal cards leave it undefined and rank with the present. */
+  dayMs?: number;
   /** Two calm levels, rendered as icon + text label (never color alone). */
   severity: "attention" | "info";
   title: string;
@@ -186,6 +190,10 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     `${format(window.start, "d MMM", { in: ctx, locale: dfLocale })} – ${format(window.end - 1, "d MMM", { in: ctx, locale: dfLocale })}`;
   const calendarDayHref = (dayMs: number) =>
     `/calendar?date=${dateKeyInZone(dayMs, timeZone)}&view=day`;
+  // Start of the viewer's "today" — the cutoff between days you can still act on
+  // (reschedule onto) and days that have already happened. Reused by the
+  // forward-only reschedule rule (f), the due-soon rule (e), and the final sort.
+  const startOfToday = dateInputToMs(dateKeyInZone(now, timeZone), timeZone);
 
   // Sleep blocks must never read as workload (see module header).
   const active = input.occurrences.filter((o) => !o.inactive);
@@ -221,6 +229,7 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     out.push({
       id: `overloaded-day:${dateKeyInZone(d.dayMs, timeZone)}`,
       kind: "overloaded-day",
+      dayMs: d.dayMs,
       severity: d.ms >= OVERLOAD_ATTENTION_MS ? "attention" : "info",
       title: t("suggestions.overloadedDay.title", { day: dayLabel(d.dayMs) }),
       body: t("suggestions.overloadedDay.body"),
@@ -250,13 +259,20 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
 
   // --- (f) Stranded movable items on those days ----------------------------
   // Uses the PRE-CAP overloaded set so a 4th heavy day still gets its nudge.
-  const lightest = curUsage.perDay.reduce(
-    (min, d) => (d.ms < min.ms ? d : min),
-    curUsage.perDay[0] ?? { dayMs: window.start, ms: 0 },
-  );
+  // This is an actionable "move it to a freer day" nudge, so it only ever points
+  // at today or a future day — you cannot reschedule a task onto a day that has
+  // already happened. The lightest target is chosen among today-or-future days,
+  // and only overloaded days you can still act on get a card.
+  const futureDays = curUsage.perDay.filter((d) => d.dayMs >= startOfToday);
+  const lightest = futureDays.length
+    ? futureDays.reduce((min, d) => (d.ms < min.ms ? d : min), futureDays[0])
+    : null;
   let stranded = 0;
   for (const d of overloadedDays) {
+    if (!lightest) break; // no today-or-future day to move onto
     if (stranded >= 2) break;
+    if (d.dayMs < startOfToday) continue; // past day — nothing left to reschedule
+    if (lightest.dayMs === d.dayMs) continue; // no freer day to move onto
     const dayEnd = days[days.indexOf(d.dayMs) + 1] ?? window.end;
     const movable = active.filter(
       (o) =>
@@ -274,6 +290,7 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     out.push({
       id: `stranded-flexible:${dateKeyInZone(d.dayMs, timeZone)}`,
       kind: "stranded-flexible",
+      dayMs: d.dayMs,
       severity: "info",
       title: t("suggestions.strandedFlexible.title", { day: dayLabel(d.dayMs) }),
       body: t("suggestions.strandedFlexible.body", {
@@ -385,6 +402,7 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     out.push({
       id: `late-night:${dateKeyInZone(days[m], timeZone)}`,
       kind: "late-night",
+      dayMs: days[m],
       severity: "info",
       title: t("suggestions.lateNight.title", { day: dayLabel(days[m]) }),
       body: t("suggestions.lateNight.body"),
@@ -452,7 +470,6 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
 
   // --- (e) Unscheduled high-priority tasks due soon -------------------------
   if (window.end > now) {
-    const startOfToday = dateInputToMs(dateKeyInZone(now, timeZone), timeZone);
     const candidates = input.tasks
       .filter((task) => {
         if (task.parentId !== null || task.completedAt != null) return false;
@@ -616,6 +633,7 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
     out.push({
       id: `anomaly:${dateKeyInZone(a.dayMs, timeZone)}`,
       kind: "anomaly",
+      dayMs: a.dayMs,
       severity: "info",
       title: t("suggestions.anomaly.title", { day: dayLabel(a.dayMs) }),
       body: t("suggestions.anomaly.body", { direction: a.direction }),
@@ -737,6 +755,11 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
   const visible = suppressed ? out.filter((s) => !suppressed.has(s.kind)) : out;
   visible.sort((a, b) => {
     if (a.severity !== b.severity) return a.severity === "attention" ? -1 : 1;
+    // Among equal severity, a card about a past day is less actionable — sink it
+    // below today/future-relevant cards (retrospective reflections stay, just lower).
+    const aPast = a.dayMs != null && a.dayMs < startOfToday;
+    const bPast = b.dayMs != null && b.dayMs < startOfToday;
+    if (aPast !== bPast) return aPast ? 1 : -1;
     if (KIND_PRIORITY[a.kind] !== KIND_PRIORITY[b.kind])
       return KIND_PRIORITY[a.kind] - KIND_PRIORITY[b.kind];
     return a.id.localeCompare(b.id);

@@ -383,9 +383,30 @@ describe("rule: unscheduled-task", () => {
 });
 
 describe("rule: stranded-flexible", () => {
-  it("suggests moving movable items off an overloaded day", () => {
+  // `now` is mid-window (Jun 4); days[4] (Jun 5) is a future, still-reschedulable day.
+  it("suggests moving movable items off an overloaded future day", () => {
     const input = makeInput();
     input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = [
+      dayLoad(input.days[4], 5),
+      dayLoad(input.days[4], 3, {
+        start: input.days[4] + 15 * HOUR,
+        end: input.days[4] + 18 * HOUR,
+        title: "Gym",
+        attributes: { flexibility: "movable" },
+      }),
+    ];
+    const out = computeSuggestions(input).filter((s) => s.kind === "stranded-flexible");
+    expect(out.map((s) => s.id)).toEqual(["stranded-flexible:2026-06-05"]);
+    expect(out[0].body).toContain("Gym");
+    // The "freer day" it names must be today-or-future, never a past day.
+    expect(out[0].dayMs).toBeGreaterThanOrEqual(input.days[3]);
+  });
+
+  it("stays silent when the only overloaded movable day is in the past", () => {
+    const input = makeInput();
+    input.prevOccurrences = prevBaseline4h(input);
+    // days[2] (Jun 3) is before "today" (Jun 4) — you cannot reschedule the past.
     input.occurrences = [
       dayLoad(input.days[2], 5),
       dayLoad(input.days[2], 3, {
@@ -395,15 +416,13 @@ describe("rule: stranded-flexible", () => {
         attributes: { flexibility: "movable" },
       }),
     ];
-    const out = computeSuggestions(input).filter((s) => s.kind === "stranded-flexible");
-    expect(out.map((s) => s.id)).toEqual(["stranded-flexible:2026-06-03"]);
-    expect(out[0].body).toContain("Gym");
+    expect(computeSuggestions(input).filter((s) => s.kind === "stranded-flexible")).toEqual([]);
   });
 
   it("stays silent when nothing on the heavy day is movable", () => {
     const input = makeInput();
     input.prevOccurrences = prevBaseline4h(input);
-    input.occurrences = [dayLoad(input.days[2], 8)];
+    input.occurrences = [dayLoad(input.days[4], 8)];
     expect(computeSuggestions(input).filter((s) => s.kind === "stranded-flexible")).toEqual([]);
   });
 });
@@ -450,6 +469,18 @@ describe("ordering and caps", () => {
     expect(computeSuggestions(input).map((s) => s.id)).toEqual(
       computeSuggestions(input).map((s) => s.id),
     );
+  });
+
+  it("sinks past-day cards below equal-severity today/future cards (but keeps them)", () => {
+    const input = makeInput();
+    input.prevOccurrences = prevBaseline4h(input);
+    // Two info-grade heavy days: one in the past (Jun 2), one in the future (Jun 6).
+    input.occurrences = [dayLoad(input.days[1], 7), dayLoad(input.days[5], 7)];
+    const ids = computeSuggestions(input)
+      .filter((s) => s.kind === "overloaded-day")
+      .map((s) => s.id);
+    // Both reflections are still emitted, but the future day ranks first.
+    expect(ids).toEqual(["overloaded-day:2026-06-06", "overloaded-day:2026-06-02"]);
   });
 });
 
@@ -681,9 +712,10 @@ describe("anomaly rule", () => {
     ];
     const out = computeSuggestions(input).filter((s) => s.kind === "anomaly");
     expect(out).toHaveLength(2);
+    // Both survive the cap; the today-anchored card (Jun 4) sorts above the past one (Jun 3).
     expect(out.map((s) => s.id)).toEqual([
-      "anomaly:2026-06-03",
       "anomaly:2026-06-04",
+      "anomaly:2026-06-03",
     ]);
   });
 });
