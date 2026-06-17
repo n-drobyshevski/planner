@@ -51,10 +51,6 @@
     "title": "Filters",
     "description": "What counts toward these numbers.",
     "inertNote": "The You tab shows only your own nights, so these filters don't apply there. They still shape the other tabs.",
-    "whoseTime": "Whose time",
-    "me": "Me",
-    "partner": "Partner",
-    "both": "Both",
     "categories": "Categories",
     "includeInactive": "Include inactive blocks",
     "includeInactiveHint": "Count grayed-out time such as sleep"
@@ -263,13 +259,7 @@
     "pts": "{points} pts",
     "satisfactionByContext": "Satisfaction by context",
     "satisfactionEmpty": "Rate satisfaction on at least {min} events in a context to see which parts of your time feel best, looking back.",
-    "satisfactionAria": "{name}: mean satisfaction {mean} of 5, from {n} rated items",
-    "twoOfYou": "The two of you, per {granularity}",
-    "you": "You",
-    "partner": "Partner",
-    "unknownMember": "Unknown",
-    "twoOfYouAria": "Tracked time per member per {granularity}",
-    "privacyNote": "Shared and visible time only; private time stays private. Joint events count for their owner's calendar."
+    "satisfactionAria": "{name}: mean satisfaction {mean} of 5, from {n} rated items"
   },
   "optimize": {
     "muted": "Muted: {label}",

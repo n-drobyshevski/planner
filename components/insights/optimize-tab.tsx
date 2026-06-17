@@ -165,7 +165,6 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     now,
     viewerId,
     workspaceId,
-    memberFilter,
   } = data;
 
   const { goals } = useCategoryGoals(workspaceId || undefined);
@@ -260,16 +259,13 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
       forecast: period.window.end > now ? forecast : null,
       anomalies,
       streak,
-      // The sleep-debt rule only ever sees the VIEWER's own nights, and only
-      // when the lens is strictly "me" (occurrences are theirs alone then).
-      sleepPairs:
-        memberFilter === "me"
-          ? buildSleepDayPairs(sleepLogs, occurrences, period.days, period.window, timeZone)
-          : null,
+      // The sleep-debt rule sees the VIEWER's own nights — occurrences are
+      // always the viewer's own slice now.
+      sleepPairs: buildSleepDayPairs(sleepLogs, occurrences, period.days, period.window, timeZone),
       suppressedKinds: new Set(suppressedKinds),
       periodLabel: period.label,
     });
-  }, [t, locale, occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goalsProgress, anomalies, streak, forecast, memberFilter, sleepLogs, suppressedKinds]);
+  }, [t, locale, occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goalsProgress, anomalies, streak, forecast, sleepLogs, suppressedKinds]);
 
   const coverage = useMemo(() => attributeCoverage(occurrences), [occurrences]);
 
@@ -287,7 +283,7 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     return buildDigestPayload({
       periodLabel: period.label,
       dayCount: period.days.length,
-      lens: memberFilter,
+      lens: "me",
       locale: locale === "ru" ? "ru" : "en",
       totalMs: usage.cur.summary.totalMs,
       prevTotalMs: usage.prev.summary.totalMs,
@@ -339,7 +335,7 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
         text: `${s.title} — ${s.evidence.summary}`,
       })),
     });
-  }, [occurrences, prevOccurrences, period, tasks, now, timeZone, categories, memberFilter, usage, forecast, goalsProgress, anomalies, streak, suggestions]);
+  }, [occurrences, prevOccurrences, period, tasks, now, timeZone, categories, usage, forecast, goalsProgress, anomalies, streak, suggestions]);
 
   function muteKind(kind: SuggestionKind) {
     if (suppressedKinds.includes(kind)) return;

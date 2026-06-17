@@ -9,7 +9,6 @@
 
 import { z } from "zod";
 import type { PeriodPreset, Granularity } from "@/lib/insights/period";
-import type { MemberFilter } from "@/lib/insights/filters";
 
 export interface SavedViewConfig {
   preset: PeriodPreset;
@@ -18,7 +17,6 @@ export interface SavedViewConfig {
   /** custom only: any ms within the last (inclusive) day of the range */
   customTo?: number;
   granularity: Granularity;
-  member: MemberFilter;
   hiddenCategoryIds: string[];
   includeInactive: boolean;
 }
@@ -36,12 +34,10 @@ const PRESETS = [
   "custom",
 ] as const satisfies readonly PeriodPreset[];
 const GRANULARITIES = ["day", "week", "month"] as const satisfies readonly Granularity[];
-const MEMBER_FILTERS = ["me", "partner", "both"] as const satisfies readonly MemberFilter[];
 // Exhaustiveness: a new union member that's missing from its list breaks these.
 type _AllPresets = PeriodPreset extends (typeof PRESETS)[number] ? true : never;
 type _AllGranularities = Granularity extends (typeof GRANULARITIES)[number] ? true : never;
-type _AllMembers = MemberFilter extends (typeof MEMBER_FILTERS)[number] ? true : never;
-const _exhaustive: [_AllPresets, _AllGranularities, _AllMembers] = [true, true, true];
+const _exhaustive: [_AllPresets, _AllGranularities] = [true, true];
 void _exhaustive;
 
 const configSchema = z.object({
@@ -51,7 +47,6 @@ const configSchema = z.object({
   // Lenient: junk values degrade to the default instead of losing the view.
   customFrom: z.number().finite().optional().catch(undefined),
   customTo: z.number().finite().optional().catch(undefined),
-  member: z.enum(MEMBER_FILTERS).default("both").catch("both"),
   hiddenCategoryIds: z.array(z.string()).default([]).catch([]),
   includeInactive: z.boolean().default(false).catch(false),
 });
@@ -59,7 +54,7 @@ const configSchema = z.object({
 /**
  * Lenient READ of a saved-view config: null when unusable (non-object, or an
  * unknown preset/granularity); missing/junk optional fields take defaults
- * (member "both", hidden [], includeInactive false).
+ * (hidden [], includeInactive false). A legacy `member` key is ignored.
  */
 export function parseViewConfig(raw: unknown): SavedViewConfig | null {
   const result = configSchema.safeParse(raw);
@@ -68,7 +63,6 @@ export function parseViewConfig(raw: unknown): SavedViewConfig | null {
   const out: SavedViewConfig = {
     preset: c.preset,
     granularity: c.granularity,
-    member: c.member,
     hiddenCategoryIds: c.hiddenCategoryIds,
     includeInactive: c.includeInactive,
   };
@@ -89,7 +83,6 @@ export function encodeViewConfig(c: SavedViewConfig): SavedViewConfig {
   const out: SavedViewConfig = {
     preset: c.preset,
     granularity: c.granularity,
-    member: c.member,
     hiddenCategoryIds: [...c.hiddenCategoryIds],
     includeInactive: c.includeInactive,
   };

@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   ResponsiveDialog,
@@ -20,14 +19,10 @@ import {
   ResponsiveDialogTrigger,
 } from "@/components/ui/responsive-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type { MemberFilter } from "@/lib/insights/filters";
-import type { Category, Member } from "@/lib/types";
+import type { Category } from "@/lib/types";
 
 interface FiltersProps {
-  members: Member[];
   categories: Category[];
-  member: MemberFilter;
-  onMemberChange: (m: MemberFilter) => void;
   hiddenCategoryIds: Set<string>;
   onHiddenCategoryIdsChange: (ids: Set<string>) => void;
   includeInactive: boolean;
@@ -37,19 +32,17 @@ interface FiltersProps {
 }
 
 /**
- * Insights-local filters: member, categories, include-inactive. Independent of
- * the calendar's sidebar filters by design — the member toggle doubles as the
- * cue that insights always include the partner's visible time. Popover on
- * desktop, bottom sheet on phones.
+ * Insights-local filters: categories and include-inactive. Independent of the
+ * calendar's sidebar filters by design. Insights always show only the viewer's
+ * own slice, so there's no member toggle. Popover on desktop, bottom sheet on
+ * phones.
  */
 export function InsightsFiltersPopover(props: FiltersProps) {
   const t = useTranslations("insights");
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const activeCount =
-    (props.member !== "both" ? 1 : 0) +
-    props.hiddenCategoryIds.size +
-    (props.includeInactive ? 1 : 0);
+    props.hiddenCategoryIds.size + (props.includeInactive ? 1 : 0);
 
   const trigger = (
     <Button
@@ -101,10 +94,7 @@ export function InsightsFiltersPopover(props: FiltersProps) {
 }
 
 function FiltersForm({
-  members,
   categories,
-  member,
-  onMemberChange,
   hiddenCategoryIds,
   onHiddenCategoryIdsChange,
   includeInactive,
@@ -126,33 +116,6 @@ function FiltersForm({
           {t("filters.inertNote")}
         </p>
       )}
-      {members.length > 1 && (
-        <fieldset className="space-y-1.5">
-          <legend className="text-xs font-medium text-muted-foreground">
-            {t("filters.whoseTime")}
-          </legend>
-          <ToggleGroup
-            type="single"
-            value={member}
-            onValueChange={(v) => v && onMemberChange(v as MemberFilter)}
-            variant="outline"
-            size="sm"
-            className="w-full"
-            disabled={filtersInert}
-          >
-            <ToggleGroupItem value="me" className="flex-1">
-              {t("filters.me")}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="partner" className="flex-1">
-              {t("filters.partner")}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="both" className="flex-1">
-              {t("filters.both")}
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </fieldset>
-      )}
-
       {categories.length > 0 && (
         <fieldset className="space-y-1.5">
           <legend className="text-xs font-medium text-muted-foreground">

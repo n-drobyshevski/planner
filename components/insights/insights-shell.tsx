@@ -22,7 +22,7 @@ import {
   type PeriodPreset,
   type PeriodState,
 } from "@/lib/insights/period";
-import { filterForInsights, type MemberFilter } from "@/lib/insights/filters";
+import { filterForInsights } from "@/lib/insights/filters";
 import { useInsightsFilters } from "@/lib/hooks/use-insights-filters";
 import { useInsightsCustomizationRealtime } from "@/lib/hooks/use-insights-prefs";
 import type { SavedViewConfig } from "@/lib/insights/views";
@@ -97,7 +97,6 @@ export interface InsightsTabData {
   workspaceId: string;
   viewerId: string;
   timeZone: string;
-  memberFilter: MemberFilter;
   /** the instant relative stats (overdue, presets) are judged against */
   now: number;
 }
@@ -222,17 +221,15 @@ function InsightsShellInner({
   // Insights-local filters (independent of the calendar's sidebar filters),
   // remembered per viewer per device.
   const {
-    memberFilter,
     hiddenCategoryIds,
     includeInactive,
-    setMemberFilter,
     setHiddenCategoryIds,
     setIncludeInactive,
   } = useInsightsFilters(viewerId || undefined);
 
   const filterArgs = useMemo(
-    () => ({ viewerId, member: memberFilter, hiddenCategoryIds, includeInactive }),
-    [viewerId, memberFilter, hiddenCategoryIds, includeInactive],
+    () => ({ viewerId, hiddenCategoryIds, includeInactive }),
+    [viewerId, hiddenCategoryIds, includeInactive],
   );
   const occurrences = useMemo(
     () => filterForInsights(cur.occurrences, filterArgs),
@@ -245,6 +242,15 @@ function InsightsShellInner({
   const futureOccurrences = useMemo(
     () => filterForInsights(fut.occurrences, filterArgs),
     [fut.occurrences, filterArgs],
+  );
+
+  // Insights are the viewer's own slice: only tasks they own or are assigned.
+  // Filtered centrally here so the Tasks tab, Overview's task stats, and the
+  // digest payload all read the same scoped set (RLS already removes the
+  // partner's private tasks; this drops their remaining visible ones).
+  const viewerTasks = useMemo(
+    () => tasks.filter((t) => t.ownerId === viewerId || t.assigneeId === viewerId),
+    [tasks, viewerId],
   );
 
   const members = useMemo(
@@ -271,14 +277,13 @@ function InsightsShellInner({
     futureWindow: future.window,
     futureDays: future.days,
     futureLoading: fut.isLoading,
-    tasks,
+    tasks: viewerTasks,
     categories: categoryMap,
     members: memberMap,
     collections: workspace.data?.collections ?? [],
     workspaceId: wsId ?? "",
     viewerId,
     timeZone,
-    memberFilter,
     now,
   };
 
@@ -325,12 +330,10 @@ function InsightsShellInner({
       ? { customTo: state.customTo }
       : {}),
     granularity: state.granularity,
-    member: memberFilter,
     hiddenCategoryIds: [...hiddenCategoryIds],
     includeInactive,
   };
   function applyView(config: SavedViewConfig) {
-    setMemberFilter(config.member);
     setHiddenCategoryIds(new Set(config.hiddenCategoryIds));
     setIncludeInactive(config.includeInactive);
     changePeriod({
@@ -370,10 +373,7 @@ function InsightsShellInner({
         }
         filtersSlot={
           <InsightsFiltersPopover
-            members={members}
             categories={categories}
-            member={memberFilter}
-            onMemberChange={setMemberFilter}
             hiddenCategoryIds={hiddenCategoryIds}
             onHiddenCategoryIdsChange={setHiddenCategoryIds}
             includeInactive={includeInactive}

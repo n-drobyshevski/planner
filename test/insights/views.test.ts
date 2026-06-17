@@ -10,7 +10,6 @@ const FULL: SavedViewConfig = {
   customFrom: Date.UTC(2026, 4, 1),
   customTo: Date.UTC(2026, 4, 31),
   granularity: "week",
-  member: "me",
   hiddenCategoryIds: ["a", "b"],
   includeInactive: true,
 };
@@ -25,17 +24,16 @@ describe("parseViewConfig — lenient read", () => {
     expect(parsed).toEqual({
       preset: "this-week",
       granularity: "day",
-      member: "both",
       hiddenCategoryIds: [],
       includeInactive: false,
     });
   });
 
-  it("degrades junk optional fields to defaults instead of failing", () => {
+  it("degrades junk optional fields to defaults and ignores legacy member", () => {
     const parsed = parseViewConfig({
       preset: "last-30d",
       granularity: "week",
-      member: "everyone", // unknown → default
+      member: "everyone", // legacy field → ignored
       hiddenCategoryIds: "nope", // junk → []
       includeInactive: "yes", // junk → false
       customFrom: "March", // junk → dropped
@@ -43,7 +41,6 @@ describe("parseViewConfig — lenient read", () => {
     expect(parsed).toEqual({
       preset: "last-30d",
       granularity: "week",
-      member: "both",
       hiddenCategoryIds: [],
       includeInactive: false,
     });

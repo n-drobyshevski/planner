@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterForInsights, type MemberFilter } from "@/lib/insights/filters";
+import { filterForInsights } from "@/lib/insights/filters";
 import type { Occurrence } from "@/lib/types";
 
 const HOUR = 3_600_000;
@@ -35,14 +35,12 @@ function occ(over: Partial<Occurrence>): Occurrence {
 function filter(
   occs: Occurrence[],
   over: Partial<{
-    member: MemberFilter;
     hiddenCategoryIds: Set<string>;
     includeInactive: boolean;
   }> = {},
 ) {
   return filterForInsights(occs, {
     viewerId: "me",
-    member: "both",
     hiddenCategoryIds: new Set(),
     includeInactive: false,
     ...over,
@@ -68,22 +66,13 @@ describe("filterForInsights", () => {
     expect(kept.map((o) => o.key)).toEqual(["a"]);
   });
 
-  it("filters by member, counting joint items for either member", () => {
+  it("keeps the viewer's own and joint items, dropping the partner's solo events", () => {
     const occs = [
       occ({ key: "mine" }),
       occ({ key: "theirs", ownerId: "you" }),
       occ({ key: "joint", ownerId: "you", isShared: true }),
     ];
-    expect(filter(occs, { member: "me" }).map((o) => o.key)).toEqual(["mine", "joint"]);
-    expect(filter(occs, { member: "partner" }).map((o) => o.key)).toEqual([
-      "theirs",
-      "joint",
-    ]);
-    expect(filter(occs, { member: "both" }).map((o) => o.key)).toEqual([
-      "mine",
-      "theirs",
-      "joint",
-    ]);
+    expect(filter(occs).map((o) => o.key)).toEqual(["mine", "joint"]);
   });
 
   it("drops hidden categories but never uncategorized items", () => {
@@ -102,15 +91,17 @@ describe("filterForInsights", () => {
     const kept = filter(
       [
         occ({ key: "a", inactive: true, categoryId: "sleep" }),
-        occ({ key: "b", inactive: true, categoryId: "hidden", ownerId: "you" }),
+        occ({ key: "b", inactive: true, categoryId: "hidden" }),
         occ({ key: "c", ownerId: "you" }),
+        occ({ key: "d", ownerId: "you", isShared: true, categoryId: "work" }),
       ],
       {
-        member: "partner",
         includeInactive: true,
         hiddenCategoryIds: new Set(["hidden"]),
       },
     );
-    expect(kept.map((o) => o.key)).toEqual(["c"]);
+    // a: viewer-owned inactive (kept). b: hidden category (dropped).
+    // c: partner solo (dropped). d: joint, visible category (kept).
+    expect(kept.map((o) => o.key)).toEqual(["a", "d"]);
   });
 });

@@ -20,11 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { categoryShares, categoryByBucket, memberByBucket } from "@/lib/analytics/balance";
+import { categoryShares, categoryByBucket } from "@/lib/analytics/balance";
 import { MIN_CATEGORY_RATINGS, satisfactionByCategory } from "@/lib/analytics/correlations";
 import { formatDuration } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
-import { toPaletteColor } from "@/lib/theme/appearance";
 import {
   INSIGHTS_CHART_MARGIN,
   TooltipRow,
@@ -34,8 +33,8 @@ import {
 } from "./chart-frame";
 import { GoalsSection } from "./goals/goals-section";
 import { SectionEmpty } from "./insights-empty";
-import { NEUTRAL, bucketLabel, bucketTick, seriesFallbackLabels, seriesMeta } from "./series";
-import { CHART_H, SectionLabel, srPercent } from "./tab-bits";
+import { bucketLabel, bucketTick, seriesFallbackLabels, seriesMeta } from "./series";
+import { CHART_H, SectionLabel } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
 /**
@@ -49,7 +48,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
   const locale = useLocale();
   const seriesLabels = seriesFallbackLabels(t);
   const reduced = usePrefersReducedMotion();
-  const { period, occurrences, prevOccurrences, timeZone, memberFilter } = data;
+  const { period, occurrences, prevOccurrences, timeZone } = data;
   const { granularity } = period;
 
   const stacked = useMemo(
@@ -60,10 +59,6 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
     () =>
       categoryShares(occurrences, prevOccurrences, period.window, period.prevWindow),
     [occurrences, prevOccurrences, period],
-  );
-  const memberSplit = useMemo(
-    () => memberByBucket(occurrences, period.buckets),
-    [occurrences, period.buckets],
   );
   // Satisfaction lens: duration-weighted mean per category, gated on n in the
   // analytics layer so a single 5-star outing can't crown a context.
@@ -97,25 +92,6 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
     }),
   );
 
-  const showMembers = data.members.size > 1 && memberFilter === "both";
-  const memberRows = memberSplit.rows.map((r) => ({
-    key: String(r.start),
-    full: bucketLabel({ start: r.start, end: r.end }, granularity, timeZone, locale),
-    ...r.byMember,
-  }));
-  const memberConfig: ChartConfig = Object.fromEntries(
-    memberSplit.memberIds.map((id) => {
-      const m = data.members.get(id);
-      return [
-        id,
-        {
-          label: m?.name ?? t("balance.unknownMember"),
-          color: m ? (toPaletteColor(m.color) ?? NEUTRAL) : NEUTRAL,
-        },
-      ];
-    }),
-  );
-
   const tooltipContent = (config: ChartConfig) => (
     <ChartTooltipContent
       labelFormatter={(_l, payload) =>
@@ -130,17 +106,6 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
       )}
     />
   );
-
-  // The two-of-you read: each member's share of the shared + visible time on
-  // screen (privacy holds — a partner's private time is never in `occurrences`,
-  // so it's never counted or shown). The viewer reads as "You".
-  const memberTotals = memberSplit.memberIds
-    .map((id) => ({
-      id,
-      ms: memberRows.reduce((s, r) => s + (Number((r as Record<string, unknown>)[id]) || 0), 0),
-    }))
-    .sort((a, b) => (a.id === data.viewerId ? -1 : b.id === data.viewerId ? 1 : b.ms - a.ms));
-  const memberTotalMs = memberTotals.reduce((s, m) => s + m.ms, 0);
 
   return (
     <>
@@ -301,62 +266,6 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
         )}
       </section>
 
-      {showMembers && memberSplit.memberIds.length > 1 && (
-        <section className="space-y-2 lg:col-span-2">
-          <SectionLabel>{t("balance.twoOfYou", { granularity })}</SectionLabel>
-          {memberTotalMs > 0 && (
-            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              {memberTotals.map((m) => {
-                const label =
-                  m.id === data.viewerId
-                    ? t("balance.you")
-                    : (data.members.get(m.id)?.name ?? t("balance.partner"));
-                const color = (memberConfig[m.id]?.color as string) ?? NEUTRAL;
-                return (
-                  <span key={m.id} className="flex items-center gap-1.5">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ background: color }}
-                      aria-hidden
-                    />
-                    <span className="font-medium">{label}</span>
-                    <span className="font-mono tabular-nums text-muted-foreground">
-                      {srPercent(m.ms, memberTotalMs)} · {formatDuration(m.ms, locale)}
-                    </span>
-                  </span>
-                );
-              })}
-            </p>
-          )}
-          <ChartContainer
-            config={memberConfig}
-            className={`aspect-auto ${CHART_H.compact} w-full`}
-            aria-label={t("balance.twoOfYouAria", { granularity })}
-          >
-            <BarChart data={memberRows} margin={INSIGHTS_CHART_MARGIN}>
-              {insightsGrid()}
-              {insightsXAxis({
-                tickFormatter: (v) => bucketTick(Number(v), granularity, timeZone, locale),
-              })}
-              {insightsYAxis({ tickCount: 3 })}
-              <ChartTooltip cursor={false} content={tooltipContent(memberConfig)} />
-              <ChartLegend content={<ChartLegendContent />} />
-              {memberSplit.memberIds.map((id) => (
-                <Bar
-                  key={id}
-                  dataKey={id}
-                  fill={`var(--color-${id})`}
-                  radius={[3, 3, 0, 0]}
-                  isAnimationActive={!reduced}
-                />
-              ))}
-            </BarChart>
-          </ChartContainer>
-          <p className="text-[11px] text-muted-foreground">
-            {t("balance.privacyNote")}
-          </p>
-        </section>
-      )}
     </>
   );
 }
