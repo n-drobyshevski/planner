@@ -116,6 +116,9 @@ export function TaskDialog(props: TaskDialogProps) {
   const tc = useTranslations("common");
   const mutations = useTaskMutations(workspaceId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Pending ownership transfer: the member the task would be handed to. Set by
+  // the Owner picker, confirmed via the alert dialog below.
+  const [transferTo, setTransferTo] = useState<string | null>(null);
 
   // The dialog is conditionally mounted by its opener (it remounts fresh per
   // open), so the defaults are computed exactly once — no re-seed effect.
@@ -249,6 +252,16 @@ export function TaskDialog(props: TaskDialogProps) {
     setConfirmDelete(false);
     close();
     void mutations.remove(task.id);
+  }
+
+  // Hand the task (and its subtree) to another member, then close — like Delete,
+  // this is its own committed action, independent of the form's Save button.
+  function onTransfer() {
+    if (!task || !transferTo) return;
+    const to = transferTo;
+    setTransferTo(null);
+    close();
+    void mutations.transfer(task.id, to);
   }
 
   return (
@@ -385,6 +398,35 @@ export function TaskDialog(props: TaskDialogProps) {
                     </Field>
                   )}
                 </form.Field>
+
+                {/* Owner drives edit rights + privacy. Only the current owner
+                    can hand the task off; everyone else sees it read-only. */}
+                {mode === "edit" && task && (
+                  <Field>
+                    <FieldLabel>{t("taskDialog.ownerLabel")}</FieldLabel>
+                    <Select
+                      value={task.ownerId}
+                      onValueChange={(v) => v !== task.ownerId && setTransferTo(v)}
+                      disabled={task.ownerId !== currentMemberId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {members.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {task.ownerId === currentMemberId && (
+                      <FieldDescription>{t("taskDialog.ownerHint")}</FieldDescription>
+                    )}
+                  </Field>
+                )}
 
                 <form.Field name="categoryId">
                   {(field) => (
@@ -690,6 +732,33 @@ export function TaskDialog(props: TaskDialogProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {tc("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={transferTo != null}
+        onOpenChange={(o) => !o && setTransferTo(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("taskDialog.transferTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                task?.isPrivate
+                  ? "taskDialog.transferDescriptionPrivate"
+                  : "taskDialog.transferDescription",
+                { name: members.find((m) => m.id === transferTo)?.name ?? "" },
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTransferTo(null)}>
+              {tc("cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={onTransfer}>
+              {t("taskDialog.transferAction")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

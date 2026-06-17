@@ -1097,6 +1097,36 @@ export async function deleteTask(sb: SupabaseClient, id: string): Promise<void> 
 }
 
 /**
+ * Transfer ownership of a task — and its whole subtree — to another workspace
+ * member. Subtasks inherit their parent's owner at creation, so the entire
+ * subtree moves together to keep ownership and visibility coherent. Only rows
+ * the caller currently owns are reassigned (RLS filters the rest), and a private
+ * task drops out of the caller's view once it belongs to the new owner.
+ */
+export async function transferTaskOwnership(
+  sb: SupabaseClient,
+  id: string,
+  newOwnerId: string,
+): Promise<void> {
+  // BFS the subtree so arbitrary nesting depth moves with the root.
+  const ids = [id];
+  let frontier = [id];
+  while (frontier.length > 0) {
+    const { data: children, error } = await sb
+      .from("tasks")
+      .select("id")
+      .in("parent_id", frontier);
+    if (error) throw error;
+    if (!children || children.length === 0) break;
+    const childIds = children.map((c) => c.id as string);
+    ids.push(...childIds);
+    frontier = childIds;
+  }
+  const { error } = await sb.from("tasks").update({ owner_id: newOwnerId }).in("id", ids);
+  if (error) throw error;
+}
+
+/**
  * Schedule a task onto the calendar as one or more real event-blocks ("parts").
  * Each block carries task_id and inherits the task's scope/visibility/owner so
  * RLS stays consistent. `timeZone` is the IANA zone the blocks are stored in.
