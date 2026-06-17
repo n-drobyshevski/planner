@@ -131,7 +131,7 @@ export function TaskDialog(props: TaskDialogProps) {
   // Auto-expand "More options" when editing a task that already uses any of the
   // fields tucked behind it, so nothing stays hidden; collapsed for quick adds.
   const [showMore, setShowMore] = useState(
-    () => defaults.isMilestone || defaults.isPrivate,
+    () => mode === "edit" && (defaults.isMilestone || defaults.isPrivate),
   );
 
   const usableCategories = categories.filter(
@@ -722,7 +722,7 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
     description: "",
     assigneeId: createParent?.assigneeId ?? "none",
     categoryId: createParent?.categoryId ?? "none",
-    isPrivate: createParent?.isPrivate ?? false,
+    isPrivate: createParent?.isPrivate ?? true,
     priority: "none",
     dueDate: "",
     startDate: "",

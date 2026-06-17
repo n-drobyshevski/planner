@@ -452,7 +452,7 @@ export function taskInputToRow(input: TaskInput): Row {
     category_id: input.categoryId ?? null,
     title: input.title,
     description: input.description ?? null,
-    is_private: input.isPrivate ?? false,
+    is_private: input.isPrivate ?? true,
     color: input.color ?? null,
     board_id: input.boardId ?? null,
     priority: input.priority ?? null,
