@@ -52,6 +52,7 @@
     "menu": {
       "center": "Center on timeline",
       "addSubtask": "Add subtask",
+      "promote": "Promote to task",
       "addCheckpoint": "Add milestone",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all"
@@ -102,7 +103,7 @@
       "created": "Created"
     },
     "dnd": {
-      "handle": "Reorder {title}",
+      "handle": "Move {title}",
       "disabledHint": "Switch sort to Manual to drag lanes into your own order."
     },
     "filtered": {
@@ -246,7 +247,8 @@
     "blocked": "Blocked",
     "private": "Private",
     "overdue": "Overdue",
-    "overdueSuffix": " (overdue)"
+    "overdueSuffix": " (overdue)",
+    "nestHint": "Make subtask"
   },
   "subtasks": {
     "title": "Subtasks",
@@ -261,6 +263,7 @@
     "markNotDone": "Mark subtask not done",
     "blocked": "Blocked",
     "blockedHint": "Finish the previous subtask first",
+    "promote": "Promote to task",
     "delete": "Delete subtask"
   },
   "contextMenu": {

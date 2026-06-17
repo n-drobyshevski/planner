@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatDayMonthToken } from "@/lib/datetime/format";
 import { isDateTokenPast } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
-import { CalendarClock, CalendarX2, Flag, GripVertical, Lock } from "lucide-react";
+import { CalendarClock, CalendarX2, CornerDownRight, Flag, GripVertical, Lock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,8 @@ export interface TaskCardProps {
   progress?: { done: number; total: number } | null;
   /** sequential subtask waiting on a predecessor */
   blocked?: boolean;
+  /** another task is hovering this one's centre, about to nest under it */
+  nesting?: boolean;
   onToggleDone: () => void;
   onOpen: () => void;
   dragging?: boolean;
@@ -49,6 +51,7 @@ export const TaskCard = forwardRef<
     assignee,
     progress,
     blocked,
+    nesting,
     onToggleDone,
     onOpen,
     dragging,
@@ -79,11 +82,19 @@ export const TaskCard = forwardRef<
         "group/card relative flex gap-2.5 rounded-md border border-l-4 bg-card p-2.5 text-left shadow-soft",
         "cursor-pointer transition-shadow hover:shadow-soft-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         dragging && "opacity-50",
+        nesting && "ring-2 ring-primary",
         className,
       )}
       {...dragProps}
       {...rest}
     >
+      {nesting && (
+        <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-1.5 rounded-md bg-primary/10 text-xs font-medium text-primary">
+          <CornerDownRight className="size-4" />
+          {t("card.nestHint")}
+        </span>
+      )}
+
       {showHandle && (
         <GripVertical
           aria-hidden

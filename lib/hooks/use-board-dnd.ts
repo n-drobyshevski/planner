@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   KeyboardSensor,
   MouseSensor,
@@ -8,10 +8,13 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { positionBetween } from "@/lib/tasks/ordering";
+import { canNest } from "@/lib/tasks/nesting";
+import { nestCollision, nestTargetId } from "@/lib/tasks/nest-collision";
 import { useOptimisticOrder } from "@/lib/hooks/use-optimistic-order";
 import type { TaskRow, Board } from "@/lib/types";
 
@@ -31,20 +34,26 @@ function buildColumns(tasks: TaskRow[], boards: Board[]): Columns {
 }
 
 /**
- * Drag state + handlers for the kanban board: column membership is kept as an
- * optimistic local copy (resynced from the tasks prop unless a drag is live),
- * and a completed drop reports the moved task's new board column + fractional
- * position via `onMove`. Columns are the active collection's boards (ordered).
+ * Drag state + handlers for the kanban board. Two outcomes share one gesture:
+ * dropping over the *middle* of another card files the dragged task under it as
+ * a subtask (`onReparent`); dropping over a card's edge or a column moves/reorders
+ * it (`onMove`). The custom collision routes a centre-band hover to a per-card
+ * `nest:` droppable, which both drives the highlight (`nestTargetId`) and keeps
+ * the target from reflowing away under the pointer. Column membership is an
+ * optimistic local copy (resynced from the tasks prop unless a drag is live).
  */
 export function useBoardDnd(
   tasks: TaskRow[],
   boards: Board[],
   onMove: (t: TaskRow, boardId: string, position: number) => void,
+  onReparent: (child: TaskRow, parentId: string) => void,
+  hasChildren: (taskId: string) => boolean,
 ) {
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const boardIds = useMemo(() => new Set(boards.map((b) => b.id)), [boards]);
   const source = useMemo(() => buildColumns(tasks, boards), [tasks, boards]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [nestTarget, setNestTarget] = useState<string | null>(null);
   const [items, setItems] = useOptimisticOrder(source, activeId !== null);
 
   // Mouse drags immediately (5px); touch requires a 200ms long-press so the
@@ -54,6 +63,16 @@ export function useBoardDnd(
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  const canNestInto = useCallback(
+    (childId: string, parentId: string) => {
+      const child = byId.get(childId);
+      const parent = byId.get(parentId);
+      return !!child && !!parent && canNest(child, parent, hasChildren);
+    },
+    [byId, hasChildren],
+  );
+  const collisionDetection = useMemo(() => nestCollision(canNestInto), [canNestInto]);
 
   const isColumn = (id: string): boolean => boardIds.has(id);
 
@@ -66,12 +85,26 @@ export function useBoardDnd(
     setActiveId(String(e.active.id));
   }
 
+  function onDragOver(e: DragOverEvent) {
+    setNestTarget(nestTargetId(e.over ? String(e.over.id) : null));
+  }
+
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
     setActiveId(null);
+    setNestTarget(null);
     if (!over) return;
 
     const activeIdStr = String(active.id);
+
+    // Centre-drop on another card → nest it as a subtask; skip the reorder math.
+    const nestId = nestTargetId(String(over.id));
+    if (nestId) {
+      const child = byId.get(activeIdStr);
+      if (child) onReparent(child, nestId);
+      return;
+    }
+
     const overIdStr = String(over.id);
     const activeC = findContainer(activeIdStr);
     const overC = isColumn(overIdStr) ? overIdStr : findContainer(overIdStr);
@@ -117,7 +150,23 @@ export function useBoardDnd(
     if (task) onMove(task, overC, positionBetween(before, after));
   }
 
+  function onDragCancel() {
+    setActiveId(null);
+    setNestTarget(null);
+  }
+
   const activeTask = activeId ? byId.get(activeId) ?? null : null;
 
-  return { byId, items, activeTask, sensors, onDragStart, onDragEnd };
+  return {
+    byId,
+    items,
+    activeTask,
+    nestTargetId: nestTarget,
+    collisionDetection,
+    sensors,
+    onDragStart,
+    onDragOver,
+    onDragEnd,
+    onDragCancel,
+  };
 }

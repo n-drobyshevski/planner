@@ -8,6 +8,7 @@ import {
   Crosshair,
   Flag,
   ListPlus,
+  Outdent,
   UnfoldVertical,
   FoldVertical,
   Trash2,
@@ -33,6 +34,7 @@ export function FlowRowMenu({
   onDelete,
   onChangeColor,
   onAddSubtask,
+  onPromote,
   onAddCheckpoint,
   onExpandAll,
   onCollapseAll,
@@ -47,6 +49,8 @@ export function FlowRowMenu({
   onChangeColor: (color: string | null) => void;
   /** Top-level lanes only: create a child task under this one. */
   onAddSubtask?: () => void;
+  /** Subtask branch rows only: un-nest back to a top-level task. */
+  onPromote?: () => void;
   /** Top-level lanes only: add a milestone checkpoint to this flow. */
   onAddCheckpoint?: () => void;
   /** Top-level lanes only: expand/collapse every lane with subtasks. */
@@ -69,6 +73,9 @@ export function FlowRowMenu({
   ];
   if (onAddSubtask) {
     actions.push({ label: t("flows.menu.addSubtask"), icon: ListPlus, onSelect: onAddSubtask });
+  }
+  if (onPromote) {
+    actions.push({ label: t("flows.menu.promote"), icon: Outdent, onSelect: onPromote });
   }
   if (onAddCheckpoint) {
     actions.push({ label: t("flows.menu.addCheckpoint"), icon: Flag, onSelect: onAddCheckpoint });

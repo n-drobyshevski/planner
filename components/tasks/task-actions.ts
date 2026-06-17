@@ -16,6 +16,10 @@ export interface TaskActions {
   create: (boardId?: string) => void;
   /** Open the create dialog seeded to file the new task under `parent`. */
   addSubtask: (parent: TaskRow) => void;
+  /** Drag-to-nest: make `child` a subtask of `parentId`, appended to its siblings. */
+  reparent: (child: TaskRow, parentId: string) => void;
+  /** Un-nest: promote a subtask back to a top-level task. */
+  promote: (child: TaskRow) => void;
   changeColor: (t: TaskRow, color: string | null) => void;
   /** Ask to delete (opens the confirm dialog). */
   remove: (t: TaskRow) => void;

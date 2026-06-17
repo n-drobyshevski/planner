@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Lock, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Lock, Outdent, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -179,6 +179,7 @@ export function SubtaskEditor({
                     if (title && title !== t.title)
                       void mutations.update(t.id, { title });
                   }}
+                  onPromote={() => void mutations.promote(t)}
                   onDelete={() => void mutations.remove(t.id)}
                 />
               );
@@ -234,12 +235,14 @@ function SubtaskRow({
   blocked,
   onToggleDone,
   onRename,
+  onPromote,
   onDelete,
 }: {
   task: TaskRow;
   blocked: boolean;
   onToggleDone: () => void;
   onRename: (title: string) => void;
+  onPromote: () => void;
   onDelete: () => void;
 }) {
   const t = useTranslations("tasks");
@@ -306,6 +309,18 @@ function SubtaskRow({
           <Lock /> {t("subtasks.blocked")}
         </Badge>
       )}
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-7 text-muted-foreground hover:text-foreground"
+        aria-label={t("subtasks.promote")}
+        title={t("subtasks.promote")}
+        onClick={onPromote}
+      >
+        <Outdent className="size-4" />
+      </Button>
 
       <Button
         type="button"

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import { upsertTask, removeTasks } from "@/lib/tasks/cache";
+import { positionBetween } from "@/lib/tasks/ordering";
 import type { TaskInput } from "@/lib/supabase/mappers";
 import type { Board, TaskRow } from "@/lib/types";
 import type { WorkspaceData } from "@/lib/hooks/use-workspace";
@@ -147,6 +148,59 @@ export function useTaskMutations(workspaceId: string | undefined) {
     }
   }
 
+  /**
+   * Re-parent a task: file it under `parentId` (drag-to-nest) or, with
+   * `parentId = null`, promote a subtask back to top-level. `position` orders it
+   * among its new siblings. A board-less subtask being promoted passes `boardId`
+   * so it lands in a visible column. One row write; fully undoable.
+   */
+  const reparent = (
+    task: TaskRow,
+    parentId: string | null,
+    position: number,
+    boardId?: string | null,
+  ) => {
+    const patch: Partial<TaskInput> = { parentId, position };
+    const prev: Partial<TaskInput> = {
+      parentId: task.parentId,
+      position: task.position,
+    };
+    if (boardId !== undefined) {
+      patch.boardId = boardId;
+      prev.boardId = task.boardId;
+    }
+    const okMsg = parentId ? t("taskNested") : t("taskPromoted");
+    return run(m.updateTask(sb, task.id, patch), okMsg, {
+      undo: (row) =>
+        inverse(t("undoLabel.move"), () => m.updateTask(sb, task.id, prev, row.updatedAt)),
+      optimistic: () => patchTaskCache(task.id, (tk) => ({ ...tk, ...patch })),
+      apply: (row) => setTasks((old) => upsertTask(old, row)),
+    });
+  };
+
+  /**
+   * Promote a subtask to a top-level task without the caller pre-computing its
+   * landing spot — appended after the last top-level task in its (or the first)
+   * board column, read from the cache. Usable anywhere a subtask is shown.
+   */
+  const promote = (task: TaskRow) => {
+    const cols = boardsOf(task.collectionId);
+    const boardId = task.boardId ?? cols[0]?.id ?? null;
+    const all = workspaceId
+      ? qc.getQueryData<TaskRow[]>(qk.tasks(workspaceId)) ?? []
+      : [];
+    const last = all
+      .filter((tk) => tk.parentId === null && tk.boardId === boardId && tk.id !== task.id)
+      .sort((a, b) => a.position - b.position)
+      .at(-1);
+    return reparent(
+      task,
+      null,
+      positionBetween(last?.position ?? null, null),
+      task.boardId == null ? boardId : undefined,
+    );
+  };
+
   return {
     create: (input: TaskInput) =>
       run(m.createTask(sb, input), t("taskCreated"), {
@@ -239,6 +293,9 @@ export function useTaskMutations(workspaceId: string | undefined) {
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       });
     },
+
+    reparent,
+    promote,
 
     /**
      * Persist a Flows-side-panel manual reorder. The lane order is a presentation

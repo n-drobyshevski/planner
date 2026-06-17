@@ -17,6 +17,8 @@
   "taskDeleted": "Задача удалена",
   "taskMoved": "Задача перемещена",
   "taskTransferred": "Задача передана",
+  "taskNested": "Стала подзадачей",
+  "taskPromoted": "Стала задачей",
   "taskCompleted": "Задача выполнена",
   "taskReopened": "Задача снова открыта",
   "checkpointCreated": "Веха добавлена",

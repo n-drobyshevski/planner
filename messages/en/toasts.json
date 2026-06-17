@@ -17,6 +17,8 @@
   "taskDeleted": "Task deleted",
   "taskMoved": "Task moved",
   "taskTransferred": "Task transferred",
+  "taskNested": "Filed as subtask",
+  "taskPromoted": "Promoted to task",
   "taskCompleted": "Task completed",
   "taskReopened": "Task reopened",
   "checkpointCreated": "Milestone added",

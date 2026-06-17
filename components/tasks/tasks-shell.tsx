@@ -20,6 +20,7 @@ import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
 import { useFlowsDisplay } from "@/lib/hooks/use-flows-display";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent, progressOf } from "@/lib/tasks/tree";
+import { positionBetween } from "@/lib/tasks/ordering";
 import { combineDateTime } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TasksToolbar, type TasksView } from "./tasks-toolbar";
@@ -263,6 +264,16 @@ export function TasksShell({
     reorderFlow: (t, flowPos) => void mutations.reorderFlow(t, flowPos),
     create: (boardId) => dialogs.openCreate(boardId),
     addSubtask: (t) => dialogs.openCreate(undefined, t.id),
+    // Drag-to-nest: append the child after the parent's existing subtasks, and
+    // nudge Flows to expand the parent so the new branch is visible at once.
+    reparent: (child, parentId) => {
+      const siblings = childrenByParent.get(parentId) ?? [];
+      const last = siblings[siblings.length - 1];
+      void mutations.reparent(child, parentId, positionBetween(last?.position ?? null, null));
+      setExpandLane((prev) => ({ id: parentId, key: (prev?.key ?? 0) + 1 }));
+    },
+    // Un-nest back to a top-level task (the mutation computes its landing spot).
+    promote: (child) => void mutations.promote(child),
     changeColor: (t, color) =>
       void mutations.update(t.id, { color }, { color: t.color }, { color }),
     remove: (t) => dialogs.openDelete(t),

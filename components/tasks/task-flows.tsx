@@ -12,6 +12,7 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   ChevronRight,
   CalendarRange,
+  CornerDownRight,
   Filter,
   GripVertical,
   LocateFixed,
@@ -20,9 +21,10 @@ import {
 } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, addDays, addMonths, format } from "date-fns";
 import { tz } from "@date-fns/tz";
-import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
+import { DndContext, DragOverlay, useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { NEST_PREFIX } from "@/lib/tasks/nest-collision";
 import { cn } from "@/lib/utils";
 import { toPaletteColor } from "@/lib/theme/appearance";
 import { Button } from "@/components/ui/button";
@@ -248,10 +250,19 @@ export function TaskFlows({
   // Hand-reordering writes a global `flowPos`, so it works in every grouping —
   // it just needs the manual sort (otherwise the chosen sort owns the order).
   const canReorder = display.sortBy === "manual";
+  // A lane (top-level task) with subtasks can't itself be nested — gates the
+  // drag-to-nest rule so the tree never grows a third level.
+  const hasChildren = useCallback(
+    (id: string) => (childrenByParent.get(id)?.length ?? 0) > 0,
+    [childrenByParent],
+  );
   const dnd = useFlowsDnd(orderedLanes, {
     anchorOf: (id) => flowAnchor.get(id) ?? 0,
     groupOf: (id) => groupByLane.get(id) ?? "all",
     onReorder: actions.reorderFlow,
+    onReparent: actions.reparent,
+    hasChildren,
+    canReorder,
   });
   const trackWidth = Math.ceil(((t1 - t0) / DAY_MS) * pxPerDay);
   // x of the now-line, pinned to the right edge once now passes the window.
@@ -536,10 +547,12 @@ export function TaskFlows({
           <div className="relative" style={{ width: G.gutterWidth, height: fillHeight }}>
             <DndContext
               sensors={dnd.sensors}
-              collisionDetection={closestCenter}
+              collisionDetection={dnd.collisionDetection}
               autoScroll={false}
               onDragStart={dnd.onDragStart}
+              onDragOver={dnd.onDragOver}
               onDragEnd={dnd.onDragEnd}
+              onDragCancel={dnd.onDragCancel}
             >
               <SortableContext items={dnd.ids} strategy={verticalListSortingStrategy}>
                 {rows.map((row) =>
@@ -549,7 +562,7 @@ export function TaskFlows({
                     <GutterLaneRow
                       key={row.lane.task.id}
                       row={row}
-                      canReorder={canReorder}
+                      nesting={dnd.nestTargetId === row.lane.task.id}
                       ownerColor={
                         members.get(row.lane.task.ownerId)?.color ?? colorOf(row.lane.task)
                       }
@@ -569,7 +582,10 @@ export function TaskFlows({
               </SortableContext>
               <DragOverlay>
                 {dnd.activeLane ? (
-                  <div className="flex items-center gap-1.5 rounded-md bg-card px-2 py-1.5 text-sm shadow-soft-lg ring-1 ring-border">
+                  <div
+                    style={{ opacity: dnd.nestTargetId ? 0.4 : 1 }}
+                    className="flex items-center gap-1.5 rounded-md bg-card px-2 py-1.5 text-sm shadow-soft-lg ring-1 ring-border transition-opacity"
+                  >
                     <GripVertical
                       className="size-4 shrink-0 text-muted-foreground/60"
                       aria-hidden
@@ -661,14 +677,15 @@ function GutterGroupHeader({ row }: { row: GroupHeaderRow }) {
 }
 
 /**
- * One gutter lane row. A `useSortable` node (disabled unless reordering is
- * possible) carries the absolute `top` plus the drag transform; the grip handle
- * is the only drag activator, so the title stays click-to-open. Subtask branch
- * rows render beneath, outside the sortable node.
+ * One gutter lane row. A `useSortable` node carries the absolute `top` plus the
+ * drag transform; the grip handle is the only drag activator, so the title stays
+ * click-to-open. Dragging always works (it powers drag-to-nest); reordering only
+ * persists in manual sort. `nesting` highlights this row as a pending drop
+ * target. Subtask branch rows render beneath, outside the sortable node.
  */
 function GutterLaneRow({
   row,
-  canReorder,
+  nesting,
   ownerColor,
   t,
   actions,
@@ -680,7 +697,7 @@ function GutterLaneRow({
   collapseAll,
 }: {
   row: LaneRow;
-  canReorder: boolean;
+  nesting: boolean;
   ownerColor: string;
   t: Translator;
   actions: TaskActions;
@@ -695,17 +712,24 @@ function GutterLaneRow({
   const hasChildren = lane.branches.length > 0;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lane.task.id,
-    disabled: !canReorder,
   });
+  // A second droppable over the lane row, so the centre-band collision can resolve
+  // a nest without the sortable reorder reflow sliding the target away.
+  const { setNodeRef: setNestRef } = useDroppable({ id: `${NEST_PREFIX}${lane.task.id}` });
+  const setRefs = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    setNestRef(node);
+  };
 
   return (
     <div>
       <div
-        ref={setNodeRef}
+        ref={setRefs}
         className={cn(
           "absolute flex items-center gap-1.5 px-2",
           lane.done && "opacity-60",
           isDragging && "z-10 opacity-50",
+          nesting && "z-10 rounded-md bg-primary/10 ring-2 ring-primary",
         )}
         style={{
           left: 0,
@@ -716,17 +740,15 @@ function GutterLaneRow({
           transition,
         }}
       >
-        {canReorder && (
-          <button
-            type="button"
-            aria-label={t("flows.dnd.handle", { title: lane.task.title })}
-            className="grid size-5 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground/40 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="size-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          aria-label={t("flows.dnd.handle", { title: lane.task.title })}
+          className="grid size-5 shrink-0 cursor-grab touch-none place-items-center rounded text-muted-foreground/40 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="size-4" />
+        </button>
         {hasChildren ? (
           <button
             type="button"
@@ -778,6 +800,9 @@ function GutterLaneRow({
             {lane.task.title}
           </button>
         </FlowRowMenu>
+        {nesting && (
+          <CornerDownRight className="size-4 shrink-0 text-primary" aria-hidden />
+        )}
       </div>
 
       {isExpanded &&
@@ -790,6 +815,7 @@ function GutterLaneRow({
             onCenter={() => scrollToTask(branch.task.id)}
             onDelete={() => actions.remove(branch.task)}
             onChangeColor={(c) => actions.changeColor(branch.task, c)}
+            onPromote={() => actions.promote(branch.task)}
           >
             <button
               type="button"

@@ -3,6 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { NEST_PREFIX } from "@/lib/tasks/nest-collision";
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,8 @@ export function SortableCard(props: {
   color: string;
   assignee: Member | null;
   progress: { done: number; total: number } | null;
+  /** another card is hovering this one's centre, about to nest under it */
+  nesting?: boolean;
   onOpen: () => void;
   onToggleDone: () => void;
   onChangeColor: (color: string | null) => void;
@@ -74,6 +77,13 @@ export function SortableCard(props: {
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: props.task.id });
+  // A second droppable over the same box, so the centre-band collision can resolve
+  // a nest without triggering the sortable reorder reflow.
+  const { setNodeRef: setNestRef } = useDroppable({ id: `${NEST_PREFIX}${props.task.id}` });
+  const setRefs = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    setNestRef(node);
+  };
   return (
     <TaskContextMenu
       task={props.task}
@@ -83,12 +93,13 @@ export function SortableCard(props: {
       onChangeColor={props.onChangeColor}
     >
       <TaskCard
-        ref={setNodeRef}
+        ref={setRefs}
         role="listitem"
         task={props.task}
         color={props.color}
         assignee={props.assignee}
         progress={props.progress}
+        nesting={props.nesting}
         onOpen={props.onOpen}
         onToggleDone={props.onToggleDone}
         dragging={isDragging}

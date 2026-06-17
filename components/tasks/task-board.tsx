@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { DndContext, DragOverlay, closestCorners } from "@dnd-kit/core";
+import { useMemo, useState } from "react";
+import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { m, AnimatePresence } from "motion/react";
 import { ListChecks, Plus } from "lucide-react";
@@ -49,10 +49,29 @@ export function TaskBoard({
   actions,
 }: TaskBoardProps) {
   const t = useTranslations("tasks");
-  const { byId, items, activeTask, sensors, onDragStart, onDragEnd } = useBoardDnd(
+  // Tasks that already have subtasks can't themselves be nested (it would orphan
+  // their children as invisible grandchildren); the hook uses this to gate nesting.
+  const parentIds = useMemo(
+    () => new Set(tasks.filter((t) => (progressOf?.(t)?.total ?? 0) > 0).map((t) => t.id)),
+    [tasks, progressOf],
+  );
+  const {
+    byId,
+    items,
+    activeTask,
+    nestTargetId,
+    collisionDetection,
+    sensors,
+    onDragStart,
+    onDragOver,
+    onDragEnd,
+    onDragCancel,
+  } = useBoardDnd(
     tasks,
     boards,
     actions.move,
+    actions.reparent,
+    (id) => parentIds.has(id),
   );
   const [addingColumn, setAddingColumn] = useState(false);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
@@ -101,6 +120,7 @@ export function TaskBoard({
                 color={colorOf(task)}
                 assignee={task.assigneeId ? members.get(task.assigneeId) ?? null : null}
                 progress={progressOf?.(task) ?? null}
+                nesting={nestTargetId === id}
                 onOpen={() => actions.open(task)}
                 onToggleDone={() => actions.toggleDone(task)}
                 onChangeColor={(c) => actions.changeColor(task, c)}
@@ -116,9 +136,11 @@ export function TaskBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={collisionDetection}
       onDragStart={onDragStart}
+      onDragOver={onDragOver}
       onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
     >
       {isMobile ? (
         <div className="flex h-full flex-col gap-3 p-3">
@@ -173,7 +195,13 @@ export function TaskBoard({
 
       <DragOverlay>
         {activeTask ? (
-          <m.div initial={{ scale: 1 }} animate={{ scale: 1.03 }} transition={tweenFast}>
+          // While a nest is pending, fade + shrink the floating card so the
+          // target's "make subtask" highlight reads through underneath it.
+          <m.div
+            initial={{ scale: 1 }}
+            animate={{ scale: nestTargetId ? 0.9 : 1.03, opacity: nestTargetId ? 0.35 : 1 }}
+            transition={tweenFast}
+          >
             <TaskCard
               task={activeTask}
               color={colorOf(activeTask)}
