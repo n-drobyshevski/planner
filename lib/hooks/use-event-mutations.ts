@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import type { DeletedSnapshot } from "@/lib/supabase/mutations";
-import type { WindowData } from "@/lib/supabase/queries";
+import { isWindowData, type WindowData } from "@/lib/supabase/queries";
 import type { EventInput } from "@/lib/supabase/mappers";
 import type { EventRow, OverrideRow, OverrideType } from "@/lib/types";
 import type { OccurrencePatch } from "@/lib/recurrence/edit-semantics";
@@ -66,7 +66,9 @@ export function useEventMutations(workspaceId: string | undefined) {
     if (!workspaceId) return () => {};
     const prev = qc.getQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) });
     qc.setQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) }, (old) =>
-      old ? { ...old, events: old.events.map((e) => (e.id === eventId ? patch(e) : e)) } : old,
+      isWindowData(old)
+        ? { ...old, events: old.events.map((e) => (e.id === eventId ? patch(e) : e)) }
+        : old,
     );
     return () => prev.forEach(([key, data]) => qc.setQueryData(key, data));
   };
@@ -74,7 +76,7 @@ export function useEventMutations(workspaceId: string | undefined) {
     if (!workspaceId) return () => {};
     const prev = qc.getQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) });
     qc.setQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) }, (old) =>
-      old ? { ...old, events: old.events.filter((e) => e.id !== eventId) } : old,
+      isWindowData(old) ? { ...old, events: old.events.filter((e) => e.id !== eventId) } : old,
     );
     return () => prev.forEach(([key, data]) => qc.setQueryData(key, data));
   };
@@ -92,7 +94,7 @@ export function useEventMutations(workspaceId: string | undefined) {
     if (!workspaceId) return () => {};
     const prev = qc.getQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) });
     qc.setQueriesData<WindowData>({ queryKey: qk.eventsAll(workspaceId) }, (old) => {
-      if (!old) return old;
+      if (!isWindowData(old)) return old;
       const idx = old.overrides.findIndex(
         (o) => o.eventId === eventId && o.occurrenceDate === occurrenceDate,
       );

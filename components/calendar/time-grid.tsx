@@ -23,6 +23,8 @@ import {
   snapMinutes,
 } from "@/lib/datetime/grid-math";
 import { DayColumn } from "./day-column";
+import { resizeOccurrence, resizePreviewSegment } from "@/lib/calendar/resize";
+import { movedStartTotal, previewSegments, shiftedMemberStart } from "@/lib/calendar/move";
 import { useUiStore } from "@/stores/ui-store";
 import { useTimelineZoom } from "@/hooks/use-timeline-zoom";
 import type { ContextLabel, Occurrence } from "@/lib/types";
@@ -123,22 +125,25 @@ interface Drag {
   // create
   anchorMin?: number;
   curMin?: number;
-  // move
+  // move — grid-minutes from days[0] so a block crossing midnight moves rigidly.
   occKey?: string;
   durationMin?: number;
-  grabMin?: number;
-  startMin?: number;
-  curDayIndex?: number;
-  curStartMin?: number;
+  /** Event start, grid-minutes from the first visible column's midnight. */
+  startTotal?: number;
+  /** Pointer-minus-start at grab, grid-minutes. */
+  grabOffsetMin?: number;
+  /** Current start while dragging, grid-minutes. */
+  curStartTotal?: number;
   /** another member's block: select-only, never moves/resizes */
   readonly?: boolean;
   /** when set, drag moves every selected member by the same delta (group move) */
   group?: GroupMember[];
-  // resize
+  // resize — absolute epoch-ms so events crossing midnight resize correctly.
   edge?: "start" | "end";
-  endMin?: number;
-  curStart?: number;
-  curEnd?: number;
+  occStartMs?: number;
+  occEndMs?: number;
+  curStartMs?: number;
+  curEndMs?: number;
 }
 
 interface Preview {
@@ -150,6 +155,10 @@ interface Preview {
   copy?: boolean;
   /** Alt held over a group with recurring members: the drop hits whole series. */
   series?: boolean;
+  /** Continuation segments when the grabbed block crosses midnight (a moved
+   *  sleep block) — drawn in the same style as the head; the label sits on the
+   *  head only. Kept on `preview` so every `setPreview(null)` clears them too. */
+  extra?: { dayIndex: number; topMin: number; heightMin: number }[];
 }
 
 export function TimeGrid({
@@ -422,9 +431,8 @@ export function TimeGrid({
     const occ = byKey.get(occKey);
     if (!occ) return;
     if (!canEdit(occ)) return; // another member's block: read-only, no move
-    const dayIndex = dayIndexOfMs(occ.start);
     const g = geom(clientX, clientY);
-    const sMin = minutesIn(occ.start, dayIndex);
+    const startTotal = (occ.start - days[0]) / 60_000;
     const durationMin = (occ.end - occ.start) / 60_000;
     dragRef.current = {
       kind: "move",
@@ -432,13 +440,12 @@ export function TimeGrid({
       startX: clientX,
       startY: clientY,
       moved: true,
-      dayIndex,
+      dayIndex: dayIndexOfMs(occ.start),
       occKey,
       durationMin,
-      grabMin: g.minutes - sMin,
-      startMin: sMin,
-      curDayIndex: dayIndex,
-      curStartMin: sMin,
+      startTotal,
+      grabOffsetMin: g.dayIndex * 1440 + g.minutes - startTotal,
+      curStartTotal: startTotal,
     };
     setArmed(true);
     try {
@@ -447,7 +454,8 @@ export function TimeGrid({
       /* ignore */
     }
     navigator.vibrate?.(10);
-    setPreview({ dayIndex, topMin: sMin, heightMin: durationMin, label: occ.title });
+    const segs = previewSegments(startTotal, durationMin, days.length);
+    if (segs[0]) setPreview({ ...segs[0], label: occ.title, extra: segs.slice(1) });
   }
 
   // Grabbing a member of a multi-selection acts on the whole group (move or
@@ -544,28 +552,30 @@ export function TimeGrid({
     if (handle && blockEl) {
       const occ = byKey.get(blockEl.dataset.occKey!);
       if (!occ) return;
-      const dayIndex = dayIndexOfMs(occ.start);
+      // Resize works in absolute time (occ.start/occ.end), not minutes-of-day
+      // relative to a single day, so a sleep block that runs past midnight
+      // resizes from whichever column its handle lives in. `dayIndex` is kept
+      // only for the shared Drag shape; the resize path ignores it.
       dragRef.current = {
         kind: "resize",
         pointerId: e.pointerId,
         startX: e.clientX,
         startY: e.clientY,
         moved: false,
-        dayIndex,
+        dayIndex: dayIndexOfMs(occ.start),
         occKey: occ.key,
         edge: (handle.dataset.resize as "start" | "end") ?? "end",
-        startMin: minutesIn(occ.start, dayIndex),
-        endMin: minutesIn(occ.end, dayIndex),
+        occStartMs: occ.start,
+        occEndMs: occ.end,
         group: groupFor(occ),
       };
     } else if (blockEl) {
       const occ = byKey.get(blockEl.dataset.occKey!);
       if (!occ) return;
-      const dayIndex = dayIndexOfMs(occ.start);
-      const sMin = minutesIn(occ.start, dayIndex);
-      // Grabbing a member of a multi-selection moves the whole group by one
-      // delta. Capture each editable, non-recurring member's start geometry now;
-      // recurring members are left out (they'd each need a scope prompt).
+      // Grid-minutes from the first visible column's midnight, so a block that
+      // crosses midnight (sleep) moves as one rigid piece. Grabbing a member of
+      // a multi-selection moves the whole group by one shared delta.
+      const startTotal = (occ.start - days[0]) / 60_000;
       const group = groupFor(occ);
       dragRef.current = {
         kind: "move",
@@ -573,13 +583,12 @@ export function TimeGrid({
         startX: e.clientX,
         startY: e.clientY,
         moved: false,
-        dayIndex,
+        dayIndex: dayIndexOfMs(occ.start),
         occKey: occ.key,
         durationMin: (occ.end - occ.start) / 60_000,
-        grabMin: g.minutes - sMin,
-        startMin: sMin,
-        curDayIndex: dayIndex,
-        curStartMin: sMin,
+        startTotal,
+        grabOffsetMin: g.dayIndex * 1440 + g.minutes - startTotal,
+        curStartTotal: startTotal,
         group,
       };
     } else {
@@ -630,9 +639,9 @@ export function TimeGrid({
       });
     } else if (d.kind === "move") {
       const dur = d.durationMin!;
-      const newStart = clamp(snapMinutes(g.minutes - d.grabMin!), 0, 1440 - dur);
-      d.curDayIndex = g.dayIndex;
-      d.curStartMin = newStart;
+      const pointerTotal = g.dayIndex * 1440 + g.minutes;
+      const startTotal = movedStartTotal(pointerTotal, d.grabOffsetMin!, days.length);
+      d.curStartTotal = startTotal;
       // Ctrl/Cmd held → the drop will duplicate (single or whole selection).
       const copy = e.ctrlKey || e.metaKey;
       // Alt hits the whole recurring family — for a group move, or any duplicate.
@@ -641,42 +650,49 @@ export function TimeGrid({
         !!byKey.get(d.occKey!)?.isRecurring || !!d.group?.some((m) => m.occ.isRecurring);
       const series = e.altKey && (!!d.group || copy) && hasRecurring;
       const title = byKey.get(d.occKey!)?.title ?? "";
-      setPreview({
-        dayIndex: g.dayIndex,
-        topMin: newStart,
-        heightMin: dur,
-        label: copy ? t("preview.copyOf", { title }) : title,
-        copy,
-        series,
-      });
-      // Group move: shift every other member by the same day + minute delta.
+      // The grabbed block's leading segment carries the label; a cross-midnight
+      // tail is shown in the same style so the full drop target is visible.
+      const segs = previewSegments(startTotal, dur, days.length);
+      if (segs[0]) {
+        setPreview({
+          ...segs[0],
+          label: copy ? t("preview.copyOf", { title }) : title,
+          copy,
+          series,
+          extra: segs.slice(1),
+        });
+      }
+      // Group move: shift every other member by the same total delta, splitting
+      // any cross-midnight member into its per-column ghost segments.
       if (d.group) {
-        const dayDelta = g.dayIndex - d.dayIndex;
-        const minuteDelta = newStart - d.startMin!;
+        const deltaTotal = startTotal - d.startTotal!;
         setGroupPreview(
           d.group
             .filter((m) => m.occ.key !== d.occKey)
-            .map((m) => ({
-              dayIndex: clamp(m.dayIndex + dayDelta, 0, days.length - 1),
-              topMin: clamp(m.sMin + minuteDelta, 0, 1440 - m.durationMin),
-              heightMin: m.durationMin,
-              label: m.occ.title,
-            })),
+            .flatMap((m) => {
+              const mStart = shiftedMemberStart(m.dayIndex * 1440 + m.sMin, deltaTotal, days.length);
+              return previewSegments(mStart, m.durationMin, days.length).map((s) => ({
+                ...s,
+                label: m.occ.title,
+              }));
+            }),
         );
       }
     } else {
-      const m = snapMinutes(clampMin(g.minutes));
       const series = !!d.group && e.altKey && d.group.some((mem) => mem.occ.isRecurring);
-      let deltaMin: number;
-      if (d.edge === "start") {
-        d.curStart = Math.min(m, d.endMin! - SLOT_MIN);
-        deltaMin = d.curStart - d.startMin!;
-        setPreview({ dayIndex: d.dayIndex, topMin: d.curStart, heightMin: d.endMin! - d.curStart, label: "", series });
-      } else {
-        d.curEnd = Math.max(m, d.startMin! + SLOT_MIN);
-        deltaMin = d.curEnd - d.endMin!;
-        setPreview({ dayIndex: d.dayIndex, topMin: d.startMin!, heightMin: d.curEnd - d.startMin!, label: "", series });
-      }
+      // Absolute time under the cursor: the cursor's own column's midnight plus
+      // its snapped minutes-of-day. Using the live column (g.dayIndex) is what
+      // lets a cross-midnight block's morning handle resolve to the right day.
+      const ptMs = days[g.dayIndex] + snapMinutes(clampMin(g.minutes)) * 60_000;
+      const next = resizeOccurrence(d.occStartMs!, d.occEndMs!, d.edge!, ptMs, SLOT_MIN);
+      d.curStartMs = next.start;
+      d.curEndMs = next.end;
+      const deltaMin =
+        d.edge === "start"
+          ? (next.start - d.occStartMs!) / 60_000
+          : (next.end - d.occEndMs!) / 60_000;
+      const seg = resizePreviewSegment(next.start, next.end, d.edge!, days, DAY_MS);
+      if (seg) setPreview({ ...seg, label: "", series });
       // Group resize: apply the same edge delta to every other member.
       if (d.group) {
         const edge = d.edge;
@@ -748,17 +764,15 @@ export function TimeGrid({
         onSelect(occ);
         return;
       }
-      const start = days[d.curDayIndex!] + d.curStartMin! * 60_000;
+      const start = days[0] + d.curStartTotal! * 60_000;
       const end = start + d.durationMin! * 60_000;
-      // Group: shift every captured member by the same day + minute delta. Ctrl/
-      // Cmd duplicates the whole selection instead of moving it; Alt = family.
+      // Group: shift every captured member by the same total delta. Ctrl/Cmd
+      // duplicates the whole selection instead of moving it; Alt = family.
       if (d.group) {
-        const dayDelta = d.curDayIndex! - d.dayIndex;
-        const minuteDelta = d.curStartMin! - d.startMin!;
+        const deltaTotal = d.curStartTotal! - d.startTotal!;
         const moves = d.group.map((m) => {
-          const mDay = clamp(m.dayIndex + dayDelta, 0, days.length - 1);
           const mStart =
-            days[mDay] + clamp(m.sMin + minuteDelta, 0, 1440 - m.durationMin) * 60_000;
+            days[0] + shiftedMemberStart(m.dayIndex * 1440 + m.sMin, deltaTotal, days.length) * 60_000;
           return { occ: m.occ, start: mStart, end: mStart + m.durationMin * 60_000 };
         });
         if (e.ctrlKey || e.metaKey) onDuplicateMany(moves, e.altKey);
@@ -783,7 +797,10 @@ export function TimeGrid({
       // Group resize: apply the same edge delta to every captured member.
       if (d.group) {
         const edge = d.edge;
-        const deltaMin = edge === "start" ? d.curStart! - d.startMin! : d.curEnd! - d.endMin!;
+        const deltaMin =
+          edge === "start"
+            ? (d.curStartMs! - d.occStartMs!) / 60_000
+            : (d.curEndMs! - d.occEndMs!) / 60_000;
         settle(d.group.map((mem) => mem.occ.key));
         onRescheduleMany(
           d.group.map((mem) => {
@@ -800,10 +817,10 @@ export function TimeGrid({
         );
       } else if (d.edge === "start") {
         settle([occ.key]);
-        onReschedule(occ, days[d.dayIndex] + d.curStart! * 60_000, occ.end);
+        onReschedule(occ, d.curStartMs ?? occ.start, occ.end);
       } else {
         settle([occ.key]);
-        onReschedule(occ, occ.start, days[d.dayIndex] + d.curEnd! * 60_000);
+        onReschedule(occ, occ.start, d.curEndMs ?? occ.end);
       }
     }
   }
@@ -1051,6 +1068,21 @@ export function TimeGrid({
               >
                 <span className="truncate text-xs font-medium text-primary">{gp.label}</span>
               </div>
+            ))}
+
+            {/* Continuation segments of a grabbed cross-midnight block: same
+                bright style as the head, drawn in the next column(s). */}
+            {preview?.extra?.map((seg, i) => (
+              <div
+                key={`extra-${i}`}
+                className="pointer-events-none absolute z-30 overflow-hidden rounded-md border-2 border-dashed border-primary bg-primary/20"
+                style={{
+                  left: `calc(${(seg.dayIndex / days.length) * 100}% + 2px)`,
+                  width: `calc(${100 / days.length}% - 4px)`,
+                  top: minutesToY(seg.topMin, hourPx),
+                  height: Math.max(minutesToY(seg.heightMin, hourPx), 6),
+                }}
+              />
             ))}
 
             {preview && (

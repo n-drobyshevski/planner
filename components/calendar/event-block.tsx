@@ -30,6 +30,15 @@ export const EventBlock = forwardRef<
     selected: boolean;
     /** false = another member's item: no drag/resize/toggle (view-only overlay) */
     editable?: boolean;
+    /**
+     * Which edges this rendered segment may resize. A multi-day event (e.g. a
+     * sleep block past midnight) is drawn as one segment per day; only the
+     * segment holding the real start shows the top handle, only the one holding
+     * the real end shows the bottom handle. A midnight continuation edge is not
+     * a real boundary, so it exposes no handle. Both default to true.
+     */
+    resizableStart?: boolean;
+    resizableEnd?: boolean;
     taskDone?: boolean;
     onToggleTaskDone?: () => void;
     /**
@@ -46,7 +55,7 @@ export const EventBlock = forwardRef<
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
 >(function EventBlock(
-  { occ, color, style, selected, editable = true, taskDone, onToggleTaskDone, clash, onActivate, onMenu, className, ...rest },
+  { occ, color, style, selected, editable = true, resizableStart = true, resizableEnd = true, taskDone, onToggleTaskDone, clash, onActivate, onMenu, className, ...rest },
   ref,
 ) {
   const t = useTranslations("calendar");
@@ -212,17 +221,17 @@ export const EventBlock = forwardRef<
           <span className="sr-only">{t("block.overlaps")}</span>
         </>
       )}
-      {editable && (
-        <>
-          <span
-            data-resize="start"
-            className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
-          />
-          <span
-            data-resize="end"
-            className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
-          />
-        </>
+      {editable && resizableStart && (
+        <span
+          data-resize="start"
+          className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize"
+        />
+      )}
+      {editable && resizableEnd && (
+        <span
+          data-resize="end"
+          className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+        />
       )}
     </div>
   );

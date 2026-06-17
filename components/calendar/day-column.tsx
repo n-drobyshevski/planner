@@ -287,6 +287,11 @@ export function DayColumn({
               color={colorOf(seg.occ)}
               selected={selectedKeys.has(seg.occ.key)}
               editable={editable}
+              // A segment clamped to the day boundary (a cross-midnight sleep
+              // block) only owns the real edge it actually contains; the other
+              // edge is a midnight continuation and exposes no resize handle.
+              resizableStart={seg.start === seg.occ.start}
+              resizableEnd={seg.end === seg.occ.end}
               onActivate={() => onSelect(seg.occ)}
               taskDone={taskId ? taskDoneById?.get(taskId) ?? false : undefined}
               onToggleTaskDone={

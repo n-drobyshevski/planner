@@ -73,6 +73,25 @@ export interface WindowData {
 }
 
 /**
+ * True iff a cached value is a window's `{ events, overrides }` payload.
+ *
+ * `qk.taskBlocks` is deliberately keyed UNDER the `["events", workspaceId]`
+ * prefix (see query-keys.ts) so `eventsAll` invalidation refetches it — but its
+ * data is a bare `EventRow[]`, not a `WindowData`. Optimistic cache patches run
+ * via `setQueriesData({ queryKey: eventsAll })`, which matches that array too,
+ * so every window updater MUST guard with this before touching `.events` /
+ * `.overrides`, or it throws on the task-blocks entry.
+ */
+export function isWindowData(value: unknown): value is WindowData {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    Array.isArray((value as Partial<WindowData>).events) &&
+    Array.isArray((value as Partial<WindowData>).overrides)
+  );
+}
+
+/**
  * Events (+ their overrides) that could intersect a visible window.
  * Recurring series are returned raw; occurrence expansion happens client-side
  * via lib/recurrence/expand. RLS enforces scope/visibility.
