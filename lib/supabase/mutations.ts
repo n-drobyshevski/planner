@@ -436,10 +436,14 @@ export async function updateCategory(
 /**
  * Convert a context between Personal and Shared by setting its owner: `null`
  * makes it Shared (both members co-own it; every event filed under it becomes a
- * joint event); a member id makes it Personal (owner-only). No event rows are
- * rewritten — jointness is derived from the category. `categories_write` already
- * permits `owner_id` null or self, so a member can only re-own a context they can
- * already edit (their own personal one or a shared one).
+ * joint event); a member id makes it Personal (owner-only). `categories_write`
+ * permits `owner_id` null or self, so a member can only re-own a context they
+ * can already edit (their own personal one or a shared one).
+ *
+ * On a Shared -> Personal conversion the `categories_refile_orphans` trigger
+ * (migration 20260629000000) un-files the OTHER member's items from this context
+ * (category_id -> null), since they can no longer read it. Without that they'd
+ * be left pointing at an unreadable context and render as "Unknown" in Insights.
  */
 export async function setCategoryOwner(
   sb: SupabaseClient,
@@ -648,6 +652,10 @@ export async function updateCollection(
  * makes it Shared (both members see + edit it), a member id makes it Personal.
  * Mirrors `setCategoryOwner`; `collections_write` only permits `owner_id` null or
  * self, so a member can only re-own a collection they can already edit.
+ *
+ * On a Shared -> Personal conversion the `collections_refile_orphans` trigger
+ * (migration 20260629000000) un-files the OTHER member's tasks from this
+ * collection (collection_id -> null), mirroring the context behaviour.
  */
 export async function setCollectionOwner(
   sb: SupabaseClient,
