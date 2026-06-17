@@ -10,6 +10,7 @@ import { useRouter, usePathname } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   updateMemberPreferences,
+  upsertMemberSleepPrefs,
   type MemberPreferencesPatch,
 } from "@/lib/supabase/mutations";
 import { useWorkspace, type WorkspaceData } from "@/lib/hooks/use-workspace";
@@ -30,10 +31,20 @@ import type {
   AppLocale,
   ContextLabel,
   Member,
+  MemberSleepPrefs,
   Palette,
   SurfaceTone,
   ThemePreference,
 } from "@/lib/types";
+
+const SLEEP_PREFS_DEFAULTS = {
+  sleepCycleLengthMin: 90,
+  sleepOnsetLatencyMin: 15,
+  targetSleepCycles: 5,
+  sleepCategoryId: null,
+  nightWindowStartHour: 20,
+  nightWindowEndHour: 12,
+} as const;
 
 function applyAppearance(accent: AccentId, tone: SurfaceTone, palette: Palette) {
   const el = document.documentElement;
@@ -60,6 +71,21 @@ function patchCachedMember(
     members: data.members.map(apply),
     currentMember: data.currentMember ? apply(data.currentMember) : null,
   };
+}
+
+/** Patch the cached sleep prefs (member-private), seeding defaults if none yet. */
+function patchCachedSleepPrefs(
+  data: WorkspaceData | undefined,
+  member: Member,
+  patch: Partial<MemberSleepPrefs>,
+): WorkspaceData | undefined {
+  if (!data) return data;
+  const base: MemberSleepPrefs = data.sleepPrefs ?? {
+    memberId: member.id,
+    workspaceId: member.workspaceId,
+    ...SLEEP_PREFS_DEFAULTS,
+  };
+  return { ...data, sleepPrefs: { ...base, ...patch } };
 }
 
 /**
@@ -100,14 +126,17 @@ export function usePreferences() {
   const showSuccessToasts = member?.showSuccessToasts ?? true;
   // Week/day display: how context time-blocks are labelled (top bar vs side).
   const contextLabel = member?.contextLabel ?? DEFAULT_CONTEXT_LABEL;
+  // Sleep prefs live in a member-private table (not on the shared members row),
+  // so the partner can't read them; null until the first save.
+  const sleepPrefs = workspace.data?.sleepPrefs ?? null;
   // Sleep planning: cycle length / onset latency / nightly cycle target.
-  const sleepCycleLengthMin = member?.sleepCycleLengthMin ?? 90;
-  const sleepOnsetLatencyMin = member?.sleepOnsetLatencyMin ?? 15;
-  const targetSleepCycles = member?.targetSleepCycles ?? 5;
+  const sleepCycleLengthMin = sleepPrefs?.sleepCycleLengthMin ?? 90;
+  const sleepOnsetLatencyMin = sleepPrefs?.sleepOnsetLatencyMin ?? 15;
+  const targetSleepCycles = sleepPrefs?.targetSleepCycles ?? 5;
   // Sleep derivation: dedicated category (null = inactive heuristic) + window.
-  const sleepCategoryId = member?.sleepCategoryId ?? null;
-  const nightWindowStartHour = member?.nightWindowStartHour ?? 20;
-  const nightWindowEndHour = member?.nightWindowEndHour ?? 12;
+  const sleepCategoryId = sleepPrefs?.sleepCategoryId ?? null;
+  const nightWindowStartHour = sleepPrefs?.nightWindowStartHour ?? 20;
+  const nightWindowEndHour = sleepPrefs?.nightWindowEndHour ?? 12;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
   // its own (Latte light, the rest dark); `default` defers to themePreference.
@@ -145,6 +174,32 @@ export function usePreferences() {
       );
       try {
         await updateMemberPreferences(createClient(), member.id, patch);
+      } catch (e) {
+        if (prev) qc.setQueryData(qk.workspace, prev); // roll back optimistic change
+        toast.error(
+          e instanceof Error ? e.message : "Couldn't save your preference",
+        );
+      }
+    },
+    [member, qc],
+  );
+
+  // Sleep prefs persist to the member-private member_sleep_prefs table (not the
+  // members row), so the same optimistic-patch-then-upsert dance runs against
+  // `data.sleepPrefs`. A partial patch upserts only the touched columns.
+  const persistSleepPrefs = useCallback(
+    async (patch: Partial<Omit<MemberSleepPrefs, "memberId" | "workspaceId">>) => {
+      if (!member) return;
+      const prev = qc.getQueryData<WorkspaceData>(qk.workspace);
+      qc.setQueryData<WorkspaceData>(qk.workspace, (d) =>
+        patchCachedSleepPrefs(d, member, patch),
+      );
+      try {
+        await upsertMemberSleepPrefs(createClient(), {
+          memberId: member.id,
+          workspaceId: member.workspaceId,
+          ...patch,
+        });
       } catch (e) {
         if (prev) qc.setQueryData(qk.workspace, prev); // roll back optimistic change
         toast.error(
@@ -240,47 +295,47 @@ export function usePreferences() {
   );
 
   // No DOM side-effect: the Sleep tab re-reads these from the workspace cache
-  // that `persist` patches, so the calculator re-ranks immediately.
+  // that `persistSleepPrefs` patches, so the calculator re-ranks immediately.
   const setSleepCycleLength = useCallback(
     (next: number) => {
-      void persist({ sleepCycleLengthMin: next });
+      void persistSleepPrefs({ sleepCycleLengthMin: next });
     },
-    [persist],
+    [persistSleepPrefs],
   );
 
   const setSleepOnsetLatency = useCallback(
     (next: number) => {
-      void persist({ sleepOnsetLatencyMin: next });
+      void persistSleepPrefs({ sleepOnsetLatencyMin: next });
     },
-    [persist],
+    [persistSleepPrefs],
   );
 
   const setTargetSleepCycles = useCallback(
     (next: number) => {
-      void persist({ targetSleepCycles: next });
+      void persistSleepPrefs({ targetSleepCycles: next });
     },
-    [persist],
+    [persistSleepPrefs],
   );
 
   const setSleepCategory = useCallback(
     (next: string | null) => {
-      void persist({ sleepCategoryId: next });
+      void persistSleepPrefs({ sleepCategoryId: next });
     },
-    [persist],
+    [persistSleepPrefs],
   );
 
   const setNightWindowStart = useCallback(
     (next: number) => {
-      void persist({ nightWindowStartHour: next });
+      void persistSleepPrefs({ nightWindowStartHour: next });
     },
-    [persist],
+    [persistSleepPrefs],
   );
 
   const setNightWindowEnd = useCallback(
     (next: number) => {
-      void persist({ nightWindowEndHour: next });
+      void persistSleepPrefs({ nightWindowEndHour: next });
     },
-    [persist],
+    [persistSleepPrefs],
   );
 
   const setPalette = useCallback(

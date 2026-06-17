@@ -30,12 +30,6 @@ const member = (id: string, color: string): Member => ({
   showInactiveInMonth: true,
   showSuccessToasts: true,
   contextLabel: "bar",
-  sleepCycleLengthMin: 90,
-  sleepOnsetLatencyMin: 15,
-  targetSleepCycles: 5,
-  sleepCategoryId: null,
-  nightWindowStartHour: 20,
-  nightWindowEndHour: 12,
 });
 
 function occ(over: Partial<Occurrence>): Occurrence {

@@ -4,7 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchWorkspaceBundle } from "@/lib/supabase/queries";
 import { qk } from "@/lib/supabase/query-keys";
-import type { Member, Category, Collection, Board } from "@/lib/types";
+import type {
+  Member,
+  Category,
+  Collection,
+  Board,
+  MemberSleepPrefs,
+} from "@/lib/types";
 
 export interface WorkspaceData {
   workspaceId: string;
@@ -14,6 +20,8 @@ export interface WorkspaceData {
   collections: Collection[];
   boards: Board[];
   currentMember: Member | null;
+  /** The current member's OWN sleep prefs (member-private); null = none yet. */
+  sleepPrefs: MemberSleepPrefs | null;
 }
 
 /** Load the workspace bundle and resolve which member the session belongs to. */
@@ -37,6 +45,7 @@ export function useWorkspace() {
         collections: bundle.collections,
         boards: bundle.boards,
         currentMember,
+        sleepPrefs: bundle.sleepPrefs,
       };
     },
     // The bundle (workspace name, members, categories) changes rarely and is

@@ -10,6 +10,7 @@ import type {
   Collection,
   Board,
   SleepLog,
+  MemberSleepPrefs,
   TaskRow,
   TaskStatusEvent,
   TaskCheckpoint,
@@ -26,6 +27,7 @@ import {
   mapCollection,
   mapBoard,
   mapSleepLog,
+  mapMemberSleepPrefs,
   mapTask,
   mapStatusEvent,
   mapCheckpoint,
@@ -38,24 +40,29 @@ export interface WorkspaceBundle {
   categories: Category[];
   collections: Collection[];
   boards: Board[];
+  /** The signed-in member's OWN sleep prefs (member-private RLS); null = none yet. */
+  sleepPrefs: MemberSleepPrefs | null;
 }
 
 /** Load the (single) workspace the signed-in member belongs to. RLS scopes it. */
 export async function fetchWorkspaceBundle(
   sb: SupabaseClient,
 ): Promise<WorkspaceBundle> {
-  const [wsRes, memRes, catRes, collRes, boardRes] = await Promise.all([
+  const [wsRes, memRes, catRes, collRes, boardRes, sleepPrefsRes] = await Promise.all([
     sb.from("workspaces").select("*").limit(1).single(),
     sb.from("members").select("*").order("created_at"),
     sb.from("categories").select("*").order("sort_order"),
     sb.from("collections").select("*").order("sort_order"),
     sb.from("boards").select("*").order("position"),
+    // Member-private RLS returns only the signed-in member's own row.
+    sb.from("member_sleep_prefs").select("*").maybeSingle(),
   ]);
   if (wsRes.error) throw wsRes.error;
   if (memRes.error) throw memRes.error;
   if (catRes.error) throw catRes.error;
   if (collRes.error) throw collRes.error;
   if (boardRes.error) throw boardRes.error;
+  if (sleepPrefsRes.error) throw sleepPrefsRes.error;
 
   return {
     workspaceId: wsRes.data.id as string,
@@ -64,6 +71,7 @@ export async function fetchWorkspaceBundle(
     categories: (catRes.data ?? []).map(mapCategory),
     collections: (collRes.data ?? []).map(mapCollection),
     boards: (boardRes.data ?? []).map(mapBoard),
+    sleepPrefs: sleepPrefsRes.data ? mapMemberSleepPrefs(sleepPrefsRes.data) : null,
   };
 }
 

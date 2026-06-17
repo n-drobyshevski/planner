@@ -5,6 +5,7 @@ import type {
   InsightsPrefs,
   InsightsView,
   SleepLog,
+  MemberSleepPrefs,
   TaskRow,
   TaskCheckpoint,
   Board,
@@ -21,6 +22,7 @@ import {
   mapInsightsPrefs,
   mapInsightsView,
   mapSleepLog,
+  mapMemberSleepPrefs,
   mapTask,
   mapBoard,
   mapCheckpoint,
@@ -29,6 +31,7 @@ import {
   eventPatchToRow,
   insightsViewInputToRow,
   sleepLogInputToRow,
+  memberSleepPrefsInputToRow,
   taskInputToRow,
   taskPatchToRow,
   boardInputToRow,
@@ -39,6 +42,7 @@ import {
   type EventInput,
   type InsightsViewInput,
   type SleepLogInput,
+  type MemberSleepPrefsInput,
   type TaskInput,
   type BoardInput,
   type CheckpointInput,
@@ -876,18 +880,6 @@ export interface MemberPreferencesPatch {
   showSuccessToasts?: boolean;
   /** How context time-blocks are labelled in the week/day grid. */
   contextLabel?: ContextLabel;
-  /** One full sleep cycle, minutes (DB check 70..110). */
-  sleepCycleLengthMin?: number;
-  /** Time to fall asleep after getting into bed, minutes (DB check 0..60). */
-  sleepOnsetLatencyMin?: number;
-  /** Nightly cycle target (DB check 3..7). */
-  targetSleepCycles?: number;
-  /** Dedicated sleep category id, or null for the inactive≡sleep heuristic. */
-  sleepCategoryId?: string | null;
-  /** Night window start on the evening before, wall hour (DB check 12..23). */
-  nightWindowStartHour?: number;
-  /** Night window end on the wake day, wall hour (DB check 4..16). */
-  nightWindowEndHour?: number;
 }
 
 /**
@@ -940,13 +932,6 @@ export async function updateMemberPreferences(
   if (patch.showInactiveInMonth != null) row.show_inactive_in_month = patch.showInactiveInMonth;
   if (patch.showSuccessToasts != null) row.show_success_toasts = patch.showSuccessToasts;
   if (patch.contextLabel != null) row.context_label = patch.contextLabel;
-  if (patch.sleepCycleLengthMin != null) row.sleep_cycle_length_min = patch.sleepCycleLengthMin;
-  if (patch.sleepOnsetLatencyMin != null) row.sleep_onset_latency_min = patch.sleepOnsetLatencyMin;
-  if (patch.targetSleepCycles != null) row.target_sleep_cycles = patch.targetSleepCycles;
-  // Nullable like `timezone`: explicit null = back to the inactive heuristic.
-  if ("sleepCategoryId" in patch) row.sleep_category_id = patch.sleepCategoryId ?? null;
-  if (patch.nightWindowStartHour != null) row.night_window_start_hour = patch.nightWindowStartHour;
-  if (patch.nightWindowEndHour != null) row.night_window_end_hour = patch.nightWindowEndHour;
   if (Object.keys(row).length === 0) return;
   const { error } = await sb.from("members").update(row).eq("id", memberId);
   if (error) throw error;
@@ -970,6 +955,24 @@ export async function upsertSleepLog(
     .single();
   if (error) throw error;
   return mapSleepLog(data);
+}
+
+/**
+ * Insert or update the signed-in member's sleep PREFERENCES (member-private,
+ * one row per member). A partial input upserts only the touched columns; on
+ * first save the rest default at the DB. RLS scopes it to their own row.
+ */
+export async function upsertMemberSleepPrefs(
+  sb: SupabaseClient,
+  input: MemberSleepPrefsInput,
+): Promise<MemberSleepPrefs> {
+  const { data, error } = await sb
+    .from("member_sleep_prefs")
+    .upsert(memberSleepPrefsInputToRow(input), { onConflict: "member_id" })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapMemberSleepPrefs(data);
 }
 
 /** Remove the viewer's log for one night. RLS limits it to their own rows. */

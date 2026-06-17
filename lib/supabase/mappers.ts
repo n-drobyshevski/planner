@@ -15,6 +15,7 @@ import type {
   Collection,
   Board,
   SleepLog,
+  MemberSleepPrefs,
   TaskRow,
   TaskStatusEvent,
   TaskCheckpoint,
@@ -55,6 +56,13 @@ export function mapMember(r: Row): Member {
     showSuccessToasts:
       r.show_success_toasts == null ? true : Boolean(r.show_success_toasts),
     contextLabel: (r.context_label as ContextLabel | null) ?? "bar",
+  };
+}
+
+export function mapMemberSleepPrefs(r: Row): MemberSleepPrefs {
+  return {
+    memberId: r.member_id as string,
+    workspaceId: r.workspace_id as string,
     sleepCycleLengthMin: (r.sleep_cycle_length_min as number | null) ?? 90,
     sleepOnsetLatencyMin: (r.sleep_onset_latency_min as number | null) ?? 15,
     targetSleepCycles: (r.target_sleep_cycles as number | null) ?? 5,
@@ -62,6 +70,34 @@ export function mapMember(r: Row): Member {
     nightWindowStartHour: (r.night_window_start_hour as number | null) ?? 20,
     nightWindowEndHour: (r.night_window_end_hour as number | null) ?? 12,
   };
+}
+
+/**
+ * Partial upsert payload for a member's sleep prefs (conflict key member_id).
+ * Only keys present are written, so single-setting saves update one column and
+ * leave the rest — `"sleepCategoryId" in patch` distinguishes "clear it" (null)
+ * from "leave untouched" (absent), matching the old member-preferences path.
+ */
+export interface MemberSleepPrefsInput {
+  memberId: string;
+  workspaceId: string;
+  sleepCycleLengthMin?: number;
+  sleepOnsetLatencyMin?: number;
+  targetSleepCycles?: number;
+  sleepCategoryId?: string | null;
+  nightWindowStartHour?: number;
+  nightWindowEndHour?: number;
+}
+
+export function memberSleepPrefsInputToRow(input: MemberSleepPrefsInput): Row {
+  const row: Row = { member_id: input.memberId, workspace_id: input.workspaceId };
+  if ("sleepCycleLengthMin" in input) row.sleep_cycle_length_min = input.sleepCycleLengthMin;
+  if ("sleepOnsetLatencyMin" in input) row.sleep_onset_latency_min = input.sleepOnsetLatencyMin;
+  if ("targetSleepCycles" in input) row.target_sleep_cycles = input.targetSleepCycles;
+  if ("sleepCategoryId" in input) row.sleep_category_id = input.sleepCategoryId ?? null;
+  if ("nightWindowStartHour" in input) row.night_window_start_hour = input.nightWindowStartHour;
+  if ("nightWindowEndHour" in input) row.night_window_end_hour = input.nightWindowEndHour;
+  return row;
 }
 
 export function mapSleepLog(r: Row): SleepLog {

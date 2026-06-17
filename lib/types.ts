@@ -82,15 +82,23 @@ export interface Member {
   showSuccessToasts: boolean;
   // How context time-blocks are labelled in the week/day grid. Defaults to "bar".
   contextLabel: ContextLabel;
-  // Sleep planning preferences (per member): one full sleep cycle in minutes,
-  // time to fall asleep after getting into bed, and the nightly cycle target.
-  // Non-null — DB defaults (90 / 15 / 5) apply on insert.
+}
+
+/**
+ * A member's sleep PREFERENCES, member-private under RLS (like SleepLog): the
+ * partner can never read these rows. Sleep planning — one full sleep cycle in
+ * minutes, time to fall asleep after getting into bed, the nightly cycle target
+ * (DB defaults 90 / 15 / 5) — plus derivation controls: the dedicated sleep
+ * category (null = the inactive≡sleep heuristic) and the night collection
+ * window (start hour 12..23 on the evening before, end hour 4..16 on the wake
+ * day; defaults 20 / 12).
+ */
+export interface MemberSleepPrefs {
+  memberId: string;
+  workspaceId: string;
   sleepCycleLengthMin: number;
   sleepOnsetLatencyMin: number;
   targetSleepCycles: number;
-  // Sleep derivation (per member): the dedicated sleep category (null = the
-  // inactive≡sleep heuristic) and the night collection window — start hour on
-  // the evening before (12..23), end hour on the wake day (4..16).
   sleepCategoryId: string | null;
   nightWindowStartHour: number;
   nightWindowEndHour: number;

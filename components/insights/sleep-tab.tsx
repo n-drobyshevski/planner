@@ -35,6 +35,7 @@ import {
   recentSleepDebtMs,
 } from "@/lib/sleep/circadian";
 import { deriveNights, type DeriveOptions } from "@/lib/sleep/derive";
+import { isViewerSleep as viewerOwnsSleep } from "@/lib/sleep/viewer-sleep";
 import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { Occurrence } from "@/lib/types";
 import { InsightLede } from "./insight-lede";
@@ -61,7 +62,7 @@ import type { InsightsTabData } from "./insights-shell";
 export function SleepTab({ data }: { data: InsightsTabData }) {
   const t = useTranslations("insights");
   const locale = useLocale();
-  const { period, rawOccurrences, members, viewerId, timeZone, now } = data;
+  const { period, rawOccurrences, viewerId, timeZone, now } = data;
 
   const workspace = useWorkspace();
   const wsId = workspace.data?.workspaceId;
@@ -75,14 +76,17 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
     [workspace.data],
   );
 
-  const viewer = members.get(viewerId);
+  // Sleep prefs are member-private (their own table), so they live on the
+  // workspace bundle's `sleepPrefs` (the signed-in member's own row), NOT on the
+  // shared members list. The Sleep tab is viewer-only, so this IS the viewer's.
+  const sleepPrefs = workspace.data?.sleepPrefs ?? null;
   const prefs: SleepPrefs = useMemo(
     () => ({
-      cycleLengthMin: viewer?.sleepCycleLengthMin ?? 90,
-      onsetLatencyMin: viewer?.sleepOnsetLatencyMin ?? 15,
-      targetCycles: viewer?.targetSleepCycles ?? 5,
+      cycleLengthMin: sleepPrefs?.sleepCycleLengthMin ?? 90,
+      onsetLatencyMin: sleepPrefs?.sleepOnsetLatencyMin ?? 15,
+      targetCycles: sleepPrefs?.targetSleepCycles ?? 5,
     }),
-    [viewer],
+    [sleepPrefs],
   );
 
   const {
@@ -114,23 +118,20 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
   // What counts as the viewer's sleep: with a dedicated sleep category set,
   // that category's timed events; otherwise the inactive≡sleep heuristic.
   // Always from the RAW window (the insights filter drops inactive
-  // occurrences; member/category filters would distort nights).
-  const sleepCategoryId = viewer?.sleepCategoryId ?? null;
+  // occurrences; member/category filters would distort nights). The ownership
+  // gate lives in lib/sleep/viewer-sleep so it's unit-tested in isolation.
+  const sleepCategoryId = sleepPrefs?.sleepCategoryId ?? null;
   const isViewerSleep = useCallback(
-    (o: Occurrence) =>
-      o.ownerId === viewerId &&
-      !o.allDay &&
-      o.kind === "event" &&
-      (sleepCategoryId !== null ? o.categoryId === sleepCategoryId : o.inactive),
+    (o: Occurrence) => viewerOwnsSleep(o, viewerId, sleepCategoryId),
     [viewerId, sleepCategoryId],
   );
   const deriveOpts = useMemo<DeriveOptions>(
     () => ({
-      startHour: viewer?.nightWindowStartHour ?? 20,
-      endHour: viewer?.nightWindowEndHour ?? 12,
+      startHour: sleepPrefs?.nightWindowStartHour ?? 20,
+      endHour: sleepPrefs?.nightWindowEndHour ?? 12,
       preFiltered: true, // isViewerSleep owns the criterion
     }),
-    [viewer?.nightWindowStartHour, viewer?.nightWindowEndHour],
+    [sleepPrefs?.nightWindowStartHour, sleepPrefs?.nightWindowEndHour],
   );
 
   const viewerSpans = useMemo(
@@ -347,8 +348,8 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
             logs={periodLogs}
             habitualPhase={habitualPhase}
             timeZone={timeZone}
-            windowStartHour={viewer?.nightWindowStartHour ?? 20}
-            windowEndHour={viewer?.nightWindowEndHour ?? 12}
+            windowStartHour={sleepPrefs?.nightWindowStartHour ?? 20}
+            windowEndHour={sleepPrefs?.nightWindowEndHour ?? 12}
             action={
               <LogNightDialog
                 todayKey={todayKey}

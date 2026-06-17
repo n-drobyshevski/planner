@@ -3,14 +3,17 @@ import {
   mapEvent,
   mapMember,
   mapSleepLog,
+  mapMemberSleepPrefs,
   mapTask,
   eventInputToRow,
   eventPatchToRow,
   sleepLogInputToRow,
+  memberSleepPrefsInputToRow,
   taskInputToRow,
   taskPatchToRow,
   type EventInput,
   type SleepLogInput,
+  type MemberSleepPrefsInput,
   type TaskInput,
 } from "@/lib/supabase/mappers";
 
@@ -264,32 +267,87 @@ function toMsBack(iso: string): number {
   return new Date(iso).getTime();
 }
 
-describe("mapMember — sleep preferences", () => {
-  const memberRow = {
-    id: "m1",
+describe("mapMember — sleep prefs moved off members", () => {
+  it("no longer emits any sleep-pref keys (they live in member_sleep_prefs now)", () => {
+    const m = mapMember({
+      id: "m1",
+      workspace_id: "w1",
+      auth_user_id: null,
+      name: "Nick",
+      color: "#aabbcc",
+      pin_hash: null,
+    }) as unknown as Record<string, unknown>;
+    for (const k of [
+      "sleepCycleLengthMin",
+      "sleepOnsetLatencyMin",
+      "targetSleepCycles",
+      "sleepCategoryId",
+      "nightWindowStartHour",
+      "nightWindowEndHour",
+    ]) {
+      expect(m).not.toHaveProperty(k);
+    }
+  });
+});
+
+describe("member_sleep_prefs mappers", () => {
+  const basePrefsRow = {
+    member_id: "m1",
     workspace_id: "w1",
-    auth_user_id: null,
-    name: "Nick",
-    color: "#aabbcc",
-    pin_hash: null,
+    sleep_cycle_length_min: 100,
+    sleep_onset_latency_min: 10,
+    target_sleep_cycles: 6,
+    sleep_category_id: "cat-sleep",
+    night_window_start_hour: 21,
+    night_window_end_hour: 9,
+    created_at: "2026-06-10T06:00:00.000Z",
   };
 
-  it("defaults to 90 / 15 / 5 when the columns are absent", () => {
-    const m = mapMember(memberRow);
-    expect(m.sleepCycleLengthMin).toBe(90);
-    expect(m.sleepOnsetLatencyMin).toBe(15);
-    expect(m.targetSleepCycles).toBe(5);
+  it("mapMemberSleepPrefs passes stored values through", () => {
+    const p = mapMemberSleepPrefs(basePrefsRow);
+    expect(p).toMatchObject({
+      memberId: "m1",
+      workspaceId: "w1",
+      sleepCycleLengthMin: 100,
+      sleepOnsetLatencyMin: 10,
+      targetSleepCycles: 6,
+      sleepCategoryId: "cat-sleep",
+      nightWindowStartHour: 21,
+      nightWindowEndHour: 9,
+    });
   });
 
-  it("passes stored values through", () => {
-    const m = mapMember({
-      ...memberRow,
-      sleep_cycle_length_min: 100,
-      sleep_onset_latency_min: 10,
-      target_sleep_cycles: 6,
+  it("mapMemberSleepPrefs defaults to 90 / 15 / 5 / null / 20 / 12 when columns are absent", () => {
+    const p = mapMemberSleepPrefs({ member_id: "m1", workspace_id: "w1" });
+    expect(p).toMatchObject({
+      sleepCycleLengthMin: 90,
+      sleepOnsetLatencyMin: 15,
+      targetSleepCycles: 5,
+      sleepCategoryId: null,
+      nightWindowStartHour: 20,
+      nightWindowEndHour: 12,
     });
-    expect(m.sleepCycleLengthMin).toBe(100);
-    expect(m.sleepOnsetLatencyMin).toBe(10);
-    expect(m.targetSleepCycles).toBe(6);
+  });
+
+  it("memberSleepPrefsInputToRow writes snake_case only for present keys", () => {
+    const input: MemberSleepPrefsInput = {
+      memberId: "m1",
+      workspaceId: "w1",
+      sleepCycleLengthMin: 100,
+    };
+    const row = memberSleepPrefsInputToRow(input);
+    expect(row).toEqual({ member_id: "m1", workspace_id: "w1", sleep_cycle_length_min: 100 });
+    expect(row).not.toHaveProperty("night_window_start_hour");
+  });
+
+  it("memberSleepPrefsInputToRow distinguishes clearing the category (null) from leaving it", () => {
+    // present + null → clears it
+    expect(
+      memberSleepPrefsInputToRow({ memberId: "m1", workspaceId: "w1", sleepCategoryId: null }),
+    ).toEqual({ member_id: "m1", workspace_id: "w1", sleep_category_id: null });
+    // absent → untouched
+    expect(
+      memberSleepPrefsInputToRow({ memberId: "m1", workspaceId: "w1" }),
+    ).not.toHaveProperty("sleep_category_id");
   });
 });
