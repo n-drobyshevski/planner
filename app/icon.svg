@@ -1,0 +1,18 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .bg     { fill: #faf8f5; }
+    .stroke { stroke: #292524; }
+    .fill   { fill: #292524; }
+    @media (prefers-color-scheme: dark) {
+      .bg     { fill: #292524; }
+      .stroke { stroke: #e7e0d7; }
+      .fill   { fill: #e7e0d7; }
+    }
+  </style>
+  <rect class="bg stroke" x="4" y="6" width="24" height="22" rx="5" stroke-width="2" />
+  <line class="stroke" x1="6" y1="13" x2="26" y2="13" stroke-width="2" />
+  <line class="stroke" x1="10" y1="3" x2="10" y2="8" stroke-width="2" stroke-linecap="round" />
+  <line class="stroke" x1="22" y1="3" x2="22" y2="8" stroke-width="2" stroke-linecap="round" />
+  <circle class="fill" cx="12.5" cy="20.5" r="2" />
+  <circle class="fill" cx="19.5" cy="20.5" r="2" />
+</svg>
