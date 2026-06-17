@@ -6,13 +6,7 @@ import { useTranslations } from "next-intl";
 import { z } from "zod";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { SettingsSection } from "@/components/settings/settings-section";
 import { FieldSet, FieldLegend, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -44,67 +38,61 @@ export function ProfileSettings() {
   const [pinMode, setPinMode] = React.useState<PinMode | null>(null);
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("profile.title")}</CardTitle>
-          <CardDescription>{t("profile.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          {/* Display name */}
-          <FieldSet>
-            <FieldLegend variant="label">{t("profile.displayName.legend")}</FieldLegend>
-            <FieldDescription>
-              {t("profile.displayName.description")}
-            </FieldDescription>
-            {/* Keyed by member.id so it initialises from the resolved name without a sync effect. */}
-            {isReady && member ? (
-              <NameField key={member.id} initial={member.name} onSave={saveName} />
-            ) : (
-              <Input disabled placeholder={tCommon("loading")} className="max-w-xs" />
-            )}
-          </FieldSet>
+    <>
+      <SettingsSection title={t("profile.title")} description={t("profile.description")}>
+        {/* Display name */}
+      <FieldSet>
+        <FieldLegend variant="label">{t("profile.displayName.legend")}</FieldLegend>
+        <FieldDescription>
+          {t("profile.displayName.description")}
+        </FieldDescription>
+        {/* Keyed by member.id so it initialises from the resolved name without a sync effect. */}
+        {isReady && member ? (
+          <NameField key={member.id} initial={member.name} onSave={saveName} />
+        ) : (
+          <Input disabled placeholder={tCommon("loading")} className="max-w-xs" />
+        )}
+      </FieldSet>
 
-          {/* Profile color */}
-          <FieldSet>
-            <FieldLegend variant="label">{t("profile.color.legend")}</FieldLegend>
-            <FieldDescription>
-              {t("profile.color.description")}
-            </FieldDescription>
-            {isReady && member ? (
-              <ColorPicker value={member.color} onSelect={saveColor} />
-            ) : (
-              <div className="h-9" />
-            )}
-          </FieldSet>
+      {/* Profile color */}
+      <FieldSet>
+        <FieldLegend variant="label">{t("profile.color.legend")}</FieldLegend>
+        <FieldDescription>
+          {t("profile.color.description")}
+        </FieldDescription>
+        {isReady && member ? (
+          <ColorPicker value={member.color} onSelect={saveColor} />
+        ) : (
+          <div className="h-11" />
+        )}
+      </FieldSet>
 
-          {/* PIN */}
-          <FieldSet>
-            <FieldLegend variant="label">{t("profile.pin.legend")}</FieldLegend>
-            <FieldDescription>
-              {member?.hasPin
-                ? t("profile.pin.descriptionSet")
-                : t("profile.pin.descriptionUnset")}
-            </FieldDescription>
-            <div className="flex flex-wrap gap-2">
-              {member?.hasPin ? (
-                <>
-                  <Button variant="outline" disabled={!isReady} onClick={() => setPinMode("change")}>
-                    {t("profile.pin.change")}
-                  </Button>
-                  <Button variant="ghost" disabled={!isReady} onClick={() => setPinMode("remove")}>
-                    {t("profile.pin.remove")}
-                  </Button>
-                </>
-              ) : (
-                <Button disabled={!isReady} onClick={() => setPinMode("set")}>
-                  {t("profile.pin.set")}
-                </Button>
-              )}
-            </div>
-          </FieldSet>
-        </CardContent>
-      </Card>
+      {/* PIN */}
+      <FieldSet>
+        <FieldLegend variant="label">{t("profile.pin.legend")}</FieldLegend>
+        <FieldDescription>
+          {member?.hasPin
+            ? t("profile.pin.descriptionSet")
+            : t("profile.pin.descriptionUnset")}
+        </FieldDescription>
+        <div className="flex flex-wrap gap-2">
+          {member?.hasPin ? (
+            <>
+              <Button variant="outline" disabled={!isReady} onClick={() => setPinMode("change")}>
+                {t("profile.pin.change")}
+              </Button>
+              <Button variant="ghost" disabled={!isReady} onClick={() => setPinMode("remove")}>
+                {t("profile.pin.remove")}
+              </Button>
+            </>
+          ) : (
+            <Button disabled={!isReady} onClick={() => setPinMode("set")}>
+              {t("profile.pin.set")}
+            </Button>
+          )}
+        </div>
+      </FieldSet>
+      </SettingsSection>
 
       <PinDialog
         mode={pinMode}
@@ -112,7 +100,7 @@ export function ProfileSettings() {
         verifyCurrentPin={verifyCurrentPin}
         savePin={savePin}
       />
-    </div>
+    </>
   );
 }
 
@@ -193,14 +181,14 @@ function ColorPicker({
             title={s.label}
             onClick={() => onSelect(s.value)}
             className={cn(
-              "relative grid size-9 place-items-center rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform outline-none focus-visible:ring-ring active:scale-95",
+              "relative grid size-11 place-items-center rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform outline-none focus-visible:ring-ring active:scale-95",
               selected ? "ring-foreground" : "ring-transparent hover:ring-border",
             )}
             style={{ backgroundColor: `var(--swatch-${s.id})` }}
           >
             {selected && (
               <Check
-                className="size-4 drop-shadow-sm"
+                className="size-5 drop-shadow-sm"
                 style={{ color: `var(--swatch-ink-${s.id}, var(--swatch-ink))` }}
                 aria-hidden
               />
@@ -370,11 +358,7 @@ function PinForm({
                 <Button
                   onClick={() => void form.handleSubmit()}
                   disabled={!canSubmit}
-                  className={
-                    mode === "remove"
-                      ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      : undefined
-                  }
+                  variant={mode === "remove" ? "destructive" : "default"}
                 >
                   {isSubmitting ? tCommon("saving") : t(`profile.pin.dialog.${mode}.submit`)}
                 </Button>

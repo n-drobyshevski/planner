@@ -2,6 +2,14 @@
   "metaTitle": "Settings · Planner",
   "title": "Settings",
   "backToCalendar": "Back to calendar",
+  "sections": {
+    "ariaLabel": "Settings sections",
+    "profile": "Profile",
+    "appearance": "Appearance",
+    "calendar": "Calendar",
+    "time": "Time",
+    "sleep": "Sleep"
+  },
   "profile": {
     "title": "Profile",
     "description": "Your name and the PIN used when switching to your profile.",
@@ -151,7 +159,7 @@
       "searchPlaceholder": "Search time zones…",
       "empty": "No time zone found."
     },
-    "currently": "Currently {time} in {zone}"
+    "currently": "Currently <time></time> in {zone}"
   },
   "sleep": {
     "title": "Sleep",

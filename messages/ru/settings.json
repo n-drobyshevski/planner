@@ -2,6 +2,14 @@
   "metaTitle": "Настройки · Planner",
   "title": "Настройки",
   "backToCalendar": "Назад к календарю",
+  "sections": {
+    "ariaLabel": "Разделы настроек",
+    "profile": "Профиль",
+    "appearance": "Оформление",
+    "calendar": "Календарь",
+    "time": "Время",
+    "sleep": "Сон"
+  },
   "profile": {
     "title": "Профиль",
     "description": "Твоё имя и PIN, который запрашивается при переключении на твой профиль.",
@@ -151,7 +159,7 @@
       "searchPlaceholder": "Поиск часовых поясов…",
       "empty": "Часовой пояс не найден."
     },
-    "currently": "Сейчас {time} в {zone}"
+    "currently": "Сейчас <time></time> в {zone}"
   },
   "sleep": {
     "title": "Сон",

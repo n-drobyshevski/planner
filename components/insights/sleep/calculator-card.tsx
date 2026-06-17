@@ -116,7 +116,7 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
           onset: prefs.onsetLatencyMin,
           link: (chunks) => (
             <Link
-              href="/settings#sleep"
+              href="/settings?section=sleep"
               className="underline underline-offset-2 hover:text-foreground"
             >
               {chunks}

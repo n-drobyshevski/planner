@@ -7,13 +7,7 @@ import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { SettingsSection } from "@/components/settings/settings-section";
 import { FieldSet, FieldLegend, FieldDescription } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -234,14 +228,9 @@ export function TimezoneSettings() {
   }, [rawTimezone, secondaryTimeZone]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("timezone.title")}</CardTitle>
-        <CardDescription>{t("timezone.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        {/* Primary zone */}
-        <FieldSet>
+    <SettingsSection title={t("timezone.title")} description={t("timezone.description")}>
+      {/* Primary zone */}
+      <FieldSet>
           <FieldLegend variant="label">{t("timezone.primary.legend")}</FieldLegend>
           <FieldDescription>
             {t("timezone.primary.description")}
@@ -319,7 +308,6 @@ export function TimezoneSettings() {
             )}
           </form.Field>
         </FieldSet>
-      </CardContent>
-    </Card>
+    </SettingsSection>
   );
 }

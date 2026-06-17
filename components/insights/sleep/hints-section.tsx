@@ -50,7 +50,7 @@ export function HintsSection({
             count: HINTS_MIN_LOGGED - scoredCount,
             link: (chunks) => (
               <Link
-                href="/settings#sleep"
+                href="/settings?section=sleep"
                 className="underline underline-offset-2 hover:text-foreground"
               >
                 {chunks}

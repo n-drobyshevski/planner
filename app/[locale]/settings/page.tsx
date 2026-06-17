@@ -3,10 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ProfileSettings } from "@/components/settings/profile-settings";
-import { AppearanceSettings } from "@/components/settings/appearance-settings";
-import { TimezoneSettings } from "@/components/settings/timezone-settings";
-import { SleepSettings } from "@/components/settings/sleep-settings";
+import { SettingsShell } from "@/components/settings/settings-shell";
 
 export async function generateMetadata({
   params,
@@ -41,11 +38,8 @@ export default async function SettingsPage({
         </Button>
         <h1 className="font-heading text-lg font-medium">{t("title")}</h1>
       </header>
-      <main className="mx-auto max-w-2xl space-y-6 px-4 py-8">
-        <ProfileSettings />
-        <AppearanceSettings />
-        <TimezoneSettings />
-        <SleepSettings />
+      <main>
+        <SettingsShell />
       </main>
     </div>
   );

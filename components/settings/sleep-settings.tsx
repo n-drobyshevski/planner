@@ -4,14 +4,13 @@ import { useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useTranslations } from "next-intl";
 
+import { SettingsSection } from "@/components/settings/settings-section";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+  Field,
+  FieldDescription,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -101,15 +100,9 @@ export function SleepSettings() {
   ]);
 
   return (
-    // scroll-mt clears the sticky header when arriving via /settings#sleep
-    <Card id="sleep" className="scroll-mt-20">
-      <CardHeader>
-        <CardTitle>{t("sleep.title")}</CardTitle>
-        <CardDescription>{t("sleep.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        <form.Field
-          name="cycleLength"
+    <SettingsSection title={t("sleep.title")} description={t("sleep.description")}>
+      <form.Field
+        name="cycleLength"
           listeners={{
             onChange: ({ value }) => setSleepCycleLength(Number(value)),
           }}
@@ -232,7 +225,8 @@ export function SleepSettings() {
           )}
         </form.Field>
 
-        <div className="grid grid-cols-2 gap-3">
+        <FieldSet>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
           <form.Field
             name="windowStart"
             listeners={{
@@ -289,11 +283,11 @@ export function SleepSettings() {
               </Field>
             )}
           </form.Field>
-        </div>
-        <FieldDescription className="-mt-3">
-          {t("sleep.nightWindow.description")}
-        </FieldDescription>
-      </CardContent>
-    </Card>
+          </div>
+          <FieldDescription>
+            {t("sleep.nightWindow.description")}
+          </FieldDescription>
+        </FieldSet>
+    </SettingsSection>
   );
 }
