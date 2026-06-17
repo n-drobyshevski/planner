@@ -16,6 +16,7 @@
   "taskUpdated": "Task updated",
   "taskDeleted": "Task deleted",
   "taskMoved": "Task moved",
+  "taskTransferred": "Task transferred",
   "taskCompleted": "Task completed",
   "taskReopened": "Task reopened",
   "checkpointCreated": "Milestone added",

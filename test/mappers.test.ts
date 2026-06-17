@@ -170,6 +170,12 @@ describe("attributes round-trip", () => {
     ).toEqual({ focus: "shallow" });
   });
 
+  it("taskInputToRow defaults to private, honoring an explicit isPrivate", () => {
+    const taskInput: TaskInput = { workspaceId: "w1", ownerId: "m1", title: "Task" };
+    expect(taskInputToRow(taskInput).is_private).toBe(true);
+    expect(taskInputToRow({ ...taskInput, isPrivate: false }).is_private).toBe(false);
+  });
+
   it("patch mappers write attributes only when present in the patch", () => {
     expect(eventPatchToRow({ title: "x" })).not.toHaveProperty("attributes");
     expect(eventPatchToRow({ attributes: { energy: 3 } })).toEqual({

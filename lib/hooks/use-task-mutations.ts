@@ -197,6 +197,16 @@ export function useTaskMutations(workspaceId: string | undefined) {
           : undefined,
         apply: (row) => setTasks((old) => upsertTask(old, row)),
       }),
+    /**
+     * Hand a task (and its subtree) to another member. A full task refetch
+     * reconciles the result: a still-shared task shows the new owner, while a
+     * transferred private task drops out of this member's view entirely. Not
+     * undoable — once it's the other member's task, RLS won't let this member
+     * move it back.
+     */
+    transfer: (taskId: string, newOwnerId: string) =>
+      run(m.transferTaskOwnership(sb, taskId, newOwnerId), t("taskTransferred")),
+
     remove: (id: string) =>
       run(m.deleteTaskDeep(sb, id), t("taskDeleted"), {
         alsoEvents: true,
