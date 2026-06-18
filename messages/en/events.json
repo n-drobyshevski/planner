@@ -12,7 +12,13 @@
     "changeColor": "Change color",
     "share": "Share",
     "makePersonal": "Make personal",
-    "copyToMyCalendar": "Copy to my calendar"
+    "copyToMyCalendar": "Copy to my calendar",
+    "you": "You",
+    "visibility": "Visibility",
+    "edited": "Edited",
+    "inactive": "Inactive",
+    "more": "More actions",
+    "duplicate": "Duplicate"
   },
   "taskStatus": {
     "open": "Open",

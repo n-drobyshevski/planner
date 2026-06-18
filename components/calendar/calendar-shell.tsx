@@ -56,7 +56,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { CalendarView, EventRow, Occurrence, TaskRow } from "@/lib/types";
+import type { CalendarView, EventRow, EventStatus, Occurrence, TaskRow } from "@/lib/types";
 
 // Defer heavy/rare overlays out of the initial /calendar JS. All are portaled,
 // so a `null` fallback costs no layout. The core EventDialog (which pulls in the
@@ -360,6 +360,9 @@ export function CalendarShell({
   );
   const [scheduling, setScheduling] = useState<TaskRow | null>(null);
   const [deletingTask, setDeletingTask] = useState<TaskRow | null>(null);
+  // A task opened from an event block's details ("Open task"); mounts the task
+  // editor in place so you stay on the calendar.
+  const [editingTask, setEditingTask] = useState<TaskRow | null>(null);
 
   function onToggleTaskDone(taskId: string) {
     const t = tasksById.get(taskId);
@@ -466,6 +469,36 @@ export function CalendarShell({
       next ? { isShared: true, isPrivate: false } : { isShared: false },
       next ? { isShared: ev.isShared, isPrivate: ev.isPrivate } : { isShared: ev.isShared },
     );
+  }
+  /** Set an event's private/visible/shared state. Series-level (master row), no
+   *  scope prompt — same path as color/share. "shared" clears Private so the
+   *  partner can both see and edit it. */
+  function onChangeVisibility(occ: Occurrence, v: "private" | "visible" | "shared") {
+    if (!canEditOcc(occ)) return;
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev) return;
+    const patch =
+      v === "private"
+        ? { isPrivate: true, isShared: false }
+        : v === "shared"
+          ? { isPrivate: false, isShared: true }
+          : { isPrivate: false, isShared: false };
+    void mutations.updateSingle(ev.id, patch, {
+      isPrivate: ev.isPrivate,
+      isShared: ev.isShared,
+    });
+  }
+  /** Set an event's lifecycle status. Series-level (master row), no scope prompt. */
+  function onChangeEventStatus(occ: Occurrence, status: EventStatus) {
+    if (!canEditOcc(occ)) return;
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (ev) void mutations.updateSingle(ev.id, { status }, { status: ev.status });
+  }
+  /** Toggle an event's inactive (grayed-out) flag. Series-level, no scope prompt. */
+  function onToggleInactive(occ: Occurrence) {
+    if (!canEditOcc(occ)) return;
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (ev) void mutations.updateSingle(ev.id, { inactive: !ev.inactive }, { inactive: ev.inactive });
   }
   /** The right-click "Share / Make personal" action for an event, or null when
    *  it doesn't apply: not editable, not a normal event, or already joint via a
@@ -651,6 +684,24 @@ export function CalendarShell({
     const input =
       ev.rrule && family ? familyCopyInput(ev, start - occ.start) : oneOffCopyInput(ev, start, end);
     void mutations.create(input);
+  }
+  /** "Duplicate" from the details view: a plain copy of the event in place. A
+   *  recurring source copies its whole series at the same times (a parallel
+   *  series); a single event copies one-off at the same slot. */
+  function duplicateFromDetails(occ: Occurrence) {
+    if (!canEditOcc(occ)) return;
+    const ev = events.find((e) => e.id === occ.eventId);
+    if (!ev) return;
+    const input = ev.rrule ? familyCopyInput(ev, 0) : oneOffCopyInput(ev, occ.start, occ.end);
+    void mutations.create(input);
+  }
+  /** Open the task a block belongs to (own, editable tasks only) in the task
+   *  editor, without leaving the calendar. */
+  function onOpenTask(taskId: string) {
+    const tsk = tasksById.get(taskId);
+    if (!tsk || tsk.ownerId !== viewerId) return;
+    setDetails(null);
+    setEditingTask(tsk);
   }
   /** Ctrl/Cmd-drag drop on a multi-selection: duplicate every selected item.
    *  With `family` (Alt), recurring members copy their whole series (deduped per
@@ -1038,55 +1089,80 @@ export function CalendarShell({
         )}
       </div>
 
-      {details && (
-        <EventDetails
+      {details &&
+        (() => {
+          // Re-resolve against live data so inline edits (color, visibility,
+          // status, inactive) reflect immediately instead of showing the
+          // snapshot captured when the block was clicked.
+          const occ =
+            occurrences.find((o) => o.key === details.occurrence.key) ?? details.occurrence;
+          const ev = events.find((e) => e.id === details.event.id) ?? details.event;
+          const cat = occ.categoryId ? categoryMap.get(occ.categoryId) : null;
+          const linkedTask = occ.taskId ? tasksById.get(occ.taskId) ?? null : null;
+          return (
+            <EventDetails
+              open
+              onOpenChange={(o) => !o && setDetails(null)}
+              occurrence={occ}
+              event={ev}
+              color={colorOf(occ)}
+              ownerColor={memberMap.get(occ.ownerId)?.color}
+              categoryName={cat?.name ?? null}
+              categoryColor={cat?.color ?? null}
+              ownerName={memberMap.get(occ.ownerId)?.name ?? "—"}
+              isOwn={canEditOcc(occ)}
+              sharedContext={cat?.ownerId === null}
+              task={linkedTask}
+              taskDone={occ.taskId ? taskDoneById.get(occ.taskId) ?? false : undefined}
+              onEdit={() => {
+                setDetails(null);
+                openEdit(occ);
+              }}
+              onDelete={() => {
+                setDetails(null);
+                onDeleteEvent(occ);
+              }}
+              onDuplicate={() => {
+                setDetails(null);
+                duplicateFromDetails(occ);
+              }}
+              onChangeColor={(c) => onChangeEventColor(occ, c)}
+              onChangeVisibility={(v) => onChangeVisibility(occ, v)}
+              onChangeStatus={(s) => onChangeEventStatus(occ, s)}
+              onToggleInactive={() => onToggleInactive(occ)}
+              onCopyToMine={() => {
+                setDetails(null);
+                onCopyToMine(occ);
+              }}
+              onToggleTaskDone={
+                occ.taskId ? () => onToggleTaskDone(occ.taskId!) : undefined
+              }
+              onOpenTask={
+                linkedTask && linkedTask.ownerId === viewerId
+                  ? () => onOpenTask(occ.taskId!)
+                  : undefined
+              }
+            />
+          );
+        })()}
+
+      {editingTask && workspace.data?.currentMember && (
+        <TaskDialog
           open
-          onOpenChange={(o) => !o && setDetails(null)}
-          occurrence={details.occurrence}
-          event={details.event}
-          color={colorOf(details.occurrence)}
-          categoryName={
-            details.occurrence.categoryId
-              ? categoryMap.get(details.occurrence.categoryId)?.name ?? null
-              : null
-          }
-          ownerName={memberMap.get(details.occurrence.ownerId)?.name ?? "—"}
-          isOwn={canEditOcc(details.occurrence)}
-          task={
-            details.occurrence.taskId ? tasksById.get(details.occurrence.taskId) ?? null : null
-          }
-          taskDone={
-            details.occurrence.taskId
-              ? taskDoneById.get(details.occurrence.taskId) ?? false
-              : undefined
-          }
-          onEdit={() => {
-            const occ = details.occurrence;
-            setDetails(null);
-            openEdit(occ);
+          onOpenChange={(o) => {
+            if (!o) setEditingTask(null);
           }}
-          onDelete={() => {
-            const occ = details.occurrence;
-            setDetails(null);
-            onDeleteEvent(occ);
-          }}
-          onChangeColor={(c) => onChangeEventColor(details.occurrence, c)}
-          sharedContext={
-            details.occurrence.categoryId
-              ? categoryMap.get(details.occurrence.categoryId)?.ownerId === null
-              : false
-          }
-          onToggleEventShared={() => onToggleEventShared(details.occurrence)}
-          onCopyToMine={() => {
-            const occ = details.occurrence;
-            setDetails(null);
-            onCopyToMine(occ);
-          }}
-          onToggleTaskDone={
-            details.occurrence.taskId
-              ? () => onToggleTaskDone(details.occurrence.taskId!)
-              : undefined
-          }
+          mode="edit"
+          workspaceId={workspace.data.workspaceId}
+          currentMemberId={workspace.data.currentMember.id}
+          collectionId={editingTask.collectionId}
+          boards={(workspace.data.boards ?? [])
+            .filter((b) => b.collectionId === editingTask.collectionId)
+            .sort((a, b) => a.position - b.position)}
+          members={workspace.data.members}
+          categories={workspace.data.categories}
+          task={editingTask}
+          subtasks={childrenByParent.get(editingTask.id) ?? []}
         />
       )}
 

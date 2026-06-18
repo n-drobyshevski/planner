@@ -350,7 +350,8 @@ export function EventDialog(props: EventDialogProps) {
   return (
     <>
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-        <ResponsiveDialogContent>
+        {/* The title states the purpose; no separate description is needed. */}
+        <ResponsiveDialogContent aria-describedby={undefined}>
           <form.Subscribe selector={(s) => s.values.itemKind}>
             {(itemKind) => {
               const isContext = itemKind === "context";

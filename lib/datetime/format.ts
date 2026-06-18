@@ -111,6 +111,39 @@ export function formatOccurrenceWhen(
 }
 
 /**
+ * The same occurrence label as `formatOccurrenceWhen`, split into a primary line
+ * (the date) and a secondary line (the time range, or "All day") for the details
+ * view's two-line "when" hero. Timed occurrences that cross midnight have no
+ * clean split, so the whole label lands in `primary` and `secondary` is null.
+ */
+export function formatOccurrenceWhenParts(
+  start: number,
+  end: number,
+  allDay: boolean,
+  timeZone: string = localTimeZone(),
+  locale = "en",
+): { primary: string; secondary: string | null } {
+  if (allDay) {
+    const lastDay = end - 1; // exclusive end → inclusive last day
+    const allDayLabel = locale === "ru" ? "Весь день" : "All day";
+    const primary = isSameDay(start, lastDay, { in: tz("UTC") })
+      ? formatWeekdayDayMonth(start, "UTC", locale)
+      : `${formatDayMonth(start, "UTC", locale)} – ${formatDayMonth(lastDay, "UTC", locale)}`;
+    return { primary, secondary: allDayLabel };
+  }
+  if (isSameDay(start, end, { in: tz(timeZone) })) {
+    return {
+      primary: formatWeekdayDayMonth(start, timeZone, locale),
+      secondary: `${formatTime(start, timeZone)} – ${formatTime(end, timeZone)}`,
+    };
+  }
+  return {
+    primary: `${formatDayMonth(start, timeZone, locale)}, ${formatTime(start, timeZone)} – ${formatDayMonth(end, timeZone, locale)}, ${formatTime(end, timeZone)}`,
+    secondary: null,
+  };
+}
+
+/**
  * Human-friendly duration from milliseconds, rounded to the nearest minute:
  * "0m", "45m", "2h", "3h 30m" (en) / "0 мин", "2 ч 30 мин" (ru). Negative input
  * clamps to zero.

@@ -89,19 +89,18 @@ function ResponsiveDialogContent({
   ...props
 }: React.ComponentProps<typeof DialogContent>) {
   const isMobile = useResponsive();
-  const shell = cn(
-    "flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0",
-    className,
-  );
+  const base = "flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0";
   if (isMobile) {
     return (
-      <SheetContent side="bottom" className={shell} {...props}>
+      <SheetContent side="bottom" className={cn(base, className)} {...props}>
         {children}
       </SheetContent>
     );
   }
+  // Default desktop width is sm:max-w-lg, but a caller's className wins (e.g. a
+  // narrower sm:max-w-sm / sm:max-w-md) — twMerge resolves the later class.
   return (
-    <DialogContent className={cn(shell, "sm:max-w-lg")} {...props}>
+    <DialogContent className={cn(base, "sm:max-w-lg", className)} {...props}>
       {children}
     </DialogContent>
   );
