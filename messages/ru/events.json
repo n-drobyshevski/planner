@@ -12,7 +12,13 @@
     "changeColor": "Изменить цвет",
     "share": "Сделать общим",
     "makePersonal": "Сделать личным",
-    "copyToMyCalendar": "Скопировать в мой календарь"
+    "copyToMyCalendar": "Скопировать в мой календарь",
+    "you": "Вы",
+    "visibility": "Видимость",
+    "edited": "Изменено",
+    "inactive": "Неактивно",
+    "more": "Другие действия",
+    "duplicate": "Дублировать"
   },
   "taskStatus": {
     "open": "Открыто",
