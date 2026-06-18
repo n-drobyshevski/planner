@@ -52,6 +52,20 @@ export function TasksSkeleton() {
   );
 }
 
+/** A narrow column of list rows — the inbox's quiet list, pre-fill. */
+export function InboxSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-2xl space-y-4 p-3 sm:p-4">
+      <Skeleton className="h-7 w-32" />
+      <div className="space-y-2">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Skeleton key={i} className="h-14 w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** A row of stat cards over a chart block. */
 export function InsightsSkeleton() {
   return (

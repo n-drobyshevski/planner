@@ -278,7 +278,12 @@
     "nothingScheduled": "nothing scheduled",
     "dueNoTime": " — due, no time blocked",
     "optimizationDetails": "Optimization details",
-    "coverageBody": "of timed events in this period carry details ({withAttributes} of {tracked}). Set energy, flexibility, focus or satisfaction in any event or task dialog — suggestions get sharper as coverage grows.",
+    "coverageTitle": "Detail coverage",
+    "coverageBody": "{withAttributes} of {tracked} timed events this period carry a detail — energy, focus, flexibility or a rating. The more you add, the sharper these guides get.",
+    "coverageCatchUp": "Catch up in Inbox →",
+    "sectionAttention": "Attention",
+    "sectionReflection": "For reflection",
+    "howThisIsMeasured": "How this is measured",
     "nothingToOptimize": "Nothing to optimize",
     "nothingToOptimizeDescription": "This period looks balanced — no heavy days, short nights or stranded tasks stood out.",
     "allDismissed": "All suggestions for this period are dismissed.",
@@ -309,6 +314,7 @@
       "anomaly": "out-of-pattern tips",
       "forecastOverload": "outlook tips",
       "sleepDebt": "sleep tips",
+      "restWindow": "rest-window tips",
       "correlationInsight": "satisfaction tips"
     }
   },
@@ -411,6 +417,13 @@
       "evidenceSummary": "{short} of your last {total} logged nights were under 7h (average {avg}).",
       "evidenceThreshold": "Fires when 3 of the last 7 logged nights are under 7 hours.",
       "action": "Open the Sleep tab"
+    },
+    "restWindow": {
+      "title": "Room to breathe on {day}",
+      "body": "A heavy day, but your waking hours still leave a clear open stretch — enough to step away.",
+      "metaGap": "{duration} open from {time}",
+      "evidenceSummary": "{tracked} tracked on {day}; the largest open daytime stretch is {gap} from {time}.",
+      "evidenceThreshold": "Fires when a heavy day has an open waking-hours gap of an hour or more (the night window is excluded)."
     },
     "correlationInsight": {
       "title": "{name} keeps rating low",

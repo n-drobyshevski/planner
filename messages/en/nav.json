@@ -2,11 +2,13 @@
   "surface": {
     "calendar": "Calendar",
     "tasks": "Tasks",
+    "inbox": "Inbox",
     "insights": "Insights"
   },
   "switcher": {
     "ariaLabel": "Current surface: {surface}. Switch surface"
   },
+  "inboxCount": "{count, plural, one {# item needs attention} other {# items need attention}}",
   "userMenu": {
     "ariaLabel": "Profile menu",
     "signedInAs": "Signed in as {name}",

@@ -2,11 +2,13 @@
   "surface": {
     "calendar": "Календарь",
     "tasks": "Задачи",
+    "inbox": "Входящие",
     "insights": "Аналитика"
   },
   "switcher": {
     "ariaLabel": "Текущий раздел: {surface}. Сменить раздел"
   },
+  "inboxCount": "{count, plural, one {# дело требует внимания} few {# дела требуют внимания} many {# дел требуют внимания} other {# дела требуют внимания}}",
   "userMenu": {
     "ariaLabel": "Меню профиля",
     "signedInAs": "Ты вошёл как {name}",

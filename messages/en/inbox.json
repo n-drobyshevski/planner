@@ -1,0 +1,21 @@
+{
+  "title": "Inbox",
+  "subtitle": "A few quick things to close out.",
+  "allCaughtUp": "You're all caught up.",
+  "allCaughtUpHint": "Finished events, done tasks and last night's sleep land here to close out. Nothing waiting now.",
+  "rateEvent": {
+    "frame": "How was “{title}”?"
+  },
+  "rateTask": {
+    "frame": "How did “{title}” go?"
+  },
+  "logSleep": {
+    "frame": "How did you sleep on {date}?"
+  },
+  "endedAgo": "Ended {ago}",
+  "doneAgo": "Done {ago}",
+  "saveSleep": "Save",
+  "expand": "Open “{title}”",
+  "collapse": "Close “{title}”",
+  "srCount": "{count, plural, =0 {Inbox is empty} one {# item to close out} other {# items to close out}}"
+}

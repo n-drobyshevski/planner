@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTranslator } from "next-intl";
+import { TZDate } from "@date-fns/tz";
 
 import {
   attributeCoverage,
@@ -806,6 +807,112 @@ describe("correlation-insight rule", () => {
     expect(
       computeSuggestions(sparse).some((s) => s.kind === "correlation-insight"),
     ).toBe(false);
+  });
+});
+
+describe("rule: rest-window", () => {
+  // Waking hours 08:00–20:00 (night window 20:00 → 08:00).
+  const NIGHT = { startHour: 20, endHour: 8 };
+  // A heavy day (9h) split into a morning block and a late-afternoon block,
+  // leaving an open 13:00–16:00 stretch in waking hours.
+  function heavyWithMiddayGap(dayMs: number): Occurrence[] {
+    return [
+      occ({ start: dayMs + 9 * HOUR, end: dayMs + 13 * HOUR }), // 09:00–13:00
+      occ({ start: dayMs + 16 * HOUR, end: dayMs + 21 * HOUR }), // 16:00–21:00 (clipped to 20:00)
+    ];
+  }
+
+  it("names the largest open waking gap on a heavy day", () => {
+    const input = makeInput({ nightWindow: NIGHT });
+    input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = heavyWithMiddayGap(input.days[2]);
+    const out = computeSuggestions(input).filter((s) => s.kind === "rest-window");
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe("rest-window:2026-06-03");
+    expect(out[0].severity).toBe("info");
+    expect(out[0].dayMs).toBe(input.days[2]);
+    expect(out[0].meta?.[0]).toContain("13:00"); // gap starts at 13:00
+  });
+
+  it("stays silent without a night window", () => {
+    const input = makeInput(); // nightWindow absent
+    input.prevOccurrences = prevBaseline4h(input);
+    input.occurrences = heavyWithMiddayGap(input.days[2]);
+    expect(computeSuggestions(input).some((s) => s.kind === "rest-window")).toBe(false);
+  });
+
+  it("does not fire on a day that isn't heavy", () => {
+    const input = makeInput({ nightWindow: NIGHT });
+    input.prevOccurrences = prevBaseline4h(input); // 6h threshold
+    input.occurrences = [
+      occ({ start: input.days[2] + 9 * HOUR, end: input.days[2] + 11 * HOUR }), // 2h, light
+    ];
+    expect(computeSuggestions(input).some((s) => s.kind === "rest-window")).toBe(false);
+  });
+
+  it("ignores open time that falls inside the night window", () => {
+    // Waking = [08:00, 12:00); a block fills it, and the only free stretch is at
+    // night → no rest-window despite the day being heavy.
+    const input = makeInput({ nightWindow: { startHour: 12, endHour: 8 } });
+    input.prevOccurrences = prevBaseline4h(input);
+    const d = input.days[2];
+    input.occurrences = [
+      occ({ start: d + 8 * HOUR, end: d + 12 * HOUR }), // fills waking 08–12
+      occ({ start: d + 14 * HOUR, end: d + 22 * HOUR }), // 8h at night → overloads the day
+    ];
+    expect(computeSuggestions(input).some((s) => s.kind === "rest-window")).toBe(false);
+  });
+
+  it("does not fire when gaps stay under an hour", () => {
+    const input = makeInput({ nightWindow: NIGHT });
+    input.prevOccurrences = prevBaseline4h(input);
+    const d = input.days[2];
+    input.occurrences = [
+      occ({ start: d + 8 * HOUR, end: d + 13 * HOUR }), // 08:00–13:00
+      occ({ start: d + 13 * HOUR + 30 * 60_000, end: d + 20 * HOUR }), // 13:30–20:00 (30-min gap)
+    ];
+    expect(computeSuggestions(input).some((s) => s.kind === "rest-window")).toBe(false);
+  });
+
+  it("caps at two heavy days", () => {
+    const input = makeInput({ nightWindow: NIGHT });
+    input.prevOccurrences = input.prevDays.slice(0, 5).map((d) => dayLoad(d, 2));
+    input.occurrences = [
+      ...heavyWithMiddayGap(input.days[0]),
+      ...heavyWithMiddayGap(input.days[1]),
+      ...heavyWithMiddayGap(input.days[2]),
+    ];
+    const out = computeSuggestions(input).filter((s) => s.kind === "rest-window");
+    expect(out).toHaveLength(2);
+  });
+
+  it("computes the waking window in the viewer zone (Berlin)", () => {
+    const bDay = (n: number) => new TZDate(2026, 5, 1 + n, 0, 0, 0, BERLIN).getTime();
+    const days = [0, 1, 2, 3, 4, 5, 6].map(bDay);
+    const prevDays = [-7, -6, -5, -4, -3, -2, -1].map(bDay);
+    const d = days[2];
+    const input: SuggestionsInput = {
+      t,
+      locale: "en",
+      occurrences: [
+        occ({ start: d + 9 * HOUR, end: d + 13 * HOUR }), // 09:00–13:00 Berlin wall
+        occ({ start: d + 16 * HOUR, end: d + 21 * HOUR }), // 16:00–21:00 Berlin wall
+      ],
+      prevOccurrences: prevDays.slice(0, 5).map((pd) => dayLoad(pd, 4)),
+      tasks: [],
+      window: { start: days[0], end: bDay(7) },
+      prevWindow: { start: prevDays[0], end: days[0] },
+      days,
+      prevDays,
+      timeZone: BERLIN,
+      now: days[3] + HOUR,
+      categoryName: (id) => id ?? "Uncategorized",
+      nightWindow: NIGHT,
+    };
+    const out = computeSuggestions(input).filter((s) => s.kind === "rest-window");
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe("rest-window:2026-06-03");
+    expect(out[0].meta?.[0]).toContain("13:00"); // wall-clock start, not 11:00 UTC
   });
 });
 

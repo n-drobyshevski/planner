@@ -11,10 +11,9 @@ import {
   BedDouble,
   CalendarClock,
   ChevronDown,
-  CircleAlert,
+  Coffee,
   Flame,
   Gauge,
-  Info,
   Meh,
   MoonStar,
   Puzzle,
@@ -62,6 +61,7 @@ import {
   useUpdateInsightsPrefs,
 } from "@/lib/hooks/use-insights-prefs";
 import { useSleepLogs } from "@/lib/hooks/use-sleep-logs";
+import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { formatDuration } from "@/lib/datetime/format";
 import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { dateInputToMs, dateKeyInZone } from "@/lib/datetime/local";
@@ -122,6 +122,7 @@ const KIND_ICONS: Record<SuggestionKind, LucideIcon> = {
   anomaly: Activity,
   "forecast-overload": CalendarClock,
   "sleep-debt": BedDouble,
+  "rest-window": Coffee,
   "correlation-insight": Meh,
 };
 
@@ -139,6 +140,7 @@ const KIND_LABEL_KEYS: Record<SuggestionKind, string> = {
   anomaly: "optimize.kind.anomaly",
   "forecast-overload": "optimize.kind.forecastOverload",
   "sleep-debt": "optimize.kind.sleepDebt",
+  "rest-window": "optimize.kind.restWindow",
   "correlation-insight": "optimize.kind.correlationInsight",
 };
 
@@ -172,6 +174,10 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
     workspaceId || undefined,
     viewerId || undefined,
   );
+  // The viewer's night window feeds the rest-window rule (waking hours = the day
+  // minus the night window). Absent prefs → the rule stays silent.
+  const { data: workspace } = useWorkspace();
+  const sleepPrefs = workspace?.sleepPrefs ?? null;
   const { prefs } = useInsightsPrefs(workspaceId || undefined, viewerId || undefined);
   const updatePrefs = useUpdateInsightsPrefs(
     workspaceId || undefined,
@@ -264,8 +270,14 @@ export function OptimizeTab({ data }: { data: InsightsTabData }) {
       sleepPairs: buildSleepDayPairs(sleepLogs, occurrences, period.days, period.window, timeZone),
       suppressedKinds: new Set(suppressedKinds),
       periodLabel: period.label,
+      nightWindow: sleepPrefs
+        ? {
+            startHour: sleepPrefs.nightWindowStartHour,
+            endHour: sleepPrefs.nightWindowEndHour,
+          }
+        : null,
     });
-  }, [t, locale, occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goalsProgress, anomalies, streak, forecast, sleepLogs, suppressedKinds]);
+  }, [t, locale, occurrences, prevOccurrences, tasks, period, timeZone, now, categories, goalsProgress, anomalies, streak, forecast, sleepLogs, suppressedKinds, sleepPrefs]);
 
   const coverage = useMemo(() => attributeCoverage(occurrences), [occurrences]);
 
@@ -513,7 +525,7 @@ function CoverageCard({
   return (
     <div className="rounded-lg border bg-card p-3 shadow-soft">
       <div className="text-xs font-medium text-muted-foreground">
-        {t("optimize.optimizationDetails")}
+        {t("optimize.coverageTitle")}
       </div>
       <div className="mt-0.5 text-base leading-tight font-semibold tabular-nums">
         {pct}%
@@ -524,6 +536,14 @@ function CoverageCard({
           tracked: coverage.tracked,
         })}
       </p>
+      {coverage.share < 1 && (
+        <Link
+          href="/inbox"
+          className="mt-1.5 inline-flex items-center text-xs font-medium text-primary hover:underline"
+        >
+          {t("optimize.coverageCatchUp")}
+        </Link>
+      )}
     </div>
   );
 }
@@ -569,19 +589,42 @@ function SuggestionList({
     );
   }
 
+  // Two calm tiers: things to act on now ("Attention"), then reflective notes
+  // ("For reflection"). The engine already sorts attention-first and caps the
+  // list, so partitioning preserves order and the cap. The tier heading is the
+  // single, text-based severity signal — never color alone.
+  const attention = visible.filter((s) => s.severity === "attention");
+  const reflection = visible.filter((s) => s.severity === "info");
+  const renderCard = (s: Suggestion) => (
+    <SuggestionCard
+      key={s.id}
+      suggestion={s}
+      onDismiss={() => persist([...dismissed, s.id])}
+      onMute={() => onMute(s.kind)}
+    />
+  );
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       {visible.length > 0 ? (
-        <ul role="list" className="flex flex-col gap-2">
-          {visible.map((s) => (
-            <SuggestionCard
-              key={s.id}
-              suggestion={s}
-              onDismiss={() => persist([...dismissed, s.id])}
-              onMute={() => onMute(s.kind)}
-            />
-          ))}
-        </ul>
+        <>
+          {attention.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <SectionLabel>{t("optimize.sectionAttention")}</SectionLabel>
+              <ul role="list" className="flex flex-col gap-2">
+                {attention.map(renderCard)}
+              </ul>
+            </section>
+          )}
+          {reflection.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <SectionLabel>{t("optimize.sectionReflection")}</SectionLabel>
+              <ul role="list" className="flex flex-col gap-2">
+                {reflection.map(renderCard)}
+              </ul>
+            </section>
+          )}
+        </>
       ) : (
         <p className="px-1 py-6 text-center text-sm text-muted-foreground">
           {t("optimize.allDismissed")}
@@ -617,7 +660,6 @@ function SuggestionCard({
 }) {
   const t = useTranslations("insights");
   const KindIcon = KIND_ICONS[suggestion.kind];
-  const SeverityIcon = suggestion.severity === "attention" ? CircleAlert : Info;
   // "Useful" is a thank-you, not a database row — it acknowledges and stops.
   const [thanked, setThanked] = useState(false);
 
@@ -625,19 +667,13 @@ function SuggestionCard({
     <li className="flex items-start gap-3 rounded-lg border bg-card p-3 shadow-soft">
       <KindIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="text-sm font-medium">{suggestion.title}</span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-            <SeverityIcon aria-hidden className="size-3" />
-            {suggestion.severity === "attention" ? t("optimize.worthALook") : t("optimize.fyi")}
-          </span>
-        </div>
+        <div className="text-sm font-medium">{suggestion.title}</div>
         <p className="mt-0.5 text-sm text-muted-foreground">{suggestion.body}</p>
-        {suggestion.meta && suggestion.meta.length > 0 && (
-          <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-            {suggestion.meta.join(" · ")}
-          </p>
-        )}
+        {/* The grounded "why", in numbers, surfaced inline (not hidden) — this is
+            the line that ties the guidance to the actual data. */}
+        <p className="mt-0.5 text-sm text-foreground/75 tabular-nums">
+          {suggestion.evidence.summary}
+        </p>
 
         <Collapsible>
           <CollapsibleTrigger asChild>
@@ -646,7 +682,7 @@ function SuggestionCard({
               size="sm"
               className="group -ml-1.5 mt-1 min-h-11 px-1.5 text-xs text-muted-foreground sm:min-h-7"
             >
-              {t("optimize.whyAmISeeing")}
+              {t("optimize.howThisIsMeasured")}
               <ChevronDown
                 data-icon="inline-end"
                 className="transition-transform group-data-[state=open]:rotate-180"
@@ -655,10 +691,6 @@ function SuggestionCard({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <dl className="mt-1 space-y-1 rounded-md bg-muted/50 p-2.5 text-xs text-muted-foreground">
-              <div>
-                <dt className="sr-only">{t("optimize.dataBehind")}</dt>
-                <dd>{suggestion.evidence.summary}</dd>
-              </div>
               <div>
                 <dt className="sr-only">{t("optimize.whenThisFires")}</dt>
                 <dd>{suggestion.evidence.threshold}</dd>

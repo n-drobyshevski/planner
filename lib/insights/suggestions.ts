@@ -16,7 +16,7 @@
 // suppressed entirely for fully past periods.
 
 import { format } from "date-fns";
-import { tz } from "@date-fns/tz";
+import { tz, TZDate } from "@date-fns/tz";
 
 import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { computeUsage } from "@/lib/analytics/usage";
@@ -48,6 +48,10 @@ const OVERLOAD_ATTENTION_MS = 10 * HOUR;
 const OVERLOAD_TYPICAL_FACTOR = 1.5;
 const OVERLOAD_MIN_SAMPLE = 5;
 const REST_GAP_MS = 8 * HOUR;
+// Rest-window rule: on a heavy day, the smallest open daytime gap worth naming,
+// and how many heavy days to surface (mirrors the stranded-flexible cap).
+const REST_WINDOW_MIN_GAP_MS = 60 * 60_000;
+const REST_WINDOW_MAX = 2;
 const DRIFT_MIN_TOTAL_MS = 8 * HOUR;
 const DRIFT_MIN_SHARE = 0.15;
 const DRIFT_MIN_CATEGORY_MS = 3 * HOUR;
@@ -81,6 +85,7 @@ export type SuggestionKind =
   | "anomaly"
   | "forecast-overload"
   | "sleep-debt"
+  | "rest-window"
   | "correlation-insight";
 
 /** "Why am I seeing this" — the exact data behind a card, for the disclosure. */
@@ -156,6 +161,10 @@ export interface SuggestionsInput {
   sleepPairs?: SleepDayPair[] | null;
   /** Kinds the member muted via feedback; filtered out before the cap. */
   suppressedKinds?: ReadonlySet<string>;
+  /** The viewer's waking-day bounds, derived from MemberSleepPrefs: the night
+   *  window is [startHour evening → endHour wake-day], so waking hours are
+   *  [endHour, startHour). Absent → the rest-window rule stays silent. */
+  nightWindow?: { startHour: number; endHour: number } | null;
   /** Human label of the focused period, for evidence ("This week"). Falls
    *  back to the window's date range. */
   periodLabel?: string;
@@ -169,12 +178,13 @@ const KIND_PRIORITY: Record<SuggestionKind, number> = {
   "goal-under-budget": 4,
   "late-night": 5,
   "sleep-debt": 6,
-  "stranded-flexible": 7,
-  fragmentation: 8,
-  anomaly: 9,
-  "streak-broken": 10,
-  "category-drift": 11,
-  "correlation-insight": 12,
+  "rest-window": 7,
+  "stranded-flexible": 8,
+  fragmentation: 9,
+  anomaly: 10,
+  "streak-broken": 11,
+  "category-drift": 12,
+  "correlation-insight": 13,
 };
 
 export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
@@ -255,6 +265,77 @@ export function computeSuggestions(input: SuggestionsInput): Suggestion[] {
         href: calendarDayHref(d.dayMs),
       },
     });
+  }
+
+  // --- (a2) Rest windows on heavy days -------------------------------------
+  // On a genuinely heavy day, where does rest actually fit? Look only at WAKING
+  // hours — the day minus the configured night window [endHour, startHour) — and
+  // find the largest stretch with nothing tracked. Reuses the heavy-day set, so
+  // it never fires on an ordinary day. Reflective (info), factual, non-color.
+  if (input.nightWindow) {
+    const { startHour, endHour } = input.nightWindow;
+    let restCards = 0;
+    for (const d of overloadedDays) {
+      if (restCards >= REST_WINDOW_MAX) break;
+      if (endHour >= startHour) break; // misconfigured window → no waking span
+      const [y, mo, dd] = dateKeyInZone(d.dayMs, timeZone).split("-").map(Number);
+      const wakeStart = new TZDate(y, mo - 1, dd, endHour, 0, 0, timeZone).getTime();
+      const wakeEnd = new TZDate(y, mo - 1, dd, startHour, 0, 0, timeZone).getTime();
+      // Tracked blocks clipped to the waking window, scanned left to right; the
+      // running cursor absorbs overlaps so no pre-merge is needed.
+      const blocks = active
+        .filter((o) => o.start < wakeEnd && o.end > wakeStart)
+        .map((o) => ({
+          start: Math.max(o.start, wakeStart),
+          end: Math.min(o.end, wakeEnd),
+        }))
+        .sort((p, q) => p.start - q.start);
+      let cursor = wakeStart;
+      let bestGap = 0;
+      let bestStart = wakeStart;
+      for (const b of blocks) {
+        if (b.start - cursor > bestGap) {
+          bestGap = b.start - cursor;
+          bestStart = cursor;
+        }
+        cursor = Math.max(cursor, b.end);
+      }
+      if (wakeEnd - cursor > bestGap) {
+        bestGap = wakeEnd - cursor;
+        bestStart = cursor;
+      }
+      if (bestGap < REST_WINDOW_MIN_GAP_MS) continue;
+      restCards += 1;
+      const gapTime = format(bestStart, "HH:mm", { in: ctx });
+      out.push({
+        id: `rest-window:${dateKeyInZone(d.dayMs, timeZone)}`,
+        kind: "rest-window",
+        dayMs: d.dayMs,
+        severity: "info",
+        title: t("suggestions.restWindow.title", { day: dayLabel(d.dayMs) }),
+        body: t("suggestions.restWindow.body"),
+        meta: [
+          t("suggestions.restWindow.metaGap", {
+            duration: dur(bestGap),
+            time: gapTime,
+          }),
+        ],
+        evidence: {
+          summary: t("suggestions.restWindow.evidenceSummary", {
+            tracked: dur(d.ms),
+            day: dayLabel(d.dayMs),
+            gap: dur(bestGap),
+            time: gapTime,
+          }),
+          threshold: t("suggestions.restWindow.evidenceThreshold"),
+          windowLabel,
+        },
+        action: {
+          label: t("suggestions.actionSeeDay"),
+          href: calendarDayHref(d.dayMs),
+        },
+      });
+    }
   }
 
   // --- (f) Stranded movable items on those days ----------------------------
