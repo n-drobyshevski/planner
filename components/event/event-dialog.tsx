@@ -38,13 +38,25 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
-import { Lock, Eye, Trash2, Users, ChevronDown, Plus } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Lock,
+  Eye,
+  Trash2,
+  Users,
+  ChevronDown,
+  Plus,
+  CircleDashed,
+  CircleCheck,
+  CircleSlash,
+} from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { RecurrenceScopePrompt, type RecurrenceScope } from "./recurrence-scope-prompt";
-import { ColorField } from "@/components/shared/color-field";
+import { ColorSwatchPicker } from "@/components/shared/color-swatch-picker";
+import { toPaletteColor } from "@/lib/theme/appearance";
 import { AttributeFields } from "@/components/shared/attribute-fields";
 import { CreateContextDialog } from "@/components/shared/create-context-dialog";
 import {
@@ -98,6 +110,9 @@ export interface EventDialogProps {
   readOnly?: boolean;
   /** Owner's name, shown in the read-only banner. */
   ownerName?: string;
+  /** Owner's identity color (hex) — the fallback for the title swatch when the
+   *  item has no per-item override and no (coloured) context. */
+  ownerColor?: string;
   /**
    * Create mode: switch the create surface to another item kind. When set, the
    * type toggle gains a "Task" option; choosing it calls this so the parent can
@@ -123,6 +138,7 @@ export function EventDialog(props: EventDialogProps) {
     occurrence,
     readOnly = false,
     ownerName,
+    ownerColor,
   } = props;
   const t = useTranslations("events");
   const tc = useTranslations("common");
@@ -225,6 +241,20 @@ export function EventDialog(props: EventDialogProps) {
   );
   const [scopePrompt, setScopePrompt] = useState<null | "edit" | "delete">(null);
   const [creatingContext, setCreatingContext] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
+
+  // The dot shown beside the title: the per-item override if set, else the
+  // chosen context's colour, else the owner's identity colour — matching how the
+  // event block on the grid resolves its colour. `null` renders a hollow "default"
+  // dot (we have no owner colour to fall back to).
+  function resolveColor(color: string | null, categoryId: string): string | null {
+    if (color) return color;
+    if (categoryId !== "none") {
+      const cat = categories.find((c) => c.id === categoryId);
+      if (cat) return cat.color;
+    }
+    return ownerColor ?? null;
+  }
 
   // Re-initialize when (re)opened for a different event/slot.
   useEffect(() => {
@@ -416,46 +446,95 @@ export function EventDialog(props: EventDialogProps) {
                   )}
                   <fieldset disabled={readOnly} className="contents">
                   <FieldGroup>
-                    {/* Title — prominent, borderless */}
-                    <form.Field name="title">
-                      {(field) => {
-                        const isInvalid =
-                          field.state.meta.isTouched && !field.state.meta.isValid;
-                        return (
-                          <Field data-invalid={isInvalid || undefined}>
-                            <Input
-                              id="ev-title"
-                              value={field.state.value}
-                              onChange={(e) => field.handleChange(e.target.value)}
-                              onBlur={field.handleBlur}
-                              placeholder={
-                                isContext
-                                  ? t("dialog.titlePlaceholderContext")
-                                  : t("dialog.titlePlaceholderEvent")
-                              }
-                              aria-label={
-                                isContext ? t("dialog.titleAriaContext") : t("dialog.titleAriaEvent")
-                              }
-                              aria-invalid={isInvalid || undefined}
-                              autoFocus
-                              className="h-auto border-0 bg-transparent px-0 py-1 text-lg font-medium md:text-lg shadow-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-transparent"
-                            />
-                            {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                          </Field>
-                        );
-                      }}
-                    </form.Field>
+                    {/* Title — a colour swatch (the item's resolved colour, click to
+                        override) beside a prominent borderless input. Mirrors the
+                        details card header and the event block on the grid. */}
+                    <div className="flex items-start gap-2.5">
+                      <form.Subscribe
+                        selector={(s) => ({
+                          color: s.values.color,
+                          categoryId: s.values.categoryId,
+                        })}
+                      >
+                        {({ color, categoryId }) => {
+                          const resolved = resolveColor(color, categoryId);
+                          return (
+                            <Popover open={colorOpen} onOpenChange={setColorOpen}>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  aria-label={t("dialog.color")}
+                                  className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                                >
+                                  <span
+                                    aria-hidden
+                                    className={`size-3.5 rounded-full ${
+                                      resolved ? "" : "border bg-background"
+                                    }`}
+                                    style={
+                                      resolved
+                                        ? { backgroundColor: toPaletteColor(resolved) }
+                                        : undefined
+                                    }
+                                  />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent align="start" className="w-auto p-2">
+                                <ColorSwatchPicker
+                                  value={color}
+                                  onSelect={(c) => {
+                                    form.setFieldValue("color", c);
+                                    setColorOpen(false);
+                                  }}
+                                  className="max-w-44"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          );
+                        }}
+                      </form.Subscribe>
 
-                    {/* When — schedule card grouping all-day + start/end */}
+                      <form.Field name="title">
+                        {(field) => {
+                          const isInvalid =
+                            field.state.meta.isTouched && !field.state.meta.isValid;
+                          return (
+                            <div className="flex flex-1 flex-col gap-1">
+                              <Input
+                                id="ev-title"
+                                value={field.state.value}
+                                onChange={(e) => field.handleChange(e.target.value)}
+                                onBlur={field.handleBlur}
+                                placeholder={
+                                  isContext
+                                    ? t("dialog.titlePlaceholderContext")
+                                    : t("dialog.titlePlaceholderEvent")
+                                }
+                                aria-label={
+                                  isContext ? t("dialog.titleAriaContext") : t("dialog.titleAriaEvent")
+                                }
+                                aria-invalid={isInvalid || undefined}
+                                autoFocus
+                                className="h-auto border-0 bg-transparent px-0 py-1 text-lg font-medium md:text-lg shadow-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-transparent"
+                              />
+                              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                            </div>
+                          );
+                        }}
+                      </form.Field>
+                    </div>
+
+                    {/* When — start / end. De-boxed: just the label + rows, and
+                        all-day simply drops the time fields (no phantom spacer). */}
                     <form.Subscribe selector={(s) => s.values.allDay}>
                       {(allDay) => (
-                        <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
+                        <div className="flex flex-col gap-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-muted-foreground">{t("dialog.when")}</span>
+                            <FieldLabel>{t("dialog.when")}</FieldLabel>
                             {!isContext && (
                               <label
                                 htmlFor="ev-allday"
-                                className="flex cursor-pointer items-center gap-2 text-sm"
+                                className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
                               >
                                 <span>{t("dialog.allDay")}</span>
                                 <form.Field name="allDay">
@@ -471,57 +550,59 @@ export function EventDialog(props: EventDialogProps) {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-[3rem_1fr_auto] items-center gap-2">
-                            <span className="text-sm text-muted-foreground">{t("dialog.start")}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="w-9 shrink-0 text-sm text-muted-foreground">
+                              {t("dialog.start")}
+                            </span>
                             <form.Field name="startDate">
                               {(field) => (
                                 <DatePicker
                                   value={field.state.value}
                                   onChange={field.handleChange}
                                   aria-label={t("dialog.startDate")}
+                                  className="flex-1"
                                 />
                               )}
                             </form.Field>
-                            {!allDay ? (
+                            {!allDay && (
                               <form.Field name="startTime">
                                 {(field) => (
                                   <TimeField
                                     value={field.state.value}
                                     onChange={field.handleChange}
                                     aria-label={t("dialog.startTime")}
-                                    className="w-28"
+                                    className="w-28 shrink-0"
                                   />
                                 )}
                               </form.Field>
-                            ) : (
-                              <span className="w-28" aria-hidden />
                             )}
                           </div>
 
-                          <div className="grid grid-cols-[3rem_1fr_auto] items-center gap-2">
-                            <span className="text-sm text-muted-foreground">{t("dialog.end")}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="w-9 shrink-0 text-sm text-muted-foreground">
+                              {t("dialog.end")}
+                            </span>
                             <form.Field name="endDate">
                               {(field) => (
                                 <DatePicker
                                   value={field.state.value}
                                   onChange={field.handleChange}
                                   aria-label={t("dialog.endDate")}
+                                  className="flex-1"
                                 />
                               )}
                             </form.Field>
-                            {!allDay ? (
+                            {!allDay && (
                               <form.Field name="endTime">
                                 {(field) => (
                                   <TimeField
                                     value={field.state.value}
                                     onChange={field.handleChange}
                                     aria-label={t("dialog.endTime")}
-                                    className="w-28"
+                                    className="w-28 shrink-0"
                                   />
                                 )}
                               </form.Field>
-                            ) : (
-                              <span className="w-28" aria-hidden />
                             )}
                           </div>
 
@@ -538,60 +619,78 @@ export function EventDialog(props: EventDialogProps) {
                       )}
                     </form.Subscribe>
 
-                    {/* Filing + sharing — how the item is categorised and who sees it. */}
+                    {/* Filing + sharing — how the item is categorised, its state, and who sees it. */}
                     <FieldSection>
-                    {/* Context + Color — paired row */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <form.Field name="categoryId">
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="ev-context">{t("dialog.context")}</FieldLabel>
-                            <Select
-                              value={field.state.value}
-                              onValueChange={(v) =>
-                                v === CREATE_CONTEXT_VALUE
-                                  ? setCreatingContext(true)
-                                  : field.handleChange(v)
-                              }
-                            >
-                              <SelectTrigger id="ev-context">
-                                <SelectValue placeholder={t("dialog.noContext")} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectGroup>
-                                  <SelectItem value="none">{t("dialog.noContext")}</SelectItem>
-                                  {usableCategories.map((c) => (
-                                    <SelectItem key={c.id} value={c.id}>
-                                      {c.name}
-                                    </SelectItem>
-                                  ))}
-                                  <SelectItem
-                                    value={CREATE_CONTEXT_VALUE}
-                                    className="text-muted-foreground"
-                                  >
-                                    <Plus className="size-4" />
-                                    {t("dialog.createContext")}
+                    {/* Context — full width (colour now lives beside the title). */}
+                    <form.Field name="categoryId">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor="ev-context">{t("dialog.context")}</FieldLabel>
+                          <Select
+                            value={field.state.value}
+                            onValueChange={(v) =>
+                              v === CREATE_CONTEXT_VALUE
+                                ? setCreatingContext(true)
+                                : field.handleChange(v)
+                            }
+                          >
+                            <SelectTrigger id="ev-context">
+                              <SelectValue placeholder={t("dialog.noContext")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectItem value="none">{t("dialog.noContext")}</SelectItem>
+                                {usableCategories.map((c) => (
+                                  <SelectItem key={c.id} value={c.id}>
+                                    {c.name}
                                   </SelectItem>
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
-                          </Field>
-                        )}
-                      </form.Field>
+                                ))}
+                                <SelectItem
+                                  value={CREATE_CONTEXT_VALUE}
+                                  className="text-muted-foreground"
+                                >
+                                  <Plus className="size-4" />
+                                  {t("dialog.createContext")}
+                                </SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      )}
+                    </form.Field>
 
-                      <form.Field name="color">
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="ev-color">{t("dialog.color")}</FieldLabel>
-                            <ColorField
-                              id="ev-color"
-                              value={field.state.value}
-                              onChange={field.handleChange}
-                            />
-                          </Field>
-                        )}
-                      </form.Field>
-                    </div>
+                    {/* Status — promoted to a primary control. "Is this settled or
+                        pencilled in?" is a real coordination signal. Each state carries
+                        a non-colour cue (dotted / check / slash), matching the grid:
+                        planned = dotted outline, cancelled = struck-through stripes. */}
+                    <form.Field name="status">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel>{t("dialog.status")}</FieldLabel>
+                          <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
+                            value={field.state.value}
+                            onValueChange={(v) => v && field.handleChange(v as EventStatus)}
+                            className="flex-wrap justify-start"
+                          >
+                            <ToggleGroupItem value="planned">
+                              <CircleDashed data-icon="inline-start" />
+                              {t("dialog.statusPlanned")}
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="confirmed">
+                              <CircleCheck data-icon="inline-start" />
+                              {t("dialog.statusConfirmed")}
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="cancelled">
+                              <CircleSlash data-icon="inline-start" />
+                              {t("dialog.statusCancelled")}
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                        </Field>
+                      )}
+                    </form.Field>
 
                     {/* Sharing — or shared-context banner */}
                     <form.Subscribe selector={(s) => deriveSharing(s.values).sharedContext}>
@@ -613,7 +712,7 @@ export function EventDialog(props: EventDialogProps) {
                                   onValueChange={(v) =>
                                     v && field.handleChange(v as EventVisibility)
                                   }
-                                  className="justify-start"
+                                  className="flex-wrap justify-start"
                                 >
                                   <ToggleGroupItem value="private">
                                     <Lock data-icon="inline-start" />
@@ -663,25 +762,6 @@ export function EventDialog(props: EventDialogProps) {
                         </Button>
                       </CollapsibleTrigger>
                       <CollapsibleContent className="flex flex-col gap-4 pt-4">
-                        <form.Field name="status">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel>{t("dialog.status")}</FieldLabel>
-                              <ToggleGroup
-                                type="single"
-                                variant="outline"
-                                value={field.state.value}
-                                onValueChange={(v) => v && field.handleChange(v as EventStatus)}
-                                className="justify-start"
-                              >
-                                <ToggleGroupItem value="planned">{t("dialog.statusPlanned")}</ToggleGroupItem>
-                                <ToggleGroupItem value="confirmed">{t("dialog.statusConfirmed")}</ToggleGroupItem>
-                                <ToggleGroupItem value="cancelled">{t("dialog.statusCancelled")}</ToggleGroupItem>
-                              </ToggleGroup>
-                            </Field>
-                          )}
-                        </form.Field>
-
                         <form.Field name="location">
                           {(field) => (
                             <Field>
@@ -856,7 +936,6 @@ export function EventDialog(props: EventDialogProps) {
  */
 function hasAdvanced(values: EventFormValues): boolean {
   return (
-    values.status !== "confirmed" ||
     values.inactive ||
     values.location.trim() !== "" ||
     values.description.trim() !== "" ||

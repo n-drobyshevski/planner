@@ -1219,6 +1219,11 @@ export function CalendarShell({
               ? memberMap.get(editor.event.ownerId)?.name
               : undefined
           }
+          ownerColor={
+            editor.mode === "edit"
+              ? memberMap.get(editor.event.ownerId)?.color
+              : workspace.data.currentMember.color
+          }
         />
       )}
 
