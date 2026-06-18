@@ -45,7 +45,7 @@ describe("AttributeFields", () => {
         idPrefix="t"
       />,
     );
-    fireEvent.click(screen.getByRole("radio", { name: "Satisfaction 4 of 5" }));
+    fireEvent.click(screen.getByRole("radio", { name: "4 Great" }));
     expect(onChange).toHaveBeenCalledWith({ mood: "calm", satisfaction: 4 });
   });
 });

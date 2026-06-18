@@ -58,23 +58,17 @@ export function AttributeFields({
               }
             >
               {meta.options.map((opt) => {
-                // Satisfaction options are bare numbers (1–5): keep them as-is and
-                // use the existing "Satisfaction N of 5" aria. The rest localize.
-                const optLabel =
-                  meta.key === "satisfaction"
-                    ? opt.label
-                    : ta(`attributes.${meta.key}.options.${opt.value}`);
+                // Every scale renders number + word from the shared `common`
+                // catalog (e.g. "3 Good"), which doubles as the option's
+                // accessible name — meaning never rides on position alone.
+                const optLabel = ta(`attributes.${meta.key}.options.${opt.value}`);
                 return (
                   <ToggleGroupItem
                     key={opt.value}
                     value={opt.value}
                     // 44px touch targets on touch screens, existing desktop density.
                     className="min-h-11 px-3 tabular-nums sm:min-h-9"
-                    aria-label={
-                      meta.key === "satisfaction"
-                        ? t("attributes.satisfactionAriaLabel", { label: opt.label })
-                        : optLabel
-                    }
+                    aria-label={optLabel}
                   >
                     {optLabel}
                   </ToggleGroupItem>

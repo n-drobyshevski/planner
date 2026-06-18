@@ -5,29 +5,11 @@ import { useTranslations } from "next-intl";
 
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { TimeField } from "@/components/ui/time-field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/**
- * The nine Karolinska Sleepiness Scale options chunked into three scan-friendly
- * bands. Labels (band + per-value descriptor) are resolved at render time via
- * the "sleep" namespace ("kssBand.*", "kss.1".."kss.9"); the numeric values are
- * the scale and never change.
- */
-const KSS_BANDS: { labelKey: string; values: number[] }[] = [
-  { labelKey: "kssBand.alert", values: [1, 2, 3] },
-  { labelKey: "kssBand.inBetween", values: [4, 5, 6] },
-  { labelKey: "kssBand.sleepy", values: [7, 8, 9] },
-];
+/** The two 1–4 scales (quality, tiredness) share one segmented layout. */
+const SCALE_LEVELS = [1, 2, 3, 4] as const;
 
 /** One night's form values; empty string / null = not provided. */
 export interface SleepLogDraft {
@@ -97,9 +79,9 @@ export function draftToInstants(
 
 /**
  * Shared quality/fatigue/times/note fields for the morning check-in card and
- * the backfill dialog. Quality is a 1..5 segmented control (tap again to
- * clear); fatigue is a select with KSS labels — nine 44px toggle items don't
- * fit a phone, and the labels carry the scale's meaning.
+ * the backfill dialog. Quality and tiredness are twin 1..4 segmented controls
+ * (number + word per level, tap the selected one again to clear) — four levels
+ * fit a phone where the old nine-point sleepiness scale needed a select.
  */
 export function SleepLogFields({
   draft,
@@ -128,14 +110,14 @@ export function SleepLogFields({
             onChange({ ...draft, quality: v === "" ? null : Number(v) })
           }
         >
-          {[1, 2, 3, 4, 5].map((n) => (
+          {SCALE_LEVELS.map((n) => (
             <ToggleGroupItem
               key={n}
               value={String(n)}
               className="min-h-11 px-3 tabular-nums pointer-fine:min-h-9"
-              aria-label={t("fields.qualityItemAriaLabel", { n })}
+              aria-label={t(`fields.qualityOptions.${n}`)}
             >
-              {n}
+              {t(`fields.qualityOptions.${n}`)}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -144,28 +126,29 @@ export function SleepLogFields({
 
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-fatigue`}>{t("fields.fatigue")}</FieldLabel>
-        <Select
+        <ToggleGroup
+          id={`${idPrefix}-fatigue`}
+          type="single"
+          variant="outline"
+          aria-label={t("fields.fatigueAriaLabel")}
+          className="flex-wrap justify-start"
           value={draft.fatigue !== null ? String(draft.fatigue) : ""}
-          onValueChange={(v) => onChange({ ...draft, fatigue: Number(v) })}
+          onValueChange={(v) =>
+            onChange({ ...draft, fatigue: v === "" ? null : Number(v) })
+          }
         >
-          <SelectTrigger id={`${idPrefix}-fatigue`} className="w-full">
-            <SelectValue placeholder={tCommon("optional")} />
-          </SelectTrigger>
-          {/* popper: nine tall items must drop below the trigger, not blanket
-              the form they belong to (one-handed mobile check-in) */}
-          <SelectContent position="popper">
-            {KSS_BANDS.map((band) => (
-              <SelectGroup key={band.labelKey}>
-                <SelectLabel>{t(band.labelKey)}</SelectLabel>
-                {band.values.map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    <span className="tabular-nums">{n}</span> — {t(`kss.${n}`)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+          {SCALE_LEVELS.map((n) => (
+            <ToggleGroupItem
+              key={n}
+              value={String(n)}
+              className="min-h-11 px-3 tabular-nums pointer-fine:min-h-9"
+              aria-label={t(`fields.fatigueOptions.${n}`)}
+            >
+              {t(`fields.fatigueOptions.${n}`)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <FieldDescription>{t("fields.fatigueDescription")}</FieldDescription>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">

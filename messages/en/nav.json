@@ -55,7 +55,6 @@
     "default": "Default"
   },
   "attributes": {
-    "clearHint": "All optional — tap a selected option again to clear it.",
-    "satisfactionAriaLabel": "Satisfaction {label} of 5"
+    "clearHint": "All optional — tap a selected option again to clear it."
   }
 }

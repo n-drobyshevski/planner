@@ -765,7 +765,7 @@ describe("sleep-debt rule (viewer-only)", () => {
 });
 
 describe("correlation-insight rule", () => {
-  it("flags the lowest-rated context at ≤2.5 mean over 5+ rated items", () => {
+  it("flags the lowest-rated context at ≤2.0 mean over 5+ rated items", () => {
     const input = makeInput();
     input.occurrences = Array.from({ length: 5 }, (_, i) =>
       occ({

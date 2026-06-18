@@ -99,14 +99,14 @@ describe("buildSleepDayPairs", () => {
     const tue = T0 + DAY;
     const logs = [log({ date: "2026-06-02" })];
     const occurrences = [
-      // 3h @2 and 1h @5 on Tuesday → (3·2 + 1·5)/4 = 2.75.
+      // 3h @2 and 1h @4 on Tuesday → (3·2 + 1·4)/4 = 2.5.
       occ({ start: tue + 9 * HOUR, end: tue + 12 * HOUR, attributes: { satisfaction: 2 } }),
-      occ({ start: tue + 13 * HOUR, end: tue + 14 * HOUR, attributes: { satisfaction: 5 } }),
+      occ({ start: tue + 13 * HOUR, end: tue + 14 * HOUR, attributes: { satisfaction: 4 } }),
       // Crosses midnight into Wednesday — only the Tuesday hour counts.
       occ({ start: tue + 23 * HOUR, end: tue + DAY + 2 * HOUR }),
     ];
     const [pair] = buildSleepDayPairs(logs, occurrences, days(7), win(7), UTC);
-    expect(pair.nextDay.meanSatisfaction).toBe(2.75);
+    expect(pair.nextDay.meanSatisfaction).toBe(2.5);
     expect(pair.nextDay.trackedMs).toBe(5 * HOUR);
   });
 
@@ -128,8 +128,8 @@ describe("buildSleepDayPairs", () => {
 
   it("skips logs whose wake date is outside the window and ignores inactive blocks", () => {
     const logs = [
-      log({ date: "2026-05-31", quality: 5 }), // before the window
-      log({ date: "2026-06-08", quality: 5 }), // at the exclusive end
+      log({ date: "2026-05-31", quality: 4 }), // before the window
+      log({ date: "2026-06-08", quality: 4 }), // at the exclusive end
       log({ date: "2026-06-01", quality: 3 }),
     ];
     const occurrences = [
@@ -188,7 +188,7 @@ describe("sleepCorrelations", () => {
     const pairs = Array.from({ length: 10 }, (_, i) =>
       pair({
         durationMs: i < 9 ? (6 + i) * HOUR : null,
-        quality: ((i % 5) + 1),
+        quality: ((i % 4) + 1),
         trackedMs: (i + 1) * HOUR,
       }),
     );
@@ -209,7 +209,7 @@ describe("sleepCorrelations", () => {
       pair({
         durationMs: (5 + i) * HOUR,
         trackedMs: (i + 1) * (i + 1) * HOUR,
-        meanSatisfaction: 5 - i * 0.3,
+        meanSatisfaction: 4 - i * 0.2,
       }),
     );
     const out = sleepCorrelations(pairs);

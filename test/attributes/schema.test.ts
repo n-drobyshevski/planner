@@ -32,7 +32,7 @@ describe("parseAttributes", () => {
 
   it("drops an invalid known key but keeps valid siblings and unknown keys", () => {
     const parsed = parseAttributes({
-      energy: 5, // invalid (1..3)
+      energy: 5, // invalid (1..4)
       flexibility: "rigid", // invalid enum
       focus: "deep",
       mood: "calm", // unknown key from a future client
@@ -64,8 +64,8 @@ describe("setAttribute", () => {
   });
 
   it("preserves unknown keys", () => {
-    const next = setAttribute({ mood: "calm" } as ItemAttributes, "satisfaction", 5);
-    expect(next).toEqual({ mood: "calm", satisfaction: 5 });
+    const next = setAttribute({ mood: "calm" } as ItemAttributes, "satisfaction", 4);
+    expect(next).toEqual({ mood: "calm", satisfaction: 4 });
   });
 });
 
@@ -92,7 +92,7 @@ describe("attributesEqual", () => {
   it("detects differences and missing keys", () => {
     expect(attributesEqual({ energy: 2 }, { energy: 3 })).toBe(false);
     expect(attributesEqual({ energy: 2 }, {})).toBe(false);
-    expect(attributesEqual({}, { satisfaction: 5 })).toBe(false);
+    expect(attributesEqual({}, { satisfaction: 4 })).toBe(false);
   });
 });
 

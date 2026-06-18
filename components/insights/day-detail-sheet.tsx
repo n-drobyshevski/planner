@@ -32,7 +32,7 @@ function clippedMs(o: Occurrence, dayStart: number, dayEnd: number): number {
   return Math.max(0, Math.min(o.end, dayEnd) - Math.max(o.start, dayStart));
 }
 
-/** Compact attribute chips, e.g. "Energy: 2 Medium · Focus: Deep". `ta` is the
+/** Compact attribute chips, e.g. "Energy: 2 Steady · Focus: Deep". `ta` is the
  *  `common` translator (attribute labels/options live there, shared with the editor). */
 function attributeChips(
   o: Occurrence,
@@ -42,11 +42,7 @@ function attributeChips(
   for (const meta of ATTRIBUTE_META) {
     const value = o.attributes[meta.key];
     if (value === undefined) continue;
-    const option = meta.options.find((opt) => opt.value === String(value));
-    const optLabel =
-      meta.key === "satisfaction"
-        ? (option?.label ?? String(value))
-        : ta(`attributes.${meta.key}.options.${String(value)}`);
+    const optLabel = ta(`attributes.${meta.key}.options.${String(value)}`);
     chips.push(`${ta(`attributes.${meta.key}.label`)}: ${optLabel}`);
   }
   return chips;

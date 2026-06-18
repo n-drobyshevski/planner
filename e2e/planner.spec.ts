@@ -18,6 +18,30 @@ test("privacy: Sam can see their own private event", async ({ page }) => {
   await expect(page.getByText("Standup").first()).toBeVisible();
 });
 
+// Regression: sign-in must seed the `planner-appearance` cookie server-side so
+// the first authed paint uses the member's real accent. Without it, the static
+// shell paints the default accent and the client reconcile repaints it — the
+// "accent color-splash" on load. The pre-paint script then applies the cookie,
+// so <html data-accent> must already match the cookie's accent (not lag it).
+test("sign-in seeds the appearance cookie (no accent color-splash)", async ({
+  page,
+  context,
+}) => {
+  await signIn(page, "Alex");
+
+  const appearance = (await context.cookies()).find(
+    (c) => c.name === "planner-appearance",
+  );
+  expect(appearance, "appearance cookie set at sign-in").toBeTruthy();
+
+  const [cookieAccent] = appearance!.value.split("~");
+  expect(cookieAccent).toBeTruthy();
+  const paintedAccent = await page.evaluate(() =>
+    document.documentElement.getAttribute("data-accent"),
+  );
+  expect(paintedAccent).toBe(cookieAccent);
+});
+
 test("create then delete an event", async ({ page }, testInfo) => {
   await signIn(page, "Alex");
   const title = `E2E-${testInfo.testId}`;

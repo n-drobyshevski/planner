@@ -204,7 +204,7 @@
     "deepWorkHint": "of {ms} focus-rated time",
     "deepWorkEmptyHint": "rate focus on events to track this",
     "bestTimeOfDay": "Best time of day",
-    "bestTimeHint": "satisfaction {mean}/5 · n {n}",
+    "bestTimeHint": "satisfaction {mean}/4 · n {n}",
     "needsRatings": "needs {min}+ rated items",
     "toughestTimeOfDay": "Toughest time of day",
     "energyLevel": "Energy level",
@@ -259,7 +259,7 @@
     "pts": "{points} pts",
     "satisfactionByContext": "Satisfaction by context",
     "satisfactionEmpty": "Rate satisfaction on at least {min} events in a context to see which parts of your time feel best, looking back.",
-    "satisfactionAria": "{name}: mean satisfaction {mean} of 5, from {n} rated items"
+    "satisfactionAria": "{name}: mean satisfaction {mean} of 4, from {n} rated items"
   },
   "optimize": {
     "muted": "Muted: {label}",
@@ -414,11 +414,11 @@
     },
     "correlationInsight": {
       "title": "{name} keeps rating low",
-      "body": "Time in {name} averaged {mean} of 5 satisfaction — worth a look at what makes it drag.",
-      "metaMean": "{mean}/5",
+      "body": "Time in {name} averaged {mean} of 4 satisfaction — worth a look at what makes it drag.",
+      "metaMean": "{mean}/4",
       "metaN": "n {n}",
-      "evidenceSummary": "{n, plural, one {# rated item} other {# rated items}} in {name} average {mean} of 5, duration-weighted. A pattern, not a cause — only you know why.",
-      "evidenceThreshold": "Fires when a context's duration-weighted satisfaction averages ≤2.5 of 5 over at least {min} rated items."
+      "evidenceSummary": "{n, plural, one {# rated item} other {# rated items}} in {name} average {mean} of 4, duration-weighted. A pattern, not a cause — only you know why.",
+      "evidenceThreshold": "Fires when a context's duration-weighted satisfaction averages ≤2.0 of 4 over at least {min} rated items."
     }
   },
   "digest": {

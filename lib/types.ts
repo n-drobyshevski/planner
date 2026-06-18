@@ -108,7 +108,7 @@ export interface MemberSleepPrefs {
  * A member's sleep log for one night, keyed by the WAKE date (`date` is a
  * zone-free yyyy-MM-dd token). Member-private under RLS: the partner can
  * never read these rows. `bedtimeAt`/`wokeAt` are optional real instants;
- * `quality` is 1..5, `fatigue` is a simplified 1..9 Karolinska scale.
+ * `quality` is 1..4 (poor→great), `fatigue` is 1..4 (alert→exhausted).
  */
 export interface SleepLog {
   id: string;

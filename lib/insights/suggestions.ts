@@ -65,7 +65,7 @@ const STREAK_NOTABLE_DAYS = 5;
 const SLEEP_SHORT_NIGHT_MS = 7 * HOUR;
 const SLEEP_RECENT_NIGHTS = 7;
 const SLEEP_SHORT_COUNT = 3;
-const SATISFACTION_LOW_MEAN = 2.5;
+const SATISFACTION_LOW_MEAN = 2.0;
 const TOTAL_CAP = 8;
 
 export type SuggestionKind =

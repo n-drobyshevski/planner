@@ -68,7 +68,7 @@ export function satisfactionByCategory(
 export interface EnergyDayLoad {
   /** start-of-day epoch ms (matches a getVisibleDays entry) */
   dayMs: number;
-  /** Σ clipped ms × energy (1..3) over energy-rated occurrences */
+  /** Σ clipped ms × energy (1..4) over energy-rated occurrences */
   weightedMs: number;
   /** clipped ms of energy-rated occurrences */
   ratedMs: number;

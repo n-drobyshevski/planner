@@ -27,7 +27,7 @@
     "energy": {
       "label": "Energy",
       "description": "How demanding this is.",
-      "options": { "1": "1 Low", "2": "2 Medium", "3": "3 High" }
+      "options": { "1": "1 Low", "2": "2 Steady", "3": "3 High", "4": "4 Peak" }
     },
     "flexibility": {
       "label": "Flexibility",
@@ -41,7 +41,8 @@
     },
     "satisfaction": {
       "label": "Satisfaction",
-      "description": "How it felt, looking back."
+      "description": "How it felt, looking back.",
+      "options": { "1": "1 Poor", "2": "2 Okay", "3": "3 Good", "4": "4 Great" }
     }
   }
 }

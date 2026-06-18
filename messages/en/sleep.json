@@ -50,12 +50,12 @@
   },
   "history": {
     "label": "Morning check-ins",
-    "srAvgQuality": "Average sleep quality {value} of 5 across {count, plural, one {# morning} other {# mornings}}",
-    "srAvgSleepiness": "average sleepiness {value} of 9 across {count, plural, one {# morning} other {# mornings}}",
-    "chartAriaLabel": "Sleep quality and morning sleepiness per night",
-    "qualityLabel": "Quality (1–5)",
-    "sleepinessLabel": "Sleepiness (1–9)",
-    "legend": "Solid line: quality (higher is better) · dashed: sleepiness (lower is better)",
+    "srAvgQuality": "Average sleep quality {value} of 4 across {count, plural, one {# morning} other {# mornings}}",
+    "srAvgSleepiness": "average tiredness {value} of 4 across {count, plural, one {# morning} other {# mornings}}",
+    "chartAriaLabel": "Sleep quality and morning tiredness per night",
+    "qualityLabel": "Quality (1–4)",
+    "sleepinessLabel": "Tiredness (1–4)",
+    "legend": "Solid line: quality (higher is better) · dashed: tiredness (lower is better)",
     "empty": "Rate how you slept in the morning check-in and your quality and sleepiness trends will show here, night over night."
   },
   "hints": {
@@ -106,30 +106,17 @@
   "fields": {
     "quality": "Sleep quality",
     "qualityAriaLabel": "Sleep quality",
-    "qualityItemAriaLabel": "Quality {n} of 5",
-    "qualityDescription": "1 = poor, 5 = great — tap again to clear.",
-    "fatigue": "How awake do you feel?",
+    "qualityOptions": { "1": "1 Poor", "2": "2 Fair", "3": "3 Good", "4": "4 Great" },
+    "qualityDescription": "Tap a selected level again to clear.",
+    "fatigue": "How tired do you feel?",
+    "fatigueAriaLabel": "Morning tiredness",
+    "fatigueOptions": { "1": "1 Alert", "2": "2 Slightly tired", "3": "3 Tired", "4": "4 Exhausted" },
+    "fatigueDescription": "Tap a selected level again to clear.",
     "wentToBed": "Went to bed",
     "wokeUp": "Woke up",
     "bedtimeAriaLabel": "Bedtime",
     "wakeAriaLabel": "Wake time",
     "note": "Note"
-  },
-  "kss": {
-    "1": "Extremely alert",
-    "2": "Very alert",
-    "3": "Alert",
-    "4": "Rather alert",
-    "5": "Neither alert nor sleepy",
-    "6": "Some signs of sleepiness",
-    "7": "Sleepy, staying awake is easy",
-    "8": "Sleepy, staying awake takes effort",
-    "9": "Very sleepy, fighting sleep"
-  },
-  "kssBand": {
-    "alert": "Alert",
-    "inBetween": "In between",
-    "sleepy": "Sleepy"
   },
   "logNight": {
     "trigger": "Log a night",

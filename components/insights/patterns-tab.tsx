@@ -263,7 +263,7 @@ function AttributesSection({
   const energyRatedMs = energyDays.reduce((s, d) => s + d.ratedMs, 0);
   const energyWeightedMs = energyDays.reduce((s, d) => s + d.weightedMs, 0);
   const energyTotalMs = energyDays.reduce((s, d) => s + d.totalMs, 0);
-  // weighted / rated = duration-weighted mean energy on the 1..3 scale.
+  // weighted / rated = duration-weighted mean energy on the 1..4 scale.
   const meanEnergy = energyRatedMs > 0 ? energyWeightedMs / energyRatedMs : null;
 
   const hasAnything =
@@ -315,7 +315,7 @@ function AttributesSection({
           <StatCard
             flat
             label={t("patterns.energyLevel")}
-            value={meanEnergy !== null ? `${meanEnergy.toFixed(1)}/3` : "—"}
+            value={meanEnergy !== null ? `${meanEnergy.toFixed(1)}/4` : "—"}
             hint={
               meanEnergy !== null && energyTotalMs > 0
                 ? t("patterns.energyHint", {

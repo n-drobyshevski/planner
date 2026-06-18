@@ -19,7 +19,7 @@ export interface SleepDayPair {
   wakeDayMs: number;
   /** wokeAt − bedtimeAt when both are present, else null */
   durationMs: number | null;
-  /** 1–5 rating, or null when unrated */
+  /** 1–4 rating, or null when unrated */
   quality: number | null;
   /** the day the member woke INTO (the wake date itself) */
   nextDay: {

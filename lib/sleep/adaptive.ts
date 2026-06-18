@@ -59,12 +59,12 @@ export const HINTS_CAP = 3;
 export const HINTS_WINDOW_DAYS = 30;
 
 const MIN_MS = 60_000;
-/** smallest group-mean differences that count as a real effect */
-const QUALITY_EFFECT = 0.7;
-const FATIGUE_EFFECT = 1.0;
+/** smallest group-mean differences that count as a real effect (1..4 scales) */
+const QUALITY_EFFECT = 0.5;
+const FATIGUE_EFFECT = 0.6;
 /** effect sizes that escalate a comparison hint to "attention" */
-const QUALITY_ATTENTION = 1.5;
-const FATIGUE_ATTENTION = 2.0;
+const QUALITY_ATTENTION = 1.2;
+const FATIGUE_ATTENTION = 1.2;
 /** bedtime spread (population σ, minutes) thresholds */
 const SPREAD_INFO_MIN = 35;
 const SPREAD_ATTENTION_MIN = 60;

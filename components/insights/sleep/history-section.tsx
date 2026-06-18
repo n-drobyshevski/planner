@@ -104,7 +104,7 @@ export function HistorySection({
               {insightsXAxis({
                 tickFormatter: (v) => bucketTick(Number(v), "day", timeZone, locale),
               })}
-              <YAxis hide domain={[0, 9]} />
+              <YAxis hide domain={[0, 4]} />
               <ChartTooltip
                 cursor={false}
                 content={

@@ -66,7 +66,7 @@ describe("taskInputSchema", () => {
     ).toBe(true);
     expect(taskInputSchema.safeParse({ ...base, attributes: { energy: 0 } }).success).toBe(false);
     expect(
-      taskPatchSchema.safeParse({ attributes: { satisfaction: 5 } }).success,
+      taskPatchSchema.safeParse({ attributes: { satisfaction: 4 } }).success,
     ).toBe(true);
     expect(
       taskPatchSchema.safeParse({ attributes: { flexibility: "rigid" } }).success,

@@ -53,7 +53,7 @@ const win = (n: number): TimeWindow => ({ start: T0, end: T0 + n * DAY });
 
 /** A 1h rated occurrence at hour `h` of day `d`. */
 const rated = (
-  satisfaction: 1 | 2 | 3 | 4 | 5,
+  satisfaction: 1 | 2 | 3 | 4,
   over: Partial<Occurrence> = {},
 ): Occurrence => occ({ attributes: { satisfaction }, ...over });
 
@@ -94,7 +94,7 @@ describe("satisfactionByCategory", () => {
   });
 
   it("drops categories under MIN_CATEGORY_RATINGS and unrated/inactive/outside occurrences", () => {
-    const fiveOf = (categoryId: string, satisfaction: 1 | 2 | 3 | 4 | 5) =>
+    const fiveOf = (categoryId: string, satisfaction: 1 | 2 | 3 | 4) =>
       Array.from({ length: MIN_CATEGORY_RATINGS }, (_, i) =>
         rated(satisfaction, {
           categoryId,
@@ -104,13 +104,13 @@ describe("satisfactionByCategory", () => {
       );
     const occs = [
       ...fiveOf("catA", 2),
-      ...fiveOf("catB", 5),
+      ...fiveOf("catB", 4),
       // catC: only 4 ratings → gated out.
-      ...fiveOf("catC", 5).slice(0, 4),
+      ...fiveOf("catC", 4).slice(0, 4),
       // Doesn't help catA reach a higher mean: unrated, inactive, outside.
       occ({ categoryId: "catA" }),
-      rated(5, { categoryId: "catA", inactive: true }),
-      rated(5, { categoryId: "catA", start: T0 - 2 * HOUR, end: T0 - HOUR }),
+      rated(4, { categoryId: "catA", inactive: true }),
+      rated(4, { categoryId: "catA", start: T0 - 2 * HOUR, end: T0 - HOUR }),
     ];
     const rows = satisfactionByCategory(occs, win(7));
     // Sorted by mean descending; catC missing.
@@ -191,35 +191,35 @@ describe("satisfactionByDaypart", () => {
   });
 
   it("attributes rated ms to dayparts by overlap, counting n once per touched part", () => {
-    // 11:00–13:00 @5 → 1h morning + 1h midday; 21:00–23:00 @3 → 1h evening + 1h night.
+    // 11:00–13:00 @4 → 1h morning + 1h midday; 21:00–23:00 @3 → 1h evening + 1h night.
     const occs = [
-      rated(5, { start: T0 + 11 * HOUR, end: T0 + 13 * HOUR }),
+      rated(4, { start: T0 + 11 * HOUR, end: T0 + 13 * HOUR }),
       rated(3, { start: T0 + 21 * HOUR, end: T0 + 23 * HOUR }),
     ];
     const agg = byPart(satisfactionByDaypart(occs, win(1), UTC));
-    expect(agg.morning).toEqual({ mean: 5, n: 1, ms: HOUR });
-    expect(agg.midday).toEqual({ mean: 5, n: 1, ms: HOUR });
+    expect(agg.morning).toEqual({ mean: 4, n: 1, ms: HOUR });
+    expect(agg.midday).toEqual({ mean: 4, n: 1, ms: HOUR });
     expect(agg.evening).toEqual({ mean: 3, n: 1, ms: HOUR });
     expect(agg.night).toEqual({ mean: 3, n: 1, ms: HOUR });
   });
 
   it("duration-weights the mean within a daypart and clips to the window", () => {
-    // Morning: 3h @2 plus 1h @5 → (3·2 + 1·5)/4 = 2.75. The @5 block starts
+    // Morning: 3h @2 plus 1h @4 → (3·2 + 1·4)/4 = 2.5. The @4 block starts
     // before the window; only its in-window hour counts.
     const occs = [
       rated(2, { start: T0 + 6 * HOUR, end: T0 + 9 * HOUR }),
-      rated(5, { start: T0 - HOUR, end: T0 + 6 * HOUR }),
+      rated(4, { start: T0 - HOUR, end: T0 + 6 * HOUR }),
     ];
-    // Window starts at 05:00 so the @5 block clips to 05:00–06:00 (morning).
+    // Window starts at 05:00 so the @4 block clips to 05:00–06:00 (morning).
     const window: TimeWindow = { start: T0 + 5 * HOUR, end: T0 + DAY };
     const agg = byPart(satisfactionByDaypart(occs, window, UTC));
-    expect(agg.morning).toEqual({ mean: 2.75, n: 2, ms: 4 * HOUR });
+    expect(agg.morning).toEqual({ mean: 2.5, n: 2, ms: 4 * HOUR });
     expect(agg.night.ms).toBe(0);
   });
 
   it("ignores inactive and unrated occurrences", () => {
     const occs = [
-      rated(5, { inactive: true, start: T0 + 9 * HOUR, end: T0 + 10 * HOUR }),
+      rated(4, { inactive: true, start: T0 + 9 * HOUR, end: T0 + 10 * HOUR }),
       occ({ start: T0 + 9 * HOUR, end: T0 + 10 * HOUR }),
     ];
     const agg = byPart(satisfactionByDaypart(occs, win(1), UTC));

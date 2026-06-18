@@ -230,7 +230,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
           <ul className="space-y-1.5" role="list">
             {satisfaction.map(({ categoryId, agg }) => {
               const meta = seriesMeta(categoryId ?? "__uncategorized__", data.categories, seriesLabels);
-              const pct = (agg.mean / 5) * 100;
+              const pct = (agg.mean / 4) * 100;
               return (
                 <li key={categoryId ?? "uncategorized"} className="flex items-center gap-2 text-xs">
                   <span
@@ -254,7 +254,7 @@ export function BalanceSections({ data }: { data: InsightsTabData }) {
                     />
                   </span>
                   <span className="w-12 text-right font-mono tabular-nums">
-                    {agg.mean.toFixed(1)}/5
+                    {agg.mean.toFixed(1)}/4
                   </span>
                   <span className="w-10 text-right font-mono tabular-nums text-muted-foreground/70">
                     n {agg.n}

@@ -24,18 +24,18 @@ export type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
 // a runtime zod dependency into every type consumer.
 export interface KnownAttributes {
   /** How demanding the item is. */
-  energy?: 1 | 2 | 3;
+  energy?: 1 | 2 | 3 | 4;
   /** How movable it is when a day overloads. */
   flexibility?: "fixed" | "movable" | "flexible";
   /** Concentration mode the item needs. */
   focus?: "deep" | "shallow";
-  /** Retrospective 1–5 rating. */
-  satisfaction?: 1 | 2 | 3 | 4 | 5;
+  /** Retrospective 1–4 rating. */
+  satisfaction?: 1 | 2 | 3 | 4;
 }
 export type ItemAttributes = KnownAttributes & { [key: string]: unknown };
 
 const valueSchemas = {
-  energy: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  energy: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   flexibility: z.enum(["fixed", "movable", "flexible"]),
   focus: z.enum(["deep", "shallow"]),
   satisfaction: z.union([
@@ -43,7 +43,6 @@ const valueSchemas = {
     z.literal(2),
     z.literal(3),
     z.literal(4),
-    z.literal(5),
   ]),
 } satisfies Record<AttributeKey, z.ZodType>;
 
@@ -119,10 +118,11 @@ export const ATTRIBUTE_META: AttributeMeta[] = [
     description: "How demanding this is.",
     options: [
       { value: "1", label: "1 Low" },
-      { value: "2", label: "2 Medium" },
+      { value: "2", label: "2 Steady" },
       { value: "3", label: "3 High" },
+      { value: "4", label: "4 Peak" },
     ],
-    decode: (raw) => Number(raw) as 1 | 2 | 3,
+    decode: (raw) => Number(raw) as 1 | 2 | 3 | 4,
   },
   {
     key: "flexibility",
@@ -150,12 +150,11 @@ export const ATTRIBUTE_META: AttributeMeta[] = [
     label: "Satisfaction",
     description: "How it felt, looking back.",
     options: [
-      { value: "1", label: "1" },
-      { value: "2", label: "2" },
-      { value: "3", label: "3" },
-      { value: "4", label: "4" },
-      { value: "5", label: "5" },
+      { value: "1", label: "1 Poor" },
+      { value: "2", label: "2 Okay" },
+      { value: "3", label: "3 Good" },
+      { value: "4", label: "4 Great" },
     ],
-    decode: (raw) => Number(raw) as 1 | 2 | 3 | 4 | 5,
+    decode: (raw) => Number(raw) as 1 | 2 | 3 | 4,
   },
 ];

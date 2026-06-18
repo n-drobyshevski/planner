@@ -185,8 +185,8 @@ describe("attributes round-trip", () => {
       attributes: { energy: 3 },
     });
     expect(taskPatchToRow({ title: "x" })).not.toHaveProperty("attributes");
-    expect(taskPatchToRow({ attributes: { satisfaction: 5 } })).toEqual({
-      attributes: { satisfaction: 5 },
+    expect(taskPatchToRow({ attributes: { satisfaction: 4 } })).toEqual({
+      attributes: { satisfaction: 4 },
     });
   });
 });
@@ -236,13 +236,13 @@ describe("sleep log mappers", () => {
       workspaceId: "w1",
       memberId: "m1",
       date: "2026-06-10",
-      quality: 5,
+      quality: 4,
     };
     const row = sleepLogInputToRow(input);
     expect(row.workspace_id).toBe("w1");
     expect(row.member_id).toBe("m1");
     expect(row.date).toBe("2026-06-10");
-    expect(row.quality).toBe(5);
+    expect(row.quality).toBe(4);
     expect(row.fatigue).toBeNull();
     expect(row.bedtime_at).toBeNull();
     expect(row.woke_at).toBeNull();
