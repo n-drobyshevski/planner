@@ -1,11 +1,46 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCredentialsByEmail } from "@/lib/auth/profiles";
 import { sha256Hex } from "@/lib/auth/pin";
+import { APPEARANCE_COOKIE, serializeAppearance } from "@/lib/theme/appearance-cookie";
+import {
+  normalizeAccent,
+  normalizePalette,
+  normalizeTone,
+} from "@/lib/theme/appearance";
+
+/**
+ * Seed the appearance cookie from the member's saved theme at sign-in, so the
+ * very first authed paint on this device uses their accent/tone/palette. The
+ * layout's pre-paint script reads this cookie; without it the static shell
+ * paints the default accent and the client reconcile repaints it once the
+ * member row loads over the network — the visible accent "color splash". Every
+ * session originates here (refreshes only extend it) and the cookie outlives
+ * them (1-year), so seeding it once per device removes the flash at the source.
+ * Mirrors the client writer in lib/hooks/use-preferences.ts (path/maxAge/lax,
+ * not httpOnly — the inline script must read it).
+ */
+async function seedAppearanceCookie(member: {
+  accent: string | null;
+  surface_tone: string | null;
+  palette: string | null;
+}): Promise<void> {
+  const store = await cookies();
+  store.set(
+    APPEARANCE_COOKIE,
+    serializeAppearance(
+      normalizeAccent(member.accent),
+      normalizeTone(member.surface_tone),
+      normalizePalette(member.palette),
+    ),
+    { path: "/", maxAge: 31_536_000, sameSite: "lax" },
+  );
+}
 
 export type SignInResult = { error: string; needsPin?: boolean };
 
@@ -17,7 +52,13 @@ export type SignInResult = { error: string; needsPin?: boolean };
  * localized {@link SignInResult} describing the failure.
  */
 async function authenticateMember(
-  member: { auth_user_id: string | null; pin_hash: string | null },
+  member: {
+    auth_user_id: string | null;
+    pin_hash: string | null;
+    accent: string | null;
+    surface_tone: string | null;
+    palette: string | null;
+  },
   pin: string,
 ): Promise<SignInResult | null> {
   const tv = await getTranslations({
@@ -48,6 +89,7 @@ async function authenticateMember(
   const { error } = await sb.auth.signInWithPassword(cred);
   if (error) return { error: error.message };
 
+  await seedAppearanceCookie(member);
   return null;
 }
 
@@ -73,7 +115,7 @@ export async function signIn(
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("members")
-    .select("auth_user_id, pin_hash")
+    .select("auth_user_id, pin_hash, accent, surface_tone, palette")
     .ilike("name", name)
     .limit(1)
     .maybeSingle();
@@ -105,7 +147,7 @@ export async function switchAccountAction(
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("members")
-    .select("auth_user_id, pin_hash")
+    .select("auth_user_id, pin_hash, accent, surface_tone, palette")
     .eq("id", memberId)
     .maybeSingle();
 

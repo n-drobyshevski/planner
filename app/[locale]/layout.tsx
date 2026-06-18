@@ -90,6 +90,17 @@ export default async function RootLayout({
       className={`${jakarta.variable} ${manrope.variable} ${geistMono.variable} h-full`}
     >
       <head>
+        {/* Re-applies the cookie-backed accent/tone/palette onto <html> before
+            paint — the no-flash trick (see APPEARANCE_INIT_SCRIPT / Phase 0
+            color-splash fix). This MUST stay a raw inline <script> in <head>:
+            it is parse-blocking, so it runs before the first paint. Do NOT swap
+            it for `next/script` strategy="beforeInteractive" — that defers the
+            inline script into Next's `self.__next_s` runtime queue (emitted
+            after <body>), which runs during bootstrap, not before paint, and
+            brings the accent splash back. React 19 logs a dev-only "script tag
+            while rendering" warning for this server-rendered <script>; it is
+            stripped from production builds and is harmless (next-themes uses the
+            same pattern for its `.dark` pre-paint script). */}
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full bg-background text-foreground">
