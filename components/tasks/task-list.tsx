@@ -23,6 +23,7 @@ import { useTranslations } from "next-intl";
 import { TaskCard } from "./task-card";
 import { TaskContextMenu } from "./task-context-menu";
 import { canNest } from "@/lib/tasks/nesting";
+import type { ById } from "@/lib/tasks/tree";
 import type { TaskActions } from "./task-actions";
 import type { Board, Member, TaskRow } from "@/lib/types";
 
@@ -33,10 +34,22 @@ export interface TaskListProps {
   colorOf: (t: TaskRow) => string;
   members: Map<string, Member>;
   progressOf?: (t: TaskRow) => { done: number; total: number } | null;
+  /** Whole-tree maps (all collection tasks) for drag-to-nest cycle/depth checks. */
+  treeById: ById;
+  treeByParent: Map<string | null, TaskRow[]>;
   actions: TaskActions;
 }
 
-export function TaskList({ tasks, boards, colorOf, members, progressOf, actions }: TaskListProps) {
+export function TaskList({
+  tasks,
+  boards,
+  colorOf,
+  members,
+  progressOf,
+  treeById,
+  treeByParent,
+  actions,
+}: TaskListProps) {
   const t = useTranslations("tasks");
   const groups = useMemo(
     () =>
@@ -49,18 +62,9 @@ export function TaskList({ tasks, boards, colorOf, members, progressOf, actions 
     [tasks, boards],
   );
 
-  const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
-  // Tasks that already have subtasks can't be nested (it would orphan their
-  // children as invisible grandchildren).
-  const parentIds = useMemo(
-    () => new Set(tasks.filter((t) => (progressOf?.(t)?.total ?? 0) > 0).map((t) => t.id)),
-    [tasks, progressOf],
-  );
-  const hasChildren = (id: string) => parentIds.has(id);
-
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  const activeTask = activeId ? byId.get(activeId) ?? null : null;
+  const activeTask = activeId ? treeById.get(activeId) ?? null : null;
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -70,8 +74,8 @@ export function TaskList({ tasks, boards, colorOf, members, progressOf, actions 
 
   function nestParentOf(overTaskId: string | null): TaskRow | null {
     if (!activeTask || !overTaskId) return null;
-    const parent = byId.get(overTaskId);
-    if (!parent || !canNest(activeTask, parent, hasChildren)) return null;
+    const parent = treeById.get(overTaskId);
+    if (!parent || !canNest(activeTask, parent, treeById, treeByParent)) return null;
     return parent;
   }
 

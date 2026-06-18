@@ -47,6 +47,7 @@ import {
   type GroupHeaderRow,
   type LaneRow,
 } from "@/lib/tasks/flows-layout";
+import type { ById } from "@/lib/tasks/tree";
 import {
   filterLanes,
   flowOrderOf,
@@ -84,6 +85,8 @@ type Density = keyof typeof ZOOM;
 export interface TaskFlowsProps {
   tasks: TaskRow[]; // top-level tasks only
   childrenByParent: Map<string | null, TaskRow[]>;
+  /** Whole-tree id lookup (all collection tasks) for drag-to-nest cycle/depth checks. */
+  treeById: ById;
   eventsByTask: Map<string, TaskStatusEvent[]>;
   /** task id -> its linked calendar blocks, for scheduled-block markers */
   blocksByTask: Map<string, EventRow[]>;
@@ -114,6 +117,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 export function TaskFlows({
   tasks,
   childrenByParent,
+  treeById,
   eventsByTask,
   blocksByTask,
   checkpointsByTask,
@@ -250,18 +254,13 @@ export function TaskFlows({
   // Hand-reordering writes a global `flowPos`, so it works in every grouping —
   // it just needs the manual sort (otherwise the chosen sort owns the order).
   const canReorder = display.sortBy === "manual";
-  // A lane (top-level task) with subtasks can't itself be nested — gates the
-  // drag-to-nest rule so the tree never grows a third level.
-  const hasChildren = useCallback(
-    (id: string) => (childrenByParent.get(id)?.length ?? 0) > 0,
-    [childrenByParent],
-  );
   const dnd = useFlowsDnd(orderedLanes, {
     anchorOf: (id) => flowAnchor.get(id) ?? 0,
     groupOf: (id) => groupByLane.get(id) ?? "all",
     onReorder: actions.reorderFlow,
     onReparent: actions.reparent,
-    hasChildren,
+    treeById,
+    treeByParent: childrenByParent,
     canReorder,
   });
   const trackWidth = Math.ceil(((t1 - t0) / DAY_MS) * pxPerDay);
@@ -821,10 +820,17 @@ function GutterLaneRow({
               type="button"
               onClick={() => actions.open(branch.task)}
               className={cn(
-                "absolute truncate rounded pr-2 pl-9 text-left text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "absolute truncate rounded pr-2 text-left text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 branch.task.completedAt != null && "line-through",
               )}
-              style={{ left: 0, top: subTop, width: G.gutterWidth, height: G.subRowHeight }}
+              style={{
+                left: 0,
+                top: subTop,
+                width: G.gutterWidth,
+                height: G.subRowHeight,
+                // base indent (past the lane's grip/twisty) + one step per level
+                paddingLeft: 36 + (branch.depth - 1) * 16,
+              }}
             >
               {branch.task.title}
             </button>

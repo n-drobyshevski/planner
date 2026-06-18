@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { m, AnimatePresence } from "motion/react";
@@ -21,6 +21,7 @@ import { BoardColumnMenu } from "./board-column-menu";
 import { BoardEditorDialog } from "./board-editor-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useBoardDnd } from "@/lib/hooks/use-board-dnd";
+import type { ById } from "@/lib/tasks/tree";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSwipe } from "@/hooks/use-swipe";
 import type { TaskActions } from "./task-actions";
@@ -35,6 +36,9 @@ export interface TaskBoardProps {
   colorOf: (t: TaskRow) => string;
   members: Map<string, Member>;
   progressOf?: (t: TaskRow) => { done: number; total: number } | null;
+  /** Whole-tree maps (all collection tasks) for drag-to-nest cycle/depth checks. */
+  treeById: ById;
+  treeByParent: Map<string | null, TaskRow[]>;
   actions: TaskActions;
 }
 
@@ -46,15 +50,11 @@ export function TaskBoard({
   colorOf,
   members,
   progressOf,
+  treeById,
+  treeByParent,
   actions,
 }: TaskBoardProps) {
   const t = useTranslations("tasks");
-  // Tasks that already have subtasks can't themselves be nested (it would orphan
-  // their children as invisible grandchildren); the hook uses this to gate nesting.
-  const parentIds = useMemo(
-    () => new Set(tasks.filter((t) => (progressOf?.(t)?.total ?? 0) > 0).map((t) => t.id)),
-    [tasks, progressOf],
-  );
   const {
     byId,
     items,
@@ -71,7 +71,8 @@ export function TaskBoard({
     boards,
     actions.move,
     actions.reparent,
-    (id) => parentIds.has(id),
+    treeById,
+    treeByParent,
   );
   const [addingColumn, setAddingColumn] = useState(false);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);

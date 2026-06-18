@@ -293,6 +293,15 @@ export interface TaskCheckpoint {
   updatedAt: number;
 }
 
+/** A blocks/blocked-by edge: `taskId` is blocked until `dependsOnTaskId` is done. */
+export interface TaskDependency {
+  id: string;
+  workspaceId: string;
+  taskId: string;
+  dependsOnTaskId: string;
+  createdAt: number;
+}
+
 export interface OverrideRow {
   id: string;
   workspaceId: string;

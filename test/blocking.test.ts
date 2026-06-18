@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { blockedIds, isBlocked, nextActionable } from "@/lib/tasks/blocking";
+import {
+  blockedIds,
+  isBlocked,
+  nextActionable,
+  dependencyBlockedIds,
+  isTaskBlocked,
+} from "@/lib/tasks/blocking";
 import type { TaskRow } from "@/lib/types";
 
 // `done` drives completedAt — the board-agnostic "done" signal the blocking
@@ -90,5 +96,32 @@ describe("nextActionable", () => {
   it("returns null when all done or empty", () => {
     expect(nextActionable([mk("a", true)])).toBeNull();
     expect(nextActionable([])).toBeNull();
+  });
+});
+
+describe("dependencyBlockedIds", () => {
+  const deps = [
+    { taskId: "a", dependsOnTaskId: "x" },
+    { taskId: "a", dependsOnTaskId: "y" },
+    { taskId: "b", dependsOnTaskId: "z" },
+  ];
+  it("blocks a task while any blocker is incomplete", () => {
+    const complete = new Set(["y", "z"]); // x still open
+    const blocked = dependencyBlockedIds(deps, (id) => complete.has(id));
+    expect(blocked.has("a")).toBe(true); // x incomplete
+    expect(blocked.has("b")).toBe(false); // z complete
+  });
+  it("clears once every blocker is complete", () => {
+    const complete = new Set(["x", "y", "z"]);
+    const blocked = dependencyBlockedIds(deps, (id) => complete.has(id));
+    expect(blocked.size).toBe(0);
+  });
+});
+
+describe("isTaskBlocked", () => {
+  it("is true when blocked by sequence OR dependency", () => {
+    expect(isTaskBlocked("a", new Set(["a"]), new Set())).toBe(true);
+    expect(isTaskBlocked("a", new Set(), new Set(["a"]))).toBe(true);
+    expect(isTaskBlocked("a", new Set(), new Set())).toBe(false);
   });
 });

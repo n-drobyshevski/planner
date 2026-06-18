@@ -15,6 +15,7 @@
 
 import { useState, type MouseEvent, type ReactNode } from "react";
 import type {
+  FlowBranch,
   FlowCheckpoint,
   FlowNode,
   FlowRow,
@@ -264,25 +265,34 @@ export function FlowTrack({
                 </>
               )}
               {/* subtask branches (only present when the lane is expanded), each
-                  drawn in its own state's line style */}
-              {branchRows.map(({ branch, subTop }) => {
-                const bStroke = lineStyleStroke(lineStyleOf(branch.task));
-                return (
-                  <Branch
-                    key={branch.task.id}
-                    branch={branch}
-                    trunkY={trunkY}
-                    subY={subTop + G.subRowHeight / 2}
-                    x={x}
-                    color={color}
-                    mine={branch.task.ownerId === currentMemberId}
-                    nowMs={nowMs}
-                    t1={t1}
-                    dasharray={bStroke.wavy ? "2 3" : bStroke.dasharray}
-                    opacityScale={bStroke.opacityScale}
-                  />
-                );
-              })}
+                  drawn in its own state's line style. A branch diverges from its
+                  PARENT's row (the trunk at depth 1, else its parent branch row)
+                  so nested branches read as a tree, not all off the trunk. */}
+              {(() => {
+                const branchY = new Map<string, number>();
+                for (const { branch, subTop } of branchRows)
+                  branchY.set(branch.task.id, subTop + G.subRowHeight / 2);
+                const fromYOf = (b: FlowBranch) =>
+                  b.depth <= 1 ? trunkY : branchY.get(b.parentId) ?? trunkY;
+                return branchRows.map(({ branch, subTop }) => {
+                  const bStroke = lineStyleStroke(lineStyleOf(branch.task));
+                  return (
+                    <Branch
+                      key={branch.task.id}
+                      branch={branch}
+                      fromY={fromYOf(branch)}
+                      subY={subTop + G.subRowHeight / 2}
+                      x={x}
+                      color={color}
+                      mine={branch.task.ownerId === currentMemberId}
+                      nowMs={nowMs}
+                      t1={t1}
+                      dasharray={bStroke.wavy ? "2 3" : bStroke.dasharray}
+                      opacityScale={bStroke.opacityScale}
+                    />
+                  );
+                });
+              })()}
               {/* trunk nodes */}
               {trunkNodes.map((n, i) => (
                 <NodeShape key={i} node={n} cx={x(n.ms)} cy={trunkY} color={color} />
@@ -439,7 +449,7 @@ export function FlowTrack({
  */
 function Branch({
   branch,
-  trunkY,
+  fromY,
   subY,
   x,
   color,
@@ -450,7 +460,8 @@ function Branch({
   opacityScale,
 }: {
   branch: FlowSegment;
-  trunkY: number;
+  /** y of the parent line this branch diverges from (trunk, or a parent branch). */
+  fromY: number;
   subY: number;
   x: (ms: number) => number;
   color: string;
@@ -465,8 +476,8 @@ function Branch({
   const divergeX = x(branch.startMs);
   const open = branch.endMs === null;
   const opacity = mine ? 0.85 : 0.45;
-  // diverge from the trunk down to the sub-row at the branch's start x
-  const diverge = `M ${divergeX} ${trunkY} C ${divergeX + ELBOW} ${trunkY} ${divergeX} ${subY} ${divergeX + ELBOW} ${subY}`;
+  // diverge from the parent line down to the sub-row at the branch's start x
+  const diverge = `M ${divergeX} ${fromY} C ${divergeX + ELBOW} ${fromY} ${divergeX} ${subY} ${divergeX + ELBOW} ${subY}`;
 
   const future = branch.startMs > nowMs && open;
   if (branch.milestone || future) {
@@ -512,7 +523,7 @@ function Branch({
   ];
   if (!open) {
     d.push(
-      `C ${mergeX} ${subY} ${mergeX - ELBOW} ${trunkY} ${mergeX} ${trunkY}`,
+      `C ${mergeX} ${subY} ${mergeX - ELBOW} ${fromY} ${mergeX} ${fromY}`,
     );
   }
   return (

@@ -68,9 +68,20 @@ export interface FlowSegment {
   checkpoints: FlowCheckpoint[];
 }
 
+/**
+ * A subtask branch within a lane. Branches are flattened pre-order across the
+ * whole subtree (a parent always precedes its children), each carrying its
+ * nesting `depth` (1 = a direct child of the trunk) and its `parentId` so the
+ * renderer can diverge a grandchild from its parent branch's row, not the trunk.
+ */
+export interface FlowBranch extends FlowSegment {
+  depth: number;
+  parentId: string;
+}
+
 export interface FlowLane extends FlowSegment {
-  /** subtask branches, in sibling order */
-  branches: FlowSegment[];
+  /** subtask branches: the whole subtree, flattened pre-order (depth-tagged) */
+  branches: FlowBranch[];
   /** convenience: completedAt != null (drives dimming) */
   done: boolean;
 }
@@ -208,12 +219,22 @@ export function buildFlowLanes(args: {
       blocksByTask?.get(task.id),
       checkpointsByTask?.get(task.id),
     );
-    const children = childrenByParent.get(task.id) ?? [];
-    // Branches don't carry checkpoints in v1 (the menu offers them on trunks
-    // only); they get an empty checkpoint overlay.
-    const branches = children.map((c) =>
-      buildSegment(c, eventsByTask.get(c.id), nowMs, blocksByTask?.get(c.id)),
-    );
+    // Flatten the whole subtree pre-order so a grandchild branch follows its
+    // parent. Each branch carries depth (1 = direct child) + parentId. Branches
+    // don't carry checkpoints in v1 (the menu offers them on trunks only).
+    const seen = new Set<string>();
+    const collect = (parentId: string, depth: number): FlowBranch[] => {
+      const out: FlowBranch[] = [];
+      for (const c of childrenByParent.get(parentId) ?? []) {
+        if (seen.has(c.id)) continue; // cycle guard (the DB forbids cycles)
+        seen.add(c.id);
+        const seg = buildSegment(c, eventsByTask.get(c.id), nowMs, blocksByTask?.get(c.id));
+        out.push({ ...seg, depth, parentId });
+        out.push(...collect(c.id, depth + 1));
+      }
+      return out;
+    };
+    const branches = collect(task.id, 1);
     return { ...trunk, branches, done: task.completedAt != null };
   });
 
@@ -285,7 +306,7 @@ export interface LaidOutLane {
   /** y of the lane's top edge (px, within the track) */
   top: number;
   isExpanded: boolean;
-  branchRows: { branch: FlowSegment; subTop: number }[];
+  branchRows: { branch: FlowBranch; subTop: number }[];
   height: number;
 }
 

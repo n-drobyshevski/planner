@@ -7,8 +7,10 @@ import { qk } from "@/lib/supabase/query-keys";
 import * as m from "@/lib/supabase/mutations";
 import { upsertTask, removeTasks } from "@/lib/tasks/cache";
 import { positionBetween } from "@/lib/tasks/ordering";
-import type { TaskInput } from "@/lib/supabase/mappers";
-import type { Board, TaskRow } from "@/lib/types";
+import { groupByParent, indexById } from "@/lib/tasks/tree";
+import { canNest } from "@/lib/tasks/nesting";
+import type { TaskInput, TaskDependencyInput } from "@/lib/supabase/mappers";
+import type { Board, TaskDependency, TaskRow } from "@/lib/types";
 import type { WorkspaceData } from "@/lib/hooks/use-workspace";
 import { useHistoryStore } from "@/stores/history-store";
 import { useNotify } from "@/lib/hooks/use-notify";
@@ -46,6 +48,12 @@ export function useTaskMutations(workspaceId: string | undefined) {
   const setTasks = (updater: (old: TaskRow[]) => TaskRow[]) => {
     if (!workspaceId) return;
     qc.setQueryData<TaskRow[]>(qk.tasks(workspaceId), (old) =>
+      old ? updater(old) : old,
+    );
+  };
+  const setDeps = (updater: (old: TaskDependency[]) => TaskDependency[]) => {
+    if (!workspaceId) return;
+    qc.setQueryData<TaskDependency[]>(qk.taskDependencies(workspaceId), (old) =>
       old ? updater(old) : old,
     );
   };
@@ -201,6 +209,49 @@ export function useTaskMutations(workspaceId: string | undefined) {
     );
   };
 
+  /**
+   * Promote a subtask up exactly ONE level — re-file it under its grandparent
+   * (or to top-level when the grandparent is null), appended after that parent's
+   * last child. A board-less task landing at top-level picks up a column so it
+   * stays visible. No-op for a task that is already top-level.
+   */
+  const promoteOneLevel = (task: TaskRow) => {
+    if (!task.parentId) return Promise.resolve(false);
+    const all = workspaceId
+      ? qc.getQueryData<TaskRow[]>(qk.tasks(workspaceId)) ?? []
+      : [];
+    const parent = all.find((tk) => tk.id === task.parentId) ?? null;
+    const grandparentId = parent?.parentId ?? null;
+    const last = all
+      .filter((tk) => tk.parentId === grandparentId && tk.id !== task.id)
+      .sort((a, b) => a.position - b.position)
+      .at(-1);
+    const boardId =
+      grandparentId === null && task.boardId == null
+        ? boardsOf(task.collectionId)[0]?.id ?? null
+        : undefined;
+    return reparent(task, grandparentId, positionBetween(last?.position ?? null, null), boardId);
+  };
+
+  /**
+   * Demote a subtask one level deeper: nest it under its immediately-preceding
+   * sibling (appended last), if that nesting is allowed (cycle / max-depth).
+   * No-op when there is no previous sibling or the move would break the rules.
+   */
+  const demote = (task: TaskRow) => {
+    const all = workspaceId
+      ? qc.getQueryData<TaskRow[]>(qk.tasks(workspaceId)) ?? []
+      : [];
+    const byId = indexById(all);
+    const byParent = groupByParent(all);
+    const siblings = byParent.get(task.parentId) ?? [];
+    const idx = siblings.findIndex((s) => s.id === task.id);
+    const prev = idx > 0 ? siblings[idx - 1] : null;
+    if (!prev || !canNest(task, prev, byId, byParent)) return Promise.resolve(false);
+    const last = (byParent.get(prev.id) ?? []).at(-1);
+    return reparent(task, prev.id, positionBetween(last?.position ?? null, null));
+  };
+
   return {
     create: (input: TaskInput) =>
       run(m.createTask(sb, input), t("taskCreated"), {
@@ -296,6 +347,43 @@ export function useTaskMutations(workspaceId: string | undefined) {
 
     reparent,
     promote,
+    promoteOneLevel,
+    demote,
+
+    /**
+     * Add a blocks/blocked-by edge (taskId is blocked until dependsOnTaskId is
+     * done). The DB rejects a cycle/duplicate; that surfaces via the toast.
+     * Applies the server row to the deps cache and pushes a remove-inverse.
+     */
+    addDependency: (input: TaskDependencyInput) =>
+      run(m.addDependency(sb, input), t("dependencyAdded"), {
+        apply: (row) => setDeps((old) => [...old.filter((d) => d.id !== row.id), row]),
+        undo: (row) =>
+          inverse(t("undoLabel.removeDependency"), () => m.removeDependency(sb, row.id)),
+      }),
+
+    /** Remove a dependency edge; undo re-adds the same blocks/blocked-by pair. */
+    removeDependency: (dep: TaskDependency) =>
+      run(m.removeDependency(sb, dep.id), t("dependencyRemoved"), {
+        optimistic: () => {
+          if (!workspaceId) return () => {};
+          const key = qk.taskDependencies(workspaceId);
+          const prev = qc.getQueryData<TaskDependency[]>(key);
+          qc.setQueryData<TaskDependency[]>(key, (old) =>
+            old?.filter((d) => d.id !== dep.id),
+          );
+          return () => qc.setQueryData(key, prev);
+        },
+        apply: () => setDeps((old) => old.filter((d) => d.id !== dep.id)),
+        undo: () =>
+          inverse(t("undoLabel.addDependency"), () =>
+            m.addDependency(sb, {
+              workspaceId: dep.workspaceId,
+              taskId: dep.taskId,
+              dependsOnTaskId: dep.dependsOnTaskId,
+            }),
+          ),
+      }),
 
     /**
      * Persist a Flows-side-panel manual reorder. The lane order is a presentation

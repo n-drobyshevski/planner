@@ -8,6 +8,7 @@ import type {
   MemberSleepPrefs,
   TaskRow,
   TaskCheckpoint,
+  TaskDependency,
   Board,
   AppLocale,
   ThemePreference,
@@ -26,6 +27,8 @@ import {
   mapTask,
   mapBoard,
   mapCheckpoint,
+  mapTaskDependency,
+  taskDependencyInputToRow,
   categoryGoalInputToRow,
   eventInputToRow,
   eventPatchToRow,
@@ -46,6 +49,7 @@ import {
   type TaskInput,
   type BoardInput,
   type CheckpointInput,
+  type TaskDependencyInput,
 } from "./mappers";
 import {
   editAll,
@@ -154,6 +158,8 @@ export interface DeletedSnapshot {
   overrides: Record<string, unknown>[];
   /** Flow checkpoints of the deleted tasks (cascade-deleted; restored on undo). */
   checkpoints: Record<string, unknown>[];
+  /** Dependency edges touching the deleted subtree (cascade-deleted; restored). */
+  dependencies: Record<string, unknown>[];
 }
 
 /**
@@ -176,7 +182,13 @@ export async function deleteEventDeep(
   if (oErr) throw oErr;
   const { error } = await sb.from("events").delete().eq("id", id);
   if (error) throw error;
-  return { tasks: [], events: events ?? [], overrides: overrides ?? [], checkpoints: [] };
+  return {
+    tasks: [],
+    events: events ?? [],
+    overrides: overrides ?? [],
+    checkpoints: [],
+    dependencies: [],
+  };
 }
 
 /**
@@ -209,14 +221,21 @@ export async function deleteTaskDeep(
   }
 
   const taskIds = tasks.map((t) => t.id as string);
-  const [evRes, cpRes] = await Promise.all([
+  const [evRes, cpRes, depRes] = await Promise.all([
     sb.from("events").select("*").in("task_id", taskIds),
     sb.from("task_checkpoints").select("*").in("task_id", taskIds),
+    // Edges where either endpoint is in the subtree cascade-delete; snapshot both.
+    sb
+      .from("task_dependencies")
+      .select("*")
+      .or(`task_id.in.(${taskIds.join(",")}),depends_on_task_id.in.(${taskIds.join(",")})`),
   ]);
   if (evRes.error) throw evRes.error;
   if (cpRes.error) throw cpRes.error;
+  if (depRes.error) throw depRes.error;
   const events = evRes.data ?? [];
   const checkpoints = cpRes.data ?? [];
+  const dependencies = depRes.data ?? [];
   const eventIds = events.map((e) => e.id as string);
   let overrides: Record<string, unknown>[] = [];
   if (eventIds.length > 0) {
@@ -233,7 +252,7 @@ export async function deleteTaskDeep(
   // everything we snapshotted.
   const { error } = await sb.from("tasks").delete().eq("id", id);
   if (error) throw error;
-  return { tasks, events, overrides, checkpoints };
+  return { tasks, events, overrides, checkpoints, dependencies };
 }
 
 /**
@@ -261,6 +280,36 @@ export async function restoreDeleted(
     const { error } = await sb.from("task_checkpoints").insert(snap.checkpoints);
     if (error) throw error;
   }
+  // Dependencies last: both endpoints (tasks) are back, and the re-inserted set
+  // was a valid DAG, so the acyclic guard passes.
+  if (snap.dependencies.length > 0) {
+    const { error } = await sb.from("task_dependencies").insert(snap.dependencies);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Add a blocks/blocked-by edge: `taskId` becomes blocked until `dependsOnTaskId`
+ * is done. The DB rejects a duplicate (unique) or a cycle (trigger). Returns the
+ * inserted row (its id drives the undo / optimistic cache).
+ */
+export async function addDependency(
+  sb: SupabaseClient,
+  input: TaskDependencyInput,
+): Promise<TaskDependency> {
+  const { data, error } = await sb
+    .from("task_dependencies")
+    .insert(taskDependencyInputToRow(input))
+    .select()
+    .single();
+  if (error) throw error;
+  return mapTaskDependency(data);
+}
+
+/** Remove a dependency edge by id. */
+export async function removeDependency(sb: SupabaseClient, id: string): Promise<void> {
+  const { error } = await sb.from("task_dependencies").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // --- Recurring edits -------------------------------------------------------
