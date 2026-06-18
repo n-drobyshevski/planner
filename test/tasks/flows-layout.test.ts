@@ -406,3 +406,47 @@ describe("layoutRows", () => {
     if (header.kind === "group") expect(header.count).toBe(1);
   });
 });
+
+describe("buildFlowLanes — deep nesting", () => {
+  it("flattens a subtree pre-order into depth-tagged branches", () => {
+    const childrenByParent = new Map([
+      [null, [task({ id: "p" })]],
+      ["p", [task({ id: "c", parentId: "p" })]],
+      ["c", [task({ id: "g", parentId: "c" })]],
+    ]);
+    const lanes = buildFlowLanes({
+      topLevel: [task({ id: "p" })],
+      childrenByParent,
+      eventsByTask: new Map(),
+      nowMs: now,
+    });
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0].branches.map((b) => [b.task.id, b.depth, b.parentId])).toEqual([
+      ["c", 1, "p"],
+      ["g", 2, "c"],
+    ]);
+  });
+
+  it("reserves a sub-row per descendant when a lane is expanded", () => {
+    const childrenByParent = new Map([
+      [null, [task({ id: "p" })]],
+      ["p", [task({ id: "c", parentId: "p" })]],
+      ["c", [task({ id: "g", parentId: "c" })]],
+    ]);
+    const lanes = buildFlowLanes({
+      topLevel: [task({ id: "p" })],
+      childrenByParent,
+      eventsByTask: new Map(),
+      nowMs: now,
+    });
+    const groups = [{ key: "all", label: "", lanes, header: false }];
+    const { rows, totalHeight } = layoutRows(groups, new Set(["p"]));
+    const lane = rows.find((r) => r.kind === "lane");
+    if (lane?.kind !== "lane") throw new Error("expected a lane row");
+    expect(lane.branchRows.map((r) => r.branch.task.id)).toEqual(["c", "g"]);
+    // trunk row + two stacked branch sub-rows
+    expect(lane.branchRows[0].subTop).toBe(FLOW_GEOM.laneHeight);
+    expect(lane.branchRows[1].subTop).toBe(FLOW_GEOM.laneHeight + FLOW_GEOM.subRowHeight);
+    expect(totalHeight).toBe(FLOW_GEOM.laneHeight + 2 * FLOW_GEOM.subRowHeight);
+  });
+});

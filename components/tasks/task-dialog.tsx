@@ -52,13 +52,22 @@ import { Trash2, CalendarPlus, ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import { SubtaskEditor } from "./subtask-editor";
+import { TaskDependenciesField } from "./task-dependencies-field";
 import { AttributeFields } from "@/components/shared/attribute-fields";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { taskFormSchema, type TaskFormValues } from "@/lib/tasks/schemas";
 import { parseAttributes, hasAnyAttribute } from "@/lib/attributes/schema";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { formatTime, formatWeekdayDayMonth } from "@/lib/datetime/format";
-import type { Board, Category, Collection, Member, TaskRow } from "@/lib/types";
+import type {
+  Board,
+  Category,
+  Collection,
+  Member,
+  TaskDependency,
+  TaskRow,
+} from "@/lib/types";
+import type { ById } from "@/lib/tasks/tree";
 import type { TaskInput } from "@/lib/supabase/mappers";
 
 export interface TaskDialogProps {
@@ -97,14 +106,27 @@ export interface TaskDialogProps {
   members: Member[];
   categories: Category[];
   task?: TaskRow | null;
-  /** live children of the task being edited (for the subtasks section) */
+  /** edit mode: the whole subtree of the task being edited (all descendants). */
   subtasks?: TaskRow[];
+  /** whole-collection maps for the subtask tree's drag cycle/max-depth checks. */
+  treeById?: ById;
+  treeByParent?: Map<string | null, TaskRow[]>;
+  /** all dependency edges (workspace), for the Blocked-by editors. */
+  dependencies?: TaskDependency[];
+  /** task ids currently blocked by an unmet dependency. */
+  dependencyBlocked?: ReadonlySet<string>;
+  /** candidate tasks to depend on (the collection's tasks). */
+  dependencyCandidates?: TaskRow[];
   /** create mode: file the new task under this parent (inherits its context). */
   createParent?: TaskRow | null;
   /** board column the create was initiated from */
   defaultBoardId?: string;
   /** open the Schedule dialog for this task (edit mode only) */
   onSchedule?: () => void;
+  /** edit mode: open the Schedule dialog for one of the subtasks. */
+  onScheduleSubtask?: (taskId: string) => void;
+  /** edit mode: open the full editor for one of the subtasks. */
+  onOpenSubtask?: (taskId: string) => void;
   /** create mode: fired after the new task is successfully inserted. */
   onCreated?: () => void;
 }
@@ -655,13 +677,48 @@ export function TaskDialog(props: TaskDialogProps) {
           </FieldGroup>
 
           {mode === "edit" && task && (
-            <div className="mt-6">
-              <SubtaskEditor
-                parent={task}
-                subtasks={props.subtasks ?? []}
-                workspaceId={workspaceId}
-              />
-            </div>
+            <>
+              <div className="mt-6">
+                <TaskDependenciesField
+                  task={task}
+                  allTasks={props.dependencyCandidates ?? []}
+                  deps={props.dependencies ?? []}
+                  onAdd={(dependsOnTaskId) =>
+                    void mutations.addDependency({
+                      workspaceId,
+                      taskId: task.id,
+                      dependsOnTaskId,
+                    })
+                  }
+                  onRemove={(dep) => void mutations.removeDependency(dep)}
+                />
+              </div>
+              <div className="mt-6">
+                <SubtaskEditor
+                  parent={task}
+                  subtasks={props.subtasks ?? []}
+                  workspaceId={workspaceId}
+                  members={members}
+                  categories={categories}
+                  currentMemberId={currentMemberId}
+                  treeById={props.treeById ?? new Map()}
+                  treeByParent={props.treeByParent ?? new Map()}
+                  dependencies={props.dependencies ?? []}
+                  dependencyBlocked={props.dependencyBlocked ?? new Set()}
+                  dependencyCandidates={props.dependencyCandidates ?? []}
+                  onSchedule={
+                    props.onScheduleSubtask
+                      ? (st) => props.onScheduleSubtask?.(st.id)
+                      : undefined
+                  }
+                  onOpenTask={
+                    props.onOpenSubtask
+                      ? (st) => props.onOpenSubtask?.(st.id)
+                      : undefined
+                  }
+                />
+              </div>
+            </>
           )}
           </ResponsiveDialogBody>
 

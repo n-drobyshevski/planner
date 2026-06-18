@@ -40,6 +40,10 @@
     "contextChange": "context change",
     "schedule": "schedule",
     "complete": "complete",
-    "reopen": "reopen"
-  }
+    "reopen": "reopen",
+    "addDependency": "add dependency",
+    "removeDependency": "remove dependency"
+  },
+  "dependencyAdded": "Dependency added",
+  "dependencyRemoved": "Dependency removed"
 }

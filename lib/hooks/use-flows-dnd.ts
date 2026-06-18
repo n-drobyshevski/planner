@@ -15,6 +15,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { positionBetween } from "@/lib/tasks/ordering";
 import { canNest } from "@/lib/tasks/nesting";
+import type { ById } from "@/lib/tasks/tree";
 import { nestCollision, nestTargetId } from "@/lib/tasks/nest-collision";
 import type { FlowLane } from "@/lib/tasks/flows-layout";
 import type { TaskRow } from "@/lib/types";
@@ -38,12 +39,14 @@ export function useFlowsDnd(
     groupOf: (id: string) => string;
     onReorder: (task: TaskRow, flowPos: number) => void;
     onReparent: (child: TaskRow, parentId: string) => void;
-    hasChildren: (taskId: string) => boolean;
+    /** Whole-tree maps (all collection tasks) for cycle + max-depth checks. */
+    treeById: ById;
+    treeByParent: Map<string | null, TaskRow[]>;
     /** reorder only persists in manual sort; nesting works regardless */
     canReorder: boolean;
   },
 ) {
-  const { anchorOf, groupOf, onReorder, onReparent, hasChildren, canReorder } = opts;
+  const { anchorOf, groupOf, onReorder, onReparent, treeById, treeByParent, canReorder } = opts;
   const ids = useMemo(() => orderedLanes.map((l) => l.task.id), [orderedLanes]);
   const byId = useMemo(
     () => new Map(orderedLanes.map((l) => [l.task.id, l.task])),
@@ -62,11 +65,11 @@ export function useFlowsDnd(
 
   const canNestInto = useCallback(
     (childId: string, parentId: string) => {
-      const child = byId.get(childId);
-      const parent = byId.get(parentId);
-      return !!child && !!parent && canNest(child, parent, hasChildren);
+      const child = treeById.get(childId);
+      const parent = treeById.get(parentId);
+      return !!child && !!parent && canNest(child, parent, treeById, treeByParent);
     },
-    [byId, hasChildren],
+    [treeById, treeByParent],
   );
   const collisionDetection = useMemo(
     () => nestCollision(canNestInto, closestCenter),

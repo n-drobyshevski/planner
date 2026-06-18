@@ -14,6 +14,7 @@ import type {
   TaskRow,
   TaskStatusEvent,
   TaskCheckpoint,
+  TaskDependency,
   TimeWindow,
 } from "@/lib/types";
 import {
@@ -31,6 +32,7 @@ import {
   mapTask,
   mapStatusEvent,
   mapCheckpoint,
+  mapTaskDependency,
 } from "./mappers";
 
 export interface WorkspaceBundle {
@@ -213,6 +215,24 @@ export async function fetchTaskCheckpoints(
     .order("position");
   if (error) throw error;
   return (data ?? []).map(mapCheckpoint);
+}
+
+/**
+ * Every blocks/blocked-by dependency edge in the workspace. Tiny and un-windowed
+ * like the checkpoints/status history; RLS only returns edges where both
+ * endpoints are visible to the viewer.
+ */
+export async function fetchTaskDependencies(
+  sb: SupabaseClient,
+  workspaceId: string,
+): Promise<TaskDependency[]> {
+  const { data, error } = await sb
+    .from("task_dependencies")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at");
+  if (error) throw error;
+  return (data ?? []).map(mapTaskDependency);
 }
 
 /**

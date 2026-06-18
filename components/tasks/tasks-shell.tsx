@@ -15,11 +15,13 @@ import { useTasks } from "@/lib/hooks/use-tasks";
 import { useTaskStatusEvents } from "@/lib/hooks/use-task-status-events";
 import { useTaskBlocks } from "@/lib/hooks/use-task-blocks";
 import { useTaskCheckpoints } from "@/lib/hooks/use-task-checkpoints";
+import { useTaskDependencies } from "@/lib/hooks/use-task-dependencies";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
 import { useFlowsDisplay } from "@/lib/hooks/use-flows-display";
 import { resolveTaskColor } from "@/lib/tasks/colors";
-import { groupByParent, progressOf } from "@/lib/tasks/tree";
+import { groupByParent, indexById, progressDeep, subtreeIds } from "@/lib/tasks/tree";
+import { dependencyBlockedIds } from "@/lib/tasks/blocking";
 import { positionBetween } from "@/lib/tasks/ordering";
 import { combineDateTime } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
@@ -130,6 +132,7 @@ export function TasksShell({
   const { blocks, isLoading: blocksLoading } = useTaskBlocks(workspaceId);
   // Milestone checkpoints power the Flows view's per-flow markers.
   const { checkpoints } = useTaskCheckpoints(workspaceId);
+  const { dependencies } = useTaskDependencies(workspaceId);
   const mutations = useTaskMutations(workspaceId);
 
   const members = workspace.data?.members ?? [];
@@ -210,7 +213,16 @@ export function TasksShell({
     () => groupByParent(collectionTasks),
     [collectionTasks],
   );
+  // Whole-tree id lookup for the views' drag-to-nest cycle/depth checks.
+  const collectionById = useMemo(() => indexById(collectionTasks), [collectionTasks]);
   const topLevel = childrenByParent.get(null) ?? [];
+
+  // Tasks blocked by an unmet dependency (a blocker not yet complete). Computed
+  // over the whole workspace so a cross-collection blocker still counts.
+  const dependencyBlocked = useMemo(() => {
+    const completeById = new Map(tasks.map((tk) => [tk.id, tk.completedAt != null]));
+    return dependencyBlockedIds(dependencies, (id) => completeById.get(id) ?? false);
+  }, [dependencies, tasks]);
 
   // Status events grouped by task id, for the Flows view's per-lane timelines.
   const eventsByTask = useMemo(() => {
@@ -243,18 +255,24 @@ export function TasksShell({
     }
     return map;
   }, [checkpoints]);
+  // Whole-subtree progress (all descendants), so a card with nested subtasks
+  // reflects everything beneath it, not just its direct children.
   const progressFor = (t: TaskRow) => {
-    const c = childrenByParent.get(t.id) ?? [];
-    return c.length ? progressOf(c) : null;
+    const p = progressDeep(t.id, childrenByParent);
+    return p.total ? p : null;
   };
   const editorState = dialogs.editor;
   const editingTask =
     editorState?.mode === "edit"
       ? (tasks.find((t) => t.id === editorState.taskId) ?? null)
       : null;
-  const editingSubtasks = editingTask
-    ? (childrenByParent.get(editingTask.id) ?? [])
-    : [];
+  // The editor renders the whole subtree of the task being edited, so pass every
+  // descendant (not just direct children).
+  const editingSubtasks = useMemo(() => {
+    if (!editingTask) return [];
+    const ids = subtreeIds(editingTask.id, childrenByParent);
+    return collectionTasks.filter((tk) => tk.id !== editingTask.id && ids.has(tk.id));
+  }, [editingTask, childrenByParent, collectionTasks]);
 
   // One grouped prop for the views instead of a six-way handler drill.
   const actions: TaskActions = {
@@ -381,6 +399,7 @@ export function TasksShell({
                   <TaskFlows
                     tasks={topLevel}
                     childrenByParent={childrenByParent}
+                    treeById={collectionById}
                     eventsByTask={eventsByTask}
                     blocksByTask={blocksByTask}
                     checkpointsByTask={checkpointsByTask}
@@ -406,6 +425,8 @@ export function TasksShell({
                     colorOf={colorOf}
                     members={memberMap}
                     progressOf={progressFor}
+                    treeById={collectionById}
+                    treeByParent={childrenByParent}
                     actions={actions}
                   />
                 ) : (
@@ -415,6 +436,8 @@ export function TasksShell({
                     colorOf={colorOf}
                     members={memberMap}
                     progressOf={progressFor}
+                    treeById={collectionById}
+                    treeByParent={childrenByParent}
                     actions={actions}
                   />
                 )}
@@ -441,6 +464,11 @@ export function TasksShell({
             categories={categories}
             task={editingTask}
             subtasks={editingSubtasks}
+            treeById={collectionById}
+            treeByParent={childrenByParent}
+            dependencies={dependencies}
+            dependencyBlocked={dependencyBlocked}
+            dependencyCandidates={collectionTasks}
             createParent={
               dialogs.editor.mode === "create" ? creatingParent : null
             }
@@ -463,6 +491,11 @@ export function TasksShell({
                 ? () => dialogs.scheduleFromEditor(editingTask)
                 : undefined
             }
+            onScheduleSubtask={(id) => {
+              const st = collectionTasks.find((tk) => tk.id === id);
+              if (st) dialogs.scheduleFromEditor(st);
+            }}
+            onOpenSubtask={(id) => dialogs.openEdit(id)}
           />
         )}
 

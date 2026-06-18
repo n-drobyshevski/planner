@@ -19,6 +19,7 @@ import type {
   TaskRow,
   TaskStatusEvent,
   TaskCheckpoint,
+  TaskDependency,
   AppLocale,
   ThemePreference,
   AccentId,
@@ -336,6 +337,30 @@ export function mapStatusEvent(r: Row): TaskStatusEvent {
     toIsDone: Boolean(r.to_is_done),
     changedBy: (r.changed_by as string | null) ?? null,
     changedAt: toMs(r.changed_at),
+  };
+}
+
+export function mapTaskDependency(r: Row): TaskDependency {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    taskId: r.task_id as string,
+    dependsOnTaskId: r.depends_on_task_id as string,
+    createdAt: toMs(r.created_at),
+  };
+}
+
+export interface TaskDependencyInput {
+  workspaceId: string;
+  taskId: string;
+  dependsOnTaskId: string;
+}
+
+export function taskDependencyInputToRow(input: TaskDependencyInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    task_id: input.taskId,
+    depends_on_task_id: input.dependsOnTaskId,
   };
 }
 

@@ -40,6 +40,10 @@
     "contextChange": "смену контекста",
     "schedule": "добавление в календарь",
     "complete": "выполнение",
-    "reopen": "повторное открытие"
-  }
+    "reopen": "повторное открытие",
+    "addDependency": "добавить зависимость",
+    "removeDependency": "удалить зависимость"
+  },
+  "dependencyAdded": "Зависимость добавлена",
+  "dependencyRemoved": "Зависимость удалена"
 }

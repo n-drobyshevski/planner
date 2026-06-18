@@ -1,28 +1,37 @@
 // Drag-to-nest rules shared by the three task views (board / list / flows).
-// The product models exactly two levels — a task and its subtasks — so these
-// guards keep a drop from ever creating a third (grandchild) level. Pure: no I/O.
+// The product allows N-level nesting (a task and its nested subtasks); these
+// guards keep a drop from creating a cycle or exceeding the max depth. Pure: no I/O.
 import type { TaskRow } from "@/lib/types";
+import {
+  MAX_DEPTH,
+  depthOf,
+  isDescendant,
+  maxSubtreeDepth,
+  type ById,
+} from "@/lib/tasks/tree";
 
 /** What a drag-over a row resolves to. Edges reorder; the centre nests. */
 export type DropMode = "nest" | "before" | "after";
 
 /**
- * Whether `child` may become a subtask of `parent` without deepening the tree
- * past two levels:
+ * Whether `child` may become a subtask of `parent`:
  * - not onto itself, and not onto its current parent (a no-op);
- * - `parent` must be top-level (nesting under a subtask would make a grandchild);
- * - `child` must be a leaf (nesting a parent would orphan its subtasks as
- *   invisible grandchildren).
+ * - never under one of `child`'s own descendants (CYCLE prevention);
+ * - the resulting deepest leaf must stay within MAX_DEPTH — the parent's depth
+ *   plus one (the child's new depth) plus the child's own subtree depth.
+ * `byId` / `byParent` describe the whole task tree (build once per view).
  */
 export function canNest(
   child: TaskRow,
   parent: TaskRow,
-  hasChildren: (taskId: string) => boolean,
+  byId: ById,
+  byParent: Map<string | null, TaskRow[]>,
 ): boolean {
   if (child.id === parent.id) return false;
   if (child.parentId === parent.id) return false;
-  if (parent.parentId !== null) return false;
-  if (hasChildren(child.id)) return false;
+  if (isDescendant(child.id, parent.id, byId)) return false; // CYCLE
+  const newChildDepth = depthOf(parent, byId) + 1;
+  if (newChildDepth + maxSubtreeDepth(child.id, byParent) > MAX_DEPTH) return false; // MAX-DEPTH
   return true;
 }
 

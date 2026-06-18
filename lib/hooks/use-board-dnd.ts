@@ -14,6 +14,7 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { positionBetween } from "@/lib/tasks/ordering";
 import { canNest } from "@/lib/tasks/nesting";
+import type { ById } from "@/lib/tasks/tree";
 import { nestCollision, nestTargetId } from "@/lib/tasks/nest-collision";
 import { useOptimisticOrder } from "@/lib/hooks/use-optimistic-order";
 import type { TaskRow, Board } from "@/lib/types";
@@ -47,7 +48,10 @@ export function useBoardDnd(
   boards: Board[],
   onMove: (t: TaskRow, boardId: string, position: number) => void,
   onReparent: (child: TaskRow, parentId: string) => void,
-  hasChildren: (taskId: string) => boolean,
+  // Whole-tree maps (all collection tasks, not just the columns) so cycle and
+  // max-depth checks see a dragged card's full subtree.
+  treeById: ById,
+  treeByParent: Map<string | null, TaskRow[]>,
 ) {
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const boardIds = useMemo(() => new Set(boards.map((b) => b.id)), [boards]);
@@ -66,11 +70,11 @@ export function useBoardDnd(
 
   const canNestInto = useCallback(
     (childId: string, parentId: string) => {
-      const child = byId.get(childId);
-      const parent = byId.get(parentId);
-      return !!child && !!parent && canNest(child, parent, hasChildren);
+      const child = treeById.get(childId);
+      const parent = treeById.get(parentId);
+      return !!child && !!parent && canNest(child, parent, treeById, treeByParent);
     },
-    [byId, hasChildren],
+    [treeById, treeByParent],
   );
   const collisionDetection = useMemo(() => nestCollision(canNestInto), [canNestInto]);
 

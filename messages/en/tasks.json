@@ -264,7 +264,19 @@
     "blocked": "Blocked",
     "blockedHint": "Finish the previous subtask first",
     "promote": "Promote to task",
-    "delete": "Delete subtask"
+    "delete": "Delete subtask",
+    "expand": "Expand subtasks",
+    "collapse": "Collapse subtasks",
+    "details": "Details",
+    "hideDetails": "Hide details",
+    "addChild": "Add subtask",
+    "actions": "Subtask actions",
+    "promoteOneLevel": "Promote one level",
+    "promoteToTop": "Promote to top",
+    "demote": "Nest under previous",
+    "schedule": "Schedule",
+    "openFullEditor": "Open full editor",
+    "depthReached": "Deepest nesting level reached"
   },
   "contextMenu": {
     "open": "Open",
@@ -308,5 +320,15 @@
       "1andHalfHours": "1.5 hours",
       "2hours": "2 hours"
     }
+  },
+  "dependencies": {
+    "blockedByLabel": "Blocked by",
+    "addLabel": "Add a blocker",
+    "addPlaceholder": "Add a task that blocks this…",
+    "emptyHint": "Not blocked by anything.",
+    "remove": "Remove blocker {title}",
+    "unknownTask": "Another task",
+    "blocked": "Blocked",
+    "blockedTitle": "Waiting on another task"
   }
 }

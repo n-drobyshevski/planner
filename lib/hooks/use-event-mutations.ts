@@ -326,6 +326,7 @@ export function useEventMutations(workspaceId: string | undefined) {
             events: snaps.flatMap((s) => s.events),
             overrides: snaps.flatMap((s) => s.overrides),
             checkpoints: snaps.flatMap((s) => s.checkpoints),
+            dependencies: snaps.flatMap((s) => s.dependencies),
           };
           return inverse(t("undoLabel.delete"), () => m.restoreDeleted(sb, merged));
         },

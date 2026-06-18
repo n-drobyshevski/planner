@@ -40,3 +40,28 @@ export function isBlocked(
 export function nextActionable(orderedSiblings: TaskRow[]): TaskRow | null {
   return orderedSiblings.find((t) => t.completedAt == null) ?? null;
 }
+
+// --- Dependency blocking (blocks / blocked-by, a separate DAG) --------------
+
+/**
+ * Ids of tasks blocked by an unmet dependency: a task is blocked while any task
+ * it depends on is not complete. `isComplete` answers per blocker id (so the
+ * caller decides what "complete" means — typically `completedAt != null`).
+ */
+export function dependencyBlockedIds(
+  deps: { taskId: string; dependsOnTaskId: string }[],
+  isComplete: (taskId: string) => boolean,
+): Set<string> {
+  const set = new Set<string>();
+  for (const d of deps) if (!isComplete(d.dependsOnTaskId)) set.add(d.taskId);
+  return set;
+}
+
+/** Whether a task is blocked, by either sequential order or an unmet dependency. */
+export function isTaskBlocked(
+  taskId: string,
+  sequentialBlocked: ReadonlySet<string>,
+  dependencyBlocked: ReadonlySet<string>,
+): boolean {
+  return sequentialBlocked.has(taskId) || dependencyBlocked.has(taskId);
+}
