@@ -392,8 +392,11 @@ export function EventDialog(props: EventDialogProps) {
               return (
                 <>
                   <ResponsiveDialogHeader>
-                    <div className="flex items-center justify-between gap-3">
-                      <ResponsiveDialogTitle>
+                    {/* On phones the type toggle drops to its own line under the
+                        title rather than competing with it (and the close button)
+                        for a single cramped row. */}
+                    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                      <ResponsiveDialogTitle className="min-w-0 truncate">
                         {mode === "create"
                           ? isContext
                             ? t("dialog.newContext")
@@ -904,7 +907,11 @@ export function EventDialog(props: EventDialogProps) {
 
           <ResponsiveDialogFooter className="sm:justify-between">
             {readOnly ? (
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="ml-auto">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="max-sm:h-11 sm:ml-auto"
+              >
                 {tc("close")}
               </Button>
             ) : (
@@ -916,23 +923,28 @@ export function EventDialog(props: EventDialogProps) {
                         variant="ghost"
                         onClick={onDelete}
                         disabled={isSubmitting}
-                        className="text-destructive"
+                        className="text-destructive max-sm:h-11"
                       >
                         <Trash2 data-icon="inline-start" />
                         {tc("delete")}
                       </Button>
                     ) : (
-                      <span />
+                      <span className="max-sm:hidden" />
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 max-sm:w-full">
                       <Button
                         variant="outline"
                         onClick={() => onOpenChange(false)}
                         disabled={isSubmitting}
+                        className="max-sm:h-11"
                       >
                         {tc("cancel")}
                       </Button>
-                      <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
+                      <Button
+                        onClick={() => void form.handleSubmit()}
+                        disabled={isSubmitting}
+                        className="max-sm:h-11 max-sm:flex-1"
+                      >
                         {isSubmitting && (
                           <Spinner data-icon="inline-start" />
                         )}
