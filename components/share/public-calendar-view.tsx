@@ -19,6 +19,7 @@ import {
 import { createPublicClient } from "@/lib/supabase/anon";
 import { fetchWindowPublic } from "@/lib/supabase/queries";
 import { expandEvents } from "@/lib/recurrence/expand";
+import { mergeRanges } from "@/lib/calendar/bands";
 import { getWindow, getVisibleDays } from "@/lib/datetime/window";
 import { localTimeZone } from "@/lib/datetime/local";
 import { Button } from "@/components/ui/button";
@@ -112,9 +113,17 @@ function PublicCalendarInner({
     queryFn: () => fetchWindowPublic(createPublicClient(), token, win),
   });
 
-  const occurrences = useMemo<Occurrence[]>(() => {
-    if (!query.data) return [];
-    return expandEvents(
+  // Split the expanded events two ways: active events become real blocks; inactive
+  // (sleep / blocked) events become a quiet "Unavailable" band instead — their time
+  // shows, their content never does (the RPC already redacted it). The RPC only
+  // returns inactive rows when the share opts in (`show_inactive`), so an empty band
+  // list just means the owner turned the band off (or has no inactive time here).
+  const { occurrences, unavailableBands } = useMemo<{
+    occurrences: Occurrence[];
+    unavailableBands: { start: number; end: number }[];
+  }>(() => {
+    if (!query.data) return { occurrences: [], unavailableBands: [] };
+    const all = expandEvents(
       query.data.events,
       query.data.overrides,
       win,
@@ -122,6 +131,15 @@ function PublicCalendarInner({
       // Context paint-blocks reveal category structure and have no public meaning;
       // keep the public view to real events.
     ).filter((o) => o.kind === "event");
+    return {
+      occurrences: all.filter((o) => !o.inactive),
+      // Cancelled inactive occurrences aren't "unavailable" — drop them.
+      unavailableBands: mergeRanges(
+        all
+          .filter((o) => o.inactive && o.status !== "cancelled")
+          .map((o) => ({ start: o.start, end: o.end })),
+      ),
+    };
   }, [query.data, win]);
 
   function shift(dir: -1 | 1) {
@@ -232,6 +250,7 @@ function PublicCalendarInner({
             view={view}
             days={days}
             occurrences={occurrences}
+            unavailableBands={unavailableBands}
             focusedMs={focusedDate}
             colorOf={() => PUBLIC_BLOCK_COLOR}
             canEdit={NEVER_EDIT}

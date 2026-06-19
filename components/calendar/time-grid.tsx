@@ -103,6 +103,8 @@ interface Props {
   labelStyle?: ContextLabel;
   /** True when the partner's calendar is overlaid (drives the 4/5 context split). */
   twoCalendars?: boolean;
+  /** Shaded "Unavailable" bands drawn behind events (public share inactive time). */
+  unavailableBands?: { start: number; end: number }[];
 }
 
 const SCHED_MIN = 60; // default minutes for a task dropped onto the grid
@@ -188,6 +190,7 @@ export function TimeGrid({
   onScheduleTask,
   labelStyle = "bar",
   twoCalendars,
+  unavailableBands,
 }: Props) {
   const t = useTranslations("calendar");
   const locale = useLocale();
@@ -1036,6 +1039,7 @@ export function TimeGrid({
                 singleColumn={days.length === 1}
                 labelStyle={labelStyle}
                 twoCalendars={twoCalendars}
+                unavailableBands={unavailableBands}
                 occurrences={occurrences}
                 colorOf={colorOf}
                 selectedKeys={selectedKeys}

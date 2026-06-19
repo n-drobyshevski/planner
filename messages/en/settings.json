@@ -273,6 +273,10 @@
         "required": "Pick at least one category.",
         "namesPlusMore": "{names} +{count, plural, one {# more} other {# more}}"
       },
+      "unavailable": {
+        "label": "Show unavailable time",
+        "description": "Shows your blocked and sleep hours as a shaded “Unavailable” band, without revealing what they are."
+      },
       "expiry": {
         "label": "Expires",
         "placeholder": "Never",

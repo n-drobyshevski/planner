@@ -67,6 +67,9 @@ export interface CanvasProps {
   contextLabel?: ContextLabel;
   /** Time-grid: partner's calendar overlaid — splits contexts 4/5 by owner. */
   twoCalendars?: boolean;
+  /** Shaded "Unavailable" time bands drawn behind events in the time-grid views
+   *  (ignored in month/agenda). Used by the public share view for inactive time. */
+  unavailableBands?: { start: number; end: number }[];
   loading: boolean;
   error: boolean;
   /** Refetch the calendar data after a load failure (omitted on display-only panes). */
@@ -195,6 +198,7 @@ export function CalendarCanvas(props: CanvasProps) {
         onScheduleTask={onScheduleTask}
         labelStyle={contextLabel}
         twoCalendars={twoCalendars}
+        unavailableBands={props.unavailableBands}
       />
     );
   }
