@@ -26,6 +26,8 @@ import type {
   SurfaceTone,
   Palette,
   ContextLabel,
+  PublicShareRow,
+  TimeslotRequestRow,
 } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -283,6 +285,7 @@ export function mapEvent(r: Row): EventRow {
     location: (r.location as string | null) ?? null,
     isPrivate: Boolean(r.is_private),
     isShared: Boolean(r.is_shared),
+    hiddenFromPublic: Boolean(r.hidden_from_public),
     color: (r.color as string | null) ?? null,
     kind: (r.kind as EventRow["kind"] | null) ?? "event",
     allDay: Boolean(r.all_day),
@@ -399,6 +402,38 @@ export function mapOverride(r: Row): OverrideRow {
   };
 }
 
+export function mapPublicShare(r: Row): PublicShareRow {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    ownerId: r.owner_id as string,
+    token: r.token as string,
+    label: (r.label as string | null) ?? null,
+    mode: r.mode as PublicShareRow["mode"],
+    categoryIds: (r.category_ids as string[] | null) ?? null,
+    expiresAt: toMsOrNull(r.expires_at),
+    revokedAt: toMsOrNull(r.revoked_at),
+    createdAt: toMs(r.created_at),
+    updatedAt: toMs(r.updated_at),
+  };
+}
+
+export function mapTimeslotRequest(r: Row): TimeslotRequestRow {
+  return {
+    id: r.id as string,
+    shareId: r.share_id as string,
+    workspaceId: r.workspace_id as string,
+    ownerId: r.owner_id as string,
+    requesterName: (r.requester_name as string | null) ?? null,
+    message: (r.message as string | null) ?? null,
+    proposedStart: toMs(r.proposed_start),
+    proposedEnd: toMs(r.proposed_end),
+    status: r.status as TimeslotRequestRow["status"],
+    createdAt: toMs(r.created_at),
+    resolvedAt: toMsOrNull(r.resolved_at),
+  };
+}
+
 /** Fields accepted when creating/updating an event (domain shape, ms times). */
 export interface EventInput {
   workspaceId: string;
@@ -409,6 +444,7 @@ export interface EventInput {
   location?: string | null;
   isPrivate?: boolean;
   isShared?: boolean;
+  hiddenFromPublic?: boolean;
   color?: string | null;
   kind?: EventRow["kind"];
   allDay?: boolean;
@@ -434,6 +470,7 @@ export function eventInputToRow(input: EventInput): Row {
     location: input.location ?? null,
     is_private: input.isPrivate ?? false,
     is_shared: input.isShared ?? false,
+    hidden_from_public: input.hiddenFromPublic ?? false,
     color: input.color ?? null,
     kind: input.kind ?? "event",
     all_day: input.allDay ?? false,
@@ -458,6 +495,8 @@ export function eventPatchToRow(patch: Partial<EventInput>): Row {
   if ("location" in patch) row.location = patch.location ?? null;
   if ("isPrivate" in patch) row.is_private = patch.isPrivate ?? false;
   if ("isShared" in patch) row.is_shared = patch.isShared ?? false;
+  if ("hiddenFromPublic" in patch)
+    row.hidden_from_public = patch.hiddenFromPublic ?? false;
   if ("color" in patch) row.color = patch.color ?? null;
   if ("kind" in patch) row.kind = patch.kind;
   if ("allDay" in patch) row.all_day = patch.allDay;

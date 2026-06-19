@@ -12,6 +12,13 @@
   "logSleep": {
     "frame": "How did you sleep on {date}?"
   },
+  "request": {
+    "frame": "{name} requested a time",
+    "frameAnon": "Someone requested a time",
+    "approve": "Approve",
+    "decline": "Decline",
+    "defaultTitle": "Requested time"
+  },
   "endedAgo": "Ended {ago}",
   "doneAgo": "Done {ago}",
   "saveSleep": "Save",

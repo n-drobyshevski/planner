@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { canSee, canEdit, layerOf, filterVisible } from "@/lib/scope/visibility";
+import {
+  canSee,
+  canEdit,
+  layerOf,
+  filterVisible,
+  publicVisible,
+  redactForPublic,
+  filterPublic,
+  MAX_PUBLIC_CONFIG,
+  PUBLIC_BUSY_LABEL,
+  type PublicShareConfig,
+} from "@/lib/scope/visibility";
 import type { Occurrence } from "@/lib/types";
 
 const OWNER = "owner-1";
@@ -24,6 +35,7 @@ function occ(over: Partial<Occurrence>): Occurrence {
     ownerId: OWNER,
     isPrivate: false,
     isShared: false,
+    hiddenFromPublic: false,
     taskId: null,
     attributes: {},
     isRecurring: false,
@@ -254,5 +266,106 @@ describe("joint events (filed under a Shared context)", () => {
         selfHidden: false,
       }),
     ).toEqual([]);
+  });
+});
+
+// --- Phase 4: the PUBLIC rung ----------------------------------------------
+
+const DETAILS_ALL: PublicShareConfig = { mode: "details", categoryIds: null };
+const BUSY_ALL: PublicShareConfig = { mode: "busy", categoryIds: null };
+
+describe("publicVisible", () => {
+  it("a private item is NEVER public, under any config", () => {
+    const e = { isPrivate: true, hiddenFromPublic: false, inactive: false, categoryId: null };
+    expect(publicVisible(e, DETAILS_ALL)).toBe(false);
+    expect(publicVisible(e, BUSY_ALL)).toBe(false);
+    expect(publicVisible({ ...e, categoryId: "cat-x" }, { mode: "details", categoryIds: ["cat-x"] })).toBe(false);
+  });
+
+  it("a hidden-from-public item is NEVER public, even when non-private", () => {
+    const e = { isPrivate: false, hiddenFromPublic: true, inactive: false, categoryId: "cat-x" };
+    expect(publicVisible(e, DETAILS_ALL)).toBe(false);
+    expect(publicVisible(e, { mode: "details", categoryIds: ["cat-x"] })).toBe(false);
+  });
+
+  it("an inactive block (sleep/holds) is never public", () => {
+    const e = { isPrivate: false, hiddenFromPublic: false, inactive: true, categoryId: null };
+    expect(publicVisible(e, DETAILS_ALL)).toBe(false);
+  });
+
+  it("a plain non-private item is public when categoryIds is null (all)", () => {
+    expect(
+      publicVisible({ isPrivate: false, hiddenFromPublic: false, inactive: false, categoryId: null }, DETAILS_ALL),
+    ).toBe(true);
+    expect(
+      publicVisible({ isPrivate: false, hiddenFromPublic: false, inactive: false, categoryId: "cat-x" }, DETAILS_ALL),
+    ).toBe(true);
+  });
+
+  it("a category allow-list shows only listed categories", () => {
+    const base = { isPrivate: false, hiddenFromPublic: false, inactive: false };
+    const cfg: PublicShareConfig = { mode: "details", categoryIds: ["cat-ok"] };
+    expect(publicVisible({ ...base, categoryId: "cat-ok" }, cfg)).toBe(true);
+    expect(publicVisible({ ...base, categoryId: "cat-no" }, cfg)).toBe(false);
+  });
+
+  it("an allow-list excludes uncategorized (null category) items", () => {
+    expect(
+      publicVisible(
+        { isPrivate: false, hiddenFromPublic: false, inactive: false, categoryId: null },
+        { mode: "details", categoryIds: ["cat-ok"] },
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("redactForPublic", () => {
+  it("details mode returns the occurrence unchanged (same reference)", () => {
+    const o = occ({ title: "Dentist", description: "molar", location: "Clinic" });
+    expect(redactForPublic(o, DETAILS_ALL)).toBe(o);
+  });
+
+  it("busy mode redacts title to the generic label and strips description/location", () => {
+    const o = occ({ title: "Dentist", description: "molar", location: "Clinic" });
+    const r = redactForPublic(o, BUSY_ALL);
+    expect(r.title).toBe(PUBLIC_BUSY_LABEL);
+    expect(r.description).toBeNull();
+    expect(r.location).toBeNull();
+    // time/identity preserved so the block still renders where it should
+    expect(r.start).toBe(o.start);
+    expect(r.end).toBe(o.end);
+    expect(r.key).toBe(o.key);
+  });
+});
+
+describe("filterPublic (present-mode parity)", () => {
+  it("drops private/hidden/inactive and keeps the rest, redacting per mode", () => {
+    const list = [
+      occ({ key: "a:1", eventId: "a", title: "Standup", isPrivate: true }),
+      occ({ key: "b:1", eventId: "b", title: "Lunch", hiddenFromPublic: true }),
+      occ({ key: "c:1", eventId: "c", title: "Sleep", inactive: true }),
+      occ({ key: "d:1", eventId: "d", title: "Gym" }),
+    ];
+    const details = filterPublic(list, DETAILS_ALL);
+    expect(details.map((o) => o.title)).toEqual(["Gym"]);
+
+    const busy = filterPublic(list, BUSY_ALL);
+    expect(busy.map((o) => o.title)).toEqual([PUBLIC_BUSY_LABEL]);
+  });
+
+  it("present mode (filterPublic with MAX_PUBLIC_CONFIG) equals the publicVisible filter", () => {
+    // Present mode and the public link must agree on what's exposed. Build a mixed
+    // list and assert the present-mode slice == the raw publicVisible predicate.
+    const list = [
+      occ({ key: "a:1", eventId: "a", isPrivate: true }),
+      occ({ key: "b:1", eventId: "b", hiddenFromPublic: true }),
+      occ({ key: "c:1", eventId: "c", inactive: true }),
+      occ({ key: "d:1", eventId: "d", categoryId: "work" }),
+      occ({ key: "e:1", eventId: "e", categoryId: null }),
+    ];
+    const present = filterPublic(list, MAX_PUBLIC_CONFIG).map((o) => o.key);
+    const expected = list.filter((o) => publicVisible(o, MAX_PUBLIC_CONFIG)).map((o) => o.key);
+    expect(present).toEqual(expected);
+    expect(present).toEqual(["d:1", "e:1"]);
   });
 });

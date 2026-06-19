@@ -12,6 +12,13 @@
   "logSleep": {
     "frame": "Как спалось в ночь на {date}?"
   },
+  "request": {
+    "frame": "{name} предлагает время",
+    "frameAnon": "Кто-то предлагает время",
+    "approve": "Принять",
+    "decline": "Отклонить",
+    "defaultTitle": "Предложенное время"
+  },
   "endedAgo": "Закончилось {ago}",
   "doneAgo": "Выполнено {ago}",
   "saveSleep": "Сохранить",

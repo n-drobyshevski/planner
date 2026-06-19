@@ -102,6 +102,9 @@ function baseOccurrence(
       !event.isPrivate &&
       (event.isShared ||
         (event.categoryId != null && sharedCategoryIds.has(event.categoryId))),
+    // Series-level public opt-out, carried so the public filter + present mode can
+    // withhold this occurrence; applyOverride leaves it alone (no override column).
+    hiddenFromPublic: event.hiddenFromPublic,
     taskId: event.taskId,
     // Series-level, like color: every occurrence inherits the master's
     // attributes; applyOverride leaves them alone (no override column).

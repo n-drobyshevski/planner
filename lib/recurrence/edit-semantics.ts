@@ -161,6 +161,7 @@ export function splitThisAndFuture(
     location: patch.location !== undefined ? patch.location : event.location,
     isPrivate: event.isPrivate,
     isShared: event.isShared,
+    hiddenFromPublic: event.hiddenFromPublic,
     color: event.color,
     kind: event.kind,
     allDay: patch.allDay !== undefined ? patch.allDay : event.allDay,

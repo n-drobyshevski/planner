@@ -18,7 +18,7 @@ import { TZDate } from "@date-fns/tz";
 
 import { dateKeyInZone, dayStartOffset } from "@/lib/datetime/local";
 import type { ItemAttributes } from "@/lib/attributes/schema";
-import type { Occurrence, TaskRow } from "@/lib/types";
+import type { Occurrence, TaskRow, TimeslotRequestRow } from "@/lib/types";
 
 const DAY = 86_400_000;
 
@@ -31,7 +31,7 @@ export const SLEEP_N = 7;
 /** Soft cap so a long-neglected workspace can't render an unbounded list. */
 export const INBOX_CAP = 50;
 
-export type InboxItemKind = "rate-event" | "rate-task" | "log-sleep";
+export type InboxItemKind = "rate-event" | "rate-task" | "log-sleep" | "request";
 
 interface InboxItemBase {
   /** Stable across recomputes: `${kind}:${entityKey}` — also the React key and
@@ -71,8 +71,24 @@ export interface LogSleepItem extends InboxItemBase {
   dateKey: string;
 }
 
-/** The discriminated union of inbox rows. Phase 4 adds a `RequestItem` member. */
-export type InboxItem = RateEventItem | RateTaskItem | LogSleepItem;
+/**
+ * A pending timeslot request from a public share viewer (Phase 4). The owner
+ * approves (→ creates an event at the proposed time) or declines. Always
+ * "attention" severity so it floats above the calm rating/sleep nudges.
+ */
+export interface RequestItem extends InboxItemBase {
+  kind: "request";
+  /** timeslot_requests row id — the approve/decline write target. */
+  requestId: string;
+  /** free-text name the requester gave, or null (anonymous). */
+  requesterName: string | null;
+  message: string | null;
+  proposedStart: number; // epoch ms
+  proposedEnd: number; // epoch ms
+}
+
+/** The discriminated union of inbox rows. */
+export type InboxItem = RateEventItem | RateTaskItem | LogSleepItem | RequestItem;
 
 export interface InboxInput {
   /** Occurrences over a trailing window (raw — both members'; we filter to the
@@ -83,6 +99,9 @@ export interface InboxInput {
   /** Wake-date tokens ("yyyy-MM-dd") that already have a sleep-log row for the
    *  viewer — sleep logs are member-private, so this is the viewer's set. */
   sleepLogDates: ReadonlySet<string>;
+  /** Pending public-share timeslot requests addressed to the viewer (RLS-scoped
+   *  to the owner). Optional so existing callers/tests need no change. */
+  requests?: TimeslotRequestRow[];
   /** The current member — only their own items are surfaced (never the partner's). */
   viewerId: string;
   now: number;
@@ -116,6 +135,21 @@ export function deriveInboxItems(input: InboxInput): InboxItem[] {
   const rateCutoff = now - rateN * DAY;
 
   const items: InboxItem[] = [];
+
+  // --- request: pending public-share timeslot proposals (attention, top) ------
+  for (const r of input.requests ?? []) {
+    items.push({
+      id: `request:${r.id}`,
+      kind: "request",
+      severity: "attention",
+      sortMs: r.createdAt,
+      requestId: r.id,
+      requesterName: r.requesterName,
+      message: r.message,
+      proposedStart: r.proposedStart,
+      proposedEnd: r.proposedEnd,
+    });
+  }
 
   // --- rate-event: the viewer's own finished, unrated, non-recurring blocks ---
   for (const o of occurrences) {

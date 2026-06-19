@@ -8,7 +8,8 @@
     "appearance": "Appearance",
     "calendar": "Calendar",
     "time": "Time",
-    "sleep": "Sleep"
+    "sleep": "Sleep",
+    "sharing": "Sharing"
   },
   "profile": {
     "title": "Profile",
@@ -189,6 +190,97 @@
       "startLabel": "Night starts after",
       "endLabel": "Night ends by",
       "description": "Derived nights collect sleep between these wall-clock hours — the start on the evening before, the end on the wake day. Widen it if you sleep past noon or keep unusual hours."
+    }
+  },
+  "sharing": {
+    "title": "Public sharing",
+    "description": "Share a read-only view of your calendar with a link. Anyone who has the link can open it — no sign-in needed. You control exactly what each link shows.",
+    "loading": "Loading links…",
+    "untitled": "Untitled link",
+    "links": {
+      "heading": "Share links",
+      "create": "Create link"
+    },
+    "empty": {
+      "title": "No share links yet",
+      "description": "Create a link to share a read-only calendar. You choose what it shows and can revoke it anytime."
+    },
+    "status": {
+      "active": "Active",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "mode": {
+      "details": "Shows event titles",
+      "busy": "Busy only, titles hidden"
+    },
+    "scope": {
+      "all": "All categories",
+      "count": "{count, plural, one {# category} other {# categories}}",
+      "namesPlusMore": "{names} +{count, plural, one {# more} other {# more}}"
+    },
+    "expiresOn": "Expires {date}",
+    "expiredOn": "Expired {date}",
+    "actions": {
+      "copy": "Copy link",
+      "edit": "Edit",
+      "revoke": "Revoke",
+      "restore": "Restore",
+      "delete": "Delete",
+      "more": "More actions"
+    },
+    "toasts": {
+      "copied": "Link copied",
+      "copyFailed": "Couldn't copy the link"
+    },
+    "revokeConfirm": {
+      "title": "Revoke this link?",
+      "description": "The link stops working immediately for anyone who has it. You can restore it later, or delete it for good.",
+      "cancel": "Cancel",
+      "confirm": "Revoke"
+    },
+    "deleteConfirm": {
+      "title": "Delete this link?",
+      "description": "The link is removed for good and can't be restored. Anyone who has it loses access.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "dialog": {
+      "createTitle": "Create share link",
+      "editTitle": "Edit share link",
+      "description": "Choose what this link shows. You can change it later, or revoke the link entirely.",
+      "label": {
+        "label": "Label",
+        "placeholder": "e.g. Family",
+        "description": "A private note so you remember who this link is for. Only you see it."
+      },
+      "mode": {
+        "legend": "What the link shows",
+        "details": {
+          "title": "Details",
+          "description": "Shows event titles."
+        },
+        "busy": {
+          "title": "Busy",
+          "description": "Shows only that you're busy — titles are hidden."
+        }
+      },
+      "scope": {
+        "legend": "Categories",
+        "description": "Limit the link to certain categories, or share them all.",
+        "all": "All categories",
+        "empty": "No categories yet.",
+        "required": "Pick at least one category.",
+        "namesPlusMore": "{names} +{count, plural, one {# more} other {# more}}"
+      },
+      "expiry": {
+        "label": "Expires",
+        "placeholder": "Never",
+        "description": "After this date the link stops working. Leave empty to keep it open."
+      },
+      "cancel": "Cancel",
+      "createSubmit": "Create link",
+      "saveSubmit": "Save changes"
     }
   }
 }

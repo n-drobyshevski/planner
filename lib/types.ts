@@ -182,6 +182,12 @@ export interface EventRow {
    * this with the shared-context derivation — see the derived `Occurrence.isShared`.
    */
   isShared: boolean;
+  /**
+   * Phase 4 public-sharing opt-out: when true, this event is withheld from every
+   * public share link (and present mode), independent of `isPrivate`. A non-private
+   * event is normally eligible for public links; this flag hides just this one.
+   */
+  hiddenFromPublic: boolean;
   /** per-item color override (hex); null = derive from category/owner */
   color: string | null;
   /** 'event' (normal) or 'context' (a Context's time-block on the calendar).
@@ -349,6 +355,8 @@ export interface Occurrence {
    * categories (not stored on the event row).
    */
   isShared: boolean;
+  /** inherited from the event: withheld from public share links + present mode */
+  hiddenFromPublic: boolean;
   /** when set, this occurrence is a scheduled block of a task */
   taskId: string | null;
   /** optimization attributes, inherited from the master event (series-level, not overridable) */
@@ -356,6 +364,44 @@ export interface Occurrence {
   isRecurring: boolean;
   /** true when a `modify` override was applied to this instance */
   isException: boolean;
+}
+
+/** Phase 4 — a public share link the owner manages (lib/scope/visibility config). */
+export interface PublicShareRow {
+  id: string;
+  workspaceId: string;
+  ownerId: string;
+  /** the unguessable URL token (`/share/<token>`) */
+  token: string;
+  /** owner's memo for the link, e.g. "Family"; null = unnamed */
+  label: string | null;
+  /** 'details' shows titles; 'busy' redacts every block to "Busy" */
+  mode: "details" | "busy";
+  /** category allow-list; null = all (non-private, non-hidden) categories */
+  categoryIds: string[] | null;
+  /** epoch ms; null = never expires */
+  expiresAt: number | null;
+  /** epoch ms the link was permanently disabled; null = active */
+  revokedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Phase 4 — a public viewer's proposed timeslot, awaiting the owner's decision. */
+export interface TimeslotRequestRow {
+  id: string;
+  shareId: string;
+  workspaceId: string;
+  /** the share's owner; RLS scopes visibility to them */
+  ownerId: string;
+  /** free-text name the requester gave; null = anonymous */
+  requesterName: string | null;
+  message: string | null;
+  proposedStart: number; // epoch ms
+  proposedEnd: number; // epoch ms
+  status: "pending" | "approved" | "declined";
+  createdAt: number;
+  resolvedAt: number | null;
 }
 
 export type CalendarView = "month" | "week" | "day" | "3day" | "agenda";

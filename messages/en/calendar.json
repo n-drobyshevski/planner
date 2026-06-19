@@ -102,6 +102,7 @@
       "showHelp": "Show this help",
       "undo": "Undo the last change",
       "blurTitles": "Blur / unblur all titles",
+      "presentMode": "Present mode (public view)",
       "toggleFilters": "Toggle the filters sidebar",
       "toggleTasks": "Toggle the tasks panel",
       "zoom": "Zoom the day grid",
@@ -121,5 +122,9 @@
       "duplicate": "Duplicate to the drop spot",
       "wholeSeries": "Act on the whole recurring series"
     }
+  },
+  "present": {
+    "banner": "Present mode — showing only what a public viewer sees",
+    "exit": "Exit"
   }
 }

@@ -60,6 +60,8 @@
     "visibilityHintPrivate": "Only you can see this.",
     "visibilityHintShared": "Shows on both calendars; you both can edit it.",
     "visibilityHintVisible": "Your partner can see it on your calendar; only you can edit it.",
+    "hideFromPublic": "Hide from public links",
+    "hideFromPublicHint": "Keep this off any shared public calendar, even when it isn't private.",
     "moreOptions": "More options",
     "status": "Status",
     "statusPlanned": "Planned",

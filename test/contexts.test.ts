@@ -24,6 +24,7 @@ function occ(over: Partial<Occurrence> & Pick<Occurrence, "start" | "end">): Occ
     ownerId: "m",
     isPrivate: false,
     isShared: false,
+    hiddenFromPublic: false,
     taskId: null,
     attributes: {},
     isRecurring: false,

@@ -16,10 +16,14 @@ import type {
   TaskCheckpoint,
   TaskDependency,
   TimeWindow,
+  TimeslotRequestRow,
+  PublicShareRow,
 } from "@/lib/types";
 import {
   mapEvent,
   mapOverride,
+  mapTimeslotRequest,
+  mapPublicShare,
   mapMember,
   mapCategory,
   mapCategoryGoal,
@@ -138,6 +142,110 @@ export async function fetchWindow(
   if (ovErr) throw ovErr;
 
   return { events, overrides: (ovData ?? []).map(mapOverride) };
+}
+
+/**
+ * The PUBLIC (anonymous) read path: events (+ overrides) for a share token over a
+ * window. Calls the SECURITY DEFINER RPCs, which validate the token (active) and
+ * apply the STRICT server-side public filter + busy-mode redaction in SQL — the
+ * anon caller never touches the events table and can never see a private,
+ * hidden-from-public, or inactive event. Pass `sb` = the cookieless anon client
+ * (lib/supabase/anon). Mirrors `fetchWindow`'s post-filter exactly: the RPC prunes
+ * `starts_at < win.end`; we keep the end/recurrence overlap test here. An invalid /
+ * expired / revoked token simply yields no rows (an empty calendar), never an error.
+ */
+/** Non-sensitive metadata for a share link (no calendar data). `null` = the token
+ *  doesn't exist; `active=false` = it exists but is revoked/expired. */
+export interface PublicShareMeta {
+  active: boolean;
+  label: string | null;
+  mode: "details" | "busy";
+}
+
+export async function fetchPublicShareMeta(
+  sb: SupabaseClient,
+  token: string,
+): Promise<PublicShareMeta | null> {
+  const { data, error } = await sb.rpc("public_share_meta", { p_token: token });
+  if (error) throw error;
+  const row = (data ?? [])[0] as
+    | { active: boolean; label: string | null; mode: "details" | "busy" }
+    | undefined;
+  return row
+    ? { active: row.active, label: row.label ?? null, mode: row.mode }
+    : null;
+}
+
+export async function fetchWindowPublic(
+  sb: SupabaseClient,
+  token: string,
+  win: TimeWindow,
+): Promise<WindowData> {
+  const startIso = new Date(win.start).toISOString();
+  const endIso = new Date(win.end).toISOString();
+  const params = { p_token: token, p_start: startIso, p_end: endIso };
+
+  const { data, error } = await sb.rpc("public_calendar_events", params);
+  if (error) throw error;
+
+  const all = ((data ?? []) as Record<string, unknown>[]).map(mapEvent);
+  const events = all.filter((e) =>
+    e.rrule
+      ? e.recurrenceEndsAt == null || e.recurrenceEndsAt >= win.start
+      : e.end >= win.start,
+  );
+  if (events.length === 0) return { events, overrides: [] };
+
+  const { data: ovData, error: ovErr } = await sb.rpc(
+    "public_calendar_overrides",
+    params,
+  );
+  if (ovErr) throw ovErr;
+
+  // The RPC returns overrides for every permitted event in the window; keep only
+  // those belonging to the events we actually return (mirrors fetchWindow's `.in`).
+  const ids = new Set(events.map((e) => e.id));
+  const overrides = ((ovData ?? []) as Record<string, unknown>[])
+    .map(mapOverride)
+    .filter((o) => ids.has(o.eventId));
+
+  return { events, overrides };
+}
+
+/**
+ * The viewer's PENDING incoming timeslot requests (Phase 4). RLS returns only the
+ * owner's own rows, so this is naturally viewer-scoped. Resolved (approved/declined)
+ * rows are excluded — the inbox shows only what still needs a decision.
+ */
+export async function fetchTimeslotRequests(
+  sb: SupabaseClient,
+  workspaceId: string,
+): Promise<TimeslotRequestRow[]> {
+  const { data, error } = await sb
+    .from("timeslot_requests")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapTimeslotRequest);
+}
+
+/**
+ * The owner's public share links (Phase 4), newest first. RLS scopes to the owner;
+ * the settings UI lists, creates, and revokes them.
+ */
+export async function fetchPublicShares(
+  sb: SupabaseClient,
+  workspaceId: string,
+): Promise<PublicShareRow[]> {
+  const { data, error } = await sb
+    .from("public_calendar_shares")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapPublicShare);
 }
 
 /**

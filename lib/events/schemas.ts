@@ -27,6 +27,9 @@ const eventFormBase = z.object({
   endTime: z.string(),
   categoryId: z.string(), // "none" | id
   visibility: z.enum(["private", "visible", "shared"]),
+  /** Phase 4: withhold this event from every public share link (and present mode).
+   *  Independent of `visibility` — a non-private event can still be hidden. */
+  hiddenFromPublic: z.boolean(),
   /** own color override (hex); null = derive from category/owner */
   color: z.string().nullable(),
   recurrence: z.custom<RecurrenceForm>().nullable(),

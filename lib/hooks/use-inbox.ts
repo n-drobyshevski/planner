@@ -4,7 +4,11 @@ import { useMemo, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { createClient } from "@/lib/supabase/client";
-import { fetchTasks, fetchSleepLogs } from "@/lib/supabase/queries";
+import {
+  fetchTasks,
+  fetchSleepLogs,
+  fetchTimeslotRequests,
+} from "@/lib/supabase/queries";
 import { qk } from "@/lib/supabase/query-keys";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
@@ -115,6 +119,13 @@ export function useInboxItems(): { items: InboxItem[]; isLoading: boolean } {
     enabled: Boolean(wsId && viewerId),
     queryFn: () => fetchSleepLogs(sb, wsId as string, viewerId as string),
   });
+  // Pending public-share timeslot requests (RLS returns only the owner's). Shares
+  // the inbox's focus-refetch liveness model — no realtime channel of its own.
+  const requestsQuery = useQuery({
+    queryKey: wsId ? qk.timeslotRequests(wsId) : ["timeslot-requests", "disabled"],
+    enabled: Boolean(wsId),
+    queryFn: () => fetchTimeslotRequests(sb, wsId as string),
+  });
 
   const sleepPrefs = ws?.sleepPrefs;
   const items = useMemo(() => {
@@ -130,15 +141,20 @@ export function useInboxItems(): { items: InboxItem[]; isLoading: boolean } {
       occurrences,
       tasks: tasksQuery.data ?? [],
       sleepLogDates,
+      requests: requestsQuery.data ?? [],
       viewerId,
       now,
       timeZone,
       nightWindow,
     });
-  }, [ready, occurrences, tasksQuery.data, sleepQuery.data, viewerId, now, timeZone, sleepPrefs]);
+  }, [ready, occurrences, tasksQuery.data, sleepQuery.data, requestsQuery.data, viewerId, now, timeZone, sleepPrefs]);
 
   const isLoading =
-    wsLoading || evLoading || tasksQuery.isLoading || sleepQuery.isLoading;
+    wsLoading ||
+    evLoading ||
+    tasksQuery.isLoading ||
+    sleepQuery.isLoading ||
+    requestsQuery.isLoading;
   return { items, isLoading };
 }
 
