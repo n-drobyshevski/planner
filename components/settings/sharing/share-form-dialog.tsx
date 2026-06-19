@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldLabel,
   FieldLegend,
@@ -79,6 +81,7 @@ export function ShareFormDialog({
   const [mode, setMode] = useState<PublicShareRow["mode"]>("details");
   // null = all categories; a Set = the explicit allow-list.
   const [scoped, setScoped] = useState<Set<string> | null>(null);
+  const [showInactive, setShowInactive] = useState(true);
   const [expiry, setExpiry] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -88,6 +91,7 @@ export function ShareFormDialog({
     setLabel(share?.label ?? "");
     setMode(share?.mode ?? "details");
     setScoped(share?.categoryIds == null ? null : new Set(share.categoryIds));
+    setShowInactive(share?.showInactive ?? true);
     setExpiry(msToIsoDate(share?.expiresAt ?? null));
     setSubmitting(false);
   }, [open, share]);
@@ -121,6 +125,7 @@ export function ShareFormDialog({
       label: trimmed === "" ? null : trimmed,
       mode,
       categoryIds,
+      showInactive,
       expiresAt: isoDateToMs(expiry),
     };
     setSubmitting(true);
@@ -278,6 +283,23 @@ export function ShareFormDialog({
               )}
             </div>
           </FieldSet>
+
+          {/* Unavailable band — show blocked/sleep time as a shaded region */}
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldLabel htmlFor="share-unavailable">
+                {t("sharing.dialog.unavailable.label")}
+              </FieldLabel>
+              <FieldDescription>
+                {t("sharing.dialog.unavailable.description")}
+              </FieldDescription>
+            </FieldContent>
+            <Switch
+              id="share-unavailable"
+              checked={showInactive}
+              onCheckedChange={setShowInactive}
+            />
+          </Field>
 
           {/* Expiry */}
           <Field>

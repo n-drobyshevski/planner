@@ -411,6 +411,7 @@ export function mapPublicShare(r: Row): PublicShareRow {
     label: (r.label as string | null) ?? null,
     mode: r.mode as PublicShareRow["mode"],
     categoryIds: (r.category_ids as string[] | null) ?? null,
+    showInactive: (r.show_inactive as boolean | null) ?? true,
     expiresAt: toMsOrNull(r.expires_at),
     revokedAt: toMsOrNull(r.revoked_at),
     createdAt: toMs(r.created_at),

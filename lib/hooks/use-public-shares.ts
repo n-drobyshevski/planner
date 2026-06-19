@@ -25,6 +25,8 @@ export interface CreateShareInput {
   mode: PublicShareRow["mode"];
   /** category allow-list; null = all categories */
   categoryIds: string[] | null;
+  /** show inactive (sleep/blocked) time as a shaded "Unavailable" band */
+  showInactive: boolean;
   /** epoch ms; null = never expires */
   expiresAt: number | null;
 }
@@ -76,6 +78,7 @@ export function useCreateShare(
             label: input.label,
             mode: input.mode,
             category_ids: input.categoryIds,
+            show_inactive: input.showInactive,
             expires_at:
               input.expiresAt == null
                 ? null
@@ -109,6 +112,7 @@ export function useUpdateShare(
       if ("label" in patch) row.label = patch.label;
       if ("mode" in patch) row.mode = patch.mode;
       if ("categoryIds" in patch) row.category_ids = patch.categoryIds;
+      if ("showInactive" in patch) row.show_inactive = patch.showInactive;
       if ("expiresAt" in patch) {
         row.expires_at =
           patch.expiresAt == null

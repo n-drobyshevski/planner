@@ -1,0 +1,31 @@
+// Time bands (pure). Epoch milliseconds; intervals are half-open [start, end).
+//
+// Used by the public share view to collapse many overlapping inactive (sleep /
+// blocked) occurrences into the minimal set of shaded "Unavailable" regions, so the
+// day column draws one calm band per stretch instead of stacked slabs.
+
+export interface TimeRange {
+  start: number;
+  end: number;
+}
+
+/**
+ * Merge overlapping or touching ranges into the minimal sorted set. Zero/negative
+ * ranges are dropped; adjacency (`end === next.start`) merges so abutting blocks
+ * read as one continuous band. Input is not mutated.
+ */
+export function mergeRanges(ranges: TimeRange[]): TimeRange[] {
+  const sorted = ranges
+    .filter((r) => r.end > r.start)
+    .sort((a, b) => a.start - b.start);
+  const out: TimeRange[] = [];
+  for (const r of sorted) {
+    const last = out[out.length - 1];
+    if (last && r.start <= last.end) {
+      last.end = Math.max(last.end, r.end);
+    } else {
+      out.push({ start: r.start, end: r.end });
+    }
+  }
+  return out;
+}

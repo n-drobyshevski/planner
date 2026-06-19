@@ -5,6 +5,7 @@ import {
   layerOf,
   filterVisible,
   publicVisible,
+  publicBandVisible,
   redactForPublic,
   filterPublic,
   MAX_PUBLIC_CONFIG,
@@ -316,6 +317,49 @@ describe("publicVisible", () => {
         { mode: "details", categoryIds: ["cat-ok"] },
       ),
     ).toBe(false);
+  });
+});
+
+describe("publicBandVisible (the 'Unavailable' time band)", () => {
+  const base = { isPrivate: false, hiddenFromPublic: false, categoryId: null };
+
+  it("an inactive item shows as a band when the share opts in", () => {
+    expect(publicBandVisible({ ...base, inactive: true }, DETAILS_ALL, true)).toBe(true);
+    expect(publicBandVisible({ ...base, inactive: true }, BUSY_ALL, true)).toBe(true);
+  });
+
+  it("is OFF when the share's showInactive is false", () => {
+    expect(publicBandVisible({ ...base, inactive: true }, DETAILS_ALL, false)).toBe(false);
+  });
+
+  it("a non-inactive (block) item is never a band, even with showInactive on", () => {
+    expect(publicBandVisible({ ...base, inactive: false }, DETAILS_ALL, true)).toBe(false);
+  });
+
+  it("private / hidden-from-public inactive time never surfaces as a band", () => {
+    expect(
+      publicBandVisible({ ...base, isPrivate: true, inactive: true }, DETAILS_ALL, true),
+    ).toBe(false);
+    expect(
+      publicBandVisible({ ...base, hiddenFromPublic: true, inactive: true }, DETAILS_ALL, true),
+    ).toBe(false);
+  });
+
+  it("respects the category allow-list exactly like a block", () => {
+    const cfg: PublicShareConfig = { mode: "busy", categoryIds: ["sleep"] };
+    expect(publicBandVisible({ ...base, inactive: true, categoryId: "sleep" }, cfg, true)).toBe(true);
+    expect(publicBandVisible({ ...base, inactive: true, categoryId: "work" }, cfg, true)).toBe(false);
+    // uncategorized excluded under an allow-list, same as publicVisible
+    expect(publicBandVisible({ ...base, inactive: true, categoryId: null }, cfg, true)).toBe(false);
+  });
+
+  it("block and band are mutually exclusive for any single item", () => {
+    for (const inactive of [true, false]) {
+      const e = { ...base, inactive };
+      const isBlock = publicVisible(e, DETAILS_ALL);
+      const isBand = publicBandVisible(e, DETAILS_ALL, true);
+      expect(isBlock && isBand).toBe(false);
+    }
   });
 });
 

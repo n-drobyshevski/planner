@@ -51,6 +51,7 @@ export function DayColumn({
   taskDoneById,
   onToggleTaskDone,
   settleKeys,
+  unavailableBands,
 }: {
   dayStart: number;
   /** Vertical scale (px per hour); defaults to the un-zoomed HOUR_PX. */
@@ -86,6 +87,9 @@ export function DayColumn({
   /** Occurrence keys that just landed from a drag/resize — they ease into place
    *  once (see SETTLE_TRANSITION). Empty/undefined at rest. */
   settleKeys?: ReadonlySet<string>;
+  /** Shaded "Unavailable" time bands (epoch-ms ranges), drawn behind events.
+   *  Public share only; clipped to this column's day. */
+  unavailableBands?: { start: number; end: number }[];
 }) {
   const t = useTranslations("calendar");
   const dayEnd = dayStart + DAY_MS;
@@ -194,6 +198,32 @@ export function DayColumn({
           className="border-b border-border/40"
         />
       ))}
+
+      {/* "Unavailable" bands (z-0): inactive/sleep time as a quiet hatched region
+          behind everything (public share). Clipped to this day; non-interactive.
+          The hatch is the non-color signal; a label shows when there's room. */}
+      {(unavailableBands ?? []).map((b, i) => {
+        const start = Math.max(b.start, dayStart);
+        const end = Math.min(b.end, dayEnd);
+        if (end <= start) return null;
+        const top = msToY(start, dayStart, hourPx);
+        const height = msToY(end, dayStart, hourPx) - top;
+        return (
+          <div
+            key={`unavail-${i}`}
+            role="img"
+            aria-label={t("unavailable")}
+            className="evt-unavailable pointer-events-none absolute inset-x-0 z-0 flex justify-center overflow-hidden"
+            style={{ top, height }}
+          >
+            {height >= 28 && (
+              <span className="mt-1 text-[11px] font-medium text-muted-foreground">
+                {t("unavailable")}
+              </span>
+            )}
+          </div>
+        );
+      })}
 
       {/* Context backdrops (z-0), behind the event blocks. */}
       {contextSegs.map((seg) => {

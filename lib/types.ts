@@ -379,6 +379,8 @@ export interface PublicShareRow {
   mode: "details" | "busy";
   /** category allow-list; null = all (non-private, non-hidden) categories */
   categoryIds: string[] | null;
+  /** show inactive (sleep/blocked) time as a shaded "Unavailable" band */
+  showInactive: boolean;
   /** epoch ms; null = never expires */
   expiresAt: number | null;
   /** epoch ms the link was permanently disabled; null = active */

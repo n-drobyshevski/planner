@@ -72,11 +72,17 @@ export function filterVisible(
 //
 // A share link exposes a read-only slice of the workspace's calendar to anonymous
 // viewers. `publicVisible` is the SINGLE SOURCE OF TRUTH for "may an anonymous
-// viewer see this item." Three things consume the SAME rule and MUST stay in
-// lockstep (the parity is unit-tested):
+// viewer see this item as a calendar BLOCK." Three things consume the SAME rule
+// and MUST stay in lockstep (the parity is unit-tested):
 //   • the SQL SECURITY DEFINER RPC `public_calendar_events` (the anon read path);
 //   • `fetchWindowPublic` (server, mirrors the window prune);
 //   • present mode (Shift+P), which redacts the authed calendar to the public view.
+//
+// Inactive events are NOT blocks: `publicBandVisible` is the parallel rule for the
+// "Unavailable" time BAND (sleep/holds shown as a shaded region, content always
+// redacted). It is consumed by the SQL RPC (gated on `show_inactive`) and the public
+// view's band layer. Present mode does not yet draw bands (deferred follow-up); when
+// it does it should reuse `publicBandVisible` so the three stay in lockstep here too.
 
 /** What a single share link exposes. */
 export interface PublicShareConfig {
@@ -115,6 +121,31 @@ export function publicVisible(
   cfg: PublicShareConfig,
 ): boolean {
   if (e.isPrivate || e.hiddenFromPublic || e.inactive) return false;
+  if (cfg.categoryIds === null) return true;
+  return e.categoryId !== null && cfg.categoryIds.includes(e.categoryId);
+}
+
+/**
+ * Whether an anonymous viewer may see an item as an "Unavailable" BAND (rather than
+ * a block). True ONLY for an INACTIVE event when the share opts in (`showInactive`),
+ * that isn't private / hidden-from-public, and that passes the same category
+ * allow-list as a block. The band exposes only the time range — its title/content
+ * stay redacted. Mirrors the `(not e.inactive or s.show_inactive)` + redaction SQL in
+ * `public_calendar_events` exactly. Block-vs-band is mutually exclusive: an item is
+ * a band iff inactive, a block iff `publicVisible`.
+ */
+export function publicBandVisible(
+  e: {
+    isPrivate: boolean;
+    hiddenFromPublic: boolean;
+    inactive: boolean;
+    categoryId: string | null;
+  },
+  cfg: PublicShareConfig,
+  showInactive: boolean,
+): boolean {
+  if (!showInactive || !e.inactive) return false;
+  if (e.isPrivate || e.hiddenFromPublic) return false;
   if (cfg.categoryIds === null) return true;
   return e.categoryId !== null && cfg.categoryIds.includes(e.categoryId);
 }
