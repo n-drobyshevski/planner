@@ -9,12 +9,7 @@ import {
 import { LazyMotion, MotionConfig, domMax } from "motion/react";
 import { addDays, addMonths, getTime, startOfDay, format } from "date-fns";
 import { tz } from "@date-fns/tz";
-import {
-  CalendarPlus,
-  ChevronLeft,
-  ChevronRight,
-  Lock,
-} from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { createPublicClient } from "@/lib/supabase/anon";
 import { fetchWindowPublic } from "@/lib/supabase/queries";
@@ -77,7 +72,6 @@ export function PublicCalendarView(props: {
 
 function PublicCalendarInner({
   token,
-  label,
 }: {
   token: string;
   label: string | null;
@@ -159,66 +153,57 @@ function PublicCalendarInner({
         in: tz(timeZone),
       })
     : "";
+  // A tighter label for phones, where the full weekday/month would crowd the
+  // single-row header off-screen.
+  const periodLabelShort = ready
+    ? format(focusedDate, view === "day" ? "EEE d MMM" : "MMM yyyy", {
+        in: tz(timeZone),
+      })
+    : "";
 
   return (
     <div className="flex h-dvh flex-col">
-      {/* Quiet, obviously-not-the-app header. */}
-      <header className="flex shrink-0 flex-col gap-2 border-b border-border bg-card px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <h1 className="truncate text-base font-semibold text-foreground">
-              {label?.trim() || "Shared calendar"}
-            </h1>
-            {/* Non-color read-only signal: icon + text. */}
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              <Lock aria-hidden className="size-3" />
-              Read-only
-            </span>
-          </div>
+      {/* Quiet, obviously-not-the-app header. One calm band; never wraps. */}
+      <header className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-3 py-2.5 sm:gap-3 sm:px-4">
+        {/* Navigation */}
+        <div className="flex min-w-0 items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Previous"
+            onClick={() => shift(-1)}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          {/* Today is the most expendable nav affordance on a phone (the arrows
+              still move the window); hide it there to keep the row intact. */}
           <Button
             size="sm"
-            variant="outline"
-            onClick={() => setRequestOpen(true)}
-            className="shrink-0"
+            variant="ghost"
+            className="h-8 max-sm:hidden"
+            onClick={() => setFocusedDate(Date.now())}
           >
-            <CalendarPlus aria-hidden className="size-4" />
-            Request a time
+            Today
           </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Next"
+            onClick={() => shift(1)}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+          <span
+            aria-live="polite"
+            className="ml-1 truncate text-sm font-medium tabular-nums text-foreground"
+          >
+            <span className="sm:hidden">{periodLabelShort}</span>
+            <span className="hidden sm:inline">{periodLabel}</span>
+          </span>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label="Previous"
-              onClick={() => shift(-1)}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setFocusedDate(Date.now())}
-            >
-              Today
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label="Next"
-              onClick={() => shift(1)}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-            <span
-              aria-live="polite"
-              className="ml-1 text-sm font-medium tabular-nums text-foreground"
-            >
-              {periodLabel}
-            </span>
-          </div>
-
+        {/* View switcher + primary action, pushed to the right edge. */}
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           <div
             role="tablist"
             aria-label="Calendar view"
@@ -230,17 +215,32 @@ function PublicCalendarInner({
                 type="button"
                 role="tab"
                 aria-selected={view === v.id}
+                aria-label={v.label}
                 onClick={() => setView(v.id)}
-                className={`min-h-8 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`min-h-8 rounded-md px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3 ${
                   view === v.id
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {v.label}
+                {/* Single letter on phones, full word once there's room. */}
+                <span aria-hidden className="sm:hidden">
+                  {v.label.charAt(0)}
+                </span>
+                <span className="hidden sm:inline">{v.label}</span>
               </button>
             ))}
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label="Request a time"
+            onClick={() => setRequestOpen(true)}
+            className="h-8 max-sm:w-8 max-sm:px-0"
+          >
+            <CalendarPlus aria-hidden className="size-4" />
+            <span className="hidden sm:inline">Request a time</span>
+          </Button>
         </div>
       </header>
 

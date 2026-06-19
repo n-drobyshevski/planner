@@ -17,14 +17,22 @@ export function NowLine({ dayStart, hourPx = HOUR_PX }: { dayStart: number; hour
 
   if (now == null || now < dayStart || now >= dayStart + DAY_MS) return null;
 
+  // The indicator color is a token (defaults to --destructive, the app's red) so
+  // surfaces can neutralize it without touching error-state red: the public share
+  // overrides --now-line to warm stone (see [data-accent="stone"] in globals.css).
+  const color = "var(--now-line, var(--destructive))";
+
   return (
     <div
       className="pointer-events-none absolute inset-x-0 z-30 animate-in fade-in duration-150"
       style={{ top: msToY(now, dayStart, hourPx) }}
       aria-hidden
     >
-      <div className="relative h-px w-full bg-destructive">
-        <span className="absolute -left-1 -top-[3px] size-2 rounded-full bg-destructive" />
+      <div className="relative h-px w-full" style={{ backgroundColor: color }}>
+        <span
+          className="absolute -left-1 -top-[3px] size-2 rounded-full"
+          style={{ backgroundColor: color }}
+        />
       </div>
     </div>
   );

@@ -1,11 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Manrope, Geist_Mono } from "next/font/google";
 import "../globals.css";
-import {
-  DEFAULT_ACCENT,
-  DEFAULT_TONE,
-  DEFAULT_PALETTE,
-} from "@/lib/theme/appearance";
+import { DEFAULT_TONE, DEFAULT_PALETTE } from "@/lib/theme/appearance";
 
 // A SECOND root layout (the app's other root is app/[locale]/layout.tsx). It sits
 // at `app/share/` — a STATIC segment — rather than under `[token]`, so the token
@@ -49,7 +45,11 @@ export default function ShareRootLayout({
   return (
     <html
       lang="en"
-      data-accent={DEFAULT_ACCENT}
+      // A neutral, brand-free accent for the anonymous public surface: warm
+      // stone replaces terracotta so the today marker / focus ring stay quiet.
+      // "stone" is a public-only accent (see [data-accent="stone"] in globals.css),
+      // intentionally not part of the in-app accent picker.
+      data-accent="stone"
       data-tone={DEFAULT_TONE}
       data-palette={DEFAULT_PALETTE}
       className={`${jakarta.variable} ${manrope.variable} ${geistMono.variable} h-full`}

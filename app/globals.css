@@ -326,6 +326,24 @@
   --sidebar-primary: #c7c2fd; --sidebar-primary-foreground: #292524; --sidebar-ring: #c7c2fd;
 }
 
+/* Public-share neutral accent.
+   "stone" is a deliberately neutral accent used ONLY by the public share surface
+   (app/share/layout.tsx) — it is intentionally absent from the ACCENTS picker
+   catalog. It maps the brand accent to warm stone-600 (#57534e, the same calm
+   tone the public event blocks use), so the today marker and focus ring read as
+   quiet neutrals rather than the terracotta brand pop. 7.1:1 on warm paper. */
+[data-accent="stone"] {
+  --primary: #57534e; --primary-foreground: #ffffff; --ring: #57534e;
+  --sidebar-primary: #57534e; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #57534e;
+  /* Current-time indicator: warm stone instead of the brand/destructive red, so
+     the public surface carries no red pop (NowLine reads --now-line). */
+  --now-line: #57534e;
+}
+.dark[data-accent="stone"] {
+  --primary: #a8a29e; --primary-foreground: #292524; --ring: #a8a29e;
+  --sidebar-primary: #a8a29e; --sidebar-primary-foreground: #292524; --sidebar-ring: #a8a29e;
+}
+
 /* ---------------------------------------------------------------------------
    Surface tone presets — neutral temperature (Settings → Appearance).
    Override ONLY the neutral-surface token group (backgrounds, cards, borders,
