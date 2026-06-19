@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import { NextIntlClientProvider } from "next-intl";
 
 import { createPublicClient } from "@/lib/supabase/anon";
 import { fetchPublicShareMeta } from "@/lib/supabase/queries";
 import { PublicCalendarView } from "@/components/share/public-calendar-view";
 import { PublicShareInactive } from "@/components/share/public-share-inactive";
+import enMessages from "@/messages/en";
 
 // SECURITY / FRESHNESS: a share link's validity must always be evaluated live — a
 // revoked or expired token has to stop serving immediately, so nothing here is
@@ -11,6 +13,14 @@ import { PublicShareInactive } from "@/components/share/public-share-inactive";
 // `params` + makes an uncached per-token RPC); the dynamic work is isolated inside
 // a <Suspense> boundary so the static chrome can render first (a `dynamic =
 // "force-dynamic"` export is both unnecessary and rejected when cacheComponents is on).
+//
+// i18n: the calendar leaves rendered here call `useTranslations`, so they need a
+// `NextIntlClientProvider`. The share tree sits OUTSIDE `[locale]` (no provider from
+// the layout), so we mount a fixed-English one. It lives INSIDE the <Suspense> — not
+// in the static layout — because a server-rendered provider inherits `now` from the
+// request config; doing that in the dynamic subtree keeps the shared layout shell
+// free of request-data reads. Explicit `locale`/`timeZone` (the calendar formats
+// dates with date-fns, not next-intl, so the zone here is inert).
 
 export default function SharePage({
   params,
@@ -19,7 +29,9 @@ export default function SharePage({
 }) {
   return (
     <Suspense fallback={<ShareLoading />}>
-      <ShareContent params={params} />
+      <NextIntlClientProvider locale="en" messages={enMessages} timeZone="UTC">
+        <ShareContent params={params} />
+      </NextIntlClientProvider>
     </Suspense>
   );
 }

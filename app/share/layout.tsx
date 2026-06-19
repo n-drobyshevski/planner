@@ -15,7 +15,13 @@ import {
 // The public share surface lives OUTSIDE [locale] and OUTSIDE the auth proxy — it
 // is anonymous and read-only, so it gets its own minimal, quiet chrome: warm paper,
 // a fixed light appearance (no per-user accent cookie, no theme toggle), English
-// only (no next-intl). Deliberately NOT the private app.
+// only (no next-intl ROUTING). Deliberately NOT the private app.
+//
+// English-only does NOT mean "no next-intl context": the calendar leaves this page
+// reuses (TimeGrid / MonthGrid / EventBlock …) call `useTranslations` and throw
+// without a `NextIntlClientProvider` in scope. That provider lives in the page,
+// INSIDE the dynamic <Suspense> boundary (see app/share/[token]/page.tsx) — keeping
+// this shared layout a static shell that reads no request data.
 
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin", "cyrillic"] });
