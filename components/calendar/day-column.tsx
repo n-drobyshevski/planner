@@ -106,9 +106,12 @@ export function DayColumn({
   // Timed children (normal events / task-blocks). ALL children are packed
   // together in one pass so overlapping events always share columns and never
   // collide — packing per-group would let a free and a nested event both claim
-  // full width and overlap. `nestedFlags` (start inside a context) only drives a
-  // small indent so the context's frame stays visible around its events.
-  const { segments, packed, nestedFlags } = useMemo(() => {
+  // full width and overlap. `nestedFlags` (start inside a context) drives a small
+  // left indent so the context's frame stays visible. `rightLabelFlags` marks
+  // events that overlap a context whose vertical side label sits on the RIGHT (a
+  // read-only / partner context in side mode); those reserve a right gutter so the
+  // label stays readable even when the event isn't itself nested in the context.
+  const { segments, packed, nestedFlags, rightLabelFlags } = useMemo(() => {
     const ctxOccs = contextSegs.map((s) => s.occ);
     const segs = occurrences
       .filter((o) => !o.allDay && o.kind !== "context" && o.start < dayEnd && o.end > dayStart)
@@ -116,13 +119,29 @@ export function DayColumn({
         occ: o,
         start: Math.max(o.start, dayStart),
         end: Math.min(o.end, dayEnd),
-        // Owner side drives the overlap lane: mine (editable) anchors left,
-        // the other person's (read-only) anchors right. See packDay.
+        // Owner side orders the overlap columns in the two-calendar overlay: mine
+        // (editable) take the left columns, the other person's (read-only) the
+        // right. Ignored in single-calendar mode (one column group). See packDay.
         mine: canEdit(o),
       }));
     const nested = segs.map((s) => enclosingContext(ctxOccs, s.occ.start) !== null);
-    return { segments: segs, packed: packDay(segs), nestedFlags: nested };
-  }, [occurrences, dayStart, dayEnd, contextSegs, canEdit]);
+    // Context side labels (side mode only) sit on the right for read-only contexts
+    // (ContextBackdrop: `editable ? left-0 : right-0`). An event overlapping such a
+    // context in time would paint over the label — flag it to inset its right edge.
+    const rightLabeled = contextSegs.filter((c) => labelStyle === "side" && !canEdit(c.occ));
+    const rightLabel = segs.map((s) =>
+      rightLabeled.some((c) => c.start < s.end && s.start < c.end),
+    );
+    // Overlapping events spread across the full width (left → center → right,
+    // uniform reduced width stepped 25%, later in front). With both calendars,
+    // columns are ordered by owner (mine left, partner right). See packDay.
+    return {
+      segments: segs,
+      packed: packDay(segs, { mode: twoCalendars ? "overlay" : "single" }),
+      nestedFlags: nested,
+      rightLabelFlags: rightLabel,
+    };
+  }, [occurrences, dayStart, dayEnd, contextSegs, canEdit, twoCalendars, labelStyle]);
 
   // Direct time-overlaps within the day → a whisper hairline "seam" on the front
   // (right-staggered) block of each clashing pair, so a double-booking reads as
@@ -228,21 +247,20 @@ export function DayColumn({
       {segments.map((seg, i) => {
         const p = packed[i];
         const taskId = seg.occ.taskId;
-        // A nested event is inset so the context label stays visible: NEST_L on
-        // the left always (also exposes the tinted frame edge), plus a matching
-        // right inset in the side variant when both calendars are shown — there
-        // the partner's label sits on the right edge and a full-width event
-        // (pack-day gives non-overlapping items 0→100%) would otherwise cover
-        // it. Free (non-nested) events keep the full width.
+        // Inset the block so a context's side label stays visible. LEFT: a nested
+        // event (started inside a context) is indented NEST_L so the tinted frame
+        // / left-side label (editable contexts) shows; free events keep the 1px
+        // edge. RIGHT: an event overlapping a context whose label sits on the right
+        // (read-only / partner context, side mode) reserves NEST_L so it can't
+        // paint over the vertical title; otherwise the usual small margin.
         const nested = nestedFlags[i];
-        const gutterL = NEST_L;
-        const gutterR = twoCalendars && labelStyle === "side" ? NEST_L : NEST_R;
-        const left = nested
-          ? `calc(${p.leftPct}% + ${gutterL}px)`
-          : `calc(${p.leftPct}% + 1px)`;
-        const width = nested
-          ? `calc(${p.widthPct}% - ${gutterL + gutterR}px)`
-          : `calc(${p.widthPct}% - 3px)`;
+        // Only blocks that actually reach the right edge can cover a right-side
+        // context label, so only those reserve the wider right gutter.
+        const coversRightLabel = rightLabelFlags[i] && p.leftPct + p.widthPct >= 100 - 1e-9;
+        const leftPx = nested ? NEST_L : 1;
+        const rightPx = coversRightLabel ? NEST_L : nested ? NEST_R : 2;
+        const left = `calc(${p.leftPct}% + ${leftPx}px)`;
+        const width = `calc(${p.widthPct}% - ${leftPx + rightPx}px)`;
         const editable = canEdit(seg.occ);
         const settling = settleKeys?.has(seg.occ.key) ?? false;
         // Pixel range (relative to this block's top) for the clash seam, if any.

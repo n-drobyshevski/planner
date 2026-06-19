@@ -4,51 +4,56 @@
 // elsewhere. This module only decides how overlapping intervals share the
 // horizontal axis.
 //
-// Owner-anchored lanes: an overlapping cluster (2+ transitively-overlapping
-// items) is split by owner into two lanes, each 3/4 of the day width. "Mine"
-// items (`mine` truthy) anchor to the LEFT border (0–75%); the other person's
-// items anchor to the RIGHT border (25–100%). The lanes overlap in the middle
-// 50%, so the two calendars stay visually separated yet each readable. A
-// single (non-overlapping) item always keeps the full width.
+// One layout strategy — a stepped SPREAD across the full day width. For an
+// overlapping cluster, items get greedy columns (colCount = max concurrency);
+// every block keeps a uniform, reduced width and its left edge steps right by
+// SPREAD_STEP, so the last column lands flush-right: 2 cols → 0–75/25–100, 3 →
+// 0–50/25–75/50–100 (left, center, right), 4 → four 25% columns touching. Later
+// starts layer in front (z), so each covered block still shows a SPREAD_STEP strip
+// on its left. Dense clusters (spread width below SPREAD_MIN_WIDTH, i.e. colCount
+// >= 5) fall back to equal side-by-side tiles with rightward span fill. A single
+// (non-overlapping) item always keeps the full width.
 //
-// Within each lane, the same two strategies as before lay the side's items out,
-// then the result is scaled into the lane:
-//   • Cascade (small lanes, <= CASCADE_MAX columns): every block extends to the
-//     lane's right edge and is staggered right by a fixed step, layered by
-//     z-index. The front block stays fully readable and earlier blocks peek out
-//     on the left. Because blocks differ only by left offset + z, revealing a
-//     covered block is a pure z-index change (no layout/animation).
-//   • Split (dense lanes): equal side-by-side columns with rightward span fill
-//     (the classic non-overlapping tiling), so crowded slots stay legible.
-// z-index follows start time across the WHOLE cluster (later start sits in
-// front), so mine/other blocks interleave correctly where the lanes overlap.
+// Column ORDER depends on the mode:
+//   • Single (options.mode === "single"): one column group; columns follow start
+//     order across the whole cluster.
+//   • Overlay (two calendars): columns are ordered by owner — "mine" (`mine`
+//     truthy) take the left columns, the partner's the right — so the two stay on
+//     their sides while every concurrent block keeps the SAME width. One event
+//     each → 0–75 / 25–100 (the classic lane split); when only one owner has
+//     events in a cluster, theirs simply use the full width.
+// z-index follows start time across the WHOLE cluster (later start sits in front),
+// so blocks interleave correctly where columns overlap.
 //
 // Times are epoch milliseconds. Intervals are half-open [start, end):
 // two intervals overlap iff a.start < b.end && b.start < a.end (touching
 // endpoints do NOT overlap).
 
-// Clusters with at most this many columns cascade; denser ones tile (split).
-const CASCADE_MAX = 4;
-// Per-column horizontal stagger cap (% of LANE width — i.e. relative scale).
-const MAX_STEP_PCT = 28;
-// Total stagger cap (% of LANE width) → the front block keeps >= ~55% of its
-// lane. Applied on the relative [0,100] scale before the lane is shrunk to 75%.
-const MAX_OFFSET_PCT = 45;
 // Resting z-index of an event block (must match event-block.tsx's z-[var(--evt-z,10)]).
 const BASE_Z = 10;
 // Stay below the selected/hover layer (z-30) so those always win.
 const MAX_Z = 29;
-// Each owner lane is 3/4 of the day-column width.
-const LANE_WIDTH_PCT = 75;
-// The other person's lane is right-anchored: 25%–100%. Mine is left at 0%.
-const OTHER_LANE_LEFT_PCT = 25;
+// Spread step: each successive column's left edge advances by this % of the day
+// width and block widths shrink so the last column is flush-right (100%). With
+// two columns this yields the 0–75 / 25–100 split (each 75% wide).
+const SPREAD_STEP = 25;
+// Below this width the spread would be too thin / non-positive (colCount ≥ 5
+// with the 25% step) → fall back to equal side-by-side tiles.
+const SPREAD_MIN_WIDTH = 25;
 
 export interface LayoutInterval {
   start: number;
   end: number;
-  /** Owner-anchored side: truthy = mine (left lane), false = the other person's
-   *  (right lane). Absent is treated as mine. */
+  /** Owner side: truthy = mine (left columns), false = the other person's (right
+   *  columns). Absent is treated as mine. Ignored when mode is "single". */
   mine?: boolean;
+}
+
+export interface PackOptions {
+  /** "overlay" (default): two-calendar view — columns are ordered by owner (mine
+   *  left, partner right) so the two stay on their sides at uniform width.
+   *  "single": one calendar — columns follow start order (`mine` is ignored). */
+  mode?: "overlay" | "single";
 }
 
 export interface PackedColumn {
@@ -58,7 +63,7 @@ export interface PackedColumn {
   colIndex: number;
   /** total number of columns in the item's cluster */
   colCount: number;
-  /** number of columns this item spans rightward (>= 1); always 1 when cascaded */
+  /** number of columns this item spans rightward (>= 1); always 1 when spread */
   colSpan: number;
   /** left offset as a percentage of the day width [0, 100] */
   leftPct: number;
@@ -80,11 +85,15 @@ interface Working {
   colIndex: number;
   /** cluster id (transitively-overlapping group) */
   cluster: number;
-  /** owner side: true = mine (left lane), false = the other person's (right) */
+  /** owner side: true = mine (left columns), false = the other person's (right) */
   mine: boolean;
 }
 
-export function packDay<T extends LayoutInterval>(items: T[]): PackedColumn[] {
+export function packDay<T extends LayoutInterval>(
+  items: T[],
+  options: PackOptions = {},
+): PackedColumn[] {
+  const mode = options.mode ?? "overlay";
   const n = items.length;
   if (n === 0) return [];
 
@@ -105,7 +114,7 @@ export function packDay<T extends LayoutInterval>(items: T[]): PackedColumn[] {
   // Partition into clusters of transitively-overlapping items. Because the
   // list is sorted by start, a new cluster begins whenever an item's start is
   // at or beyond the maximum end seen so far in the current cluster. (Column
-  // assignment is done later, per owner-lane, so mine/other never share one.)
+  // assignment is done later, per owner, so mine/other never share a column.)
   let clusterId = 0;
   let clusterMaxEnd = -Infinity;
   for (let i = 0; i < work.length; i++) {
@@ -134,8 +143,8 @@ export function packDay<T extends LayoutInterval>(items: T[]): PackedColumn[] {
   const result = new Array<PackedColumn>(n);
 
   for (const members of clusters.values()) {
-    // z follows start order across the WHOLE cluster (both lanes), so where the
-    // mine/other lanes overlap in the middle the later-starting block wins.
+    // z follows start order across the WHOLE cluster, so where columns overlap
+    // the later-starting block wins (mine/other interleave correctly).
     // `members` preserves the global start-asc (end-desc) order from grouping.
     const zByIndex = new Map<number, number>();
     members.forEach((item, rank) => {
@@ -157,45 +166,38 @@ export function packDay<T extends LayoutInterval>(items: T[]): PackedColumn[] {
       continue;
     }
 
-    // Overlapping cluster: split by owner into two 3/4 lanes (mine left,
-    // other right). Each side is laid out independently and scaled into its
-    // lane. Empty subgroups are a no-op (that lane simply stays empty).
-    layoutLane(
-      members.filter((m) => m.mine),
-      0,
-      LANE_WIDTH_PCT,
-      result,
-      zByIndex,
-    );
-    layoutLane(
-      members.filter((m) => !m.mine),
-      OTHER_LANE_LEFT_PCT,
-      LANE_WIDTH_PCT,
-      result,
-      zByIndex,
-    );
+    // Assign columns, then spread them across the FULL width (uniform reduced
+    // widths, last column flush-right; dense clusters tile). In single mode the
+    // whole cluster is one column group. In overlay mode columns are ordered by
+    // owner — mine first (left), the partner's next (right) — so the two stay on
+    // their sides while every concurrent block keeps the same width. With one
+    // event each this yields the 0–75 / 25–100 split; when only one owner has
+    // events here, theirs simply use the full width.
+    let colCount: number;
+    if (mode === "single") {
+      colCount = assignColumns(members);
+    } else {
+      const mineCols = assignColumns(members.filter((m) => m.mine));
+      const otherGroup = members.filter((m) => !m.mine);
+      const otherCols = assignColumns(otherGroup);
+      for (const o of otherGroup) o.colIndex += mineCols; // partner columns sit right of mine
+      colCount = mineCols + otherCols;
+    }
+    layoutColumns(members, colCount, result, zByIndex);
   }
 
   return result;
 }
 
 /**
- * Lay out one owner-side's overlapping items (greedy columns + cascade/split),
- * then map the relative [0,100] geometry into the lane [laneLeftPct,
- * laneLeftPct + laneWidthPct]. Writes into `result` by original index, using
- * the cluster-wide `zByIndex` for stacking.
+ * Greedy first-fit column assignment over `group` (mutates each item's
+ * `colIndex`): place each item in the first column whose last placed item does
+ * not overlap it, else open a new column. Returns the column count, which for an
+ * interval set equals its maximum concurrency (0 for an empty group). `group`
+ * must be start-sorted.
  */
-function layoutLane(
-  group: Working[],
-  laneLeftPct: number,
-  laneWidthPct: number,
-  result: PackedColumn[],
-  zByIndex: Map<number, number>,
-): void {
-  if (group.length === 0) return;
-
-  // Greedy column assignment WITHIN this lane only: place each item in the
-  // first column whose last placed item does not overlap it; else open one.
+function assignColumns(group: Working[]): number {
+  if (group.length === 0) return 0;
   const lastInColumn: Working[] = [];
   for (const item of group) {
     let placed = false;
@@ -212,40 +214,47 @@ function layoutLane(
       lastInColumn.push(item);
     }
   }
+  return group.reduce((m, it) => Math.max(m, it.colIndex), 0) + 1;
+}
 
-  const colCount = group.reduce((m, it) => Math.max(m, it.colIndex), 0) + 1;
-  const cascade = colCount <= CASCADE_MAX;
-  // Per-column stagger (relative scale), capped so the total offset never eats
-  // more than MAX_OFFSET_PCT of the lane (keeps the front block readable).
-  const stepPct = cascade
-    ? Math.min(MAX_STEP_PCT, MAX_OFFSET_PCT / Math.max(1, colCount - 1))
-    : 0;
-
-  // Map a relative [0,100] left/width into the lane.
-  const toLaneLeft = (rel: number) => laneLeftPct + (rel * laneWidthPct) / 100;
-  const toLaneWidth = (rel: number) => (rel * laneWidthPct) / 100;
+/**
+ * Lay out a cluster's items across the FULL day width given their already-assigned
+ * `colIndex` and the cluster's `colCount`. While the spread width stays >=
+ * SPREAD_MIN_WIDTH (colCount <= 4) blocks spread (left → center → right, uniform
+ * reduced width stepped by SPREAD_STEP, last column flush-right); denser clusters
+ * fall back to equal side-by-side tiles with rightward span fill. Stacking uses
+ * the cluster-wide `zByIndex` (later start in front).
+ */
+function layoutColumns(
+  group: Working[],
+  colCount: number,
+  result: PackedColumn[],
+  zByIndex: Map<number, number>,
+): void {
+  const spreadW = 100 - SPREAD_STEP * (colCount - 1);
+  const spread = spreadW >= SPREAD_MIN_WIDTH;
 
   for (const item of group) {
     const zIndex = zByIndex.get(item.index)!;
 
-    if (cascade) {
-      // Stagger right by column; every block runs to the lane's right edge,
-      // so blocks differ only by left offset + z-index.
-      const relLeft = item.colIndex * stepPct;
+    if (spread) {
+      // Step right by column at a fixed width; the last column lands flush against
+      // the right edge (left → center → right), layered by z so each covered block
+      // keeps a SPREAD_STEP strip exposed on its left.
       result[item.index] = {
         index: item.index,
         colIndex: item.colIndex,
         colCount,
         colSpan: 1,
-        leftPct: toLaneLeft(relLeft),
-        widthPct: toLaneWidth(100 - relLeft),
+        leftPct: item.colIndex * SPREAD_STEP,
+        widthPct: spreadW,
         zIndex,
       };
       continue;
     }
 
-    // Dense lane: equal columns. Expand colSpan rightward until a column holds
-    // an overlapping item (in this lane) or the lane's right edge is reached.
+    // Dense cluster: equal columns. Expand colSpan rightward until a column holds
+    // an overlapping item or the right edge is reached.
     let span = 1;
     for (let c = item.colIndex + 1; c < colCount; c++) {
       let blocked = false;
@@ -265,8 +274,8 @@ function layoutLane(
       colIndex: item.colIndex,
       colCount,
       colSpan: span,
-      leftPct: toLaneLeft((item.colIndex / colCount) * 100),
-      widthPct: toLaneWidth((span / colCount) * 100),
+      leftPct: (item.colIndex / colCount) * 100,
+      widthPct: (span / colCount) * 100,
       zIndex,
     };
   }
