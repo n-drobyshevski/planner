@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { combineDateTime, msToDateInput, msToTimeInput } from "@/lib/datetime/local";
@@ -45,6 +46,7 @@ export function PublicRequestDialog({
   prefillStart?: number;
   prefillEnd?: number;
 }) {
+  const t = useTranslations("share");
   const [name, setName] = useState("");
   const [date, setDate] = useState(() =>
     msToDateInput(prefillStart ?? Date.now(), timeZone),
@@ -71,7 +73,7 @@ export function PublicRequestDialog({
     const start = combineDateTime(date, startTime, timeZone);
     const end = combineDateTime(date, endTime, timeZone);
     if (!(end > start)) {
-      toast.error("The end time must be after the start time.");
+      toast.error(t("errors.endAfterStart"));
       return;
     }
     setBusy(true);
@@ -91,9 +93,9 @@ export function PublicRequestDialog({
         return;
       }
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      toast.error(data?.error || "Couldn't send your request. Please try again.");
+      toast.error(data?.error || t("errors.send"));
     } catch {
-      toast.error("Couldn't send your request. Please check your connection.");
+      toast.error(t("errors.network"));
     } finally {
       setBusy(false);
     }
@@ -111,51 +113,47 @@ export function PublicRequestDialog({
         {done ? (
           <>
             <DialogHeader>
-              <DialogTitle>Request sent</DialogTitle>
-              <DialogDescription>
-                Thanks — your proposed time has been sent. It’s up to the calendar’s
-                owner to accept or decline.
-              </DialogDescription>
+              <DialogTitle>{t("success.title")}</DialogTitle>
+              <DialogDescription>{t("success.body")}</DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button onClick={() => onOpenChange(false)}>Close</Button>
+              <Button onClick={() => onOpenChange(false)}>
+                {t("success.close")}
+              </Button>
             </DialogFooter>
           </>
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Request a time</DialogTitle>
-              <DialogDescription>
-                Propose a time that works for you. The owner decides whether to
-                accept it.
-              </DialogDescription>
+              <DialogTitle>{t("dialog.title")}</DialogTitle>
+              <DialogDescription>{t("dialog.description")}</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="req-name">Your name (optional)</Label>
+                <Label htmlFor="req-name">{t("dialog.nameLabel")}</Label>
                 <Input
                   id="req-name"
                   value={name}
                   maxLength={120}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="So they know who’s asking"
+                  placeholder={t("dialog.namePlaceholder")}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="req-date">Date</Label>
+                <Label htmlFor="req-date">{t("dialog.dateLabel")}</Label>
                 <DatePicker
                   id="req-date"
                   value={date}
                   onChange={setDate}
-                  aria-label="Requested date"
+                  aria-label={t("dialog.dateAria")}
                 />
               </div>
 
               <div className="flex gap-3">
                 <div className="flex-1 space-y-1.5">
-                  <Label htmlFor="req-start">From</Label>
+                  <Label htmlFor="req-start">{t("dialog.fromLabel")}</Label>
                   <Input
                     id="req-start"
                     type="time"
@@ -164,7 +162,7 @@ export function PublicRequestDialog({
                   />
                 </div>
                 <div className="flex-1 space-y-1.5">
-                  <Label htmlFor="req-end">To</Label>
+                  <Label htmlFor="req-end">{t("dialog.toLabel")}</Label>
                   <Input
                     id="req-end"
                     type="time"
@@ -175,13 +173,13 @@ export function PublicRequestDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="req-message">Message (optional)</Label>
+                <Label htmlFor="req-message">{t("dialog.messageLabel")}</Label>
                 <Textarea
                   id="req-message"
                   value={message}
                   maxLength={1000}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="What’s it about?"
+                  placeholder={t("dialog.messagePlaceholder")}
                   rows={3}
                 />
               </div>
@@ -193,10 +191,10 @@ export function PublicRequestDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={busy}
               >
-                Cancel
+                {t("dialog.cancel")}
               </Button>
               <Button onClick={() => void submit()} disabled={busy}>
-                {busy ? "Sending…" : "Send request"}
+                {busy ? t("dialog.sending") : t("dialog.send")}
               </Button>
             </DialogFooter>
           </>

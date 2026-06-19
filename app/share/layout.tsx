@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Viewport } from "next";
 import { Plus_Jakarta_Sans, Manrope, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import { DEFAULT_TONE, DEFAULT_PALETTE } from "@/lib/theme/appearance";
@@ -13,22 +13,23 @@ import { DEFAULT_TONE, DEFAULT_PALETTE } from "@/lib/theme/appearance";
 // a fixed light appearance (no per-user accent cookie, no theme toggle), English
 // only (no next-intl ROUTING). Deliberately NOT the private app.
 //
-// English-only does NOT mean "no next-intl context": the calendar leaves this page
-// reuses (TimeGrid / MonthGrid / EventBlock …) call `useTranslations` and throw
-// without a `NextIntlClientProvider` in scope. That provider lives in the page,
-// INSIDE the dynamic <Suspense> boundary (see app/share/[token]/page.tsx) — keeping
-// this shared layout a static shell that reads no request data.
+// The calendar leaves this page reuses (TimeGrid / MonthGrid / EventBlock …) call
+// `useTranslations` and throw without a `NextIntlClientProvider` in scope. That
+// provider lives in the page, INSIDE the dynamic <Suspense> boundary, with the
+// locale resolved per-request (see app/share/[token]/page.tsx) — keeping this
+// shared layout a static shell that reads no request data.
+//
+// i18n / `lang`: locale negotiation (cookie → Accept-Language → Russian) is
+// per-request and would make this shell dynamic, defeating the static-chrome-first
+// design. So the static `<html lang>` carries the surface's default (Russian), and
+// the accurate per-request `lang` is set on the content roots inside the dynamic
+// subtree (PublicCalendarView / PublicShareInactive). Screen readers honour the
+// nearest ancestor `lang`, so the inner value wins where content actually renders.
+// Page metadata (title/description) is localised by the page's `generateMetadata`.
 
 const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin", "cyrillic"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "Shared calendar",
-  description: "A read-only shared calendar.",
-  // A public link should never be indexed.
-  robots: { index: false, follow: false },
-};
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -44,7 +45,7 @@ export default function ShareRootLayout({
 }) {
   return (
     <html
-      lang="en"
+      lang="ru"
       // A neutral, brand-free accent for the anonymous public surface: warm
       // stone replaces terracotta so the today marker / focus ring stay quiet.
       // "stone" is a public-only accent (see [data-accent="stone"] in globals.css),

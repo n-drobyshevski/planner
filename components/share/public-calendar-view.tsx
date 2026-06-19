@@ -7,6 +7,7 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { LazyMotion, MotionConfig, domMax, m } from "motion/react";
+import { useLocale, useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
@@ -17,6 +18,8 @@ import { expandEvents } from "@/lib/recurrence/expand";
 import { partitionPublicOccurrences } from "@/lib/calendar/bands";
 import { getWindow, getVisibleDays, navigate } from "@/lib/datetime/window";
 import { formatRangeLabel } from "@/lib/datetime/format";
+import { dateFnsLocale } from "@/lib/datetime/date-locale";
+import { PUBLIC_BUSY_LABEL } from "@/lib/scope/visibility";
 import { localTimeZone, defaultStartOnDay } from "@/lib/datetime/local";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -31,6 +34,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CalendarCanvas } from "@/components/calendar/calendar-canvas";
 import { PublicRequestDialog } from "@/components/share/public-request-dialog";
+import { ShareLanguageToggle } from "@/components/share/share-language-toggle";
 import type { CalendarView, Occurrence, TimeWindow } from "@/lib/types";
 
 // The public surface is deliberately quiet: every block renders in one calm warm
@@ -44,12 +48,13 @@ const NEVER_EDIT = () => false;
 
 // Day / 3-day / week / month on the public surface — the agenda view stays in the
 // private app. 3-day is the legible "week-lite" and the default on phones, where
-// week's 7 columns crowd a narrow viewport.
-const VIEWS: { id: CalendarView; label: string }[] = [
-  { id: "day", label: "Day" },
-  { id: "3day", label: "3 days" },
-  { id: "week", label: "Week" },
-  { id: "month", label: "Month" },
+// week's 7 columns crowd a narrow viewport. Labels come from the `share.views.*`
+// catalog (resolved at render via `useTranslations`).
+const VIEWS: { id: CalendarView; labelKey: string }[] = [
+  { id: "day", labelKey: "views.day" },
+  { id: "3day", labelKey: "views.threeDay" },
+  { id: "week", labelKey: "views.week" },
+  { id: "month", labelKey: "views.month" },
 ];
 
 export function PublicCalendarView(props: {
@@ -83,11 +88,14 @@ export function PublicCalendarView(props: {
 
 function PublicCalendarInner({
   token,
+  mode,
 }: {
   token: string;
   label: string | null;
   mode: "details" | "busy";
 }) {
+  const t = useTranslations("share");
+  const locale = useLocale();
   const timeZone = localTimeZone(); // the public viewer's own device zone
   const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView>("week");
@@ -135,15 +143,26 @@ function PublicCalendarInner({
   // owner turned the band off (or has no inactive time here). Context windows carry
   // the owner's day-structure and obey the same privacy filters as events, so they
   // render here too (neutral stone, read-only) just as they do in the private app.
+  // In busy mode every block's title is the server's `PUBLIC_BUSY_LABEL` sentinel
+  // ("Busy"); localise it for display. Gated on mode === "busy" so a real event
+  // genuinely titled "Busy" in a details-mode share is never rewritten.
+  const busyLabel = t("busy");
   const { occurrences, unavailableBands } = useMemo<{
     occurrences: Occurrence[];
     unavailableBands: { start: number; end: number }[];
   }>(() => {
     if (!query.data) return { occurrences: [], unavailableBands: [] };
-    return partitionPublicOccurrences(
+    const partitioned = partitionPublicOccurrences(
       expandEvents(query.data.events, query.data.overrides, win, EMPTY_SHARED),
     );
-  }, [query.data, win]);
+    if (mode !== "busy") return partitioned;
+    return {
+      ...partitioned,
+      occurrences: partitioned.occurrences.map((o) =>
+        o.title === PUBLIC_BUSY_LABEL ? { ...o, title: busyLabel } : o,
+      ),
+    };
+  }, [query.data, win, mode, busyLabel]);
 
   // The shared helper steps each view by one of its own units (day ±1, 3-day ±3,
   // week ±1 week, month ±1 month) and re-aligns to local midnight.
@@ -160,9 +179,10 @@ function PublicCalendarInner({
 
   const periodLabel = ready
     ? view === "3day"
-      ? formatRangeLabel("3day", focusedDate, timeZone)
+      ? formatRangeLabel("3day", focusedDate, timeZone, locale)
       : format(focusedDate, view === "day" ? "EEEE d MMMM" : "MMMM yyyy", {
           in: tz(timeZone),
+          locale: dateFnsLocale(locale),
         })
     : "";
   // A tighter label for phones, where the full weekday/month would crowd the
@@ -170,9 +190,10 @@ function PublicCalendarInner({
   // share between both.
   const periodLabelShort = ready
     ? view === "3day"
-      ? formatRangeLabel("3day", focusedDate, timeZone)
+      ? formatRangeLabel("3day", focusedDate, timeZone, locale)
       : format(focusedDate, view === "day" ? "EEE d MMM" : "MMM yyyy", {
           in: tz(timeZone),
+          locale: dateFnsLocale(locale),
         })
     : "";
 
@@ -188,7 +209,7 @@ function PublicCalendarInner({
   }
 
   return (
-    <div className="relative flex h-dvh flex-col">
+    <div lang={locale} className="relative flex h-dvh flex-col">
       {/* Quiet, obviously-not-the-app header. One calm band; never wraps. */}
       <header className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-3 py-2.5 sm:gap-3 sm:px-4">
         {/* Navigation */}
@@ -196,7 +217,7 @@ function PublicCalendarInner({
           <Button
             size="icon"
             variant="ghost"
-            aria-label="Previous"
+            aria-label={t("nav.previous")}
             onClick={() => shift(-1)}
           >
             <ChevronLeft className="size-4" />
@@ -209,12 +230,12 @@ function PublicCalendarInner({
             className="h-8 max-sm:hidden"
             onClick={() => setFocusedDate(Date.now())}
           >
-            Today
+            {t("nav.today")}
           </Button>
           <Button
             size="icon"
             variant="ghost"
-            aria-label="Next"
+            aria-label={t("nav.next")}
             onClick={() => shift(1)}
           >
             <ChevronRight className="size-4" />
@@ -234,15 +255,18 @@ function PublicCalendarInner({
               wide screens — where there's room and a mouse-drag is the gesture —
               so the calm single-row header never crowds or wraps on phones. */}
           <span className="hidden text-xs text-muted-foreground lg:inline">
-            Drag a slot to request a time
+            {t("dragHint")}
           </span>
+          {/* A quiet EN/RU switch — the anonymous surface auto-picks a language but
+              any recipient can flip it. Mirrors the view-switcher's segmented look. */}
+          <ShareLanguageToggle />
           {/* Phones: a compact dropdown — clearer than four single-letter tabs in a
               narrow row. Reuses the standard form-control vocabulary already on this
               surface; portals its content, so the header never clips it. */}
           <Select value={view} onValueChange={(v) => setView(v as CalendarView)}>
             <SelectTrigger
               size="sm"
-              aria-label="Calendar view"
+              aria-label={t("nav.viewLabel")}
               className="h-8 w-[6.75rem] md:hidden"
             >
               <SelectValue />
@@ -250,7 +274,7 @@ function PublicCalendarInner({
             <SelectContent align="end">
               {VIEWS.map((v) => (
                 <SelectItem key={v.id} value={v.id}>
-                  {v.label}
+                  {t(v.labelKey)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -258,7 +282,7 @@ function PublicCalendarInner({
           {/* md+: the segmented control, with room for all four full labels. */}
           <div
             role="tablist"
-            aria-label="Calendar view"
+            aria-label={t("nav.viewLabel")}
             className="hidden items-center gap-1 rounded-lg bg-muted p-0.5 md:flex"
           >
             {VIEWS.map((v) => (
@@ -267,7 +291,7 @@ function PublicCalendarInner({
                 type="button"
                 role="tab"
                 aria-selected={view === v.id}
-                aria-label={v.label}
+                aria-label={t(v.labelKey)}
                 onClick={() => setView(v.id)}
                 className={`min-h-8 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   view === v.id
@@ -275,7 +299,7 @@ function PublicCalendarInner({
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {v.label}
+                {t(v.labelKey)}
               </button>
             ))}
           </div>
@@ -289,7 +313,7 @@ function PublicCalendarInner({
             className="hidden h-8 md:inline-flex"
           >
             <CalendarPlus aria-hidden className="size-4" />
-            Request a time
+            {t("requestCta")}
           </Button>
         </div>
       </header>
@@ -349,7 +373,7 @@ function PublicCalendarInner({
           className="h-12 gap-2 rounded-full px-5 shadow-soft-lg"
         >
           <CalendarPlus aria-hidden className="size-5" />
-          Request a time
+          {t("requestCta")}
         </Button>
       </m.div>
 

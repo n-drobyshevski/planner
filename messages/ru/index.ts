@@ -11,6 +11,7 @@ import recurrence from "./recurrence.json";
 import events from "./events.json";
 import toasts from "./toasts.json";
 import validation from "./validation.json";
+import share from "./share.json";
 
 /** Composed Russian catalog (mirrors the English key tree in messages/en). */
 const messages = {
@@ -27,6 +28,7 @@ const messages = {
   events,
   toasts,
   validation,
+  share,
 };
 
 export default messages;

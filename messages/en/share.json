@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "title": "Shared calendar",
+    "description": "A read-only shared calendar."
+  },
+  "loading": "Loading the shared calendar…",
+  "views": {
+    "day": "Day",
+    "threeDay": "3 days",
+    "week": "Week",
+    "month": "Month"
+  },
+  "nav": {
+    "previous": "Previous",
+    "next": "Next",
+    "today": "Today",
+    "viewLabel": "Calendar view"
+  },
+  "dragHint": "Drag a slot to request a time",
+  "requestCta": "Request a time",
+  "busy": "Busy",
+  "dialog": {
+    "title": "Request a time",
+    "description": "Propose a time that works for you. The owner decides whether to accept it.",
+    "nameLabel": "Your name (optional)",
+    "namePlaceholder": "So they know who’s asking",
+    "dateLabel": "Date",
+    "dateAria": "Requested date",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "messageLabel": "Message (optional)",
+    "messagePlaceholder": "What’s it about?",
+    "cancel": "Cancel",
+    "send": "Send request",
+    "sending": "Sending…"
+  },
+  "success": {
+    "title": "Request sent",
+    "body": "Thanks — your proposed time has been sent. It’s up to the calendar’s owner to accept or decline.",
+    "close": "Close"
+  },
+  "errors": {
+    "endAfterStart": "The end time must be after the start time.",
+    "send": "Couldn’t send your request. Please try again.",
+    "network": "Couldn’t send your request. Please check your connection."
+  },
+  "inactive": {
+    "title": "This link is no longer active",
+    "body": "The shared calendar you’re looking for has been turned off or has expired. Ask the person who shared it for a new link."
+  },
+  "language": {
+    "label": "Language"
+  }
+}
