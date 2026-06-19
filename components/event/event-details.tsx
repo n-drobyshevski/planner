@@ -350,14 +350,23 @@ export function EventDetails({
         <ResponsiveDialogFooter className="sm:justify-between">
           {isOwn ? (
             <>
-              <Button variant="ghost" onClick={onDelete} className="text-destructive">
+              <Button
+                variant="ghost"
+                onClick={onDelete}
+                className="text-destructive max-sm:h-11"
+              >
                 <Trash2 data-icon="inline-start" />
                 {tc("delete")}
               </Button>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-sm:w-full">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" aria-label={t("details.more")}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label={t("details.more")}
+                      className="max-sm:size-11"
+                    >
                       <MoreHorizontal />
                     </Button>
                   </DropdownMenuTrigger>
@@ -448,21 +457,29 @@ export function EventDetails({
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button onClick={onEdit}>
+                <Button onClick={onEdit} className="max-sm:h-11 max-sm:flex-1">
                   <Pencil data-icon="inline-start" />
                   {tc("edit")}
                 </Button>
               </div>
             </>
           ) : (
-            <div className="ml-auto flex gap-2">
+            <div className="flex gap-2 max-sm:w-full sm:ml-auto">
               {occurrence.kind === "event" && onCopyToMine && (
-                <Button variant="outline" onClick={onCopyToMine}>
+                <Button
+                  variant="outline"
+                  onClick={onCopyToMine}
+                  className="max-sm:h-11 max-sm:flex-1"
+                >
                   <CopyPlus data-icon="inline-start" />
                   {t("details.copyToMyCalendar")}
                 </Button>
               )}
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="max-sm:h-11 max-sm:flex-1"
+              >
                 {tc("close")}
               </Button>
             </div>

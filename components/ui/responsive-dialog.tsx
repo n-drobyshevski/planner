@@ -114,7 +114,10 @@ function ResponsiveDialogHeader({
     <div
       data-slot="responsive-dialog-header"
       className={cn(
-        "flex shrink-0 flex-col gap-1 px-4 pt-4 pb-3 text-left",
+        // pr-12 reserves room for the absolute close button (size-7 @ right-4)
+        // so a long title, badges, or the create-mode type toggle never slip
+        // underneath it — on both the desktop dialog and the mobile sheet.
+        "flex shrink-0 flex-col gap-1 pt-4 pr-12 pb-3 pl-4 text-left",
         className,
       )}
       {...props}
@@ -145,7 +148,11 @@ function ResponsiveDialogFooter({
     <div
       data-slot="responsive-dialog-footer"
       className={cn(
-        "mt-auto flex shrink-0 flex-col-reverse gap-2 border-t bg-muted/50 px-4 py-3 sm:flex-row sm:justify-end",
+        // Mobile: a plain top-to-bottom stack — DOM order is authored so the
+        // primary action lands last (bottom, in thumb reach) and a destructive
+        // action lands first (top, away from it). Desktop: a single row, the
+        // caller deciding justify-between vs -end.
+        "mt-auto flex shrink-0 flex-col gap-2 border-t bg-muted/50 px-4 py-3 sm:flex-row sm:justify-end",
         isMobile && "pb-safe",
         className,
       )}
