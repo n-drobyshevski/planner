@@ -16,7 +16,7 @@ import { fetchWindowPublic } from "@/lib/supabase/queries";
 import { expandEvents } from "@/lib/recurrence/expand";
 import { partitionPublicOccurrences } from "@/lib/calendar/bands";
 import { getWindow, getVisibleDays } from "@/lib/datetime/window";
-import { localTimeZone } from "@/lib/datetime/local";
+import { localTimeZone, defaultStartOnDay } from "@/lib/datetime/local";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -84,6 +84,11 @@ function PublicCalendarInner({
   // keeps hydration stable.
   const [focusedDate, setFocusedDate] = useState(0);
   const [requestOpen, setRequestOpen] = useState(false);
+  // The slot the viewer drew (epoch ms), used to pre-fill the request dialog.
+  // null = the manual header button → today's defaults.
+  const [prefill, setPrefill] = useState<{ start: number; end: number } | null>(
+    null,
+  );
   useEffect(() => {
     if (!focusedDate) setFocusedDate(Date.now());
   }, [focusedDate]);
@@ -193,6 +198,12 @@ function PublicCalendarInner({
 
         {/* View switcher + primary action, pushed to the right edge. */}
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+          {/* Quiet discoverability nudge for the drag-to-request gesture. Only on
+              wide screens — where there's room and a mouse-drag is the gesture —
+              so the calm single-row header never crowds or wraps on phones. */}
+          <span className="hidden text-xs text-muted-foreground lg:inline">
+            Drag a slot to request a time
+          </span>
           <div
             role="tablist"
             aria-label="Calendar view"
@@ -224,7 +235,10 @@ function PublicCalendarInner({
             size="sm"
             variant="outline"
             aria-label="Request a time"
-            onClick={() => setRequestOpen(true)}
+            onClick={() => {
+              setPrefill(null);
+              setRequestOpen(true);
+            }}
             className="h-8 max-sm:w-8 max-sm:px-0"
           >
             <CalendarPlus aria-hidden className="size-4" />
@@ -250,8 +264,17 @@ function PublicCalendarInner({
             selectedKey={null}
             onSelect={NOOP}
             onPickDay={NOOP}
-            onCreateRange={NOOP}
-            onCreateDay={NOOP}
+            // Drawing a slot on the read-only public surface proposes a time
+            // rather than creating an event: seed and open the request dialog.
+            onCreateRange={(start, end) => {
+              setPrefill({ start, end });
+              setRequestOpen(true);
+            }}
+            onCreateDay={(dayMs) => {
+              const start = defaultStartOnDay(dayMs, timeZone);
+              setPrefill({ start, end: start + 3_600_000 });
+              setRequestOpen(true);
+            }}
             onReschedule={NOOP}
             onChangeColor={NOOP}
             onDeleteEvent={NOOP}
@@ -263,10 +286,15 @@ function PublicCalendarInner({
       </main>
 
       <PublicRequestDialog
+        // Remount per drawn slot so the dialog's field initializers re-seed
+        // (avoids a set-state-in-effect that the react-hooks lint rejects).
+        key={prefill ? `${prefill.start}-${prefill.end}` : "manual"}
         token={token}
         open={requestOpen}
         onOpenChange={setRequestOpen}
         timeZone={timeZone}
+        prefillStart={prefill?.start}
+        prefillEnd={prefill?.end}
       />
     </div>
   );

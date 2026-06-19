@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { combineDateTime, msToDateInput } from "@/lib/datetime/local";
+import { combineDateTime, msToDateInput, msToTimeInput } from "@/lib/datetime/local";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,16 +29,32 @@ export function PublicRequestDialog({
   open,
   onOpenChange,
   timeZone,
+  prefillStart,
+  prefillEnd,
 }: {
   token: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   timeZone: string;
+  /**
+   * Optional epoch-ms range to seed the form with — e.g. a slot the viewer drew
+   * on the public calendar. Absent → today, 09:00–10:00 (the manual-button path).
+   * The parent remounts this dialog via `key` so a fresh gesture re-seeds these
+   * initializers; the fields stay fully editable afterwards.
+   */
+  prefillStart?: number;
+  prefillEnd?: number;
 }) {
   const [name, setName] = useState("");
-  const [date, setDate] = useState(() => msToDateInput(Date.now(), timeZone));
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("10:00");
+  const [date, setDate] = useState(() =>
+    msToDateInput(prefillStart ?? Date.now(), timeZone),
+  );
+  const [startTime, setStartTime] = useState(() =>
+    prefillStart != null ? msToTimeInput(prefillStart, timeZone) : "09:00",
+  );
+  const [endTime, setEndTime] = useState(() =>
+    prefillEnd != null ? msToTimeInput(prefillEnd, timeZone) : "10:00",
+  );
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
