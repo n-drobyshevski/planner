@@ -42,13 +42,18 @@ export const ContextBackdrop = forwardRef<
     labelStyle?: ContextLabel;
     /** false = another member's context: no move/resize (view-only overlay) */
     editable?: boolean;
+    /** Which edge the vertical side label sits on. Defaults to the owner-based
+        convention (mine left, partner right); the single-calendar public share
+        forces "left" so every label shares one edge. */
+    labelSide?: "left" | "right";
   } & MenuableProps &
     React.HTMLAttributes<HTMLDivElement>
 >(function ContextBackdrop(
-  { occ, color, style, selected, singleColumn, labelStyle = "bar", editable = true, onMenu, className, ...rest },
+  { occ, color, style, selected, singleColumn, labelStyle = "bar", editable = true, labelSide, onMenu, className, ...rest },
   ref,
 ) {
   const timeZone = useViewerTimeZone();
+  const side = labelSide ?? (editable ? "left" : "right");
   const timeRange = `${formatTime(occ.start, timeZone)}–${formatTime(occ.end, timeZone)}`;
   // The block's pixel height arrives in `style` (set from durationToHeight); the
   // side label uses it to decide whether there's room for the time range.
@@ -99,7 +104,8 @@ export const ContextBackdrop = forwardRef<
         <div
           className={cn(
             "pointer-events-auto absolute inset-y-0 z-10 flex w-3.5 items-start justify-center overflow-hidden select-none",
-            editable ? "left-0 cursor-grab" : "right-0 cursor-pointer",
+            side === "left" ? "left-0" : "right-0",
+            editable ? "cursor-grab" : "cursor-pointer",
           )}
           style={{ backgroundColor: toPaletteColor(color), color: toPaletteInk(color) }}
         >

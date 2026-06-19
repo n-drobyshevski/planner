@@ -14,7 +14,7 @@ import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/anon";
 import { fetchWindowPublic } from "@/lib/supabase/queries";
 import { expandEvents } from "@/lib/recurrence/expand";
-import { mergeRanges } from "@/lib/calendar/bands";
+import { partitionPublicOccurrences } from "@/lib/calendar/bands";
 import { getWindow, getVisibleDays } from "@/lib/datetime/window";
 import { localTimeZone } from "@/lib/datetime/local";
 import { Button } from "@/components/ui/button";
@@ -107,33 +107,22 @@ function PublicCalendarInner({
     queryFn: () => fetchWindowPublic(createPublicClient(), token, win),
   });
 
-  // Split the expanded events two ways: active events become real blocks; inactive
-  // (sleep / blocked) events become a quiet "Unavailable" band instead — their time
-  // shows, their content never does (the RPC already redacted it). The RPC only
-  // returns inactive rows when the share opts in (`show_inactive`), so an empty band
-  // list just means the owner turned the band off (or has no inactive time here).
+  // Split the expanded occurrences for the public surface: context zones and active
+  // events become drawable blocks/backdrops; inactive (sleep / blocked) events
+  // become a quiet "Unavailable" band instead — their time shows, their content
+  // never does (the RPC already redacted it). The RPC only returns inactive rows
+  // when the share opts in (`show_inactive`), so an empty band list just means the
+  // owner turned the band off (or has no inactive time here). Context windows carry
+  // the owner's day-structure and obey the same privacy filters as events, so they
+  // render here too (neutral stone, read-only) just as they do in the private app.
   const { occurrences, unavailableBands } = useMemo<{
     occurrences: Occurrence[];
     unavailableBands: { start: number; end: number }[];
   }>(() => {
     if (!query.data) return { occurrences: [], unavailableBands: [] };
-    const all = expandEvents(
-      query.data.events,
-      query.data.overrides,
-      win,
-      EMPTY_SHARED,
-      // Context paint-blocks reveal category structure and have no public meaning;
-      // keep the public view to real events.
-    ).filter((o) => o.kind === "event");
-    return {
-      occurrences: all.filter((o) => !o.inactive),
-      // Cancelled inactive occurrences aren't "unavailable" — drop them.
-      unavailableBands: mergeRanges(
-        all
-          .filter((o) => o.inactive && o.status !== "cancelled")
-          .map((o) => ({ start: o.start, end: o.end })),
-      ),
-    };
+    return partitionPublicOccurrences(
+      expandEvents(query.data.events, query.data.overrides, win, EMPTY_SHARED),
+    );
   }, [query.data, win]);
 
   function shift(dir: -1 | 1) {
@@ -253,6 +242,10 @@ function PublicCalendarInner({
             unavailableBands={unavailableBands}
             focusedMs={focusedDate}
             colorOf={() => PUBLIC_BLOCK_COLOR}
+            // Context zones use the slim vertical side label here, not the full-width
+            // top bar: a thin labelled spine keeps the quiet public surface from
+            // stacking heavy header bars, and lets the events inside read cleanly.
+            contextLabel="side"
             canEdit={NEVER_EDIT}
             selectedKey={null}
             onSelect={NOOP}

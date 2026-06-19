@@ -129,10 +129,14 @@ export function DayColumn({
         mine: canEdit(o),
       }));
     const nested = segs.map((s) => enclosingContext(ctxOccs, s.occ.start) !== null);
-    // Context side labels (side mode only) sit on the right for read-only contexts
-    // (ContextBackdrop: `editable ? left-0 : right-0`). An event overlapping such a
-    // context in time would paint over the label — flag it to inset its right edge.
-    const rightLabeled = contextSegs.filter((c) => labelStyle === "side" && !canEdit(c.occ));
+    // Side labels sit on the LEFT by default; the RIGHT edge is reserved only when
+    // a second calendar is overlaid (the partner's read-only contexts), so the two
+    // calendars' labels separate. With one calendar (e.g. the public share) every
+    // label is on the left, cleared by the nested-event left inset. So only a
+    // right-labeled context flags overlapping events to inset their right edge.
+    const rightLabeled = contextSegs.filter(
+      (c) => labelStyle === "side" && twoCalendars && !canEdit(c.occ),
+    );
     const rightLabel = segs.map((s) =>
       rightLabeled.some((c) => c.start < s.end && s.start < c.end),
     );
@@ -260,6 +264,9 @@ export function DayColumn({
               singleColumn={singleColumn}
               labelStyle={labelStyle}
               editable={editable}
+              // Left edge unless a second calendar is overlaid (then partner's
+              // read-only contexts go right to separate from mine).
+              labelSide={editable || !twoCalendars ? "left" : "right"}
               style={{
                 top: msToY(seg.start, dayStart, hourPx),
                 height: durationToHeight(seg.start, seg.end, hourPx),
