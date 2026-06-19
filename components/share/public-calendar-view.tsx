@@ -6,8 +6,8 @@ import {
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
-import { LazyMotion, MotionConfig, domMax } from "motion/react";
-import { addDays, addMonths, getTime, startOfDay, format } from "date-fns";
+import { LazyMotion, MotionConfig, domMax, m } from "motion/react";
+import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -15,9 +15,18 @@ import { createPublicClient } from "@/lib/supabase/anon";
 import { fetchWindowPublic } from "@/lib/supabase/queries";
 import { expandEvents } from "@/lib/recurrence/expand";
 import { partitionPublicOccurrences } from "@/lib/calendar/bands";
-import { getWindow, getVisibleDays } from "@/lib/datetime/window";
+import { getWindow, getVisibleDays, navigate } from "@/lib/datetime/window";
+import { formatRangeLabel } from "@/lib/datetime/format";
 import { localTimeZone, defaultStartOnDay } from "@/lib/datetime/local";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CalendarCanvas } from "@/components/calendar/calendar-canvas";
@@ -33,10 +42,12 @@ const NOOP = () => {};
 const EMPTY_SHARED: ReadonlySet<string> = new Set();
 const NEVER_EDIT = () => false;
 
-// Only week / day / month on the public surface — the prosumer 3-day/agenda views
-// stay in the private app.
+// Day / 3-day / week / month on the public surface — the agenda view stays in the
+// private app. 3-day is the legible "week-lite" and the default on phones, where
+// week's 7 columns crowd a narrow viewport.
 const VIEWS: { id: CalendarView; label: string }[] = [
   { id: "day", label: "Day" },
+  { id: "3day", label: "3 days" },
   { id: "week", label: "Week" },
   { id: "month", label: "Month" },
 ];
@@ -78,7 +89,11 @@ function PublicCalendarInner({
   mode: "details" | "busy";
 }) {
   const timeZone = localTimeZone(); // the public viewer's own device zone
+  const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView>("week");
+  // Sentinel for the once-only phone default applied in the render-time block
+  // below. State (not a ref) so it can be read during render lint-cleanly.
+  const [mobileDefaultApplied, setMobileDefaultApplied] = useState(false);
   // Client-only "now" so server and client agree (0 until mounted → skeleton),
   // mirroring the use-inbox day-bucket gate. The route is dynamic, but this also
   // keeps hydration stable.
@@ -130,33 +145,50 @@ function PublicCalendarInner({
     );
   }, [query.data, win]);
 
+  // The shared helper steps each view by one of its own units (day ±1, 3-day ±3,
+  // week ±1 week, month ±1 month) and re-aligns to local midnight.
   function shift(dir: -1 | 1) {
-    const ctx = { in: tz(timeZone) };
-    const base = focusedDate;
-    const next =
-      view === "day"
-        ? addDays(base, dir, ctx)
-        : view === "month"
-          ? addMonths(base, dir, ctx)
-          : addDays(base, dir * 7, ctx); // week (+ any other)
-    setFocusedDate(getTime(startOfDay(next, ctx)));
+    setFocusedDate(navigate(view, focusedDate, dir, { timeZone }));
+  }
+
+  // The manual entry point to the request flow (the desktop header button and the
+  // mobile FAB): no drawn slot, so the dialog falls back to today's defaults.
+  function openManualRequest() {
+    setPrefill(null);
+    setRequestOpen(true);
   }
 
   const periodLabel = ready
-    ? format(focusedDate, view === "day" ? "EEEE d MMMM" : "MMMM yyyy", {
-        in: tz(timeZone),
-      })
+    ? view === "3day"
+      ? formatRangeLabel("3day", focusedDate, timeZone)
+      : format(focusedDate, view === "day" ? "EEEE d MMMM" : "MMMM yyyy", {
+          in: tz(timeZone),
+        })
     : "";
   // A tighter label for phones, where the full weekday/month would crowd the
-  // single-row header off-screen.
+  // single-row header off-screen. The 3-day range is already compact enough to
+  // share between both.
   const periodLabelShort = ready
-    ? format(focusedDate, view === "day" ? "EEE d MMM" : "MMM yyyy", {
-        in: tz(timeZone),
-      })
+    ? view === "3day"
+      ? formatRangeLabel("3day", focusedDate, timeZone)
+      : format(focusedDate, view === "day" ? "EEE d MMM" : "MMM yyyy", {
+          in: tz(timeZone),
+        })
     : "";
 
+  // Phones default to 3-day, applied once at render time (React's "adjust state on
+  // changed input" pattern, mirroring calendar-shell) rather than in an effect, so
+  // it converges without a cascading set-state-in-effect and never paints a week
+  // frame: `useIsMobile` is false until mounted (matching SSR), and the canvas is
+  // gated on `ready`, so this flips before the first canvas paint. The `view` guard
+  // means it only overrides the untouched default — week stays selectable on phones.
+  if (isMobile && !mobileDefaultApplied) {
+    setMobileDefaultApplied(true);
+    if (view === "week") setView("3day");
+  }
+
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="relative flex h-dvh flex-col">
       {/* Quiet, obviously-not-the-app header. One calm band; never wraps. */}
       <header className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-3 py-2.5 sm:gap-3 sm:px-4">
         {/* Navigation */}
@@ -204,10 +236,30 @@ function PublicCalendarInner({
           <span className="hidden text-xs text-muted-foreground lg:inline">
             Drag a slot to request a time
           </span>
+          {/* Phones: a compact dropdown — clearer than four single-letter tabs in a
+              narrow row. Reuses the standard form-control vocabulary already on this
+              surface; portals its content, so the header never clips it. */}
+          <Select value={view} onValueChange={(v) => setView(v as CalendarView)}>
+            <SelectTrigger
+              size="sm"
+              aria-label="Calendar view"
+              className="h-8 w-[6.75rem] md:hidden"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {VIEWS.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* md+: the segmented control, with room for all four full labels. */}
           <div
             role="tablist"
             aria-label="Calendar view"
-            className="flex items-center gap-1 rounded-lg bg-muted p-0.5"
+            className="hidden items-center gap-1 rounded-lg bg-muted p-0.5 md:flex"
           >
             {VIEWS.map((v) => (
               <button
@@ -217,32 +269,27 @@ function PublicCalendarInner({
                 aria-selected={view === v.id}
                 aria-label={v.label}
                 onClick={() => setView(v.id)}
-                className={`min-h-8 rounded-md px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3 ${
+                className={`min-h-8 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   view === v.id
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {/* Single letter on phones, full word once there's room. */}
-                <span aria-hidden className="sm:hidden">
-                  {v.label.charAt(0)}
-                </span>
-                <span className="hidden sm:inline">{v.label}</span>
+                {v.label}
               </button>
             ))}
           </div>
+          {/* Desktop keeps the action in the header; on phones it moves to the
+              thumb-reachable FAB below, so the mobile header stays purely
+              navigational (move through time · switch view). */}
           <Button
             size="sm"
             variant="outline"
-            aria-label="Request a time"
-            onClick={() => {
-              setPrefill(null);
-              setRequestOpen(true);
-            }}
-            className="h-8 max-sm:w-8 max-sm:px-0"
+            onClick={openManualRequest}
+            className="hidden h-8 md:inline-flex"
           >
             <CalendarPlus aria-hidden className="size-4" />
-            <span className="hidden sm:inline">Request a time</span>
+            Request a time
           </Button>
         </div>
       </header>
@@ -284,6 +331,27 @@ function PublicCalendarInner({
           />
         )}
       </main>
+
+      {/* Phones: the single primary action floats into the right-thumb zone as a
+          labeled FAB (the desktop header keeps its own button). The terracotta is
+          the one accent on an otherwise neutral surface, so the action reads
+          unmistakably against the stone event cards instead of blending in. Sits
+          above the canvas (events top out at z-30) and clears the home indicator. */}
+      <m.div
+        className="absolute right-4 z-40 md:hidden"
+        style={{ bottom: "max(1rem, env(safe-area-inset-bottom))" }}
+        initial={{ opacity: 0, scale: 0.9, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Button
+          onClick={openManualRequest}
+          className="h-12 gap-2 rounded-full px-5 shadow-soft-lg"
+        >
+          <CalendarPlus aria-hidden className="size-5" />
+          Request a time
+        </Button>
+      </m.div>
 
       <PublicRequestDialog
         // Remount per drawn slot so the dialog's field initializers re-seed
