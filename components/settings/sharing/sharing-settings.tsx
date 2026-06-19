@@ -124,6 +124,25 @@ export function SharingSettings() {
     setFormOpen(true);
   };
 
+  /** Plain-language summary of what a link discloses, axis by axis. */
+  const visibilitySummary = (share: PublicShareRow): string => {
+    if (
+      share.showEventTitles &&
+      share.showEventDetails &&
+      share.showContextNames
+    )
+      return t("sharing.visibility.full");
+    const parts: string[] = [];
+    if (share.showEventTitles) {
+      parts.push(t("sharing.visibility.titles"));
+      if (share.showEventDetails) parts.push(t("sharing.visibility.notes"));
+    } else {
+      parts.push(t("sharing.visibility.busy"));
+    }
+    if (share.showContextNames) parts.push(t("sharing.visibility.contextNames"));
+    return parts.join(", ");
+  };
+
   /** Plain-language summary of which categories a link can show. */
   const scopeSummary = (share: PublicShareRow): string => {
     if (share.categoryIds == null) return t("sharing.scope.all");
@@ -173,7 +192,7 @@ export function SharingSettings() {
               const status = statusOf(share);
               const StatusIcon = STATUS_ICON[status];
               const revoked = status === "revoked";
-              const ModeIcon = share.mode === "busy" ? EyeOff : Eye;
+              const VisIcon = share.showEventTitles ? Eye : EyeOff;
               return (
                 <li
                   key={share.id}
@@ -204,11 +223,11 @@ export function SharingSettings() {
                         </Badge>
                       </div>
 
-                      {/* What this link exposes — mode + category scope. */}
+                      {/* What this link exposes — visibility + category scope. */}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
-                          <ModeIcon className="size-3.5" aria-hidden />
-                          {t(`sharing.mode.${share.mode}`)}
+                          <VisIcon className="size-3.5" aria-hidden />
+                          {visibilitySummary(share)}
                         </span>
                         <span aria-hidden className="text-border">
                           ·

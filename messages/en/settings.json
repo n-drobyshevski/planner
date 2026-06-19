@@ -210,9 +210,12 @@
       "expired": "Expired",
       "revoked": "Revoked"
     },
-    "mode": {
-      "details": "Shows event titles",
-      "busy": "Busy only, titles hidden"
+    "visibility": {
+      "full": "Full details",
+      "titles": "Titles",
+      "notes": "Notes",
+      "contextNames": "Context names",
+      "busy": "Busy only"
     },
     "scope": {
       "all": "All categories",
@@ -254,15 +257,19 @@
         "placeholder": "e.g. Family",
         "description": "A private note so you remember who this link is for. Only you see it."
       },
-      "mode": {
+      "visibility": {
         "legend": "What the link shows",
-        "details": {
-          "title": "Details",
-          "description": "Shows event titles."
+        "titles": {
+          "label": "Show event titles",
+          "description": "Off renders every event as a plain “Busy” block."
         },
-        "busy": {
-          "title": "Busy",
-          "description": "Shows only that you're busy — titles are hidden."
+        "details": {
+          "label": "Show descriptions & locations",
+          "description": "Notes and places on each event. Needs titles shown."
+        },
+        "contextNames": {
+          "label": "Show context window names",
+          "description": "The named bands (Work, Sleep). Reveal the shape of your day even when events stay “Busy”."
         }
       },
       "scope": {

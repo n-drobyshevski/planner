@@ -88,7 +88,6 @@ export function PublicCalendarView(props: {
 
 function PublicCalendarInner({
   token,
-  mode,
 }: {
   token: string;
   label: string | null;
@@ -143,9 +142,10 @@ function PublicCalendarInner({
   // owner turned the band off (or has no inactive time here). Context windows carry
   // the owner's day-structure and obey the same privacy filters as events, so they
   // render here too (neutral stone, read-only) just as they do in the private app.
-  // In busy mode every block's title is the server's `PUBLIC_BUSY_LABEL` sentinel
-  // ("Busy"); localise it for display. Gated on mode === "busy" so a real event
-  // genuinely titled "Busy" in a details-mode share is never rewritten.
+  // The RPC redacts any hidden title to the server `PUBLIC_BUSY_LABEL` sentinel
+  // ("Busy") — independently per axis: events when titles are off, context bands
+  // when their names are off. Localise the sentinel wherever it lands; a block that
+  // kept its real title is never touched (the sentinel is a server-only constant).
   const busyLabel = t("busy");
   const { occurrences, unavailableBands } = useMemo<{
     occurrences: Occurrence[];
@@ -155,14 +155,13 @@ function PublicCalendarInner({
     const partitioned = partitionPublicOccurrences(
       expandEvents(query.data.events, query.data.overrides, win, EMPTY_SHARED),
     );
-    if (mode !== "busy") return partitioned;
     return {
       ...partitioned,
       occurrences: partitioned.occurrences.map((o) =>
         o.title === PUBLIC_BUSY_LABEL ? { ...o, title: busyLabel } : o,
       ),
     };
-  }, [query.data, win, mode, busyLabel]);
+  }, [query.data, win, busyLabel]);
 
   // The shared helper steps each view by one of its own units (day ±1, 3-day ±3,
   // week ±1 week, month ±1 month) and re-aligns to local midnight.

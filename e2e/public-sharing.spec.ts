@@ -1,8 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 
 // Phase 4 — public calendar sharing. Requires the seeded test DB (pnpm seed),
-// which creates two fixed-token shares ("e2e-details-token", "e2e-busy-token"),
-// a private "Standup", a hidden-from-public "Hidden lunch", and a pending request.
+// which creates three fixed-token shares ("e2e-details-token", "e2e-busy-token",
+// "e2e-context-token"), a "Coffee together" public event, a "Work hours" context
+// window, a private "Standup", a hidden-from-public "Hidden lunch", and a pending
+// request.
 //
 // NOTE on ordering: the request endpoint is rate-limited per IP (and per share in
 // the DB). The tests that must succeed run BEFORE the rate-limit test, which
@@ -10,6 +12,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 const DETAILS = "/share/e2e-details-token";
 const BUSY = "/share/e2e-busy-token";
+const CONTEXT = "/share/e2e-context-token";
 
 async function signIn(page: Page, name: "Alex" | "Sam") {
   await page.goto("/login");
@@ -34,11 +37,23 @@ test.describe("public share — read path", () => {
     await expect(page.getByText("Hidden lunch")).toHaveCount(0);
   });
 
-  test("busy link redacts every title to 'Busy'", async ({ page }) => {
+  test("busy link redacts every title to 'Busy' — including context names", async ({ page }) => {
     await page.goto(BUSY);
     await expect(page.getByText("Read-only")).toBeVisible();
     await expect(page.getByText("Busy").first()).toBeVisible({ timeout: 25_000 });
-    // The real titles must not appear in busy mode.
+    // No real titles in busy mode — neither events NOR the context window's name.
+    await expect(page.getByText("Coffee together")).toHaveCount(0);
+    await expect(page.getByText("Standup")).toHaveCount(0);
+    await expect(page.getByText("Work hours")).toHaveCount(0);
+  });
+
+  test("context link discloses context-window names while events stay 'Busy'", async ({ page }) => {
+    await page.goto(CONTEXT);
+    await expect(page.getByText("Read-only")).toBeVisible();
+    // The named context band IS disclosed (the "shape of the day")...
+    await expect(page.getByText("Work hours").first()).toBeVisible({ timeout: 25_000 });
+    // ...but individual event titles are still redacted to "Busy".
+    await expect(page.getByText("Busy").first()).toBeVisible();
     await expect(page.getByText("Coffee together")).toHaveCount(0);
     await expect(page.getByText("Standup")).toHaveCount(0);
   });

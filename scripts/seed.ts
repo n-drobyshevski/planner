@@ -165,6 +165,13 @@ async function main() {
       all_day: false, starts_at: s3, ends_at: plus(s3, 90), time_zone: tz,
     },
     {
+      // A named context window (the labelled day-structure band). Public shares can
+      // disclose its NAME independently of event titles — see the context-names share.
+      workspace_id: ws.id, owner_id: memA.id, category_id: home.id,
+      title: "Work hours", kind: "context",
+      all_day: false, starts_at: at(0, 9), ends_at: at(0, 17), time_zone: tz,
+    },
+    {
       // Weekly recurring shared event (Mon/Wed/Fri 18:00 dinner).
       workspace_id: ws.id, owner_id: memB.id, category_id: home.id,
       title: "Dinner",
@@ -191,13 +198,28 @@ async function main() {
   });
   if (hidErr) throw hidErr;
 
-  // Two share links: one shows titles, one redacts to "Busy". Fixed tokens so the
-  // e2e specs can navigate /share/<token> deterministically.
+  // Three share links with fixed tokens so the e2e specs can navigate
+  // /share/<token> deterministically. Visibility is now per-axis (the `mode` column
+  // is vestigial — kept only so a not-yet-redeployed client can still read it):
+  //   • details  — everything shown (titles, descriptions, context names).
+  //   • busy     — everything redacted to "Busy".
+  //   • context  — events redacted to "Busy", but context-window NAMES disclosed
+  //                (the "shape of the day without the events" case).
   const { data: shares, error: shErr } = await admin
     .from("public_calendar_shares")
     .insert([
-      { workspace_id: ws.id, owner_id: memA.id, token: "e2e-details-token", label: "Friends", mode: "details" },
-      { workspace_id: ws.id, owner_id: memA.id, token: "e2e-busy-token", label: "Work", mode: "busy" },
+      {
+        workspace_id: ws.id, owner_id: memA.id, token: "e2e-details-token", label: "Friends", mode: "details",
+        show_event_titles: true, show_event_details: true, show_context_names: true,
+      },
+      {
+        workspace_id: ws.id, owner_id: memA.id, token: "e2e-busy-token", label: "Work", mode: "busy",
+        show_event_titles: false, show_event_details: false, show_context_names: false,
+      },
+      {
+        workspace_id: ws.id, owner_id: memA.id, token: "e2e-context-token", label: "Shape", mode: "busy",
+        show_event_titles: false, show_event_details: false, show_context_names: true,
+      },
     ])
     .select();
   if (shErr) throw shErr;

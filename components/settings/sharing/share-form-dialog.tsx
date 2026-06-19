@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,8 +31,6 @@ import type {
   UpdateSharePatch,
 } from "@/lib/hooks/use-public-shares";
 import type { PublicShareRow } from "@/lib/types";
-
-const MODES = ["details", "busy"] as const;
 
 /** Local epoch-ms <-> ISO "yyyy-MM-dd" for the DatePicker (date-only expiry). */
 function msToIsoDate(ms: number | null): string {
@@ -78,18 +74,25 @@ export function ShareFormDialog({
   const categories = workspace.data?.categories ?? [];
 
   const [label, setLabel] = useState("");
-  const [mode, setMode] = useState<PublicShareRow["mode"]>("details");
+  // Each disclosure axis is independent; descriptions/locations only take effect
+  // when titles are shown (enforced in the UI and the RPC).
+  const [showEventTitles, setShowEventTitles] = useState(true);
+  const [showEventDetails, setShowEventDetails] = useState(true);
+  const [showContextNames, setShowContextNames] = useState(true);
   // null = all categories; a Set = the explicit allow-list.
   const [scoped, setScoped] = useState<Set<string> | null>(null);
   const [showInactive, setShowInactive] = useState(true);
   const [expiry, setExpiry] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Seed the form whenever it opens, from the edited link or from defaults.
+  // Seed the form whenever it opens, from the edited link or from defaults
+  // (new links show everything).
   useEffect(() => {
     if (!open) return;
     setLabel(share?.label ?? "");
-    setMode(share?.mode ?? "details");
+    setShowEventTitles(share?.showEventTitles ?? true);
+    setShowEventDetails(share?.showEventDetails ?? true);
+    setShowContextNames(share?.showContextNames ?? true);
     setScoped(share?.categoryIds == null ? null : new Set(share.categoryIds));
     setShowInactive(share?.showInactive ?? true);
     setExpiry(msToIsoDate(share?.expiresAt ?? null));
@@ -123,7 +126,10 @@ export function ShareFormDialog({
     const trimmed = label.trim();
     const payload: CreateShareInput = {
       label: trimmed === "" ? null : trimmed,
-      mode,
+      showEventTitles,
+      // Descriptions/locations can't be exposed while titles are hidden.
+      showEventDetails: showEventTitles && showEventDetails,
+      showContextNames,
       categoryIds,
       showInactive,
       expiresAt: isoDateToMs(expiry),
@@ -170,54 +176,85 @@ export function ShareFormDialog({
             </FieldDescription>
           </Field>
 
-          {/* Mode — what the link reveals */}
+          {/* Visibility — what the link reveals, one independent switch per axis.
+              "Privacy is legible": each row spells out exactly what turning it on
+              exposes, so the owner reads the link's disclosure top to bottom. */}
           <FieldSet>
             <FieldLegend variant="label">
-              {t("sharing.dialog.mode.legend")}
+              {t("sharing.dialog.visibility.legend")}
             </FieldLegend>
-            <div
-              role="radiogroup"
-              aria-label={t("sharing.dialog.mode.legend")}
-              className="grid gap-2"
-            >
-              {MODES.map((value) => {
-                const active = mode === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setMode(value)}
-                    className={cn(
-                      "flex min-h-11 w-full items-start gap-3 rounded-2xl border p-3 text-left outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30",
-                      active
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-muted/60",
-                    )}
-                  >
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
-                        active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border",
-                      )}
-                    >
-                      {active && <Check className="size-3" />}
-                    </span>
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-foreground">
-                        {t(`sharing.dialog.mode.${value}.title`)}
-                      </span>
-                      <span className="text-sm leading-normal text-muted-foreground">
-                        {t(`sharing.dialog.mode.${value}.description`)}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="grid gap-1">
+              {/* Event titles */}
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="share-titles">
+                    {t("sharing.dialog.visibility.titles.label")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("sharing.dialog.visibility.titles.description")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="share-titles"
+                  checked={showEventTitles}
+                  onCheckedChange={setShowEventTitles}
+                />
+              </Field>
+
+              {/* Descriptions & locations — only meaningful with titles, so it
+                  nests under (and disables with) the titles switch. */}
+              <Field orientation="horizontal" className="pl-4">
+                <FieldContent>
+                  <FieldLabel htmlFor="share-details">
+                    {t("sharing.dialog.visibility.details.label")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("sharing.dialog.visibility.details.description")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="share-details"
+                  checked={showEventTitles && showEventDetails}
+                  disabled={!showEventTitles}
+                  onCheckedChange={setShowEventDetails}
+                />
+              </Field>
+
+              {/* Context-window names — the labelled day-structure bands. Works
+                  independently of titles: reveal the shape of the day while events
+                  stay "Busy". */}
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="share-context-names">
+                    {t("sharing.dialog.visibility.contextNames.label")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("sharing.dialog.visibility.contextNames.description")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="share-context-names"
+                  checked={showContextNames}
+                  onCheckedChange={setShowContextNames}
+                />
+              </Field>
+
+              {/* Unavailable time — blocked/sleep hours as a shaded band. */}
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor="share-unavailable">
+                    {t("sharing.dialog.unavailable.label")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("sharing.dialog.unavailable.description")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="share-unavailable"
+                  checked={showInactive}
+                  onCheckedChange={setShowInactive}
+                />
+              </Field>
             </div>
           </FieldSet>
 
@@ -283,23 +320,6 @@ export function ShareFormDialog({
               )}
             </div>
           </FieldSet>
-
-          {/* Unavailable band — show blocked/sleep time as a shaded region */}
-          <Field orientation="horizontal">
-            <FieldContent>
-              <FieldLabel htmlFor="share-unavailable">
-                {t("sharing.dialog.unavailable.label")}
-              </FieldLabel>
-              <FieldDescription>
-                {t("sharing.dialog.unavailable.description")}
-              </FieldDescription>
-            </FieldContent>
-            <Switch
-              id="share-unavailable"
-              checked={showInactive}
-              onCheckedChange={setShowInactive}
-            />
-          </Field>
 
           {/* Expiry */}
           <Field>

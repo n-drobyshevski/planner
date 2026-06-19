@@ -375,8 +375,12 @@ export interface PublicShareRow {
   token: string;
   /** owner's memo for the link, e.g. "Family"; null = unnamed */
   label: string | null;
-  /** 'details' shows titles; 'busy' redacts every block to "Busy" */
-  mode: "details" | "busy";
+  /** show real event titles vs the generic "Busy" block */
+  showEventTitles: boolean;
+  /** show event descriptions & locations (only effective when titles are shown) */
+  showEventDetails: boolean;
+  /** show real context-window names (the labelled day-structure bands) vs "Busy" */
+  showContextNames: boolean;
   /** category allow-list; null = all (non-private, non-hidden) categories */
   categoryIds: string[] | null;
   /** show inactive (sleep/blocked) time as a shaded "Unavailable" band */

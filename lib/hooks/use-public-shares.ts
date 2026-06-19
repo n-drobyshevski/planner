@@ -22,7 +22,12 @@ import type { PublicShareRow } from "@/lib/types";
 /** Fields the owner sets when minting a link; token + timestamps are DB-side. */
 export interface CreateShareInput {
   label: string | null;
-  mode: PublicShareRow["mode"];
+  /** show real event titles vs the generic "Busy" block */
+  showEventTitles: boolean;
+  /** show event descriptions & locations (only effective when titles are shown) */
+  showEventDetails: boolean;
+  /** show real context-window names (the labelled day-structure bands) vs "Busy" */
+  showContextNames: boolean;
   /** category allow-list; null = all categories */
   categoryIds: string[] | null;
   /** show inactive (sleep/blocked) time as a shaded "Unavailable" band */
@@ -76,7 +81,9 @@ export function useCreateShare(
             workspace_id: workspaceId,
             owner_id: memberId,
             label: input.label,
-            mode: input.mode,
+            show_event_titles: input.showEventTitles,
+            show_event_details: input.showEventDetails,
+            show_context_names: input.showContextNames,
             category_ids: input.categoryIds,
             show_inactive: input.showInactive,
             expires_at:
@@ -110,7 +117,9 @@ export function useUpdateShare(
       if (!workspaceId) return;
       const row: Record<string, unknown> = {};
       if ("label" in patch) row.label = patch.label;
-      if ("mode" in patch) row.mode = patch.mode;
+      if ("showEventTitles" in patch) row.show_event_titles = patch.showEventTitles;
+      if ("showEventDetails" in patch) row.show_event_details = patch.showEventDetails;
+      if ("showContextNames" in patch) row.show_context_names = patch.showContextNames;
       if ("categoryIds" in patch) row.category_ids = patch.categoryIds;
       if ("showInactive" in patch) row.show_inactive = patch.showInactive;
       if ("expiresAt" in patch) {
