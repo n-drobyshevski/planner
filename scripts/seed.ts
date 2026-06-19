@@ -181,6 +181,40 @@ async function main() {
   if (evErr) throw evErr;
   console.log("✓ sample events");
 
+  // --- Phase 4: public-sharing fixtures (deterministic tokens for e2e) ---------
+  // A NON-private event explicitly withheld from public links — the public view
+  // must never show it (distinct from the private "Standup", which is hidden by RLS).
+  const { error: hidErr } = await admin.from("events").insert({
+    workspace_id: ws.id, owner_id: memA.id, category_id: home.id,
+    title: "Hidden lunch", hidden_from_public: true,
+    all_day: false, starts_at: at(1, 12), ends_at: plus(at(1, 12), 60), time_zone: tz,
+  });
+  if (hidErr) throw hidErr;
+
+  // Two share links: one shows titles, one redacts to "Busy". Fixed tokens so the
+  // e2e specs can navigate /share/<token> deterministically.
+  const { data: shares, error: shErr } = await admin
+    .from("public_calendar_shares")
+    .insert([
+      { workspace_id: ws.id, owner_id: memA.id, token: "e2e-details-token", label: "Friends", mode: "details" },
+      { workspace_id: ws.id, owner_id: memA.id, token: "e2e-busy-token", label: "Work", mode: "busy" },
+    ])
+    .select();
+  if (shErr) throw shErr;
+  const detailsShare = shares.find((s) => s.token === "e2e-details-token")!;
+  console.log(`✓ public shares (${shares.length})`);
+
+  // One pending timeslot request → lands in memA's inbox.
+  const { error: reqErr } = await admin.from("timeslot_requests").insert([
+    {
+      share_id: detailsShare.id, workspace_id: ws.id, owner_id: memA.id,
+      requester_name: "Riley", message: "Lunch next week?",
+      proposed_start: at(3, 12), proposed_end: at(3, 13), status: "pending",
+    },
+  ]);
+  if (reqErr) throw reqErr;
+  console.log("✓ sample timeslot request");
+
   // Sample tasks (+ ordered subtasks + a task already scheduled on the calendar).
   const memBWork = cats.find((c) => c.owner_id === memB.id)!;
   const { data: taskRows, error: tErr } = await admin

@@ -216,6 +216,7 @@ describe("firstCommitment", () => {
       ownerId: VIEWER,
       isPrivate: false,
       isShared: false,
+      hiddenFromPublic: false,
       taskId: null,
       attributes: {},
       isRecurring: false,

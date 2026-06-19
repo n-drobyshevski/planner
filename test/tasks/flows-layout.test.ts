@@ -66,6 +66,7 @@ function block(over: Partial<EventRow>): EventRow {
     location: null,
     isPrivate: false,
     isShared: false,
+    hiddenFromPublic: false,
     color: null,
     kind: "event",
     allDay: false,

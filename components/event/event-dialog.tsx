@@ -42,6 +42,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import {
   Lock,
   Eye,
+  EyeOff,
   Trash2,
   Users,
   ChevronDown,
@@ -190,6 +191,7 @@ export function EventDialog(props: EventDialogProps) {
           location: value.location.trim() || null,
           isPrivate,
           isShared,
+          hiddenFromPublic: value.hiddenFromPublic,
           color: value.color,
           allDay: isContext ? false : value.allDay,
           inactive: value.inactive,
@@ -220,6 +222,7 @@ export function EventDialog(props: EventDialogProps) {
         location: value.location.trim() || null,
         isPrivate,
         isShared,
+        hiddenFromPublic: value.hiddenFromPublic,
         color: value.color,
         allDay: isContext ? false : value.allDay,
         inactive: value.inactive,
@@ -340,6 +343,7 @@ export function EventDialog(props: EventDialogProps) {
         // The 3-way control governs the whole series on an "all" edit.
         isPrivate,
         isShared,
+        hiddenFromPublic: value.hiddenFromPublic,
         color: value.color,
         allDay: value.allDay,
         inactive: value.inactive,
@@ -740,6 +744,38 @@ export function EventDialog(props: EventDialogProps) {
                         )
                       }
                     </form.Subscribe>
+
+                    {/* Public-share opt-out (Phase 4). Orthogonal to the
+                        private/visible/shared control above — a non-private event
+                        can still be withheld from share links + present mode. */}
+                    <form.Field name="hiddenFromPublic">
+                      {(field) => (
+                        <Field>
+                          <label
+                            htmlFor="ev-hide-public"
+                            className="flex cursor-pointer items-center justify-between gap-3"
+                          >
+                            <span className="flex items-center gap-2">
+                              <EyeOff
+                                aria-hidden
+                                className="size-4 shrink-0 text-muted-foreground"
+                              />
+                              <FieldLabel className="cursor-pointer">
+                                {t("dialog.hideFromPublic")}
+                              </FieldLabel>
+                            </span>
+                            <Switch
+                              id="ev-hide-public"
+                              checked={field.state.value}
+                              onCheckedChange={field.handleChange}
+                            />
+                          </label>
+                          <FieldDescription>
+                            {t("dialog.hideFromPublicHint")}
+                          </FieldDescription>
+                        </Field>
+                      )}
+                    </form.Field>
                     </FieldSection>
 
                     <Separator />
@@ -968,6 +1004,7 @@ function buildInitial(props: EventDialogProps, timeZone: string): EventFormValue
       endTime: msToTimeInput(occurrence.end, timeZone),
       categoryId: occurrence.categoryId ?? "none",
       visibility: event.isPrivate ? "private" : event.isShared ? "shared" : "visible",
+      hiddenFromPublic: event.hiddenFromPublic,
       color: event.color ?? null,
       recurrence: parseRRule(event.rrule),
       // From the MASTER event, not the occurrence patch — attributes are
@@ -991,6 +1028,7 @@ function buildInitial(props: EventDialogProps, timeZone: string): EventFormValue
     endTime: msToTimeInput(end, timeZone),
     categoryId: defaultCategoryId ?? "none",
     visibility: "visible",
+    hiddenFromPublic: false,
     color: null,
     recurrence: null,
     attributes: {},

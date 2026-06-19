@@ -12,7 +12,12 @@ import { tz } from "@date-fns/tz";
 import { getWindow, getVisibleDays, navigate, defaultCreateDay } from "@/lib/datetime/window";
 import { formatRangeLabel, toDateParam } from "@/lib/datetime/format";
 import { TimezoneProvider } from "@/lib/datetime/timezone-context";
-import { filterVisible, canEdit } from "@/lib/scope/visibility";
+import {
+  filterVisible,
+  filterPublic,
+  canEdit,
+  MAX_PUBLIC_CONFIG,
+} from "@/lib/scope/visibility";
 import { resolveBlockColor } from "@/lib/calendar/colors";
 import { sharedRemovalVariant } from "@/lib/calendar/delete-copy";
 import {
@@ -38,7 +43,7 @@ import { CalendarToolbar } from "./calendar-toolbar";
 import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
-import { Users, User, CopyPlus } from "lucide-react";
+import { Users, User, CopyPlus, Eye } from "lucide-react";
 import { EventDetails } from "@/components/event/event-details";
 import type { ItemAction } from "@/components/shared/item-context-menu";
 import { TaskBacklogRail, TaskBacklogSheet } from "@/components/tasks/task-backlog-rail";
@@ -248,6 +253,8 @@ export function CalendarShell({
   const toggleSelected = useUiStore((s) => s.toggleSelectedEventKey);
   const clearSelection = useUiStore((s) => s.clearSelection);
   const toggleMaskTitles = useUiStore((s) => s.toggleMaskTitles);
+  const presentMode = useUiStore((s) => s.presentMode);
+  const togglePresentMode = useUiStore((s) => s.togglePresentMode);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
   const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
   const ownCalendarHidden = useUiStore((s) => s.ownCalendarHidden);
@@ -307,6 +314,30 @@ export function CalendarShell({
         selfHidden: ownCalendarHidden,
       }),
     [nextWin.occurrences, viewerId, overlayMemberIds, hiddenCategoryIds, ownCalendarHidden],
+  );
+
+  // Present mode (Shift+P): show exactly what an anonymous public viewer sees —
+  // the whole workspace's public-eligible blocks, bypassing the viewer's personal
+  // overlay/self-hidden/category toggles (a public viewer has none of those). Same
+  // `filterPublic` the /share route applies, so the preview is faithful. When off,
+  // the normal viewer-filtered set passes straight through.
+  const displayed = useMemo(
+    () => (presentMode ? filterPublic(occurrences, MAX_PUBLIC_CONFIG) : visible),
+    [presentMode, occurrences, visible],
+  );
+  const prevDisplayed = useMemo(
+    () =>
+      presentMode
+        ? filterPublic(prevWin.occurrences, MAX_PUBLIC_CONFIG)
+        : prevVisible,
+    [presentMode, prevWin.occurrences, prevVisible],
+  );
+  const nextDisplayed = useMemo(
+    () =>
+      presentMode
+        ? filterPublic(nextWin.occurrences, MAX_PUBLIC_CONFIG)
+        : nextVisible,
+    [presentMode, nextWin.occurrences, nextVisible],
   );
 
   const memberMap = useMemo(
@@ -645,6 +676,7 @@ export function CalendarShell({
       location: ev.location,
       isPrivate: ev.isPrivate,
       isShared: ev.isShared,
+      hiddenFromPublic: ev.hiddenFromPublic,
       color: ev.color,
       kind: ev.kind,
       allDay: ev.allDay,
@@ -828,6 +860,12 @@ export function CalendarShell({
       toggleMaskTitles();
       return;
     }
+    // Shift+P enters/leaves present mode — the public-viewer redaction preview.
+    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      togglePresentMode();
+      return;
+    }
     // Ctrl+Alt+Left / Right toggle the left sidebar / right task-backlog panel.
     if (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey) {
       if (e.key === "ArrowLeft") {
@@ -959,6 +997,23 @@ export function CalendarShell({
       {/* SurfaceChrome (the (surfaces) layout) owns the h-dvh frame + header;
           the shell fills the content area below it. */}
       <div className="flex h-full flex-col">
+      {presentMode && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex shrink-0 items-center justify-center gap-2 border-b border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground"
+        >
+          <Eye aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+          <span>{t("present.banner")}</span>
+          <button
+            type="button"
+            onClick={togglePresentMode}
+            className="ml-1 inline-flex min-h-8 items-center rounded-md px-2 underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-fine:min-h-6"
+          >
+            {t("present.exit")}
+          </button>
+        </div>
+      )}
       <CalendarToolbar
         view={view}
         label={label}
@@ -993,7 +1048,7 @@ export function CalendarShell({
                 <CalendarCanvas
                   view={view}
                   days={prevDays}
-                  occurrences={prevVisible}
+                  occurrences={prevDisplayed}
                   focusedMs={prevFocus}
                   colorOf={colorOf}
                   canEdit={canEditOcc}
@@ -1010,7 +1065,7 @@ export function CalendarShell({
                 <CalendarCanvas
                   view={view}
                   days={nextDays}
-                  occurrences={nextVisible}
+                  occurrences={nextDisplayed}
                   focusedMs={nextFocus}
                   colorOf={colorOf}
                   canEdit={canEditOcc}
@@ -1027,7 +1082,7 @@ export function CalendarShell({
               <CalendarCanvas
                 view={view}
                 days={days}
-                occurrences={visible}
+                occurrences={displayed}
                 focusedMs={focusedDate}
                 colorOf={colorOf}
                 selectedKey={selectedKey}

@@ -25,6 +25,7 @@ const GROUPS: { titleKey: string; items: { labelKey: string; keys: string[] }[] 
       { labelKey: "showHelp", keys: ["?"] },
       { labelKey: "undo", keys: ["Ctrl", "Z"] },
       { labelKey: "blurTitles", keys: ["Shift", "M"] },
+      { labelKey: "presentMode", keys: ["Shift", "P"] },
     ],
   },
   {

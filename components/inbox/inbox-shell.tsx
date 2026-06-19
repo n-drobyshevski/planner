@@ -13,6 +13,7 @@ import { useInboxItems } from "@/lib/hooks/use-inbox";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useUpsertSleepLog } from "@/lib/hooks/use-sleep-logs";
+import { useTimeslotRequests } from "@/lib/hooks/use-timeslot-requests";
 import { setAttribute } from "@/lib/attributes/schema";
 import {
   draftToInstants,
@@ -31,6 +32,7 @@ import type {
   LogSleepItem,
   RateEventItem,
   RateTaskItem,
+  RequestItem,
 } from "@/lib/inbox/derive";
 
 const emptySubscribe = () => () => {};
@@ -62,6 +64,7 @@ function InboxShellInner() {
   const events = useEventMutations(wsId);
   const tasks = useTaskMutations(wsId);
   const upsertSleep = useUpsertSleepLog(wsId, viewerId);
+  const requests = useTimeslotRequests(wsId);
 
   // Merge the picked satisfaction into the entity's existing attribute bag and
   // write it through the optimistic mutation; the cache patch drops the row.
@@ -83,6 +86,32 @@ function InboxShellInner() {
           );
     },
     [events, tasks],
+  );
+
+  // Approve a public timeslot request → create the event at the proposed time
+  // (owned by the approving member), then mark the request approved. Both steps
+  // must land for the row to leave; the event create toasts on its own failure.
+  const onApprove = useCallback(
+    async (item: RequestItem): Promise<boolean> => {
+      if (!wsId || !viewerId) return false;
+      const created = await events.create({
+        workspaceId: wsId,
+        ownerId: viewerId,
+        title: item.requesterName?.trim() || t("request.defaultTitle"),
+        description: item.message ?? null,
+        start: item.proposedStart,
+        end: item.proposedEnd,
+        timeZone,
+      });
+      if (!created) return false;
+      return requests.markApproved(item.requestId);
+    },
+    [events, requests, wsId, viewerId, timeZone, t],
+  );
+
+  const onDecline = useCallback(
+    (item: RequestItem) => requests.markDeclined(item.requestId),
+    [requests],
   );
 
   const onLogSleep = useCallback(
@@ -135,6 +164,8 @@ function InboxShellInner() {
               now={now}
               onRate={onRate}
               onLogSleep={onLogSleep}
+              onApprove={onApprove}
+              onDecline={onDecline}
             />
           ))}
         </ul>

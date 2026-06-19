@@ -21,7 +21,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except API routes, Next internals, and files with an extension.
-    "/((?!api|_next|_vercel|.*\\..*).*)",
+    // Everything except API routes, Next internals, files with an extension, and
+    // the public `/share/<token>` surface — which is intentionally OUTSIDE auth and
+    // locale routing (an anonymous, read-only calendar). Keeping it off the matcher
+    // means next-intl never prefixes it and Supabase never gates it.
+    "/((?!api|_next|_vercel|share|.*\\..*).*)",
   ],
 };

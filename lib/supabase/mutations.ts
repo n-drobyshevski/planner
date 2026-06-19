@@ -422,6 +422,7 @@ export async function splitSeries(
     location: newSeries.location,
     isPrivate: newSeries.isPrivate,
     isShared: newSeries.isShared,
+    hiddenFromPublic: newSeries.hiddenFromPublic,
     color: newColor !== undefined ? newColor : newSeries.color,
     kind: newSeries.kind,
     allDay: newSeries.allDay,

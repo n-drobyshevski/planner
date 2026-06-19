@@ -41,4 +41,9 @@ export const qk = {
   /** The viewer's Insights dashboard prefs row (member-private under RLS). */
   insightsPrefs: (workspaceId: string, memberId: string) =>
     ["insights-prefs", workspaceId, memberId] as const,
+  /** The owner's public share links (Phase 4); RLS-scoped to the owner. */
+  publicShares: (workspaceId: string) => ["public-shares", workspaceId] as const,
+  /** The owner's pending incoming timeslot requests (Phase 4); RLS-scoped. */
+  timeslotRequests: (workspaceId: string) =>
+    ["timeslot-requests", workspaceId] as const,
 };

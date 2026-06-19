@@ -7,6 +7,7 @@ import { tz } from "@date-fns/tz";
 import {
   BedDouble,
   CalendarCheck,
+  CalendarPlus,
   ChevronDown,
   SquareCheckBig,
   type LucideIcon,
@@ -29,12 +30,14 @@ import type {
   LogSleepItem,
   RateEventItem,
   RateTaskItem,
+  RequestItem,
 } from "@/lib/inbox/derive";
 
 const KIND_ICON: Record<InboxItem["kind"], LucideIcon> = {
   "rate-event": CalendarCheck,
   "rate-task": SquareCheckBig,
   "log-sleep": BedDouble,
+  request: CalendarPlus,
 };
 
 // The shared 4-level satisfaction control, sourced from the single attribute
@@ -49,6 +52,8 @@ export function InboxRow({
   now,
   onRate,
   onLogSleep,
+  onApprove,
+  onDecline,
 }: {
   item: InboxItem;
   timeZone: string;
@@ -57,6 +62,10 @@ export function InboxRow({
    *  false re-enables the control for a retry. */
   onRate: (item: RateItem, value: 1 | 2 | 3 | 4) => Promise<boolean>;
   onLogSleep: (item: LogSleepItem, draft: SleepLogDraft) => Promise<void>;
+  /** Approve a timeslot request → creates the event; true on success. */
+  onApprove: (item: RequestItem) => Promise<boolean>;
+  /** Decline a timeslot request; true on success. */
+  onDecline: (item: RequestItem) => Promise<boolean>;
 }) {
   const t = useTranslations("inbox");
   const tc = useTranslations("common");
@@ -67,7 +76,7 @@ export function InboxRow({
   const { frame, subtitle } = describe(item, t, timeZone, now, locale);
 
   async function rate(value: 1 | 2 | 3 | 4) {
-    if (busy || item.kind === "log-sleep") return;
+    if (busy || item.kind === "log-sleep" || item.kind === "request") return;
     setBusy(true);
     // On success the optimistic cache patch drops this row from the derived list
     // (it unmounts); on failure the hook reverts + toasts, so re-enable to retry.
@@ -104,7 +113,13 @@ export function InboxRow({
 
       {open && (
         <div className="px-3 pb-4 pl-10">
-          {item.kind === "log-sleep" ? (
+          {item.kind === "request" ? (
+            <RequestExpando
+              item={item}
+              onApprove={onApprove}
+              onDecline={onDecline}
+            />
+          ) : item.kind === "log-sleep" ? (
             <SleepExpando
               item={item}
               onLogSleep={onLogSleep}
@@ -184,6 +199,55 @@ function SleepExpando({
   );
 }
 
+/** Approve (→ create the event) or decline a public timeslot request. The row
+ *  leaves via re-derivation once the request cache drops it. */
+function RequestExpando({
+  item,
+  onApprove,
+  onDecline,
+}: {
+  item: RequestItem;
+  onApprove: (item: RequestItem) => Promise<boolean>;
+  onDecline: (item: RequestItem) => Promise<boolean>;
+}) {
+  const t = useTranslations("inbox");
+  const [busy, setBusy] = useState<null | "approve" | "decline">(null);
+
+  async function run(action: "approve" | "decline") {
+    if (busy) return;
+    setBusy(action);
+    const ok = await (action === "approve" ? onApprove(item) : onDecline(item));
+    if (!ok) setBusy(null); // failure toasted by the hook; re-enable to retry
+  }
+
+  return (
+    <div className="space-y-3">
+      {item.message && (
+        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+          {item.message}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          onClick={() => void run("approve")}
+          disabled={busy !== null}
+          className="min-h-11 sm:min-h-9"
+        >
+          {t("request.approve")}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => void run("decline")}
+          disabled={busy !== null}
+          className="min-h-11 sm:min-h-9"
+        >
+          {t("request.decline")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** The localized one-line frame + (for ratings) a relative-time subtitle. */
 function describe(
   item: InboxItem,
@@ -207,6 +271,19 @@ function describe(
       subtitle: t("doneAgo", {
         ago: formatDistance(item.sortMs, now, { addSuffix: true, locale: dfLocale }),
       }),
+    };
+  }
+  if (item.kind === "request") {
+    const name = item.requesterName?.trim();
+    const day = format(item.proposedStart, "EEE d MMM", {
+      in: tz(timeZone),
+      locale: dfLocale,
+    });
+    const from = format(item.proposedStart, "HH:mm", { in: tz(timeZone), locale: dfLocale });
+    const to = format(item.proposedEnd, "HH:mm", { in: tz(timeZone), locale: dfLocale });
+    return {
+      frame: name ? t("request.frame", { name }) : t("request.frameAnon"),
+      subtitle: `${day}, ${from}–${to}`,
     };
   }
   return {

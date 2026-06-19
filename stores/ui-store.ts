@@ -23,6 +23,13 @@ interface UiState {
   ownCalendarHidden: boolean;
   /** blur every event title + task name across the calendar (Shift+M) */
   maskTitles: boolean;
+  /**
+   * Present mode (Shift+P): redact the authed calendar to exactly what an anonymous
+   * public viewer would see — drop private / hidden-from-public / inactive blocks —
+   * without logging out. Reuses the public visibility filter (lib/scope/visibility
+   * `filterPublic`); pairs with `maskTitles`. A local preview, never persisted.
+   */
+  presentMode: boolean;
   /** task selected for editing (tasks views) */
   selectedTaskId: string | null;
   /** the "Unscheduled tasks" rail on the calendar (T4) */
@@ -45,6 +52,8 @@ interface UiState {
   toggleOwnCalendar: () => void;
   /** Blur / un-blur all event + task titles on the calendar (Shift+M). */
   toggleMaskTitles: () => void;
+  /** Enter / leave present mode — the public-viewer redaction preview (Shift+P). */
+  togglePresentMode: () => void;
   /** Replace the whole hidden-categories set (e.g. "show only this" / "show all"). */
   setHiddenCategoryIds: (next: Set<string>) => void;
   /** Replace the whole overlaid-members set. */
@@ -63,6 +72,7 @@ export const useUiStore = create<UiState>((set) => ({
   overlayMemberIds: new Set(),
   ownCalendarHidden: false,
   maskTitles: false,
+  presentMode: false,
   selectedTaskId: null,
   taskBacklogOpen: false,
   hourPx: DEFAULT_HOUR_PX,
@@ -102,6 +112,7 @@ export const useUiStore = create<UiState>((set) => ({
     }),
   toggleOwnCalendar: () => set((s) => ({ ownCalendarHidden: !s.ownCalendarHidden })),
   toggleMaskTitles: () => set((s) => ({ maskTitles: !s.maskTitles })),
+  togglePresentMode: () => set((s) => ({ presentMode: !s.presentMode })),
   setHiddenCategoryIds: (hiddenCategoryIds) => set({ hiddenCategoryIds }),
   setOverlayMemberIds: (overlayMemberIds) => set({ overlayMemberIds }),
   setHourPx: (px) => set({ hourPx: clampHourPx(px) }),

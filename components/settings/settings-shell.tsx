@@ -8,6 +8,7 @@ import {
   Clock,
   Moon,
   Palette,
+  Share2,
   User,
   type LucideIcon,
 } from "lucide-react";
@@ -18,8 +19,15 @@ import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { CalendarSettings } from "@/components/settings/calendar-settings";
 import { TimezoneSettings } from "@/components/settings/timezone-settings";
 import { SleepSettings } from "@/components/settings/sleep-settings";
+import { SharingSettings } from "@/components/settings/sharing/sharing-settings";
 
-type SectionId = "profile" | "appearance" | "calendar" | "time" | "sleep";
+type SectionId =
+  | "profile"
+  | "appearance"
+  | "calendar"
+  | "time"
+  | "sleep"
+  | "sharing";
 
 const SECTIONS: { id: SectionId; icon: LucideIcon; Component: () => React.JSX.Element }[] = [
   { id: "profile", icon: User, Component: ProfileSettings },
@@ -27,6 +35,7 @@ const SECTIONS: { id: SectionId; icon: LucideIcon; Component: () => React.JSX.El
   { id: "calendar", icon: CalendarDays, Component: CalendarSettings },
   { id: "time", icon: Clock, Component: TimezoneSettings },
   { id: "sleep", icon: Moon, Component: SleepSettings },
+  { id: "sharing", icon: Share2, Component: SharingSettings },
 ];
 
 const SECTION_IDS = SECTIONS.map((s) => s.id);

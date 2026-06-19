@@ -29,6 +29,7 @@ function occ(start: number, title: string, opts: Partial<Occurrence> = {}): Occu
     ownerId: "m",
     isPrivate: false,
     isShared: false,
+    hiddenFromPublic: false,
     taskId: null,
     attributes: {},
     isRecurring: false,

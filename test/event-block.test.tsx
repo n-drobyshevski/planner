@@ -24,6 +24,7 @@ function occ(over: Partial<Occurrence> = {}): Occurrence {
     ownerId: "m",
     isPrivate: false,
     isShared: false,
+    hiddenFromPublic: false,
     taskId: null,
     attributes: {},
     isRecurring: false,
