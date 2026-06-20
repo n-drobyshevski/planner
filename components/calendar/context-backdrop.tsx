@@ -124,7 +124,7 @@ export const ContextBackdrop = forwardRef<
           {onMenu && (
             <ItemMenuButton
               onMenu={onMenu}
-              className="absolute inset-x-0 bottom-0.5 mx-auto text-white/90 hover:text-white"
+              className="absolute inset-x-0 bottom-0.5 mx-auto text-current opacity-90 hover:opacity-100"
             />
           )}
         </div>
@@ -152,7 +152,7 @@ export const ContextBackdrop = forwardRef<
           {onMenu && (
             <ItemMenuButton
               onMenu={onMenu}
-              className="-mr-0.5 ml-auto text-white/90 hover:text-white"
+              className="-mr-0.5 ml-auto text-current opacity-90 hover:opacity-100"
             />
           )}
         </div>
