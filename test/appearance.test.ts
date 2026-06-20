@@ -4,6 +4,7 @@ import {
   normalizePalette,
   normalizePinkBase,
   paletteMode,
+  toPaletteStroke,
   PALETTES,
   PINK_PRESETS,
   DEFAULT_PINK_BASE,
@@ -12,6 +13,22 @@ import {
   serializeAppearance,
   APPEARANCE_INIT_SCRIPT,
 } from "@/lib/theme/appearance-cookie";
+
+describe("toPaletteStroke", () => {
+  // Flows strokes: map to the swatch var, then defer lightness/chroma to the
+  // palette's --flow-stroke-l/-c (unset = identity via the `l`/`c` keywords).
+  it("wraps a known accent in its swatch var, re-lit by the flow-stroke vars", () => {
+    expect(toPaletteStroke("#0f766e")).toBe(
+      "oklch(from var(--swatch-teal) var(--flow-stroke-l, l) var(--flow-stroke-c, c) h)",
+    );
+  });
+
+  it("passes a custom (non-accent) hex straight through, still re-littable", () => {
+    expect(toPaletteStroke("#123456")).toBe(
+      "oklch(from #123456 var(--flow-stroke-l, l) var(--flow-stroke-c, c) h)",
+    );
+  });
+});
 
 describe("eventFillStyle", () => {
   // A known accent hex (teal is in the ACCENTS catalog) maps to its palette var

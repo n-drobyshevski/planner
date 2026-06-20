@@ -170,6 +170,22 @@ export function toPaletteColor(
 }
 
 /**
+ * A theme-mapped color tuned for thin strokes and small marks on a surface — the
+ * Flows timeline (trunks, branches, status/milestone nodes, checkpoints) and the
+ * gutter color dots. It maps the hex to its palette swatch like `toPaletteColor`,
+ * then re-lights it to a stroke-legible shade where the active palette declares
+ * one via `--flow-stroke-l` / `--flow-stroke-c`. Light pastel palettes (pink) set
+ * these so a hairline stays ≥3:1 on the near-white card; the default warm palette
+ * and the dark palettes leave them unset, so the swatch's own `l`/`c` pass through
+ * unchanged (an identity round-trip through oklch, the same pattern
+ * `eventFillStyle` already uses). The result is a CSS color string usable as a
+ * fill/background or directly as an SVG `stroke`/`fill` attribute.
+ */
+export function toPaletteStroke(hex: string): string {
+  return `oklch(from ${toPaletteColor(hex) ?? hex} var(--flow-stroke-l, l) var(--flow-stroke-c, c) h)`;
+}
+
+/**
  * The legible text/icon color to overlay on a filled swatch of `hex`. Catppuccin
  * Latte (a light theme with wide-lightness accents) sets per-accent inks; every
  * other palette falls back to its single `--swatch-ink` (white / dark `crust`),

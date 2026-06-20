@@ -26,7 +26,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { NEST_PREFIX } from "@/lib/tasks/nest-collision";
 import { cn } from "@/lib/utils";
-import { toPaletteColor } from "@/lib/theme/appearance";
+import { toPaletteColor, toPaletteStroke } from "@/lib/theme/appearance";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
@@ -592,9 +592,10 @@ export function TaskFlows({
                     <span
                       className="size-2 shrink-0 rounded-full"
                       style={{
-                        backgroundColor:
+                        backgroundColor: toPaletteStroke(
                           members.get(dnd.activeLane.task.ownerId)?.color ??
-                          colorOf(dnd.activeLane.task),
+                            colorOf(dnd.activeLane.task),
+                        ),
                       }}
                       aria-hidden
                     />
@@ -766,13 +767,13 @@ function GutterLaneRow({
         {lane.task.isMilestone ? (
           <CircleDot
             className="size-3 shrink-0"
-            style={{ color: ownerColor }}
+            style={{ color: toPaletteStroke(ownerColor) }}
             aria-label={t("flows.milestone.label")}
           />
         ) : (
           <span
             className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: ownerColor }}
+            style={{ backgroundColor: toPaletteStroke(ownerColor) }}
             aria-hidden
           />
         )}

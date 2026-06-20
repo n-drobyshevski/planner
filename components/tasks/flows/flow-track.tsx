@@ -27,7 +27,7 @@ import {
   wavePath,
   type FlowLineStyle,
 } from "@/lib/tasks/flow-line-styles";
-import { toPaletteColor } from "@/lib/theme/appearance";
+import { toPaletteStroke } from "@/lib/theme/appearance";
 import { msToDateInput } from "@/lib/datetime/local";
 import type { TaskRow } from "@/lib/types";
 
@@ -168,7 +168,10 @@ export function FlowTrack({
             );
           }
           const { lane, top, branchRows } = row;
-          const color = colorOf(lane.task);
+          // Theme-mapped, stroke-legible color — feeds every trunk/branch/node
+          // stroke and the checkpoint lane fallback below, so the whole lane
+          // re-tints with the palette and stays visible on light pastel surfaces.
+          const color = toPaletteStroke(colorOf(lane.task));
           const mine = lane.task.ownerId === currentMemberId;
           const trunkY = top + G.laneHeight / 2;
           const startX = x(lane.startMs);
@@ -890,7 +893,9 @@ function CheckpointMarker({
   mine: boolean;
   nowMs: number;
 }) {
-  const color = cp.color ? toPaletteColor(cp.color) : laneColor;
+  // A checkpoint's own color uses the stroke shade too (it's a stroked ring), so
+  // it matches the lane and stays legible; null inherits the already-mapped lane.
+  const color = cp.color ? toPaletteStroke(cp.color) : laneColor;
   const card = "var(--card)";
   const r = FLOW_GEOM.nodeRadius + 0.5;
   const future = cp.ms > nowMs && !cp.reached;

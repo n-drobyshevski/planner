@@ -613,6 +613,15 @@
   --member-a:     oklch(from var(--pink-base, #ec4899) 0.88 0.09 h);
   --member-b:     oklch(from var(--pink-base, #ec4899) 0.87 0.08 calc(h - 45));
   --event-shared: oklch(from var(--pink-base, #ec4899) 0.89 0.08 calc(h + 28));
+
+  /* Flows strokes (toPaletteStroke): the pastel swatches above are fills — as a
+     hairline on the L0.99 card they vanish. Re-light task colors to a mid-dark,
+     re-saturated shade so trunks/branches/dots stay ≥3:1 and read as the pink
+     family. Only this light pastel palette sets these; default/dark leave them
+     unset so the swatch's own l/c pass through. */
+  --flow-stroke-l: 0.52;
+  --flow-stroke-c: 0.16;
+
   --chart-1: oklch(from var(--pink-base, #ec4899) 0.62 0.15 h);
   --chart-2: oklch(from var(--pink-base, #ec4899) 0.64 0.12 calc(h - 45));
   --chart-3: oklch(from var(--pink-base, #ec4899) 0.66 0.12 calc(h + 30));
