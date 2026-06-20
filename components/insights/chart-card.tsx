@@ -198,7 +198,7 @@ export function ChartCard({
                 <SlidersHorizontal />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 space-y-3 p-3">
+            <PopoverContent align="end" className="w-72 space-y-3 p-3">
               {typeChoices && (
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">{t("chartCard.chartType")}</Label>
@@ -217,7 +217,7 @@ export function ChartCard({
                           key={ct}
                           value={ct}
                           aria-label={t("chartCard.barChart", { type: typeLabel })}
-                          className="min-h-9 flex-1 gap-1.5"
+                          className="min-h-9 flex-1 gap-1 px-2 text-xs"
                         >
                           <Icon aria-hidden className="size-3.5" />
                           {typeLabel}
