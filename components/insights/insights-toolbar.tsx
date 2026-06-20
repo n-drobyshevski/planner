@@ -67,7 +67,7 @@ export function InsightsToolbar({
           type="single"
           value={period.granularity}
           onValueChange={(v) => v && onGranularityChange(v as Granularity)}
-          variant="outline"
+          variant="segmented"
           size="sm"
           className="hidden md:flex"
           aria-label={t("toolbar.bucketSize")}

@@ -30,11 +30,6 @@ const THEME_OPTIONS = [
   { value: "system", icon: Monitor },
 ] as const;
 
-// Make the active segment legible in every theme/tone (default `bg-muted` is
-// invisible when --muted == --card, e.g. neutral/cool dark) by tying it to the accent.
-const SELECTED_SEGMENT =
-  "data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-primary";
-
 export function AppearanceSettings() {
   const t = useTranslations("settings");
   const {
@@ -85,19 +80,14 @@ export function AppearanceSettings() {
         <FieldDescription>{t("appearance.language.description")}</FieldDescription>
         <ToggleGroup
           type="single"
-          variant="outline"
+          variant="segmented"
           value={locale}
           onValueChange={(v) => v && setLocale(v as AppLocale)}
           disabled={disabled}
           aria-label={t("appearance.language.ariaLabel")}
         >
           {LANGUAGE_OPTIONS.map(({ value, label }) => (
-            <ToggleGroupItem
-              key={value}
-              value={value}
-              aria-label={label}
-              className={SELECTED_SEGMENT}
-            >
+            <ToggleGroupItem key={value} value={value} aria-label={label}>
               {label}
             </ToggleGroupItem>
           ))}
@@ -183,7 +173,7 @@ export function AppearanceSettings() {
           {(field) => (
             <ToggleGroup
               type="single"
-              variant="outline"
+              variant="segmented"
               value={field.state.value}
               onValueChange={(v) => v && field.handleChange(v as ThemePreference)}
               disabled={disabled || catppuccin}
@@ -192,12 +182,7 @@ export function AppearanceSettings() {
               {THEME_OPTIONS.map(({ value, icon: Icon }) => {
                 const label = t(`appearance.theme.${value}`);
                 return (
-                  <ToggleGroupItem
-                    key={value}
-                    value={value}
-                    aria-label={label}
-                    className={SELECTED_SEGMENT}
-                  >
+                  <ToggleGroupItem key={value} value={value} aria-label={label}>
                     <Icon data-icon="inline-start" />
                     {label}
                   </ToggleGroupItem>
@@ -274,7 +259,7 @@ export function AppearanceSettings() {
           {(field) => (
             <ToggleGroup
               type="single"
-              variant="outline"
+              variant="segmented"
               value={field.state.value}
               onValueChange={(v) =>
                 v && field.handleChange(v as (typeof TONES)[number]["id"])
@@ -289,7 +274,6 @@ export function AppearanceSettings() {
                     key={tone.id}
                     value={tone.id}
                     aria-label={label}
-                    className={SELECTED_SEGMENT}
                   >
                     <span
                       data-icon="inline-start"

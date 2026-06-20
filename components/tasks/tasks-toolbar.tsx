@@ -60,7 +60,7 @@ export function TasksToolbar({
           type="single"
           value={view}
           onValueChange={(v) => v && onViewChange(v as TasksView)}
-          variant="outline"
+          variant="segmented"
           size="sm"
           className="hidden md:flex"
         >

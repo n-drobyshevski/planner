@@ -149,7 +149,7 @@ export function TaskBoard({
             type="single"
             value={mobileBoard?.id ?? ""}
             onValueChange={(v) => v && setActiveBoardId(v)}
-            variant="outline"
+            variant="segmented"
             size="sm"
             className="w-full overflow-x-auto"
           >

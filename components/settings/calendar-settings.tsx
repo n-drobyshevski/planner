@@ -20,11 +20,6 @@ import type { ContextLabel } from "@/lib/types";
 // Context-label variants; the visible label resolves via t(`calendarDisplay.contextLabel.${value}`).
 const CONTEXT_LABEL_OPTIONS = ["bar", "side"] as const;
 
-// Match the appearance segments: tie the active state to the accent so it stays
-// legible in every theme/tone (default `bg-muted` is invisible when --muted == --card).
-const SELECTED_SEGMENT =
-  "data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-primary";
-
 /**
  * How the calendar reads: which events show, how context blocks are labelled,
  * and whether success toasts appear. Instant apply, same as the rest of
@@ -97,7 +92,7 @@ export function CalendarSettings() {
           {(field) => (
             <ToggleGroup
               type="single"
-              variant="outline"
+              variant="segmented"
               value={field.state.value}
               onValueChange={(v) => v && field.handleChange(v as ContextLabel)}
               disabled={disabled}
@@ -106,12 +101,7 @@ export function CalendarSettings() {
               {CONTEXT_LABEL_OPTIONS.map((value) => {
                 const label = t(`calendarDisplay.contextLabel.${value}`);
                 return (
-                  <ToggleGroupItem
-                    key={value}
-                    value={value}
-                    aria-label={label}
-                    className={SELECTED_SEGMENT}
-                  >
+                  <ToggleGroupItem key={value} value={value} aria-label={label}>
                     {label}
                   </ToggleGroupItem>
                 );

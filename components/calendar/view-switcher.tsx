@@ -19,7 +19,7 @@ export function ViewSwitcher({
       onValueChange={(v) => {
         if (v) onViewChange(v as CalendarView);
       }}
-      variant="outline"
+      variant="segmented"
       size="sm"
     >
       <ToggleGroupItem value="agenda">{t("views.agenda")}</ToggleGroupItem>

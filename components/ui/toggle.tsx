@@ -11,8 +11,15 @@ const toggleVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-transparent",
-        outline: "border border-input bg-transparent hover:bg-muted",
+        default: "bg-transparent data-[state=on]:bg-muted",
+        outline:
+          "border border-input bg-transparent hover:bg-muted data-[state=on]:bg-muted",
+        // Segmented control: an inner pill that lifts off the group's filled
+        // track (the track itself is styled on the ToggleGroup root). Active is
+        // a neutral white card + hairline ring + soft shadow — no accent — so it
+        // reads in every tone, including ones where --muted == --card.
+        segmented:
+          "rounded-md border-0 bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-card data-[state=on]:text-foreground data-[state=on]:shadow-sm data-[state=on]:ring-1 data-[state=on]:ring-foreground/20",
       },
       size: {
         default:
