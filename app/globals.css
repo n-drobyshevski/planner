@@ -118,6 +118,13 @@
   --input: #e7e0d7;
   --ring: #57534e; /* warm stone focus ring */
 
+  /* Pastel, desaturated take on the active accent — drives the calendar
+     multi-select halo (.evt-selected). Derived from --ring so it follows every
+     accent/Pink/Catppuccin flavor; max(l,0.72) keeps it pastel-light in light
+     mode (esp. Pink's deep L0.5 ring) without brightening already-light dark-mode
+     accents. Declared once here; var(--ring) resolves per palette at use-site. */
+  --evt-sel: oklch(from var(--ring) max(l, 0.72) calc(c * 0.7) h);
+
   --member-a: #c0492a;
   --member-b: #0f766e;
   --event-shared: #b45309;
@@ -843,6 +850,32 @@
     color-mix(in oklab, var(--foreground) 12%, transparent) 0 5px,
     transparent 5px 10px
   );
+}
+
+/* ---- Multi-select highlight (calendar time grid) ----
+   A quiet, palette-adaptive selection halo, layered from the block outward:
+   1. a hairline ink keyline that always separates the block from its OWN fill, so
+      the selection stays legible even when the active accent matches the fill hue
+      (e.g. Peach accent on a coral event, Catppuccin on a peach one);
+   2. a soft PASTEL accent ring (var(--evt-sel)) — a lightened, desaturated take on
+      the active accent so the effect stays calm (never a heavy/dark band) while
+      still re-tinting across every accent, Pink, and the Catppuccin flavors;
+   3. a faint accent glow so a batch of selected blocks reads as one gathered set;
+   plus a whisper of warm soft-shadow lift.
+   --evt-sel derives from --ring: max(l,0.72) floors lightness so a dark light-mode
+   accent (Pink --ring is a deep L0.5 raspberry) becomes pastel, while an already-
+   light dark-mode accent passes through unchanged (dark mode never brightens into
+   something loud); chroma is trimmed for softness. It's set in :root but reads
+   each palette's own --ring at use-site, so no per-palette code is needed.
+   Unlayered (like .cn-toast) so it outranks the block's hover:shadow-* utilities
+   — selection should win over a hover lift. The block's existing transition-shadow
+   eases it in/out; the global prefers-reduced-motion rule already neutralises that. */
+.evt-selected {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--foreground), transparent 25%),
+    0 0 0 3px var(--evt-sel),
+    0 0 0 6px color-mix(in oklab, var(--evt-sel), transparent 84%),
+    0 1px 2px rgb(28 25 23 / 0.05);
 }
 
 /* ---- Toasts (Sonner) ----

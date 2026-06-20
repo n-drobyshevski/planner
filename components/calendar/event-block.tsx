@@ -127,10 +127,14 @@ export const EventBlock = forwardRef<
         // gives them their own "openable, look-don't-touch" affordance without
         // implying a drag. Skipped when selected/focused (those own the ring).
         !editable && !selected && "hover:ring-1 hover:ring-foreground/20",
-        selected && "z-30 ring-2 ring-foreground",
-        // Keyboard focus ring (foreground ink contrasts every fill, matching the
-        // selection ring) so a focused block is always visible.
-        "focus-visible:z-30 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none",
+        // Multi-select highlight: a palette-adaptive accent halo (.evt-selected,
+        // globals.css) that re-tints with the active palette and reads as a
+        // gathered batch — distinct from the ink focus outline below.
+        selected && "z-30 evt-selected",
+        // Keyboard focus uses an ink OUTLINE (a separate property from the
+        // selection box-shadow), so focus stays visible even on a selected block
+        // and never competes with the halo. Ink contrasts every fill.
+        "focus-visible:z-30 focus-visible:outline-2 focus-visible:outline-foreground focus-visible:outline-offset-1",
         // Inactive styling (faint wash + flat) is handled by eventFillStyle's
         // inline fill, so the grayscale `evt-inactive` filter isn't applied here.
         eventStatusClass(occ.status),

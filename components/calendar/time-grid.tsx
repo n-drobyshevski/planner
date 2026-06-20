@@ -958,8 +958,10 @@ export function TimeGrid({
                       onClick={(e) => (e.shiftKey ? onToggleSelect(o) : onSelect(o))}
                       style={{ backgroundColor: toPaletteColor(colorOf(o)), color: toPaletteInk(colorOf(o)) }}
                       className={cn(
-                        "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium",
-                        selectedKeys.has(o.key) && "ring-2 ring-foreground",
+                        "truncate rounded px-1.5 py-0.5 text-left text-xs font-medium transition-shadow duration-150 ease-out-quint",
+                        // Palette-adaptive multi-select halo (shared with timed
+                        // blocks; .evt-selected in globals.css).
+                        selectedKeys.has(o.key) && "evt-selected",
                         o.inactive && "evt-inactive",
                         eventStatusClass(o.status),
                         o.status === "cancelled" && "line-through",
