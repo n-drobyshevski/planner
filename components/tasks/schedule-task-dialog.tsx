@@ -192,7 +192,7 @@ export function ScheduleTaskDialog({
                 <FieldLabel>{t("schedule.howLabel")}</FieldLabel>
                 <ToggleGroup
                   type="single"
-                  variant="outline"
+                  variant="segmented"
                   value={field.state.value}
                   onValueChange={(v) => v && field.handleChange(v as Mode)}
                   className="justify-start"

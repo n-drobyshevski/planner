@@ -204,7 +204,7 @@ export function ChartCard({
                   <Label className="text-xs text-muted-foreground">{t("chartCard.chartType")}</Label>
                   <ToggleGroup
                     type="single"
-                    variant="outline"
+                    variant="segmented"
                     value={settings.chartType}
                     onValueChange={(v) => v && setChartType(v as ChartType)}
                     className="w-full"

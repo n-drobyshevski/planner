@@ -145,7 +145,7 @@ export function SubtaskDetail({
           <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
           <ToggleGroup
             type="single"
-            variant="outline"
+            variant="segmented"
             value={task.priority ? String(task.priority) : "none"}
             onValueChange={(v) =>
               patch(

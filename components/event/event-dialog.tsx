@@ -410,7 +410,7 @@ export function EventDialog(props: EventDialogProps) {
                           {(field) => (
                             <ToggleGroup
                               type="single"
-                              variant="outline"
+                              variant="segmented"
                               size="sm"
                               value={field.state.value}
                               onValueChange={(v) => {
