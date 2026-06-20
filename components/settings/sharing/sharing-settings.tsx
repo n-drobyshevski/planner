@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { getSiteOrigin } from "@/lib/site-url";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -100,10 +101,10 @@ export function SharingSettings() {
   const [revoking, setRevoking] = useState<PublicShareRow | null>(null);
   const [deleting, setDeleting] = useState<PublicShareRow | null>(null);
 
-  const shareUrl = (token: string) =>
-    typeof window === "undefined"
-      ? `/share/${token}`
-      : `${window.location.origin}/share/${token}`;
+  const shareUrl = (token: string) => {
+    const origin = getSiteOrigin();
+    return origin ? `${origin}/share/${token}` : `/share/${token}`;
+  };
 
   const copyLink = async (token: string) => {
     try {

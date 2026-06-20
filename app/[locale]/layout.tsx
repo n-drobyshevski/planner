@@ -13,6 +13,7 @@ import {
   DEFAULT_PALETTE,
 } from "@/lib/theme/appearance";
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/theme/appearance-cookie";
+import { getSiteOrigin } from "@/lib/site-url";
 import { routing } from "@/i18n/routing";
 
 // Latin brand face. Plus Jakarta Sans has no basic-Cyrillic glyphs (only
@@ -37,6 +38,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteOrigin() ?? "https://planr.page"),
   title: "Planner",
   description: "A warm, shared calendar for two.",
 };
