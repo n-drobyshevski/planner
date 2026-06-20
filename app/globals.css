@@ -551,6 +551,13 @@
   --popover-foreground: var(--foreground);
   --primary: oklch(from var(--pink-base, #ec4899) 0.5 c h);
   --primary-foreground: #ffffff;
+  /* Pastel primary FILL for light mode: a soft pink close to the chosen base, with
+     dark crust ink on top (~8:1, AAA). Mirrors the dark block's light-primary-with-
+     dark-ink recipe. --primary itself stays the deeper L0.5 accent so the focus ring
+     and every text-/border-/ring-primary use (links, today number, drag/nesting
+     indicators, active tab) stay legible; only the solid fills repaint to these. */
+  --primary-soft: oklch(from var(--pink-base, #ec4899) 0.8 0.13 h);
+  --primary-soft-ink: oklch(from var(--pink-base, #ec4899) 0.25 0.05 h);
   --secondary: oklch(from var(--pink-base, #ec4899) 0.93 0.035 h);
   --secondary-foreground: var(--foreground);
   --muted: oklch(from var(--pink-base, #ec4899) 0.93 0.035 h);
@@ -627,6 +634,19 @@
   --chart-3: oklch(from var(--pink-base, #ec4899) 0.66 0.12 calc(h + 30));
   --chart-4: oklch(from var(--pink-base, #ec4899) 0.60 0.14 calc(h - 25));
   --chart-5: oklch(from var(--pink-base, #ec4899) 0.62 0.11 calc(h - 58));
+}
+/* Pink light only: repaint the SOLID primary / sidebar-primary fills (buttons, badges,
+   today pill, active nav, nav logo, drag pills) to the pastel --primary-soft + dark ink,
+   so the action color reads as the chosen base pink rather than a dark raspberry. The
+   compound selector outranks ds-tailwind's .bg-primary, so source order is irrelevant.
+   Ink utilities (text-/border-/ring-primary) and the bg-primary/10–20 tints keep the
+   deeper --primary and stay legible. */
+[data-palette="pink"]:not(.dark) :is(.bg-primary, .bg-sidebar-primary) {
+  background-color: var(--primary-soft);
+}
+[data-palette="pink"]:not(.dark)
+  :is(.text-primary-foreground, .text-sidebar-primary-foreground) {
+  color: var(--primary-soft-ink);
 }
 .dark[data-palette="pink"] {
   --background: oklch(from var(--pink-base, #ec4899) 0.17 0.03 h);
