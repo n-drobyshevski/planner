@@ -13,7 +13,7 @@ import type {
 } from "@/lib/types";
 
 export const DEFAULT_THEME: ThemePreference = "system";
-export const DEFAULT_ACCENT: AccentId = "peach";
+export const DEFAULT_ACCENT: AccentId = "stone";
 export const DEFAULT_TONE: SurfaceTone = "warm";
 export const DEFAULT_PALETTE: Palette = "default";
 export const DEFAULT_CONTEXT_LABEL: ContextLabel = "bar";
@@ -28,12 +28,15 @@ export interface AccentPreset {
 }
 
 /**
- * The 14 Catppuccin accent colors (Catppuccin's canonical order). `swatch` is the
- * warm default-palette interpretation of each; `peach` (the brand terracotta) is
- * the default and lives in :root. The literal Catppuccin hex per flavor lives in
- * the [data-palette="catppuccin-*"] --swatch-* blocks in app/globals.css.
+ * The accent picker: warm `stone` (the warm-neutral brand default, not a
+ * Catppuccin hue) followed by the 14 Catppuccin accent colors (Catppuccin's
+ * canonical order). `swatch` is the warm default-palette interpretation of each;
+ * `stone` is the default and lives in :root, `peach` (the former brand terracotta)
+ * gets a restore block. The literal Catppuccin hex per flavor lives in the
+ * [data-palette="catppuccin-*"] --swatch-* blocks in app/globals.css.
  */
 export const ACCENTS: readonly AccentPreset[] = [
+  { id: "stone", label: "Stone", swatch: "#57534e" },
   { id: "rosewater", label: "Rosewater", swatch: "#b0645a" },
   { id: "flamingo", label: "Flamingo", swatch: "#bf5d5d" },
   { id: "pink", label: "Pink", swatch: "#be185d" },
@@ -84,7 +87,7 @@ export const PALETTES: readonly PalettePreset[] = [
     id: "default",
     label: "Default",
     description: "Warm paper & stone",
-    swatches: ["#faf8f5", "#f2ede7", "#c0492a", "#292524"],
+    swatches: ["#faf8f5", "#f2ede7", "#57534e", "#292524"],
   },
   {
     id: "catppuccin-latte",

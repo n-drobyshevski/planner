@@ -18,8 +18,9 @@ export type AppLocale = "en" | "ru";
 
 /** Appearance preferences, stored per member. Mirror the DB CHECK constraints. */
 export type ThemePreference = "light" | "dark" | "system";
-/** The 14 Catppuccin accent colors. Each has a default-(warm)-palette hex plus a
- *  value per Catppuccin flavor (see the --swatch-* / [data-accent] CSS). */
+/** The 14 Catppuccin accent colors plus warm `stone` (the warm-neutral brand
+ *  default). Each has a default-(warm)-palette hex plus a value per Catppuccin
+ *  flavor (see the --swatch-* / [data-accent] CSS). */
 export type AccentId =
   | "rosewater"
   | "flamingo"
@@ -34,7 +35,8 @@ export type AccentId =
   | "sky"
   | "sapphire"
   | "blue"
-  | "lavender";
+  | "lavender"
+  | "stone";
 export type SurfaceTone = "warm" | "neutral" | "cool";
 /**
  * Full-palette theme. `default` keeps the native warm system (light/dark +

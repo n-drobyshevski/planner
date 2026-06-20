@@ -46,13 +46,15 @@ export default function ShareRootLayout({
   return (
     <html
       lang="ru"
-      // A neutral, brand-free accent for the anonymous public surface: warm
-      // stone replaces terracotta so the today marker / focus ring stay quiet.
-      // "stone" is a public-only accent (see [data-accent="stone"] in globals.css),
-      // intentionally not part of the in-app accent picker.
+      // The anonymous public surface pins the warm-stone accent (also the in-app
+      // brand default) so the focus ring stays quiet, AND neutralizes the now-line
+      // to warm stone — the app keeps the red now-line by default, so this override
+      // is scoped here rather than to [data-accent="stone"] (see globals.css /
+      // components/calendar/now-line.tsx).
       data-accent="stone"
       data-tone={DEFAULT_TONE}
       data-palette={DEFAULT_PALETTE}
+      style={{ "--now-line": "#57534e" } as React.CSSProperties}
       className={`${jakarta.variable} ${manrope.variable} ${geistMono.variable} h-full`}
     >
       <body className="min-h-full bg-background text-foreground">{children}</body>

@@ -1,8 +1,10 @@
 import type { Occurrence, Category, Member, TaskRow } from "@/lib/types";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 
-// Fallback when an event has no category and its owner can't be resolved.
-const FALLBACK = "#c0492a"; // coral (WCAG-AA on white text)
+// Fallback when an event has no category and its owner can't be resolved. Neutral
+// warm stone (not Member A's terracotta) so an unresolved block reads as "no
+// owner" rather than borrowing a member identity. White text is AAA on it.
+const FALLBACK = "#57534e"; // warm stone-600
 
 /**
  * Resolve the display color for an occurrence: per-item override, else category,

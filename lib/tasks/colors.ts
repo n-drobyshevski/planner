@@ -3,7 +3,7 @@ import type { TaskRow, Category, Member } from "@/lib/types";
 // Mirrors lib/calendar/colors.ts so tasks and their scheduled blocks read the
 // same. Own color wins; else category color; else the assignee/owner member
 // color; else a generic fallback.
-const FALLBACK = "#c0492a"; // coral
+const FALLBACK = "#57534e"; // warm stone-600 (neutral, not a member identity)
 
 export function resolveTaskColor(
   task: Pick<TaskRow, "color" | "categoryId" | "ownerId" | "assigneeId">,

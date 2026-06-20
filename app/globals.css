@@ -102,7 +102,7 @@
   --popover: #ffffff;
   --popover-foreground: #292524;
 
-  --primary: #c0492a; /* terracotta-coral, 4.97:1 on white */
+  --primary: #57534e; /* warm stone-600, white text 7:1 on fill (AAA) */
   --primary-foreground: #ffffff;
   --secondary: #f2ede7; /* warm stone-100 */
   --secondary-foreground: #44403c; /* stone-700 */
@@ -115,13 +115,13 @@
 
   --border: #e7e0d7; /* warm stone-200 */
   --input: #e7e0d7;
-  --ring: #c0492a; /* on-brand focus ring */
+  --ring: #57534e; /* warm stone focus ring */
 
   --member-a: #c0492a;
   --member-b: #0f766e;
   --event-shared: #b45309;
 
-  --chart-1: #c0492a;
+  --chart-1: #57534e;
   --chart-2: #0f766e;
   --chart-3: #b45309;
   --chart-4: #0369a1;
@@ -129,12 +129,12 @@
 
   --sidebar: #f6f2ec;
   --sidebar-foreground: #292524;
-  --sidebar-primary: #c0492a;
+  --sidebar-primary: #57534e;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f1ebe4;
   --sidebar-accent-foreground: #292524;
   --sidebar-border: #e7e0d7;
-  --sidebar-ring: #c0492a;
+  --sidebar-ring: #57534e;
 
   /* The 14 accent swatches — picker dots AND (via toPaletteColor) event/task/
      category/member colors. Catppuccin palette blocks remap these so everything
@@ -155,6 +155,10 @@
   --swatch-sapphire: #1668a8;
   --swatch-blue: #0369a1;
   --swatch-lavender: #6d5dd6;
+  /* Warm-neutral brand-default accent; mid-dark so white ink stays valid in
+     both themes (the default-palette swatches do not lighten for dark, the same
+     way --swatch-peach / --member-a stay #c0492a). */
+  --swatch-stone: #57534e;
   --swatch-ink: #ffffff;
 }
 
@@ -166,7 +170,7 @@
   --popover: #292524;
   --popover-foreground: #faf8f5;
 
-  --primary: #f2754e; /* lighter coral on dark, 6.19:1 on bg */
+  --primary: #a8a29e; /* warm stone-400 on dark, dark ink 7:1 on fill (AAA) */
   --primary-foreground: #292524;
   --secondary: #3a3531;
   --secondary-foreground: #faf8f5;
@@ -179,13 +183,13 @@
 
   --border: #3a3531;
   --input: #423c37;
-  --ring: #f2754e;
+  --ring: #a8a29e;
 
   --member-a: #c0492a;
   --member-b: #0f766e;
   --event-shared: #b45309;
 
-  --chart-1: #f2754e;
+  --chart-1: #a8a29e;
   --chart-2: #2dd4bf;
   --chart-3: #fbbf24;
   --chart-4: #38bdf8;
@@ -193,21 +197,22 @@
 
   --sidebar: #1c1917;
   --sidebar-foreground: #faf8f5;
-  --sidebar-primary: #f2754e;
+  --sidebar-primary: #a8a29e;
   --sidebar-primary-foreground: #292524;
   --sidebar-accent: #292524;
   --sidebar-accent-foreground: #faf8f5;
   --sidebar-border: #3a3531;
-  --sidebar-ring: #f2754e;
+  --sidebar-ring: #a8a29e;
 }
 
 /* ---------------------------------------------------------------------------
-   Accent presets — the 14 Catppuccin accent colors (Settings → Appearance).
-   Each preset overrides ONLY the brand-color token group (primary + ring +
-   sidebar-primary), leaving surfaces to the tone presets below. `peach` (the
-   warm brand terracotta) is the default and lives in :root / .dark, so it needs
-   no block here. Light values are tuned for white text; dark values for dark ink
-   (#292524). A higher-specificity `.dark[data-accent]` block wins in dark mode.
+   Accent presets — the 14 Catppuccin accent colors + warm `stone` (Settings →
+   Appearance). Each preset overrides ONLY the brand-color token group (primary +
+   ring + sidebar-primary), leaving surfaces to the tone presets below. `stone`
+   (the warm-neutral brand accent) is the default and lives in :root / .dark; the
+   block below is kept explicit, and `peach` (terracotta, the former default) gets
+   its own restore block. Light values are tuned for white text; dark values for
+   dark ink (#292524). A higher-specificity `.dark[data-accent]` block wins in dark.
 --------------------------------------------------------------------------- */
 [data-accent="rosewater"] {
   --primary: #b0645a; --primary-foreground: #ffffff; --ring: #b0645a;
@@ -326,18 +331,28 @@
   --sidebar-primary: #c7c2fd; --sidebar-primary-foreground: #292524; --sidebar-ring: #c7c2fd;
 }
 
-/* Public-share neutral accent.
-   "stone" is a deliberately neutral accent used ONLY by the public share surface
-   (app/share/layout.tsx) — it is intentionally absent from the ACCENTS picker
-   catalog. It maps the brand accent to warm stone-600 (#57534e, the same calm
-   tone the public event blocks use), so the today marker and focus ring read as
-   quiet neutrals rather than the terracotta brand pop. 7.1:1 on warm paper. */
+/* Peach (terracotta) — the former brand default, now an explicit override.
+   The :root / .dark default is warm stone, so this block restores terracotta for
+   members who saved accent='peach' (and for anyone who picks it from the picker).
+   4.97:1 white-on-fill light / 6.19:1 dark. */
+[data-accent="peach"] {
+  --primary: #c0492a; --primary-foreground: #ffffff; --ring: #c0492a;
+  --sidebar-primary: #c0492a; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #c0492a;
+}
+.dark[data-accent="peach"] {
+  --primary: #f2754e; --primary-foreground: #292524; --ring: #f2754e;
+  --sidebar-primary: #f2754e; --sidebar-primary-foreground: #292524; --sidebar-ring: #f2754e;
+}
+
+/* Stone — the warm-neutral brand default (also lives in :root / .dark, kept here
+   explicit so an explicit accent='stone' selection is self-documenting). Warm
+   stone-600 (#57534e, 7.1:1 on warm paper); dark lightens to stone-400 (#a8a29e).
+   NOTE: the public-share now-line neutralization is scoped to the share surface
+   itself (app/share/layout.tsx), NOT to this accent — so default (stone) users in
+   the app keep the red now-line. */
 [data-accent="stone"] {
   --primary: #57534e; --primary-foreground: #ffffff; --ring: #57534e;
   --sidebar-primary: #57534e; --sidebar-primary-foreground: #ffffff; --sidebar-ring: #57534e;
-  /* Current-time indicator: warm stone instead of the brand/destructive red, so
-     the public surface carries no red pop (NowLine reads --now-line). */
-  --now-line: #57534e;
 }
 .dark[data-accent="stone"] {
   --primary: #a8a29e; --primary-foreground: #292524; --ring: #a8a29e;
@@ -432,7 +447,7 @@
   --accent:#ccd0da; --accent-foreground:#4c4f69;
   --destructive:#d20f39;
   --border:#ccd0da; --input:#bcc0cc; --ring:var(--swatch-peach);
-  --swatch-rosewater:#dc8a78; --swatch-flamingo:#dd7878; --swatch-pink:#ea76cb; --swatch-mauve:#8839ef; --swatch-red:#d20f39; --swatch-maroon:#e64553; --swatch-peach:#fe640b; --swatch-yellow:#df8e1d; --swatch-green:#40a02b; --swatch-teal:#179299; --swatch-sky:#04a5e5; --swatch-sapphire:#209fb5; --swatch-blue:#1e66f5; --swatch-lavender:#7287fd; --swatch-ink:#ffffff;
+  --swatch-rosewater:#dc8a78; --swatch-flamingo:#dd7878; --swatch-pink:#ea76cb; --swatch-mauve:#8839ef; --swatch-red:#d20f39; --swatch-maroon:#e64553; --swatch-peach:#fe640b; --swatch-yellow:#df8e1d; --swatch-green:#40a02b; --swatch-teal:#179299; --swatch-sky:#04a5e5; --swatch-sapphire:#209fb5; --swatch-blue:#1e66f5; --swatch-lavender:#7287fd; --swatch-stone:#5c5f77; --swatch-ink:#ffffff;
   /* Latte is light: most accents need near-black ink for AA (mauve/red/blue keep
      white via the --swatch-ink fallback). Used by buttons, chips, avatars, checks. */
   --swatch-ink-rosewater:#11111b; --swatch-ink-flamingo:#11111b; --swatch-ink-pink:#11111b; --swatch-ink-maroon:#11111b; --swatch-ink-peach:#11111b; --swatch-ink-yellow:#11111b; --swatch-ink-green:#11111b; --swatch-ink-teal:#11111b; --swatch-ink-sky:#11111b; --swatch-ink-sapphire:#11111b; --swatch-ink-lavender:#11111b;
@@ -457,7 +472,7 @@
   --accent:#414559; --accent-foreground:#c6d0f5;
   --destructive:#e78284;
   --border:#414559; --input:#51576d; --ring:var(--swatch-peach);
-  --swatch-rosewater:#f2d5cf; --swatch-flamingo:#eebebe; --swatch-pink:#f4b8e4; --swatch-mauve:#ca9ee6; --swatch-red:#e78284; --swatch-maroon:#ea999c; --swatch-peach:#ef9f76; --swatch-yellow:#e5c890; --swatch-green:#a6d189; --swatch-teal:#81c8be; --swatch-sky:#99d1db; --swatch-sapphire:#85c1dc; --swatch-blue:#8caaee; --swatch-lavender:#babbf1; --swatch-ink:#232634;
+  --swatch-rosewater:#f2d5cf; --swatch-flamingo:#eebebe; --swatch-pink:#f4b8e4; --swatch-mauve:#ca9ee6; --swatch-red:#e78284; --swatch-maroon:#ea999c; --swatch-peach:#ef9f76; --swatch-yellow:#e5c890; --swatch-green:#a6d189; --swatch-teal:#81c8be; --swatch-sky:#99d1db; --swatch-sapphire:#85c1dc; --swatch-blue:#8caaee; --swatch-lavender:#babbf1; --swatch-stone:#949cbb; --swatch-ink:#232634;
   --member-a:#8caaee; --member-b:#a6d189; --event-shared:#ef9f76;
   --chart-1:#ca9ee6; --chart-2:#8caaee; --chart-3:#a6d189; --chart-4:#ef9f76; --chart-5:#81c8be;
   --sidebar:#232634; --sidebar-foreground:#c6d0f5;
@@ -477,7 +492,7 @@
   --accent:#363a4f; --accent-foreground:#cad3f5;
   --destructive:#ed8796;
   --border:#363a4f; --input:#494d64; --ring:var(--swatch-peach);
-  --swatch-rosewater:#f4dbd6; --swatch-flamingo:#f0c6c6; --swatch-pink:#f5bde6; --swatch-mauve:#c6a0f6; --swatch-red:#ed8796; --swatch-maroon:#ee99a0; --swatch-peach:#f5a97f; --swatch-yellow:#eed49f; --swatch-green:#a6da95; --swatch-teal:#8bd5ca; --swatch-sky:#91d7e3; --swatch-sapphire:#7dc4e4; --swatch-blue:#8aadf4; --swatch-lavender:#b7bdf8; --swatch-ink:#181926;
+  --swatch-rosewater:#f4dbd6; --swatch-flamingo:#f0c6c6; --swatch-pink:#f5bde6; --swatch-mauve:#c6a0f6; --swatch-red:#ed8796; --swatch-maroon:#ee99a0; --swatch-peach:#f5a97f; --swatch-yellow:#eed49f; --swatch-green:#a6da95; --swatch-teal:#8bd5ca; --swatch-sky:#91d7e3; --swatch-sapphire:#7dc4e4; --swatch-blue:#8aadf4; --swatch-lavender:#b7bdf8; --swatch-stone:#939ab7; --swatch-ink:#181926;
   --member-a:#8aadf4; --member-b:#a6da95; --event-shared:#f5a97f;
   --chart-1:#c6a0f6; --chart-2:#8aadf4; --chart-3:#a6da95; --chart-4:#f5a97f; --chart-5:#8bd5ca;
   --sidebar:#181926; --sidebar-foreground:#cad3f5;
@@ -497,7 +512,7 @@
   --accent:#313244; --accent-foreground:#cdd6f4;
   --destructive:#f38ba8;
   --border:#313244; --input:#45475a; --ring:var(--swatch-peach);
-  --swatch-rosewater:#f5e0dc; --swatch-flamingo:#f2cdcd; --swatch-pink:#f5c2e7; --swatch-mauve:#cba6f7; --swatch-red:#f38ba8; --swatch-maroon:#eba0ac; --swatch-peach:#fab387; --swatch-yellow:#f9e2af; --swatch-green:#a6e3a1; --swatch-teal:#94e2d5; --swatch-sky:#89dceb; --swatch-sapphire:#74c7ec; --swatch-blue:#89b4fa; --swatch-lavender:#b4befe; --swatch-ink:#11111b;
+  --swatch-rosewater:#f5e0dc; --swatch-flamingo:#f2cdcd; --swatch-pink:#f5c2e7; --swatch-mauve:#cba6f7; --swatch-red:#f38ba8; --swatch-maroon:#eba0ac; --swatch-peach:#fab387; --swatch-yellow:#f9e2af; --swatch-green:#a6e3a1; --swatch-teal:#94e2d5; --swatch-sky:#89dceb; --swatch-sapphire:#74c7ec; --swatch-blue:#89b4fa; --swatch-lavender:#b4befe; --swatch-stone:#9399b2; --swatch-ink:#11111b;
   --member-a:#89b4fa; --member-b:#a6e3a1; --event-shared:#fab387;
   --chart-1:#cba6f7; --chart-2:#89b4fa; --chart-3:#a6e3a1; --chart-4:#fab387; --chart-5:#94e2d5;
   --sidebar:#11111b; --sidebar-foreground:#cdd6f4;
@@ -562,6 +577,10 @@
 [data-palette^="catppuccin-"][data-accent="lavender"] {
   --primary:var(--swatch-lavender); --primary-foreground:var(--swatch-ink-lavender, var(--swatch-ink)); --ring:var(--swatch-lavender);
   --sidebar-primary:var(--swatch-lavender); --sidebar-primary-foreground:var(--swatch-ink-lavender, var(--swatch-ink)); --sidebar-ring:var(--swatch-lavender);
+}
+[data-palette^="catppuccin-"][data-accent="stone"] {
+  --primary:var(--swatch-stone); --primary-foreground:var(--swatch-ink-stone, var(--swatch-ink)); --ring:var(--swatch-stone);
+  --sidebar-primary:var(--swatch-stone); --sidebar-primary-foreground:var(--swatch-ink-stone, var(--swatch-ink)); --sidebar-ring:var(--swatch-stone);
 }
 
 @layer base {

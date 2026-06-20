@@ -12,7 +12,7 @@ carry the design system — read them before any UI work:
 
 **Register:** product (an app-shell planner, not a marketing surface).
 **Personality:** calm, precise, understated — *"a warm, shared calendar for two."*
-Warmth is carried by restraint (warm-paper surface, one terracotta accent), never by
-decoration.
+Warmth is carried by restraint (warm-paper surface, one warm-stone accent, with terracotta
+surviving as Member A's identity), never by decoration.
 **Avoid:** gamified-productivity patterns, generic-SaaS-dashboard chrome, and
 cold/sterile minimalism.

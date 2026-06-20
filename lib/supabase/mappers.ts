@@ -49,7 +49,7 @@ export function mapMember(r: Row): Member {
     hasPin: r.pin_hash != null,
     locale: (r.locale as AppLocale | null) ?? "en",
     themePreference: (r.theme_preference as ThemePreference | null) ?? "system",
-    accent: (r.accent as AccentId | null) ?? "peach",
+    accent: (r.accent as AccentId | null) ?? "stone",
     surfaceTone: (r.surface_tone as SurfaceTone | null) ?? "warm",
     palette: (r.palette as Palette | null) ?? "default",
     timezone: (r.timezone as string | null) ?? null,

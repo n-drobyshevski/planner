@@ -2,6 +2,8 @@
 name: Planner
 description: A warm, shared calendar for two — quiet, precise, built to coordinate.
 colors:
+  warm-stone: "#57534e"
+  warm-stone-dark: "#a8a29e"
   terracotta: "#c0492a"
   terracotta-light: "#f2754e"
   warm-paper: "#faf8f5"
@@ -54,7 +56,7 @@ spacing:
   xl: "1rem"
 components:
   button-primary:
-    backgroundColor: "{colors.terracotta}"
+    backgroundColor: "{colors.warm-stone}"
     textColor: "{colors.card-white}"
     rounded: "{rounded.lg}"
     padding: "0 0.625rem"
@@ -77,7 +79,7 @@ components:
     rounded: "{rounded.xl}"
     padding: "1rem"
   badge:
-    backgroundColor: "{colors.terracotta}"
+    backgroundColor: "{colors.warm-stone}"
     textColor: "{colors.card-white}"
     rounded: "{rounded.pill}"
     padding: "0.125rem 0.5rem"
@@ -102,9 +104,10 @@ people answer "are we both free, and whose is this?" at a glance and then get on
 their day. Every decision serves coordination and trust; nothing exists to impress.
 
 The surface is **warm paper** (`#faf8f5`) with **stone ink** (`#292524`) and a single
-committed accent, a **terracotta-coral** (`#c0492a`). Warmth is the material, not a
+committed accent, a **warm stone** (`#57534e`). Warmth is the material, not a
 decoration layered on top: it lives in the paper, the stone neutrals, and the soft
-shadows, which is what lets the interface stay quiet without turning cold or clinical.
+shadows — and in the one terracotta that survives as Member A's identity — which is what
+lets the interface stay quiet without turning cold or clinical.
 Hierarchy is built from a deliberately shallow type scale and generous spacing rather
 than big display type — this is a product register, so there is no hero tier, no
 marketing voice, no ornament competing with the schedule itself.
@@ -117,7 +120,7 @@ quiet and precise, yet human.
 
 **Key Characteristics:**
 - Warm, paper-toned light surface; warm-charcoal dark mode — never pure white or pure black.
-- One committed terracotta accent, used sparingly; color otherwise carries *meaning* (whose, what, what-state).
+- One committed warm-stone accent, used sparingly; color otherwise carries *meaning* (whose, what, what-state), with terracotta surviving as Member A.
 - Shallow type scale, single family in weight contrast; precision over flourish.
 - Soft, warm-tinted shadows and hairline rings; mostly flat, depth only where it means "floating."
 - Rounded, gentle geometry (0.75rem base radius) — approachable, not bubbly.
@@ -125,13 +128,14 @@ quiet and precise, yet human.
 
 ## 2. Colors
 
-A warm, low-saturation neutral field with one terracotta accent — and a small, strict set
+A warm, low-saturation neutral field with one warm-stone accent — and a small, strict set
 of *semantic* colors that encode ownership and status.
 
 ### Primary
-- **Terracotta Coral** (`#c0492a`): The single brand accent. Verified 4.97:1 on white. Reserved for primary actions, the focus ring, active navigation, and selection. In dark mode it lightens to **Warm Coral** (`#f2754e`, 6.19:1 on charcoal) so it stays legible without glare. It is also Member A's identity color.
+- **Warm Stone** (`#57534e`): The single brand accent. White text is 7:1 on the fill (AAA). Reserved for primary actions, the focus ring, active navigation, and selection. In dark mode it lightens to **Stone 400** (`#a8a29e`, dark ink) so it stays legible without glare. Deliberately neutral — the accent is the quietest thing on screen, so the member/category colors carry the eye, not the chrome.
 
 ### Secondary
+- **Terracotta Coral** (`#c0492a`): Member A's identity color (dark mode keeps the warm coral, `#f2754e` where it needs legibility). Once the brand accent, now demoted to *meaning* — "this is Member A," not "this is the action." Still selectable as the **Peach** accent for anyone who prefers it.
 - **Teal** (`#0f766e`): Member B's identity color. Not a general-purpose accent — it appears only where it means "this belongs to the second person."
 - **Shared Amber** (`#b45309`): The color of jointly-owned events. Distinct from both members so "ours" reads instantly as neither "mine" nor "yours."
 
@@ -147,7 +151,7 @@ of *semantic* colors that encode ownership and status.
 - **Stone Ink** (`#292524`): Primary text. Warm near-black, not `#000`.
 
 ### Named Rules
-**The One Accent Rule.** Terracotta is the *only* decorative accent, and it stays rare — primary action, focus, active state, selection. If a screen has two terracotta things competing for "the" action, one of them is wrong.
+**The One Accent Rule.** Warm stone is the *only* decorative accent, and it stays rare — primary action, focus, active state, selection. The member/category colors (terracotta, teal, amber, the swatch set) are not decoration; they carry *meaning*, so they coexist with the stone accent rather than competing with it. If a screen has two stone things competing for "the" action, one of them is wrong.
 
 **The Color-Means-Something Rule.** Outside the single accent, color is never decorative. A hue on screen answers a question: *whose is this* (Member A coral / Member B teal), *is it ours* (shared amber), or *what category* (the swatch set). Adding color "for visual interest" is prohibited; it breaks the legibility the whole product depends on.
 
@@ -192,13 +196,13 @@ Components are compact and quiet: small heights, gentle radii, restrained states
 
 ### Buttons
 - **Shape:** Gently rounded (`0.75rem`, `rounded-lg`). Compact heights — default `2rem` (`h-8`), with `xs`/`sm`/`lg` from `1.5rem`–`2.25rem`. Text `0.875rem`, weight 500.
-- **Primary:** Terracotta fill, white text. Hover dims to ~80% opacity. The one loud control on a screen.
+- **Primary:** Warm-stone fill, white text. Hover dims to ~80% opacity. The one committed control on a screen — quiet by design, not loud.
 - **Outline / Secondary / Ghost:** Paper or warm-stone fills with stone ink; hover lands on `muted`. These carry most of the app's actions — primary is rare by design.
 - **Destructive:** *Tinted, not solid* — `destructive/10` fill with red text, deepening to `/20` on hover. Quiet about danger until you hover; never a loud red block.
-- **Hover / Focus / Active:** Color-only hover (no lift). Focus is a 3px terracotta ring at 50% (`ring-3 ring-ring/50`) plus a ring-colored border. Active nudges down 1px (`translate-y-px`) for a tactile press.
+- **Hover / Focus / Active:** Color-only hover (no lift). Focus is a 3px warm-stone ring at 50% (`ring-3 ring-ring/50`) plus a ring-colored border. Active nudges down 1px (`translate-y-px`) for a tactile press.
 
 ### Chips / Badges
-- **Style:** Full pill (`1.95rem`, `rounded-4xl`), `1.25rem` tall, `text-xs` weight 500. Variants: terracotta `default`, warm-stone `secondary`, tinted `destructive`, hairline `outline`, `ghost`.
+- **Style:** Full pill (`1.95rem`, `rounded-4xl`), `1.25rem` tall, `text-xs` weight 500. Variants: warm-stone `default`, warm-stone-100 `secondary`, tinted `destructive`, hairline `outline`, `ghost`.
 - **Use:** Status and category markers. Category chips take their fill from the contrast-checked swatch set, with per-swatch legible ink.
 
 ### Cards / Containers
@@ -210,12 +214,12 @@ Components are compact and quiet: small heights, gentle radii, restrained states
 
 ### Inputs / Fields
 - **Style:** `2rem` tall, `rounded-lg`, transparent fill with a warm-stone border. Padding `0.25rem 0.625rem`.
-- **Focus:** Border shifts to terracotta + a 3px terracotta ring at 50%. No glow, no animation beyond the color/ring change.
+- **Focus:** Border shifts to warm stone + a 3px warm-stone ring at 50%. No glow, no animation beyond the color/ring change.
 - **Placeholder:** Stone-muted at full AA contrast — never a faint gray hint.
 - **Error / Disabled:** `aria-invalid` → destructive border + ring; disabled → muted fill, reduced opacity, no pointer.
 
 ### Navigation
-- **Style:** A warm sidebar surface (`#f6f2ec`), one notch warmer than the paper body, plus a top toolbar. Active items use the terracotta `sidebar-primary`; rest/hover stay in warm neutrals. Typography is the app's title/label scale, not enlarged.
+- **Style:** A warm sidebar surface (`#f6f2ec`), one notch warmer than the paper body, plus a top toolbar. Active items use the warm-stone `sidebar-primary`; rest/hover stay in warm neutrals. Typography is the app's title/label scale, not enlarged.
 - **Mobile:** Sidebar collapses to a sheet; safe-area insets (`pt-safe`/`pb-safe`) clear the notch and home indicator.
 
 ### Event Block (signature component)
@@ -228,7 +232,7 @@ The defining custom component — a timed block in the calendar grid, and the cl
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** keep terracotta rare — primary action, focus, active, selection only (**The One Accent Rule**).
+- **Do** keep the warm-stone accent rare — primary action, focus, active, selection only (**The One Accent Rule**).
 - **Do** let color mean something outside the accent: whose (coral / teal), ours (amber), or category (the swatch set).
 - **Do** tint every neutral and every shadow warm (stone `#…`, shadow `rgb(28 25 23 / …)`); use warm near-black `#292524` for text, never `#000`.
 - **Do** build hierarchy from weight, color, and spacing on a shallow scale that tops out near 1rem.
