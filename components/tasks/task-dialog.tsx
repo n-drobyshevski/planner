@@ -300,7 +300,7 @@ export function TaskDialog(props: TaskDialogProps) {
               {mode === "create" && props.onKindChange && (
                 <ToggleGroup
                   type="single"
-                  variant="outline"
+                  variant="segmented"
                   size="sm"
                   value="task"
                   onValueChange={(v) =>
@@ -516,7 +516,7 @@ export function TaskDialog(props: TaskDialogProps) {
                     <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
                     <ToggleGroup
                       type="single"
-                      variant="outline"
+                      variant="segmented"
                       value={field.state.value}
                       onValueChange={(v) =>
                         field.handleChange((v || "none") as TaskFormValues["priority"])

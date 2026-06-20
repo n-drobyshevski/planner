@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CalendarCanvas } from "@/components/calendar/calendar-canvas";
 import { PublicRequestDialog } from "@/components/share/public-request-dialog";
@@ -279,29 +280,20 @@ function PublicCalendarInner({
             </SelectContent>
           </Select>
           {/* md+: the segmented control, with room for all four full labels. */}
-          <div
-            role="tablist"
+          <ToggleGroup
+            type="single"
+            variant="segmented"
+            value={view}
+            onValueChange={(v) => v && setView(v as CalendarView)}
             aria-label={t("nav.viewLabel")}
-            className="hidden items-center gap-1 rounded-lg bg-muted p-0.5 md:flex"
+            className="hidden md:flex"
           >
             {VIEWS.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                role="tab"
-                aria-selected={view === v.id}
-                aria-label={t(v.labelKey)}
-                onClick={() => setView(v.id)}
-                className={`min-h-8 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  view === v.id
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
+              <ToggleGroupItem key={v.id} value={v.id} aria-label={t(v.labelKey)}>
                 {t(v.labelKey)}
-              </button>
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
           {/* Desktop keeps the action in the header; on phones it moves to the
               thumb-reachable FAB below, so the mobile header stays purely
               navigational (move through time · switch view). */}

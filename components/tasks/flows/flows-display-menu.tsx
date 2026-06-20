@@ -345,9 +345,8 @@ function TriToggle({
       type="single"
       value={value}
       onValueChange={(v) => v && onValueChange(v)}
-      variant="outline"
+      variant="segmented"
       size="sm"
-      spacing={0}
       aria-label={ariaLabel}
       className="w-full"
     >

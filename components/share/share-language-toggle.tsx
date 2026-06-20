@@ -15,6 +15,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
  * A quiet EN/RU switch for the anonymous share surface. The share view auto-picks
@@ -80,28 +81,26 @@ export function ShareLanguageToggle() {
 
       {/* md+: the segmented control, both options inline. Mirrors the view
           switcher's segmented look so it reads as part of the surface. */}
-      <div
-        role="group"
+      <ToggleGroup
+        type="single"
+        variant="segmented"
+        value={locale}
+        onValueChange={(v) => v && choose(v)}
+        disabled={pending}
         aria-label={t("language.label")}
-        className="hidden shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5 md:flex"
+        className="hidden shrink-0 md:flex"
       >
         {OPTIONS.map((opt) => (
-          <button
+          <ToggleGroupItem
             key={opt.value}
-            type="button"
-            aria-pressed={locale === opt.value}
-            disabled={pending}
-            onClick={() => choose(opt.value)}
-            className={`min-h-8 rounded-md px-2 text-xs font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70 ${
-              locale === opt.value
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            value={opt.value}
+            aria-label={opt.endonym}
+            className="text-xs tabular-nums"
           >
             {opt.code}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
     </>
   );
 }

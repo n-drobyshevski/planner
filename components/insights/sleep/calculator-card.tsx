@@ -63,7 +63,7 @@ export function CalculatorCard({ prefs }: { prefs: SleepPrefs }) {
           <ToggleGroup
             id="sleep-calc-mode"
             type="single"
-            variant="outline"
+            variant="segmented"
             aria-label={t("calculator.directionAriaLabel")}
             value={mode}
             onValueChange={(v) => {

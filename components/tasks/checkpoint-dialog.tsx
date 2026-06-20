@@ -226,7 +226,7 @@ export function CheckpointDialog(props: CheckpointDialogProps) {
                     <FieldLabel>{t("checkpointDialog.shapeLabel")}</FieldLabel>
                     <ToggleGroup
                       type="single"
-                      variant="outline"
+                      variant="segmented"
                       value={field.state.value}
                       onValueChange={(v) => v && field.handleChange(v as CheckpointShape)}
                       className="justify-start"

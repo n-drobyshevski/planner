@@ -476,7 +476,7 @@ export function TaskFlows({
             type="single"
             value={densityFor(pxPerDay)}
             onValueChange={(v) => v && setPxPerDay(ZOOM[v as Density])}
-            variant="outline"
+            variant="segmented"
             size="sm"
             aria-label={t("flows.zoom.label")}
           >
