@@ -1,0 +1,123 @@
+import "server-only";
+
+import { headers } from "next/headers";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+  type VerifiedRegistrationResponse,
+  type VerifiedAuthenticationResponse,
+} from "@simplewebauthn/server";
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from "@simplewebauthn/server";
+
+const RP_NAME = "Planner";
+
+/**
+ * Derive the WebAuthn relying party from the incoming request. rpID is the
+ * registrable domain (host without port) and origin is the full scheme+host the
+ * browser will report. Works for localhost dev and the deployed domain without
+ * extra config; override with WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN if a request is
+ * served behind a proxy that rewrites Host.
+ */
+export async function getRelyingParty(): Promise<{
+  rpID: string;
+  origin: string;
+}> {
+  const envRpId = process.env.WEBAUTHN_RP_ID;
+  const envOrigin = process.env.WEBAUTHN_ORIGIN;
+  if (envRpId && envOrigin) return { rpID: envRpId, origin: envOrigin };
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const rpID = host.split(":")[0];
+  const origin = `${proto}://${host}`;
+  return { rpID: envRpId ?? rpID, origin: envOrigin ?? origin };
+}
+
+/** Stored credential shape passed to the authentication verifier. */
+export type StoredCredential = {
+  credential_id: string; // base64url
+  public_key: string; // base64url COSE key
+  counter: number;
+  transports: string[] | null;
+};
+
+export async function buildRegistrationOptions(opts: {
+  memberId: string;
+  memberName: string;
+  existing: { credential_id: string; transports: string[] | null }[];
+}): Promise<PublicKeyCredentialCreationOptionsJSON> {
+  const { rpID } = await getRelyingParty();
+  return generateRegistrationOptions({
+    rpName: RP_NAME,
+    rpID,
+    // userID must be stable per member so re-registration replaces, not duplicates.
+    userID: new TextEncoder().encode(opts.memberId),
+    userName: opts.memberName,
+    attestationType: "none",
+    excludeCredentials: opts.existing.map((c) => ({
+      id: c.credential_id,
+      transports: (c.transports ?? undefined) as never,
+    })),
+    authenticatorSelection: {
+      residentKey: "preferred",
+      userVerification: "preferred",
+    },
+  });
+}
+
+export async function verifyRegistration(opts: {
+  response: RegistrationResponseJSON;
+  expectedChallenge: string;
+}): Promise<VerifiedRegistrationResponse> {
+  const { rpID, origin } = await getRelyingParty();
+  return verifyRegistrationResponse({
+    response: opts.response,
+    expectedChallenge: opts.expectedChallenge,
+    expectedOrigin: origin,
+    expectedRPID: rpID,
+    requireUserVerification: false,
+  });
+}
+
+export async function buildAuthenticationOptions(opts: {
+  allow: { credential_id: string; transports: string[] | null }[];
+}): Promise<PublicKeyCredentialRequestOptionsJSON> {
+  const { rpID } = await getRelyingParty();
+  return generateAuthenticationOptions({
+    rpID,
+    userVerification: "preferred",
+    allowCredentials: opts.allow.map((c) => ({
+      id: c.credential_id,
+      transports: (c.transports ?? undefined) as never,
+    })),
+  });
+}
+
+export async function verifyAuthentication(opts: {
+  response: AuthenticationResponseJSON;
+  expectedChallenge: string;
+  credential: StoredCredential;
+}): Promise<VerifiedAuthenticationResponse> {
+  const { rpID, origin } = await getRelyingParty();
+  return verifyAuthenticationResponse({
+    response: opts.response,
+    expectedChallenge: opts.expectedChallenge,
+    expectedOrigin: origin,
+    expectedRPID: rpID,
+    requireUserVerification: false,
+    credential: {
+      id: opts.credential.credential_id,
+      publicKey: Buffer.from(opts.credential.public_key, "base64url"),
+      counter: opts.credential.counter,
+      transports: (opts.credential.transports ?? undefined) as never,
+    },
+  });
+}

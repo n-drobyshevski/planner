@@ -4,8 +4,15 @@ import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
-import { Check, Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { passkeyEnroll, browserSupportsWebAuthn } from "@/lib/auth/passkey-client";
+import {
+  listPasskeys,
+  removePasskey,
+  type PasskeySummary,
+} from "@/app/[locale]/login/actions";
 import { SettingsSection } from "@/components/settings/settings-section";
 import { FieldSet, FieldLegend, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -92,6 +99,9 @@ export function ProfileSettings() {
           )}
         </div>
       </FieldSet>
+
+      {/* Passkeys */}
+      <PasskeysSection isReady={isReady} />
       </SettingsSection>
 
       <PinDialog
@@ -101,6 +111,96 @@ export function ProfileSettings() {
         savePin={savePin}
       />
     </>
+  );
+}
+
+/**
+ * Passkey management for the signed-in member. Passkeys are the primary,
+ * phishing-resistant login factor; the PIN above is the fallback. Only renders
+ * its controls when the browser supports WebAuthn.
+ */
+function PasskeysSection({ isReady }: { isReady: boolean }) {
+  const t = useTranslations("settings");
+  const [supported, setSupported] = React.useState(false);
+  const [passkeys, setPasskeys] = React.useState<PasskeySummary[] | null>(null);
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => setSupported(browserSupportsWebAuthn()), []);
+  const refresh = React.useCallback(() => {
+    void listPasskeys().then(setPasskeys);
+  }, []);
+  React.useEffect(() => {
+    if (supported) refresh();
+  }, [supported, refresh]);
+
+  const add = () => {
+    setBusy(true);
+    void passkeyEnroll().then((res) => {
+      setBusy(false);
+      if ("ok" in res) {
+        toast.success(t("profile.passkeys.added"));
+        refresh();
+      } else if ("error" in res) {
+        toast.error(res.error);
+      }
+    });
+  };
+
+  const remove = (id: string) => {
+    setBusy(true);
+    void removePasskey(id).then((res) => {
+      setBusy(false);
+      if ("error" in res) toast.error(res.error);
+      else {
+        toast.success(t("profile.passkeys.removed"));
+        refresh();
+      }
+    });
+  };
+
+  return (
+    <FieldSet>
+      <FieldLegend variant="label">{t("profile.passkeys.legend")}</FieldLegend>
+      <FieldDescription>
+        {supported
+          ? t("profile.passkeys.description")
+          : t("profile.passkeys.unsupported")}
+      </FieldDescription>
+      {supported && (
+        <div className="flex flex-col gap-3">
+          {passkeys && passkeys.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {passkeys.map((pk) => (
+                <li
+                  key={pk.id}
+                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                >
+                  <span className="flex items-center gap-2 text-sm">
+                    <KeyRound className="size-4 text-muted-foreground" aria-hidden />
+                    {pk.label || t("profile.passkeys.defaultLabel")}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={busy}
+                    onClick={() => remove(pk.id)}
+                    aria-label={t("profile.passkeys.remove")}
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div>
+            <Button disabled={!isReady || busy} onClick={add}>
+              <KeyRound className="size-4" aria-hidden />
+              {t("profile.passkeys.add")}
+            </Button>
+          </div>
+        </div>
+      )}
+    </FieldSet>
   );
 }
 

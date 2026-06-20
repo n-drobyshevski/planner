@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
-import { useTranslations } from "next-intl";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { toast } from "sonner";
+import { KeyRound } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PinInput } from "@/components/auth/pin-input";
 import { signIn } from "@/app/[locale]/login/actions";
+import { passkeyLogin, browserSupportsWebAuthn } from "@/lib/auth/passkey-client";
 
 /**
  * Nickname + PIN sign-in. The member is found by name; their PIN (when set) is
@@ -20,9 +22,33 @@ import { signIn } from "@/app/[locale]/login/actions";
 export function LoginScreen() {
   const t = useTranslations("auth");
   const tv = useTranslations("validation");
+  const locale = useLocale();
   // The transition keeps `pending` true through the post-sign-in redirect,
   // which the form's own isSubmitting wouldn't cover.
   const [pending, startTransition] = useTransition();
+  // Passkey sign-in runs its own pending state and only renders when the
+  // browser supports WebAuthn (checked client-side to avoid an SSR mismatch).
+  const [passkeyPending, setPasskeyPending] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  useEffect(() => setPasskeySupported(browserSupportsWebAuthn()), []);
+
+  const runPasskey = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error(tv("enterName"));
+      return;
+    }
+    setPasskeyPending(true);
+    void passkeyLogin(trimmed).then((res) => {
+      if ("ok" in res) {
+        // Hard-navigate so per-member React Query caches reset (mirrors switch).
+        window.location.assign(`/${locale}/calendar`);
+        return;
+      }
+      setPasskeyPending(false);
+      if ("error" in res) toast.error(res.error);
+    });
+  };
 
   // Built inside the component so validation messages can read the catalog.
   const loginFormSchema = useMemo(
@@ -81,6 +107,29 @@ export function LoginScreen() {
               );
             }}
           </form.Field>
+
+          {passkeySupported && (
+            <form.Subscribe selector={(s) => s.values.name}>
+              {(name) => (
+                <div className="flex flex-col gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={passkeyPending || pending || !name.trim()}
+                    onClick={() => runPasskey(name)}
+                  >
+                    <KeyRound className="size-4" aria-hidden />
+                    {passkeyPending ? t("signingIn") : t("passkeySignIn")}
+                  </Button>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="h-px flex-1 bg-border" />
+                    {t("orUsePin")}
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
+                </div>
+              )}
+            </form.Subscribe>
+          )}
 
           <form.Field name="pin">
             {(field) => {

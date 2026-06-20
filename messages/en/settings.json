@@ -57,6 +57,16 @@
       "hideLabel": "Hide {label}",
       "mismatch": "PINs don't match.",
       "incorrect": "Incorrect PIN."
+    },
+    "passkeys": {
+      "legend": "Passkeys",
+      "description": "Sign in with Face ID, a fingerprint, or your device — the strongest, fastest way in. Your PIN stays as a fallback.",
+      "unsupported": "This device or browser doesn't support passkeys.",
+      "add": "Add a passkey",
+      "remove": "Remove passkey",
+      "defaultLabel": "Passkey",
+      "added": "Passkey added.",
+      "removed": "Passkey removed."
     }
   },
   "appearance": {

@@ -4,10 +4,14 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { updateMember, updateMemberPin } from "@/lib/supabase/mutations";
+import { updateMember } from "@/lib/supabase/mutations";
 import { useWorkspace, type WorkspaceData } from "@/lib/hooks/use-workspace";
 import { qk } from "@/lib/supabase/query-keys";
-import { sha256Hex } from "@/lib/auth/pin";
+import {
+  setPassphrase,
+  removePassphrase,
+  verifyCurrentSecret,
+} from "@/app/[locale]/login/actions";
 import { useNotify } from "@/lib/hooks/use-notify";
 import type { Member } from "@/lib/types";
 
@@ -84,29 +88,22 @@ export function useProfile() {
     [member, optimistic],
   );
 
-  /** Compare a candidate PIN against the stored hash (re-selected; not cached). */
+  /** Compare a candidate PIN against the stored secret (verified server-side, scrypt). */
   const verifyCurrentPin = useCallback(
-    async (pin: string): Promise<boolean> => {
-      if (!member) return false;
-      const { data, error } = await createClient()
-        .from("members")
-        .select("pin_hash")
-        .eq("id", member.id)
-        .single();
-      if (error || !data?.pin_hash) return false;
-      return (await sha256Hex(pin)) === data.pin_hash;
-    },
-    [member],
+    (pin: string): Promise<boolean> => verifyCurrentSecret(pin),
+    [],
   );
 
-  /** Set a new PIN (string) or clear it (null). */
+  /** Set a new PIN (string) or clear it (null). Hashed with salted scrypt server-side. */
   const savePin = useCallback(
     async (pin: string | null) => {
       if (!member) return false;
-      const hash = pin ? await sha256Hex(pin) : null;
       return optimistic(
         { hasPin: pin != null },
-        () => updateMemberPin(createClient(), member.id, hash),
+        async () => {
+          const res = pin ? await setPassphrase(pin) : await removePassphrase();
+          if ("error" in res) throw new Error(res.error);
+        },
         pin ? "PIN updated" : "PIN removed",
       );
     },

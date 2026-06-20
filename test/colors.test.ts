@@ -20,6 +20,7 @@ const member = (id: string, color: string): Member => ({
   name: id,
   color,
   hasPin: false,
+  hasPasskey: false,
   locale: "en",
   themePreference: "system",
   accent: "peach",

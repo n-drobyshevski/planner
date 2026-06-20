@@ -63,7 +63,8 @@ export interface Member {
   authUserId: string | null;
   name: string;
   color: string; // hex accent
-  hasPin: boolean;
+  hasPin: boolean; // a passphrase secret is set (scrypt; the legacy "PIN" UX gate)
+  hasPasskey: boolean; // at least one WebAuthn credential registered
   // UI language (per member). Mirrors the DB CHECK; "en" default. Cross-device
   // source of truth the app reconciles the URL `[locale]` segment to on load.
   locale: AppLocale;

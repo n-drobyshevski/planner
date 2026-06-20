@@ -6,5 +6,8 @@
   "incorrectPin": "Incorrect PIN.",
   "memberNotFound": "We couldn't find anyone with that name.",
   "profileNotLinked": "This profile isn't linked to a login yet.",
-  "loginNotConfigured": "Login isn't configured for this profile."
+  "loginNotConfigured": "Login isn't configured for this profile.",
+  "noPasskey": "No passkey is registered for this profile. Sign in with your PIN, then add one in Settings.",
+  "passkeyFailed": "Passkey sign-in failed. Please try again.",
+  "notSignedIn": "You need to be signed in to do that."
 }
