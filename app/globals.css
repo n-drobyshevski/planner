@@ -619,8 +619,8 @@
      re-saturated shade so trunks/branches/dots stay ≥3:1 and read as the pink
      family. Only this light pastel palette sets these; default/dark leave them
      unset so the swatch's own l/c pass through. */
-  --flow-stroke-l: 0.52;
-  --flow-stroke-c: 0.16;
+  --flow-stroke-l: 0.50;
+  --flow-stroke-c: 0.17;
 
   --chart-1: oklch(from var(--pink-base, #ec4899) 0.62 0.15 h);
   --chart-2: oklch(from var(--pink-base, #ec4899) 0.64 0.12 calc(h - 45));
