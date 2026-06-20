@@ -22,16 +22,16 @@ function isCancel(e: unknown): boolean {
 }
 
 /**
- * Full passkey sign-in: fetch a challenge for the nickname, run the native
- * authentication ceremony, then verify + mint the session server-side. The
- * caller hard-navigates on `{ ok: true }`.
+ * Full passkey sign-in, usernameless: fetch a discoverable-credential challenge,
+ * run the native ceremony (the browser shows the saved passkeys and the user
+ * picks one), then verify + resolve the member + mint the session server-side.
+ * The caller hard-navigates on `{ ok: true }`.
  */
-export async function passkeyLogin(nickname: string): Promise<CeremonyResult> {
-  const begin = await beginPasskeyLogin(nickname);
-  if ("error" in begin) return { error: begin.error };
+export async function passkeyLogin(): Promise<CeremonyResult> {
+  const { options } = await beginPasskeyLogin();
   let assertion;
   try {
-    assertion = await startAuthentication({ optionsJSON: begin.options });
+    assertion = await startAuthentication({ optionsJSON: options });
   } catch (e) {
     if (isCancel(e)) return { cancelled: true };
     return { error: e instanceof Error ? e.message : "passkey error" };

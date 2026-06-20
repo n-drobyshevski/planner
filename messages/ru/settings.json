@@ -66,7 +66,13 @@
       "remove": "Удалить ключ доступа",
       "defaultLabel": "Ключ доступа",
       "added": "Ключ доступа добавлен.",
-      "removed": "Ключ доступа удалён."
+      "removed": "Ключ доступа удалён.",
+      "addedOn": "Добавлен {date}",
+      "deviceLine": "{browser} на {os}",
+      "lastUsed": "Последний вход {when}",
+      "neverUsed": "Ещё не использовался",
+      "synced": "Синхронизирован",
+      "thisDevice": "Это устройство"
     }
   },
   "appearance": {

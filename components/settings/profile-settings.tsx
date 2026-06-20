@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
-import { Check, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
+import { Check, Cloud, Eye, EyeOff, KeyRound, Laptop, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatDayMonthYear, formatRelativeToNow } from "@/lib/datetime/format";
 import { passkeyEnroll, browserSupportsWebAuthn } from "@/lib/auth/passkey-client";
 import {
   listPasskeys,
@@ -121,6 +122,7 @@ export function ProfileSettings() {
  */
 function PasskeysSection({ isReady }: { isReady: boolean }) {
   const t = useTranslations("settings");
+  const locale = useLocale();
   const [supported, setSupported] = React.useState(false);
   const [passkeys, setPasskeys] = React.useState<PasskeySummary[] | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -170,26 +172,74 @@ function PasskeysSection({ isReady }: { isReady: boolean }) {
         <div className="flex flex-col gap-3">
           {passkeys && passkeys.length > 0 && (
             <ul className="flex flex-col gap-2">
-              {passkeys.map((pk) => (
-                <li
-                  key={pk.id}
-                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-                >
-                  <span className="flex items-center gap-2 text-sm">
-                    <KeyRound className="size-4 text-muted-foreground" aria-hidden />
-                    {pk.label || t("profile.passkeys.defaultLabel")}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={busy}
-                    onClick={() => remove(pk.id)}
-                    aria-label={t("profile.passkeys.remove")}
+              {passkeys.map((pk) => {
+                const synced =
+                  pk.backedUp === true || pk.deviceType === "multiDevice";
+                const Icon = synced ? Cloud : pk.deviceType ? Laptop : KeyRound;
+                const where =
+                  pk.createdBrowser && pk.createdOs
+                    ? ` · ${t("profile.passkeys.deviceLine", { browser: pk.createdBrowser, os: pk.createdOs })}`
+                    : pk.createdBrowser
+                      ? ` · ${pk.createdBrowser}`
+                      : pk.createdOs
+                        ? ` · ${pk.createdOs}`
+                        : "";
+                return (
+                  <li
+                    key={pk.id}
+                    className="flex items-start justify-between gap-3 rounded-md border px-3 py-2.5"
                   >
-                    <Trash2 className="size-4" aria-hidden />
-                  </Button>
-                </li>
-              ))}
+                    <div className="flex min-w-0 items-start gap-3">
+                      <Icon
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-sm font-medium">{pk.provider}</span>
+                          {pk.deviceType && (
+                            <span className="rounded-full border px-1.5 py-px text-[0.6875rem] font-medium text-muted-foreground">
+                              {synced
+                                ? t("profile.passkeys.synced")
+                                : t("profile.passkeys.thisDevice")}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {t("profile.passkeys.addedOn", {
+                            date: formatDayMonthYear(
+                              new Date(pk.created_at).getTime(),
+                              undefined,
+                              locale,
+                            ),
+                          })}
+                          {where}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {pk.last_used_at
+                            ? t("profile.passkeys.lastUsed", {
+                                when: formatRelativeToNow(
+                                  new Date(pk.last_used_at).getTime(),
+                                  locale,
+                                ),
+                              })
+                            : t("profile.passkeys.neverUsed")}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      disabled={busy}
+                      onClick={() => remove(pk.id)}
+                      aria-label={t("profile.passkeys.remove")}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </Button>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <div>

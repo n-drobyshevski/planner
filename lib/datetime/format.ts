@@ -1,4 +1,4 @@
-import { format, isSameDay } from "date-fns";
+import { format, formatDistanceToNow, isSameDay } from "date-fns";
 import { tz } from "@date-fns/tz";
 import type { CalendarView } from "@/lib/types";
 import { getVisibleDays } from "@/lib/datetime/window";
@@ -158,6 +158,15 @@ export function formatDuration(ms: number, locale = "en"): string {
   if (h === 0) return `${m}${mu}`;
   if (m === 0) return `${h}${hu}`;
   return `${h}${hu} ${m}${mu}`;
+}
+
+/**
+ * Relative time from now with a suffix, e.g. "2 days ago" / "2 дня назад".
+ * Reads the current time, so call it only client-side (it backs "last used"
+ * style labels, never prerendered chrome).
+ */
+export function formatRelativeToNow(ms: number, locale = "en"): string {
+  return formatDistanceToNow(ms, { addSuffix: true, locale: dateFnsLocale(locale) });
 }
 
 /** URL date param helpers. `toDateParam` encodes the focused day in `timeZone`. */

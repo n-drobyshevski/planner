@@ -67,7 +67,8 @@ export async function buildRegistrationOptions(opts: {
       transports: (c.transports ?? undefined) as never,
     })),
     authenticatorSelection: {
-      residentKey: "preferred",
+      // Required so the credential is discoverable — usernameless login depends on it.
+      residentKey: "required",
       userVerification: "preferred",
     },
   });
@@ -87,17 +88,23 @@ export async function verifyRegistration(opts: {
   });
 }
 
-export async function buildAuthenticationOptions(opts: {
-  allow: { credential_id: string; transports: string[] | null }[];
+export async function buildAuthenticationOptions(opts?: {
+  allow?: { credential_id: string; transports: string[] | null }[];
 }): Promise<PublicKeyCredentialRequestOptionsJSON> {
   const { rpID } = await getRelyingParty();
+  // Omitting allowCredentials triggers the discoverable-credential (usernameless)
+  // flow: the browser shows every passkey registered for this RP and the user picks.
+  const allow = opts?.allow;
   return generateAuthenticationOptions({
     rpID,
     userVerification: "preferred",
-    allowCredentials: opts.allow.map((c) => ({
-      id: c.credential_id,
-      transports: (c.transports ?? undefined) as never,
-    })),
+    allowCredentials:
+      allow && allow.length > 0
+        ? allow.map((c) => ({
+            id: c.credential_id,
+            transports: (c.transports ?? undefined) as never,
+          }))
+        : undefined,
   });
 }
 

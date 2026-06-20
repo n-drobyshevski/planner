@@ -32,21 +32,17 @@ export function LoginScreen() {
   const [passkeySupported, setPasskeySupported] = useState(false);
   useEffect(() => setPasskeySupported(browserSupportsWebAuthn()), []);
 
-  const runPasskey = (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      toast.error(tv("enterName"));
-      return;
-    }
+  const runPasskey = () => {
     setPasskeyPending(true);
-    void passkeyLogin(trimmed).then((res) => {
+    // Usernameless: the browser shows the saved passkeys and the user picks one.
+    void passkeyLogin().then((res) => {
       if ("ok" in res) {
         // Hard-navigate so per-member React Query caches reset (mirrors switch).
         window.location.assign(`/${locale}/calendar`);
         return;
       }
       setPasskeyPending(false);
-      if ("error" in res) toast.error(res.error);
+      if ("error" in res) toast.error(res.error); // a cancel resolves silently
     });
   };
 
@@ -83,6 +79,24 @@ export function LoginScreen() {
             void form.handleSubmit();
           }}
         >
+          {passkeySupported && (
+            <div className="flex flex-col gap-4">
+              <Button
+                type="button"
+                disabled={passkeyPending || pending}
+                onClick={runPasskey}
+              >
+                <KeyRound className="size-4" aria-hidden />
+                {passkeyPending ? t("signingIn") : t("passkeySignIn")}
+              </Button>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                {t("orUseName")}
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </div>
+          )}
+
           <form.Field name="name">
             {(field) => {
               const isInvalid =
@@ -107,29 +121,6 @@ export function LoginScreen() {
               );
             }}
           </form.Field>
-
-          {passkeySupported && (
-            <form.Subscribe selector={(s) => s.values.name}>
-              {(name) => (
-                <div className="flex flex-col gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={passkeyPending || pending || !name.trim()}
-                    onClick={() => runPasskey(name)}
-                  >
-                    <KeyRound className="size-4" aria-hidden />
-                    {passkeyPending ? t("signingIn") : t("passkeySignIn")}
-                  </Button>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="h-px flex-1 bg-border" />
-                    {t("orUsePin")}
-                    <span className="h-px flex-1 bg-border" />
-                  </div>
-                </div>
-              )}
-            </form.Subscribe>
-          )}
 
           <form.Field name="pin">
             {(field) => {
@@ -159,7 +150,11 @@ export function LoginScreen() {
 
           <form.Subscribe selector={(s) => s.values.name}>
             {(name) => (
-              <Button type="submit" disabled={pending || !name.trim()}>
+              <Button
+                type="submit"
+                variant={passkeySupported ? "outline" : "default"}
+                disabled={pending || !name.trim()}
+              >
                 {pending ? t("signingIn") : t("signIn")}
               </Button>
             )}

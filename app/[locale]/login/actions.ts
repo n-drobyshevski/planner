@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -15,6 +15,8 @@ import {
   verifyRegistration,
   type StoredCredential,
 } from "@/lib/auth/webauthn";
+import { resolveProvider } from "@/lib/auth/aaguids";
+import { parseUserAgent } from "@/lib/auth/user-agent";
 import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
@@ -42,7 +44,6 @@ const MEMBER_COLS = "id, auth_user_id, has_secret, pin_hash, accent, surface_ton
 
 // Short-lived cookies binding a WebAuthn ceremony's challenge to the request.
 const CHAL_LOGIN = "wa_login_chal";
-const CHAL_LOGIN_MEMBER = "wa_login_member";
 const CHAL_ENROLL = "wa_enroll_chal";
 const CHALLENGE_MAX_AGE = 300; // 5 minutes
 
@@ -254,59 +255,47 @@ export async function signOutAction(): Promise<void> {
 // Passkey login (WebAuthn) — the primary, phishing-resistant factor.
 // ---------------------------------------------------------------------------
 
-async function loadCredentials(
-  memberId: string,
-): Promise<StoredCredential[]> {
+/**
+ * Look up a single stored credential by its (globally unique) credential id,
+ * returning the verifier inputs plus the owning member id. This is what makes
+ * usernameless login possible: the assertion identifies the credential, and the
+ * credential identifies the member — no typed nickname needed.
+ */
+async function loadCredentialByItsId(
+  credentialId: string,
+): Promise<{ memberId: string; credential: StoredCredential } | null> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("webauthn_credentials")
-    .select("credential_id, public_key, counter, transports")
-    .eq("member_id", memberId);
-  return (data ?? []) as StoredCredential[];
+    .select("member_id, credential_id, public_key, counter, transports")
+    .eq("credential_id", credentialId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    memberId: data.member_id as string,
+    credential: data as StoredCredential,
+  };
 }
 
 /**
- * Step 1 of passkey login: resolve the member by nickname, then return a signed
- * WebAuthn challenge scoped to their registered credentials. The challenge and
- * the resolved member id are stashed in short-lived httpOnly cookies for step 2.
+ * Step 1 of passkey login: return a discoverable-credential challenge (no
+ * allowCredentials), so the browser shows every passkey registered for this site
+ * and the user picks one — nothing typed. Only the challenge is stashed; the
+ * member is resolved from the chosen credential in step 2.
  */
-export async function beginPasskeyLogin(
-  nickname: string,
-): Promise<{ options: PublicKeyCredentialRequestOptionsJSON } | { error: string }> {
-  const tv = await getTranslations({
-    locale: await getLocale(),
-    namespace: "validation",
-  });
-
-  const name = nickname.trim();
-  if (!name) return { error: tv("enterName") };
-
-  const admin = createAdminClient();
-  const { data: member } = await admin
-    .from("members")
-    .select("id")
-    .ilike("name", name)
-    .limit(1)
-    .maybeSingle();
-  if (!member) return { error: tv("memberNotFound") };
-
-  const creds = await loadCredentials(member.id);
-  if (creds.length === 0) return { error: tv("noPasskey") };
-
-  const options = await buildAuthenticationOptions({
-    allow: creds.map((c) => ({ credential_id: c.credential_id, transports: c.transports })),
-  });
-
+export async function beginPasskeyLogin(): Promise<{
+  options: PublicKeyCredentialRequestOptionsJSON;
+}> {
+  const options = await buildAuthenticationOptions();
   await setEphemeral(CHAL_LOGIN, options.challenge);
-  await setEphemeral(CHAL_LOGIN_MEMBER, member.id);
   return { options };
 }
 
 /**
- * Step 2 of passkey login: verify the signed assertion against the stored
- * credential and the challenge from step 1, bump the signature counter, then
- * mint the session via the same bridge the passphrase path uses. Returns
- * `{ ok: true }` so the client can hard-navigate to /calendar.
+ * Step 2 of passkey login: resolve the member from the chosen credential, verify
+ * the signed assertion against the stored credential and the challenge from step
+ * 1, bump the signature counter, then mint the session via the same bridge the
+ * passphrase path uses. Returns `{ ok: true }` so the client can hard-navigate.
  */
 export async function finishPasskeyLogin(
   response: AuthenticationResponseJSON,
@@ -318,29 +307,26 @@ export async function finishPasskeyLogin(
 
   const store = await cookies();
   const challenge = store.get(CHAL_LOGIN)?.value;
-  const memberId = store.get(CHAL_LOGIN_MEMBER)?.value;
-  await clearEphemeral(CHAL_LOGIN, CHAL_LOGIN_MEMBER);
-  if (!challenge || !memberId) return { error: tv("passkeyFailed") };
+  await clearEphemeral(CHAL_LOGIN);
+  if (!challenge) return { error: tv("passkeyFailed") };
+
+  const owner = await loadCredentialByItsId(response.id);
+  if (!owner) return { error: tv("passkeyFailed") };
 
   const admin = createAdminClient();
   const { data: member } = await admin
     .from("members")
     .select(MEMBER_COLS)
-    .eq("id", memberId)
+    .eq("id", owner.memberId)
     .maybeSingle();
   if (!member) return { error: tv("memberNotFound") };
-
-  const credential = (await loadCredentials(memberId)).find(
-    (c) => c.credential_id === response.id,
-  );
-  if (!credential) return { error: tv("passkeyFailed") };
 
   let verified;
   try {
     verified = await verifyAuthentication({
       response,
       expectedChallenge: challenge,
-      credential,
+      credential: owner.credential,
     });
   } catch {
     return { error: tv("passkeyFailed") };
@@ -428,7 +414,11 @@ export async function finishPasskeyEnrollment(
     return { error: tv("passkeyFailed") };
   }
 
-  const { credential } = verified.registrationInfo;
+  const info = verified.registrationInfo;
+  const { credential } = info;
+  // Capture distinguishing metadata: the authenticator model (aaguid), whether
+  // it's synced vs device-bound, and the browser/OS it was created from.
+  const ua = parseUserAgent((await headers()).get("user-agent"));
   const admin = createAdminClient();
   const { error } = await admin.from("webauthn_credentials").insert({
     member_id: member.id,
@@ -437,6 +427,11 @@ export async function finishPasskeyEnrollment(
     counter: credential.counter,
     transports: credential.transports ?? null,
     label: label?.trim() || null,
+    aaguid: info.aaguid ?? null,
+    device_type: info.credentialDeviceType ?? null,
+    backed_up: info.credentialBackedUp ?? null,
+    created_os: ua.os,
+    created_browser: ua.browser,
   });
   if (error) return { error: error.message };
 
@@ -446,7 +441,12 @@ export async function finishPasskeyEnrollment(
 
 export type PasskeySummary = {
   id: string;
-  label: string | null;
+  /** A user label if set, else the resolved authenticator/provider name. */
+  provider: string;
+  deviceType: string | null; // singleDevice | multiDevice
+  backedUp: boolean | null;
+  createdOs: string | null;
+  createdBrowser: string | null;
   created_at: string;
   last_used_at: string | null;
 };
@@ -457,10 +457,27 @@ export async function listPasskeys(): Promise<PasskeySummary[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("webauthn_credentials")
-    .select("id, label, created_at, last_used_at")
+    .select(
+      "id, label, aaguid, device_type, backed_up, created_os, created_browser, created_at, last_used_at",
+    )
     .eq("member_id", member.id)
     .order("created_at", { ascending: true });
-  return (data ?? []) as PasskeySummary[];
+  return (data ?? []).map((r) => {
+    const deviceType = (r.device_type as string | null) ?? null;
+    const backedUp = (r.backed_up as boolean | null) ?? null;
+    const label = (r.label as string | null)?.trim() || null;
+    return {
+      id: r.id as string,
+      provider:
+        label ?? resolveProvider(r.aaguid as string | null, { deviceType, backedUp }),
+      deviceType,
+      backedUp,
+      createdOs: (r.created_os as string | null) ?? null,
+      createdBrowser: (r.created_browser as string | null) ?? null,
+      created_at: r.created_at as string,
+      last_used_at: (r.last_used_at as string | null) ?? null,
+    };
+  });
 }
 
 export async function removePasskey(

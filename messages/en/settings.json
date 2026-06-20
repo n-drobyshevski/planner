@@ -66,7 +66,13 @@
       "remove": "Remove passkey",
       "defaultLabel": "Passkey",
       "added": "Passkey added.",
-      "removed": "Passkey removed."
+      "removed": "Passkey removed.",
+      "addedOn": "Added {date}",
+      "deviceLine": "{browser} on {os}",
+      "lastUsed": "Last used {when}",
+      "neverUsed": "Not used yet",
+      "synced": "Synced",
+      "thisDevice": "This device"
     }
   },
   "appearance": {
