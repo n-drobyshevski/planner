@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { AppNav } from "@/components/app-nav";
+import { AppearancePanel } from "@/components/appearance-panel";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
 import { SlotTarget, ToolbarSlotsProvider } from "@/components/toolbar-slots";
 import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
@@ -75,6 +76,8 @@ export function SurfaceChrome({ children }: { children: React.ReactNode }) {
         </header>
         <div className="min-h-0 flex-1">{children}</div>
       </div>
+      {/* Global Shift+T appearance panel; renders nothing until opened. */}
+      <AppearancePanel />
     </ToolbarSlotsProvider>
   );
 }

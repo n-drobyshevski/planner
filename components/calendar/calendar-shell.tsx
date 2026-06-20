@@ -255,6 +255,7 @@ export function CalendarShell({
   const toggleMaskTitles = useUiStore((s) => s.toggleMaskTitles);
   const presentMode = useUiStore((s) => s.presentMode);
   const togglePresentMode = useUiStore((s) => s.togglePresentMode);
+  const appearancePanelOpen = useUiStore((s) => s.appearancePanelOpen);
   const hiddenCategoryIds = useUiStore((s) => s.hiddenCategoryIds);
   const overlayMemberIds = useUiStore((s) => s.overlayMemberIds);
   const ownCalendarHidden = useUiStore((s) => s.ownCalendarHidden);
@@ -839,7 +840,15 @@ export function CalendarShell({
   keyHandlerRef.current = (e: KeyboardEvent) => {
     // Don't hijack keys while a dialog/sheet is open or while typing — applies
     // to every shortcut below (incl. Shift+M, so typing "M" never toggles).
-    if (editor || details || pendingReschedule || pendingDelete || scheduling || shortcutsOpen)
+    if (
+      editor ||
+      details ||
+      pendingReschedule ||
+      pendingDelete ||
+      scheduling ||
+      shortcutsOpen ||
+      appearancePanelOpen
+    )
       return;
     const ae = document.activeElement;
     if (

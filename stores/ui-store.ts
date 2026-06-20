@@ -30,6 +30,12 @@ interface UiState {
    * `filterPublic`); pairs with `maskTitles`. A local preview, never persisted.
    */
   presentMode: boolean;
+  /**
+   * App-wide Appearance panel (Shift+T): a right-side overlay holding the theme /
+   * palette / accent / tone controls, openable from any signed-in surface so a
+   * theme tweak never makes you leave your view. Not persisted.
+   */
+  appearancePanelOpen: boolean;
   /** task selected for editing (tasks views) */
   selectedTaskId: string | null;
   /** the "Unscheduled tasks" rail on the calendar (T4) */
@@ -54,6 +60,9 @@ interface UiState {
   toggleMaskTitles: () => void;
   /** Enter / leave present mode — the public-viewer redaction preview (Shift+P). */
   togglePresentMode: () => void;
+  /** Open / close the app-wide Appearance panel (Shift+T). */
+  setAppearancePanelOpen: (open: boolean) => void;
+  toggleAppearancePanel: () => void;
   /** Replace the whole hidden-categories set (e.g. "show only this" / "show all"). */
   setHiddenCategoryIds: (next: Set<string>) => void;
   /** Replace the whole overlaid-members set. */
@@ -73,6 +82,7 @@ export const useUiStore = create<UiState>((set) => ({
   ownCalendarHidden: false,
   maskTitles: false,
   presentMode: false,
+  appearancePanelOpen: false,
   selectedTaskId: null,
   taskBacklogOpen: false,
   hourPx: DEFAULT_HOUR_PX,
@@ -113,6 +123,9 @@ export const useUiStore = create<UiState>((set) => ({
   toggleOwnCalendar: () => set((s) => ({ ownCalendarHidden: !s.ownCalendarHidden })),
   toggleMaskTitles: () => set((s) => ({ maskTitles: !s.maskTitles })),
   togglePresentMode: () => set((s) => ({ presentMode: !s.presentMode })),
+  setAppearancePanelOpen: (appearancePanelOpen) => set({ appearancePanelOpen }),
+  toggleAppearancePanel: () =>
+    set((s) => ({ appearancePanelOpen: !s.appearancePanelOpen })),
   setHiddenCategoryIds: (hiddenCategoryIds) => set({ hiddenCategoryIds }),
   setOverlayMemberIds: (overlayMemberIds) => set({ overlayMemberIds }),
   setHourPx: (px) => set({ hourPx: clampHourPx(px) }),

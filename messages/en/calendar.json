@@ -104,6 +104,7 @@
       "undo": "Undo the last change",
       "blurTitles": "Blur / unblur all titles",
       "presentMode": "Present mode (public view)",
+      "appearance": "Open the appearance panel",
       "toggleFilters": "Toggle the filters sidebar",
       "toggleTasks": "Toggle the tasks panel",
       "zoom": "Zoom the day grid",

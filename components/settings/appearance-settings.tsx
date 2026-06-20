@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useTranslations } from "next-intl";
-import { Check, Monitor, Moon, Sun } from "lucide-react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/settings/settings-section";
@@ -17,24 +17,20 @@ import { usePreferences } from "@/lib/hooks/use-preferences";
 import {
   ACCENTS,
   DEFAULT_PINK_BASE,
-  PALETTES,
   TONES,
   paletteMode,
 } from "@/lib/theme/appearance";
+import {
+  PaletteField,
+  ThemeField,
+} from "@/components/settings/appearance-fields";
 import { PinkBaseField } from "@/components/settings/pink-base-field";
-import type { AppLocale, ThemePreference } from "@/lib/types";
+import type { AppLocale } from "@/lib/types";
 
 // Endonyms — language names stay in their own language, never translated.
 const LANGUAGE_OPTIONS = [
   { value: "en", label: "English" },
   { value: "ru", label: "Русский" },
-] as const;
-
-// Theme options; the visible label resolves via t(`appearance.theme.${value}`).
-const THEME_OPTIONS = [
-  { value: "light", icon: Sun },
-  { value: "dark", icon: Moon },
-  { value: "system", icon: Monitor },
 ] as const;
 
 export function AppearanceSettings() {
@@ -108,103 +104,33 @@ export function AppearanceSettings() {
       </FieldSet>
 
       {/* Color palette */}
-      <FieldSet>
-        <FieldLegend variant="label">{t("appearance.palette.legend")}</FieldLegend>
-        <FieldDescription>{t("appearance.palette.description")}</FieldDescription>
-        <form.Field
-          name="palette"
-          listeners={{ onChange: ({ value }) => setPalette(value) }}
-        >
-          {(field) => (
-            <div
-              role="radiogroup"
-              aria-label={t("appearance.palette.ariaLabel")}
-              className="grid grid-cols-2 gap-3 sm:grid-cols-3"
-            >
-              {PALETTES.map((p) => {
-                const selected = field.state.value === p.id;
-                // Keep Catppuccin flavor names (Latte/Frappé/…) as their own
-                // endonyms; only the "Default" label and every description localize.
-                const paletteLabel =
-                  p.id === "default" ? t("appearance.palette.labels.default") : p.label;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={paletteLabel}
-                    disabled={disabled}
-                    onClick={() => field.handleChange(p.id)}
-                    className={cn(
-                      "flex flex-col gap-2 rounded-lg border-2 p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                      selected
-                        ? "border-primary"
-                        : "border-border hover:border-foreground/30",
-                    )}
-                  >
-                    <span className="flex gap-1" aria-hidden>
-                      {p.swatches.map((c, i) => (
-                        <span
-                          key={i}
-                          className="size-5 rounded-full ring-1 ring-foreground/10"
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </span>
-                    <span className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-medium text-foreground">
-                        {paletteLabel}
-                      </span>
-                      {selected && (
-                        <Check className="size-4 shrink-0 text-primary" aria-hidden />
-                      )}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {t(`appearance.palette.descriptions.${p.id}`)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </form.Field>
-      </FieldSet>
+      <form.Field
+        name="palette"
+        listeners={{ onChange: ({ value }) => setPalette(value) }}
+      >
+        {(field) => (
+          <PaletteField
+            value={field.state.value}
+            onChange={field.handleChange}
+            disabled={disabled}
+          />
+        )}
+      </form.Field>
 
       {/* Theme */}
-      <FieldSet>
-        <FieldLegend variant="label">{t("appearance.theme.legend")}</FieldLegend>
-        <FieldDescription>
-          {catppuccin
-            ? t("appearance.theme.descriptionLocked")
-            : t("appearance.theme.description")}
-        </FieldDescription>
-        <form.Field
-          name="theme"
-          listeners={{ onChange: ({ value }) => setThemePref(value) }}
-        >
-          {(field) => (
-            <ToggleGroup
-              type="single"
-              variant="segmented"
-              value={field.state.value}
-              onValueChange={(v) => v && field.handleChange(v as ThemePreference)}
-              disabled={disabled || catppuccin}
-              aria-label={t("appearance.theme.ariaLabel")}
-            >
-              {THEME_OPTIONS.map(({ value, icon: Icon }) => {
-                const label = t(`appearance.theme.${value}`);
-                return (
-                  <ToggleGroupItem key={value} value={value} aria-label={label}>
-                    <Icon data-icon="inline-start" />
-                    {label}
-                  </ToggleGroupItem>
-                );
-              })}
-            </ToggleGroup>
-          )}
-        </form.Field>
-      </FieldSet>
+      <form.Field
+        name="theme"
+        listeners={{ onChange: ({ value }) => setThemePref(value) }}
+      >
+        {(field) => (
+          <ThemeField
+            value={field.state.value}
+            onChange={field.handleChange}
+            disabled={disabled || catppuccin}
+            locked={catppuccin}
+          />
+        )}
+      </form.Field>
 
       {/* Accent color — hidden under the `pink` palette, which owns its own
           accent via the base-color control below. */}
