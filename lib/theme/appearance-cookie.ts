@@ -46,3 +46,36 @@ export function writeAppearanceCookie(
  * dependency-free.
  */
 export const APPEARANCE_INIT_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )${APPEARANCE_COOKIE}=([^;]*)/);if(!m)return;var p=m[1].split("~");if(p.length<3)return;var a=p[0],t=p[1],pal=p[2],pb=p[3]||"",el=document.documentElement;if(a)el.dataset.accent=a;if(pal)el.dataset.palette=pal;el.dataset.tone=pal==="default"?t:"warm";if(pal==="pink"&&/^#[0-9A-Fa-f]{6}$/.test(pb))el.style.setProperty("--pink-base",pb);else el.style.removeProperty("--pink-base");}catch(e){}})();`;
+
+/**
+ * Combined appearance + dark pre-paint script for the error pages that render
+ * OUTSIDE the app providers (the root `not-found.tsx` and `global-error.tsx`). It
+ * mirrors APPEARANCE_INIT_SCRIPT (reads `planner-appearance` and stamps
+ * `data-accent`/`data-palette`/`data-tone` + `--pink-base`) AND resolves the
+ * next-themes `.dark` class itself — those pages aren't inside ThemeProvider, so
+ * nothing else applies it. Dark follows next-themes' own rule: the `theme` key in
+ * localStorage, falling back to the system `prefers-color-scheme`.
+ *
+ * `target` is where to apply it: `"documentElement"` for global-error, which owns
+ * `<html>` and runs this from `<head>`; or `"parent"` for the root not-found, which
+ * can't own `<html>` (Next's DefaultLayout does) and renders this as the first child
+ * of a themed wrapper `<div>` — `document.currentScript.parentElement` is that
+ * wrapper. Tiny and dependency-free; any failure degrades to the base (light) theme.
+ */
+export function errorThemeInitScript(target: "documentElement" | "parent"): string {
+  const el =
+    target === "documentElement"
+      ? "document.documentElement"
+      : "document.currentScript.parentElement";
+  return (
+    `(function(){try{var el=${el};` +
+    `var m=document.cookie.match(/(?:^|; )${APPEARANCE_COOKIE}=([^;]*)/);` +
+    `if(m){var p=m[1].split("~");if(p.length>=3){var a=p[0],t=p[1],pal=p[2],pb=p[3]||"";` +
+    `if(a)el.dataset.accent=a;if(pal)el.dataset.palette=pal;` +
+    `el.dataset.tone=pal==="default"?t:"warm";` +
+    `if(pal==="pink"&&/^#[0-9A-Fa-f]{6}$/.test(pb))el.style.setProperty("--pink-base",pb);}}` +
+    `var th=localStorage.getItem("theme");` +
+    `if(th==="dark"||((!th||th==="system")&&matchMedia("(prefers-color-scheme: dark)").matches))el.classList.add("dark");` +
+    `}catch(e){}})();`
+  );
+}

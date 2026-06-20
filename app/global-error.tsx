@@ -5,14 +5,16 @@ import { RotateCw, TriangleAlert } from "lucide-react";
 
 import { FullPageMessage } from "@/components/shared/full-page-message";
 import { Button } from "@/components/ui/button";
+import { errorThemeInitScript } from "@/lib/theme/appearance-cookie";
 import "./globals.css";
 
 /**
  * Last-resort boundary: catches errors thrown by the root layout itself, so it
  * replaces that layout entirely and must render its own `<html>`/`<body>`. It
- * lives outside every provider (no intl, no theme, no fonts), so the copy is
- * hardcoded English and the page leans on the base tokens in globals.css for the
- * warm-paper surface. This is a rare screen; keep it self-contained and calm.
+ * lives outside every provider (no intl, no fonts), so the copy is hardcoded
+ * English. Since it owns `<html>`, a parse-blocking `<head>` script applies the
+ * user's appearance + dark before paint (next-themes isn't mounted here), so a
+ * dark-mode user doesn't get a warm-paper flash on a crash. Rare screen; calm.
  */
 export default function GlobalError({
   error,
@@ -26,7 +28,14 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: errorThemeInitScript("documentElement"),
+          }}
+        />
+      </head>
       <body className="min-h-dvh bg-background text-foreground antialiased">
         <FullPageMessage
           icon={TriangleAlert}

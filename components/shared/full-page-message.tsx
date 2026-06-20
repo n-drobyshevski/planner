@@ -24,6 +24,7 @@ export function FullPageMessage({
   description,
   className,
   alert = false,
+  lang,
   children,
 }: {
   icon: LucideIcon;
@@ -32,11 +33,18 @@ export function FullPageMessage({
   className?: string;
   /** Set for genuine error states so assistive tech announces it. Omit for 404. */
   alert?: boolean;
+  /**
+   * Marks the content's language. Useful when the surrounding `<html lang>` can't
+   * know it (e.g. the root not-found resolves the locale per-request, below a
+   * static `<html lang="en">` shell). Screen readers honor the nearest ancestor.
+   */
+  lang?: string;
   /** Action row (buttons / links). */
   children?: React.ReactNode;
 }) {
   return (
     <main
+      lang={lang}
       role={alert ? "alert" : undefined}
       className={cn(
         "flex min-h-dvh w-full flex-col items-center justify-center p-6 text-center",
