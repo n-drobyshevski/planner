@@ -12,6 +12,16 @@ function localeOf(path: string): "en" | "ru" {
  * unauthenticated -> /login; authenticated on "/" or /login -> /calendar — all
  * locale-aware (Russian keeps its `/ru` prefix).
  *
+ * Auth presence is read with `getClaims()`, NOT `getUser()`. With the project's
+ * asymmetric JWT signing keys, `getClaims()` verifies the access token locally
+ * (WebCrypto + cached JWKS) with no Auth-server roundtrip — this is what the
+ * proxy adds to TTFB on *every* request, so it directly bounds First Contentful
+ * Paint. `getUser()` instead hit the Auth server on each navigation. `getClaims`
+ * still refreshes expired tokens and writes the rotated cookies via `setAll`,
+ * and it's Supabase's documented recommendation for gating in the proxy. (It
+ * validates signature + expiry, not server-side revocation — the same trade-off
+ * already accepted client-side in `lib/hooks/use-workspace.ts`.)
+ *
  * Composed on top of next-intl: `i18nResponse` is the locale middleware's
  * response (carrying the NEXT_LOCALE cookie and the internal `[locale]` rewrite).
  * We set the refreshed auth cookies onto it and return it on the happy path, so
@@ -61,9 +71,10 @@ export async function updateSession(
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Do not run code between createServerClient and getClaims() — Supabase
+  // guidance, a stray statement here can cause hard-to-debug random logouts.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims; // truthy when authenticated; used only for gating
 
   const path = request.nextUrl.pathname;
   const prefix = localeOf(path) === "ru" ? "/ru" : "";

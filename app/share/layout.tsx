@@ -59,6 +59,21 @@ export default function ShareRootLayout({
       style={{ "--now-line": "#57534e" } as React.CSSProperties}
       className={`${jakarta.variable} ${manrope.variable} ${geistMono.variable} h-full`}
     >
+      {/* Warm the Supabase TLS connection: the public calendar's data comes from
+          anonymous RPCs, so a preconnect shaves DNS + TLS off the first fetch. */}
+      {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
+        <head>
+          <link
+            rel="preconnect"
+            href={process.env.NEXT_PUBLIC_SUPABASE_URL}
+            crossOrigin="anonymous"
+          />
+          <link
+            rel="dns-prefetch"
+            href={process.env.NEXT_PUBLIC_SUPABASE_URL}
+          />
+        </head>
+      ) : null}
       <body className="min-h-full bg-background text-foreground">
         {children}
         <SpeedInsights />

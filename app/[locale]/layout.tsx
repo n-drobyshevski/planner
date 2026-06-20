@@ -30,11 +30,19 @@ const jakarta = Plus_Jakarta_Sans({
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin", "cyrillic"],
+  // Not preloaded: it only fills the Cyrillic glyphs Jakarta lacks, so it's not
+  // above-the-fold for the (measured) `en` locale. Skipping the preload keeps
+  // Jakarta the lone high-priority font request at FCP; `ru` still swaps Manrope
+  // in via `display: swap`.
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  // Monospace for code/inputs — never above the fold, so it doesn't need to be a
+  // render-blocking preload competing with the HTML/CSS.
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -94,6 +102,23 @@ export default async function RootLayout({
       className={`${jakarta.variable} ${manrope.variable} ${geistMono.variable} h-full`}
     >
       <head>
+        {/* Warm the TLS connection to Supabase so the first post-hydration
+            workspace fetch (REST) doesn't pay for DNS + TLS on the critical
+            path. `crossOrigin` matches the CORS data fetch; dns-prefetch is the
+            fallback for browsers that ignore preconnect. */}
+        {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
+          <>
+            <link
+              rel="preconnect"
+              href={process.env.NEXT_PUBLIC_SUPABASE_URL}
+              crossOrigin="anonymous"
+            />
+            <link
+              rel="dns-prefetch"
+              href={process.env.NEXT_PUBLIC_SUPABASE_URL}
+            />
+          </>
+        ) : null}
         {/* Re-applies the cookie-backed accent/tone/palette onto <html> before
             paint — the no-flash trick (see APPEARANCE_INIT_SCRIPT / Phase 0
             color-splash fix). This MUST stay a raw inline <script> in <head>:
