@@ -1,5 +1,7 @@
 import type { Viewport } from "next";
 import { Plus_Jakarta_Sans, Manrope, Geist_Mono } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import "../globals.css";
 import { DEFAULT_TONE, DEFAULT_PALETTE } from "@/lib/theme/appearance";
 
@@ -57,7 +59,11 @@ export default function ShareRootLayout({
       style={{ "--now-line": "#57534e" } as React.CSSProperties}
       className={`${jakarta.variable} ${manrope.variable} ${geistMono.variable} h-full`}
     >
-      <body className="min-h-full bg-background text-foreground">{children}</body>
+      <body className="min-h-full bg-background text-foreground">
+        {children}
+        <SpeedInsights />
+        <Analytics />
+      </body>
     </html>
   );
 }
