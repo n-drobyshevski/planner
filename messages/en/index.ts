@@ -12,6 +12,7 @@ import events from "./events.json";
 import toasts from "./toasts.json";
 import validation from "./validation.json";
 import share from "./share.json";
+import errors from "./errors.json";
 
 /** Composed English catalog. Each surface owns its own namespace file so
  *  translation work never collides on a single JSON. English is the source of
@@ -31,6 +32,7 @@ const messages = {
   toasts,
   validation,
   share,
+  errors,
 };
 
 export default messages;

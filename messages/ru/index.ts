@@ -12,6 +12,7 @@ import events from "./events.json";
 import toasts from "./toasts.json";
 import validation from "./validation.json";
 import share from "./share.json";
+import errors from "./errors.json";
 
 /** Composed Russian catalog (mirrors the English key tree in messages/en). */
 const messages = {
@@ -29,6 +30,7 @@ const messages = {
   toasts,
   validation,
   share,
+  errors,
 };
 
 export default messages;
