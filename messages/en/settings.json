@@ -92,6 +92,7 @@
       },
       "descriptions": {
         "default": "Warm paper & stone",
+        "pink": "Soft blossom · your hue",
         "catppuccin-latte": "Catppuccin · light",
         "catppuccin-frappe": "Catppuccin · dark",
         "catppuccin-macchiato": "Catppuccin · dark",
@@ -112,6 +113,20 @@
       "descriptionLocked": "Used for buttons, highlights, and focus rings — shown in the active flavor's palette.",
       "description": "Used for buttons, highlights, links, and focus rings.",
       "ariaLabel": "Accent color"
+    },
+    "pinkBase": {
+      "legend": "Base pink",
+      "description": "The hue the whole Pink palette is built from. Pick a preset or set any custom color.",
+      "ariaLabel": "Base pink color",
+      "custom": "Custom color",
+      "hexLabel": "Hex color value",
+      "presets": {
+        "blossom": "Blossom",
+        "rose": "Rose",
+        "bubblegum": "Bubblegum",
+        "fuchsia": "Fuchsia",
+        "orchid": "Orchid"
+      }
     },
     "tone": {
       "legend": "Surface tone",

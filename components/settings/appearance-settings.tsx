@@ -14,7 +14,14 @@ import {
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePreferences } from "@/lib/hooks/use-preferences";
-import { ACCENTS, PALETTES, TONES } from "@/lib/theme/appearance";
+import {
+  ACCENTS,
+  DEFAULT_PINK_BASE,
+  PALETTES,
+  TONES,
+  paletteMode,
+} from "@/lib/theme/appearance";
+import { PinkBaseField } from "@/components/settings/pink-base-field";
 import type { AppLocale, ThemePreference } from "@/lib/types";
 
 // Endonyms — language names stay in their own language, never translated.
@@ -38,20 +45,26 @@ export function AppearanceSettings() {
     accent,
     tone,
     palette,
+    pinkBase,
     setLocale,
     setThemePref,
     setAccent,
     setTone,
     setPalette,
+    setPinkBase,
     isReady,
   } = usePreferences();
 
   // Controls stay disabled until the signed-in member resolves. `isReady` is
   // false on both the server and the first client render, so no hydration drift.
   const disabled = !isReady;
-  // A Catppuccin flavor owns light/dark + surfaces, so those controls lock while
-  // one is active; the accent picker stays live (it maps into the flavor).
-  const catppuccin = palette !== "default";
+  // A Catppuccin flavor owns light/dark AND surfaces (paletteMode !== null), so it
+  // locks the theme + tone controls; its accent picker stays live (it maps into
+  // the flavor). The `pink` palette owns surfaces but stays light/dark-aware, so it
+  // locks only tone — and swaps the accent picker for its own base-color control.
+  const catppuccin = paletteMode(palette) !== null;
+  const ownsSurfaces = palette !== "default";
+  const isPink = palette === "pink";
 
   const current = { palette, theme: themePreference, accent, tone };
 
@@ -193,62 +206,74 @@ export function AppearanceSettings() {
         </form.Field>
       </FieldSet>
 
-      {/* Accent color */}
-      <FieldSet>
-        <FieldLegend variant="label">{t("appearance.accent.legend")}</FieldLegend>
-        <FieldDescription>
-          {catppuccin
-            ? t("appearance.accent.descriptionLocked")
-            : t("appearance.accent.description")}
-        </FieldDescription>
-        <form.Field
-          name="accent"
-          listeners={{ onChange: ({ value }) => setAccent(value) }}
-        >
-          {(field) => (
-            <div
-              role="radiogroup"
-              aria-label={t("appearance.accent.ariaLabel")}
-              className="flex flex-wrap gap-3"
-            >
-              {ACCENTS.map((a) => {
-                const selected = field.state.value === a.id;
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={a.label}
-                    title={a.label}
-                    disabled={disabled}
-                    onClick={() => field.handleChange(a.id)}
-                    className={cn(
-                      "relative grid size-11 place-items-center rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform outline-none focus-visible:ring-ring active:scale-95 disabled:cursor-not-allowed disabled:opacity-50",
-                      selected ? "ring-foreground" : "ring-transparent hover:ring-border",
-                    )}
-                    style={{ backgroundColor: `var(--swatch-${a.id})` }}
-                  >
-                    {selected && (
-                      <Check
-                        className="size-5 drop-shadow-sm"
-                        style={{ color: `var(--swatch-ink-${a.id}, var(--swatch-ink))` }}
-                        aria-hidden
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </form.Field>
-      </FieldSet>
+      {/* Accent color — hidden under the `pink` palette, which owns its own
+          accent via the base-color control below. */}
+      {!isPink && (
+        <FieldSet>
+          <FieldLegend variant="label">{t("appearance.accent.legend")}</FieldLegend>
+          <FieldDescription>
+            {catppuccin
+              ? t("appearance.accent.descriptionLocked")
+              : t("appearance.accent.description")}
+          </FieldDescription>
+          <form.Field
+            name="accent"
+            listeners={{ onChange: ({ value }) => setAccent(value) }}
+          >
+            {(field) => (
+              <div
+                role="radiogroup"
+                aria-label={t("appearance.accent.ariaLabel")}
+                className="flex flex-wrap gap-3"
+              >
+                {ACCENTS.map((a) => {
+                  const selected = field.state.value === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={a.label}
+                      title={a.label}
+                      disabled={disabled}
+                      onClick={() => field.handleChange(a.id)}
+                      className={cn(
+                        "relative grid size-11 place-items-center rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform outline-none focus-visible:ring-ring active:scale-95 disabled:cursor-not-allowed disabled:opacity-50",
+                        selected ? "ring-foreground" : "ring-transparent hover:ring-border",
+                      )}
+                      style={{ backgroundColor: `var(--swatch-${a.id})` }}
+                    >
+                      {selected && (
+                        <Check
+                          className="size-5 drop-shadow-sm"
+                          style={{ color: `var(--swatch-ink-${a.id}, var(--swatch-ink))` }}
+                          aria-hidden
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </form.Field>
+        </FieldSet>
+      )}
+
+      {/* Base pink — the `pink` palette's configurable hue (presets + custom). */}
+      {isPink && (
+        <PinkBaseField
+          value={pinkBase ?? DEFAULT_PINK_BASE}
+          onChange={setPinkBase}
+          disabled={disabled}
+        />
+      )}
 
       {/* Surface tone */}
       <FieldSet>
         <FieldLegend variant="label">{t("appearance.tone.legend")}</FieldLegend>
         <FieldDescription>
-          {catppuccin
+          {ownsSurfaces
             ? t("appearance.tone.descriptionLocked")
             : t("appearance.tone.description")}
         </FieldDescription>
@@ -264,7 +289,7 @@ export function AppearanceSettings() {
               onValueChange={(v) =>
                 v && field.handleChange(v as (typeof TONES)[number]["id"])
               }
-              disabled={disabled || catppuccin}
+              disabled={disabled || ownsSurfaces}
               aria-label={t("appearance.tone.ariaLabel")}
             >
               {TONES.map((tone) => {

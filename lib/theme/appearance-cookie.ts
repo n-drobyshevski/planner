@@ -10,13 +10,17 @@ import type { AccentId, Palette, SurfaceTone } from "@/lib/types";
  */
 export const APPEARANCE_COOKIE = "planner-appearance";
 
-/** Serialize as a `~`-delimited triple; none of the ids contain `~`. */
+/** Serialize as a `~`-delimited tuple `accent~tone~palette~pinkBase`; none of the
+ *  ids contain `~`. The 4th slot is the `pink` palette's base hex, empty when
+ *  null (= default pink). Older 3-field cookies stay readable (the reader keys on
+ *  `>= 3`). The `#` in a hex is cookie-safe, so it's written verbatim. */
 export function serializeAppearance(
   accent: AccentId,
   tone: SurfaceTone,
   palette: Palette,
+  pinkBase: string | null,
 ): string {
-  return `${accent}~${tone}~${palette}`;
+  return `${accent}~${tone}~${palette}~${pinkBase ?? ""}`;
 }
 
 /** Persist the current appearance to the cookie (client-only). 1-year expiry. */
@@ -24,18 +28,21 @@ export function writeAppearanceCookie(
   accent: AccentId,
   tone: SurfaceTone,
   palette: Palette,
+  pinkBase: string | null,
 ): void {
   if (typeof document === "undefined") return;
   document.cookie =
-    `${APPEARANCE_COOKIE}=${serializeAppearance(accent, tone, palette)}` +
+    `${APPEARANCE_COOKIE}=${serializeAppearance(accent, tone, palette, pinkBase)}` +
     `; path=/; max-age=31536000; samesite=lax`;
 }
 
 /**
  * Blocking inline script for the document <head>: reads the appearance cookie
- * and sets the <html> data attributes before first paint, mirroring the
- * `data-tone` rule (a Catppuccin flavor owns its surfaces, so only the default
- * palette honors the chosen tone). Unknown/missing cookie leaves the static
- * defaults already rendered on <html>. Kept tiny and dependency-free.
+ * and sets the <html> data attributes (and, for the `pink` palette, the
+ * `--pink-base` inline style) before first paint, mirroring the `data-tone` rule
+ * (a non-default palette owns its surfaces, so only the default palette honors
+ * the chosen tone). Tolerates the legacy 3-field cookie. Unknown/missing cookie
+ * leaves the static defaults already rendered on <html>. Kept tiny and
+ * dependency-free.
  */
-export const APPEARANCE_INIT_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )${APPEARANCE_COOKIE}=([^;]*)/);if(!m)return;var p=m[1].split("~");if(p.length!==3)return;var a=p[0],t=p[1],pal=p[2],el=document.documentElement;if(a)el.dataset.accent=a;if(pal)el.dataset.palette=pal;el.dataset.tone=pal==="default"?t:"warm";}catch(e){}})();`;
+export const APPEARANCE_INIT_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )${APPEARANCE_COOKIE}=([^;]*)/);if(!m)return;var p=m[1].split("~");if(p.length<3)return;var a=p[0],t=p[1],pal=p[2],pb=p[3]||"",el=document.documentElement;if(a)el.dataset.accent=a;if(pal)el.dataset.palette=pal;el.dataset.tone=pal==="default"?t:"warm";if(pal==="pink"&&/^#[0-9A-Fa-f]{6}$/.test(pb))el.style.setProperty("--pink-base",pb);else el.style.removeProperty("--pink-base");}catch(e){}})();`;

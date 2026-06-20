@@ -920,6 +920,8 @@ export interface MemberPreferencesPatch {
   accent?: AccentId;
   surfaceTone?: SurfaceTone;
   palette?: Palette;
+  /** The `pink` palette's base hue (`#rrggbb`), or null to use the default pink. */
+  pinkBase?: string | null;
   /** IANA zone, or null to clear it (= follow the device). */
   timezone?: string | null;
   /** IANA zone, or null to turn the secondary zone off. */
@@ -975,6 +977,8 @@ export async function updateMemberPreferences(
   if (patch.accent != null) row.accent = patch.accent;
   if (patch.surfaceTone != null) row.surface_tone = patch.surfaceTone;
   if (patch.palette != null) row.palette = patch.palette;
+  // `pinkBase` is nullable (explicit null = use the default pink), so key on presence.
+  if ("pinkBase" in patch) row.pink_base = patch.pinkBase ?? null;
   // `timezone`/`secondaryTimezone` are nullable: an explicit null clears the
   // column (= follow device / turn secondary off), so key on presence, not value.
   if ("timezone" in patch) row.timezone = patch.timezone ?? null;

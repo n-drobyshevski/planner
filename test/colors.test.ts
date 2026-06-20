@@ -26,6 +26,7 @@ const member = (id: string, color: string): Member => ({
   accent: "peach",
   surfaceTone: "warm",
   palette: "default",
+  pinkBase: null,
   timezone: null,
   secondaryTimezone: null,
   showInactiveInMonth: true,

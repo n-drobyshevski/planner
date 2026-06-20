@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { eventFillStyle } from "@/lib/theme/appearance";
+import {
+  eventFillStyle,
+  normalizePalette,
+  normalizePinkBase,
+  paletteMode,
+  PALETTES,
+  PINK_PRESETS,
+  DEFAULT_PINK_BASE,
+} from "@/lib/theme/appearance";
+import {
+  serializeAppearance,
+  APPEARANCE_INIT_SCRIPT,
+} from "@/lib/theme/appearance-cookie";
 
 describe("eventFillStyle", () => {
   // A known accent hex (teal is in the ACCENTS catalog) maps to its palette var
@@ -49,5 +61,53 @@ describe("eventFillStyle", () => {
       borderColor: "#123456",
       color: "var(--foreground)",
     });
+  });
+});
+
+describe("pink palette", () => {
+  it("is a registered palette and normalizes from a string", () => {
+    expect(PALETTES.some((p) => p.id === "pink")).toBe(true);
+    expect(normalizePalette("pink")).toBe("pink");
+    expect(normalizePalette("nope")).toBe("default");
+  });
+
+  it("defers light/dark to the member (paletteMode === null), unlike Catppuccin", () => {
+    expect(paletteMode("pink")).toBeNull();
+    expect(paletteMode("default")).toBeNull();
+    expect(paletteMode("catppuccin-latte")).toBe("light");
+    expect(paletteMode("catppuccin-mocha")).toBe("dark");
+  });
+
+  it("normalizePinkBase accepts #rrggbb (lowercased), rejects junk → null", () => {
+    expect(normalizePinkBase("#EC4899")).toBe("#ec4899");
+    expect(normalizePinkBase("#abc")).toBeNull(); // shorthand not allowed
+    expect(normalizePinkBase("ec4899")).toBeNull(); // missing #
+    expect(normalizePinkBase("red")).toBeNull();
+    expect(normalizePinkBase(null)).toBeNull();
+    expect(normalizePinkBase(undefined)).toBeNull();
+  });
+
+  it("every preset value is a valid base and the default matches a preset", () => {
+    for (const p of PINK_PRESETS) expect(normalizePinkBase(p.value)).toBe(p.value);
+    expect(PINK_PRESETS.some((p) => p.value === DEFAULT_PINK_BASE)).toBe(true);
+  });
+});
+
+describe("appearance cookie", () => {
+  it("serializes a 4-field tuple, empty 4th slot when pinkBase is null", () => {
+    expect(serializeAppearance("stone", "warm", "default", null)).toBe(
+      "stone~warm~default~",
+    );
+    expect(serializeAppearance("stone", "warm", "pink", "#ec4899")).toBe(
+      "stone~warm~pink~#ec4899",
+    );
+  });
+
+  it("init script reads a 4th field and only paints --pink-base under the pink palette", () => {
+    // Pink palette + a valid base → sets the var; the regex/hex guard is inline.
+    expect(APPEARANCE_INIT_SCRIPT).toContain('pal==="pink"');
+    expect(APPEARANCE_INIT_SCRIPT).toContain("setProperty(\"--pink-base\"");
+    // Tolerates the legacy 3-field cookie (no hard length===3 check).
+    expect(APPEARANCE_INIT_SCRIPT).toContain("p.length<3");
   });
 });

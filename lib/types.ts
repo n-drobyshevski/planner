@@ -41,10 +41,14 @@ export type SurfaceTone = "warm" | "neutral" | "cool";
 /**
  * Full-palette theme. `default` keeps the native warm system (light/dark +
  * accent + tone); the Catppuccin flavors override the entire palette and own
- * their own light/dark mode (Latte is light, the rest are dark).
+ * their own light/dark mode (Latte is light, the rest are dark). `pink` is a
+ * drenched soft-blossom palette whose every token derives from one configurable
+ * base hue (`Member.pinkBase` → the `--pink-base` CSS var); unlike Catppuccin it
+ * stays light/dark-aware (it honors the member's themePreference).
  */
 export type Palette =
   | "default"
+  | "pink"
   | "catppuccin-latte"
   | "catppuccin-frappe"
   | "catppuccin-macchiato"
@@ -73,6 +77,9 @@ export interface Member {
   accent: AccentId;
   surfaceTone: SurfaceTone;
   palette: Palette;
+  // The configurable base hue for the `pink` palette (a `#rrggbb` hex), or null
+  // to use the default pink. Only meaningful while `palette === "pink"`.
+  pinkBase: string | null;
   // Time-zone preferences (per member). `timezone` null = follow the device;
   // `secondaryTimezone` null = no secondary zone shown. Both are IANA names.
   timezone: string | null;

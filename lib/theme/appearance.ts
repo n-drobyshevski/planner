@@ -18,6 +18,10 @@ export const DEFAULT_TONE: SurfaceTone = "warm";
 export const DEFAULT_PALETTE: Palette = "default";
 export const DEFAULT_CONTEXT_LABEL: ContextLabel = "bar";
 
+/** The fallback base hue for the `pink` palette when the member hasn't picked a
+ *  custom one. Mirrors the `var(--pink-base, …)` fallback in app/globals.css. */
+export const DEFAULT_PINK_BASE = "#ec4899";
+
 export interface AccentPreset {
   id: AccentId;
   label: string;
@@ -90,6 +94,12 @@ export const PALETTES: readonly PalettePreset[] = [
     swatches: ["#faf8f5", "#f2ede7", "#57534e", "#292524"],
   },
   {
+    id: "pink",
+    label: "Pink",
+    description: "Soft blossom, your hue",
+    swatches: ["#fdf2f6", "#fbe3ec", "#ec4899", "#4a1f33"],
+  },
+  {
     id: "catppuccin-latte",
     label: "Latte",
     description: "Catppuccin · light",
@@ -115,9 +125,28 @@ export const PALETTES: readonly PalettePreset[] = [
   },
 ] as const;
 
+/** Quick-pick base hues for the `pink` palette (Settings → Appearance → Base
+ *  pink), alongside the free custom color picker. `value` seeds `--pink-base`;
+ *  the rest of the palette derives from it in OKLCH (see app/globals.css), so
+ *  these only set the hue/chroma — surface lightness stays fixed for AAA. */
+export interface PinkPreset {
+  id: string;
+  label: string;
+  value: string;
+}
+export const PINK_PRESETS: readonly PinkPreset[] = [
+  { id: "blossom", label: "Blossom", value: "#f9a8d4" },
+  { id: "rose", label: "Rose", value: "#ec4899" },
+  { id: "bubblegum", label: "Bubblegum", value: "#f472b6" },
+  { id: "fuchsia", label: "Fuchsia", value: "#d946ef" },
+  { id: "orchid", label: "Orchid", value: "#c084fc" },
+] as const;
+
 const ACCENT_IDS = new Set<string>(ACCENTS.map((a) => a.id));
 const TONE_IDS = new Set<string>(TONES.map((t) => t.id));
 const PALETTE_IDS = new Set<string>(PALETTES.map((p) => p.id));
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 /** Default-palette hex → accent token. Every pickable color comes from ACCENTS
  *  (the swatch picker derives from it, seeds use these hexes), so this covers
@@ -239,13 +268,20 @@ export function normalizePalette(value: string | null | undefined): Palette {
   return value && PALETTE_IDS.has(value) ? (value as Palette) : DEFAULT_PALETTE;
 }
 
+/** Coerce an unknown string to a `#rrggbb` pink base, or null (= default pink).
+ *  Guards the cookie/DB against junk before it reaches the `--pink-base` var. */
+export function normalizePinkBase(value: string | null | undefined): string | null {
+  return value && HEX_COLOR.test(value) ? value.toLowerCase() : null;
+}
+
 /**
- * The light/dark mode a palette dictates, or `null` for `default` (which defers
- * to the member's own themePreference). Catppuccin Latte is light; the other
- * three flavors are dark. Used to drive next-themes so the `.dark` class — and
- * any `dark:` utilities — stay consistent with the active flavor.
+ * The light/dark mode a palette dictates, or `null` when the palette defers to
+ * the member's own themePreference. `default` and `pink` are both light/dark-
+ * aware (they return null). Among the Catppuccin flavors, Latte is light and the
+ * other three are dark. Used to drive next-themes so the `.dark` class — and any
+ * `dark:` utilities — stay consistent with a mode-owning flavor.
  */
 export function paletteMode(palette: Palette): "light" | "dark" | null {
-  if (palette === "default") return null;
+  if (palette === "default" || palette === "pink") return null;
   return palette === "catppuccin-latte" ? "light" : "dark";
 }

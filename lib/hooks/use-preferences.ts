@@ -46,16 +46,28 @@ const SLEEP_PREFS_DEFAULTS = {
   nightWindowEndHour: 12,
 } as const;
 
-function applyAppearance(accent: AccentId, tone: SurfaceTone, palette: Palette) {
+function applyAppearance(
+  accent: AccentId,
+  tone: SurfaceTone,
+  palette: Palette,
+  pinkBase: string | null,
+) {
   const el = document.documentElement;
   el.dataset.accent = accent;
   el.dataset.palette = palette;
-  // A Catppuccin flavor owns its surfaces, so neutralize the tone preset
+  // A non-default palette owns its surfaces, so neutralize the tone preset
   // (`warm` has no override block); only `default` honors the chosen tone.
   el.dataset.tone = palette === "default" ? tone : "warm";
+  // The `pink` palette derives every token from this base hue; other palettes
+  // ignore it. Clear it otherwise so a stale value can't leak into the var.
+  if (palette === "pink" && pinkBase) {
+    el.style.setProperty("--pink-base", pinkBase);
+  } else {
+    el.style.removeProperty("--pink-base");
+  }
   // Mirror to the cookie so the layout's pre-paint script reproduces it with no
   // flash on the next full load (and on first load on a fresh device/browser).
-  writeAppearanceCookie(accent, tone, palette);
+  writeAppearanceCookie(accent, tone, palette, pinkBase);
 }
 
 /** Patch the cached workspace bundle so the current member's prefs update at once. */
@@ -115,6 +127,8 @@ export function usePreferences() {
   const tone = member?.surfaceTone ?? DEFAULT_TONE;
   const themePreference = member?.themePreference ?? DEFAULT_THEME;
   const palette = member?.palette ?? DEFAULT_PALETTE;
+  // The `pink` palette's configurable base hue (null = default pink #ec4899).
+  const pinkBase = member?.pinkBase ?? null;
   // Time zones: the stored value (null = follow device) and the resolved zone
   // the calendar actually renders in. The secondary zone is null when off.
   const rawTimezone = member?.timezone ?? null;
@@ -146,7 +160,7 @@ export function usePreferences() {
   const themeReconciled = useRef(false);
   useEffect(() => {
     if (!member) return;
-    applyAppearance(member.accent, member.surfaceTone, member.palette);
+    applyAppearance(member.accent, member.surfaceTone, member.palette, member.pinkBase);
     if (!themeReconciled.current) {
       themeReconciled.current = true;
       if (desiredTheme !== theme) setTheme(desiredTheme);
@@ -214,18 +228,18 @@ export function usePreferences() {
     (next: Member["accent"]) => {
       // Crossfade the re-tint via the View Transitions API (instant fallback
       // under reduced-motion / unsupported browsers — see withAppearanceTransition).
-      withAppearanceTransition(() => applyAppearance(next, tone, palette)); // DOM + cookie
+      withAppearanceTransition(() => applyAppearance(next, tone, palette, pinkBase)); // DOM + cookie
       void persist({ accent: next });
     },
-    [persist, tone, palette],
+    [persist, tone, palette, pinkBase],
   );
 
   const setTone = useCallback(
     (next: Member["surfaceTone"]) => {
-      withAppearanceTransition(() => applyAppearance(accent, next, palette)); // DOM + cookie
+      withAppearanceTransition(() => applyAppearance(accent, next, palette, pinkBase)); // DOM + cookie
       void persist({ surfaceTone: next });
     },
-    [persist, accent, palette],
+    [persist, accent, palette, pinkBase],
   );
 
   // Switch UI language: persist to the member row (so it follows across devices)
@@ -345,14 +359,24 @@ export function usePreferences() {
       // honors tone, a Catppuccin flavor forces 'warm') and mirrors all three to
       // the cookie; flushSync lands the next-themes class in the after-snapshot.
       withAppearanceTransition(() => {
-        applyAppearance(accent, tone, next);
-        flushSync(() =>
-          setTheme(next === "default" ? themePreference : paletteMode(next) ?? "dark"),
-        );
+        applyAppearance(accent, tone, next, pinkBase);
+        // `default` and `pink` defer to the member's themePreference (paletteMode
+        // → null); the Catppuccin flavors force their own light/dark mode.
+        flushSync(() => setTheme(paletteMode(next) ?? themePreference));
       });
       void persist({ palette: next });
     },
-    [persist, setTheme, accent, tone, themePreference],
+    [persist, setTheme, accent, tone, themePreference, pinkBase],
+  );
+
+  const setPinkBase = useCallback(
+    (next: string | null) => {
+      // Re-tint the whole pink palette live (the var drives every token). Crossfade
+      // it like the other appearance swaps; instant under reduced motion.
+      withAppearanceTransition(() => applyAppearance(accent, tone, palette, next)); // DOM + cookie
+      void persist({ pinkBase: next });
+    },
+    [persist, accent, tone, palette],
   );
 
   return {
@@ -363,6 +387,8 @@ export function usePreferences() {
     accent,
     tone,
     palette,
+    /** The `pink` palette's base hue (`#rrggbb`), or null = the default pink. */
+    pinkBase,
     /** Stored zone (null = follow device) — for the Settings picker's selected state. */
     rawTimezone,
     /** Resolved zone the calendar renders in (stored value or the device zone). */
@@ -391,6 +417,7 @@ export function usePreferences() {
     setAccent,
     setTone,
     setPalette,
+    setPinkBase,
     setTimezone,
     setSecondaryTimezone,
     setShowInactiveInMonth,

@@ -521,6 +521,149 @@
   --sidebar-border:#313244; --sidebar-ring:var(--swatch-peach);
 }
 
+/* ---------------------------------------------------------------------------
+   Pink — a drenched soft-blossom palette derived entirely from one base hue,
+   `--pink-base` (the member's configurable color; `#ec4899` fallback). Unlike
+   the Catppuccin flavors it is light/dark-aware (paletteMode("pink") === null),
+   so both a light and a `.dark` block are defined. Surfaces and ink fix their
+   OKLCH lightness (and use a low fixed chroma) so ANY chosen hue stays WCAG-AAA
+   legible — the user configures the hue; the palette stays calm. The accent
+   (`--primary`) borrows the base hue + chroma at a fixed, contrast-safe
+   lightness. Placed AFTER every [data-accent]/.dark[data-accent] block so the
+   (0,1,0)/(0,2,0) ties resolve to pink when a stale accent is still selected.
+   --destructive is left to inherit :root so red stays red; the 14 --swatch-*,
+   --member-*, --event-shared, and --chart-* are remapped (below) into the pink
+   family — a fully committed monochromatic-pink look. Each is derived from
+   --pink-base with a per-token HUE OFFSET, so the whole 14-shade fan rotates
+   with the chosen base. They span a wide pink→magenta→orchid arc (Δh -58..+35)
+   in two lightness tiers (deep = white ink; light = a dark per-swatch ink) so
+   adjacent hues stay distinguishable; the two members + shared sit on three of
+   the most separated positions. Swatch L is fixed per token, so white/dark ink
+   stays legible for any base hue. --------------------------------------------- */
+[data-palette="pink"] {
+  --background: oklch(from var(--pink-base, #ec4899) 0.975 0.018 h);
+  --foreground: oklch(from var(--pink-base, #ec4899) 0.28 0.06 h);
+  --card: oklch(from var(--pink-base, #ec4899) 0.99 0.01 h);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(from var(--pink-base, #ec4899) 0.5 c h);
+  --primary-foreground: #ffffff;
+  --secondary: oklch(from var(--pink-base, #ec4899) 0.93 0.035 h);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(from var(--pink-base, #ec4899) 0.93 0.035 h);
+  --muted-foreground: oklch(from var(--pink-base, #ec4899) 0.44 0.05 h);
+  --accent: oklch(from var(--pink-base, #ec4899) 0.9 0.045 h);
+  --accent-foreground: var(--foreground);
+  --border: oklch(from var(--pink-base, #ec4899) 0.88 0.04 h);
+  --input: oklch(from var(--pink-base, #ec4899) 0.88 0.04 h);
+  --ring: oklch(from var(--pink-base, #ec4899) 0.5 c h);
+  --sidebar: oklch(from var(--pink-base, #ec4899) 0.955 0.025 h);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: oklch(from var(--pink-base, #ec4899) 0.5 c h);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: oklch(from var(--pink-base, #ec4899) 0.9 0.045 h);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(from var(--pink-base, #ec4899) 0.88 0.04 h);
+  --sidebar-ring: oklch(from var(--pink-base, #ec4899) 0.5 c h);
+
+  /* The 14 accent swatches, remapped into the pink family (light). Deep tier
+     (L<=0.56) keeps white ink; light tier (L>=0.66) gets a dark per-swatch ink.
+     Warm names (peach/flamingo/rosewater/yellow) land on the coral side (+Δh),
+     cool names (sapphire/blue/sky/teal/green/mauve/lavender) on the magenta→
+     orchid side (-Δh), so a stored category keeps its relative warm/cool feel. */
+  --swatch-pink:      oklch(from var(--pink-base, #ec4899) 0.56 0.19 calc(h - 2));
+  --swatch-red:       oklch(from var(--pink-base, #ec4899) 0.47 0.20 calc(h + 10));
+  --swatch-maroon:    oklch(from var(--pink-base, #ec4899) 0.40 0.13 calc(h + 5));
+  --swatch-rosewater: oklch(from var(--pink-base, #ec4899) 0.74 0.09 calc(h + 16));
+  --swatch-flamingo:  oklch(from var(--pink-base, #ec4899) 0.58 0.16 calc(h + 24));
+  --swatch-peach:     oklch(from var(--pink-base, #ec4899) 0.70 0.12 calc(h + 34));
+  --swatch-yellow:    oklch(from var(--pink-base, #ec4899) 0.82 0.07 calc(h + 28));
+  --swatch-sapphire:  oklch(from var(--pink-base, #ec4899) 0.70 0.12 calc(h - 22));
+  --swatch-blue:      oklch(from var(--pink-base, #ec4899) 0.49 0.18 calc(h - 14));
+  --swatch-sky:       oklch(from var(--pink-base, #ec4899) 0.56 0.14 calc(h - 30));
+  --swatch-teal:      oklch(from var(--pink-base, #ec4899) 0.72 0.10 calc(h - 38));
+  --swatch-green:     oklch(from var(--pink-base, #ec4899) 0.80 0.07 calc(h - 52));
+  --swatch-mauve:     oklch(from var(--pink-base, #ec4899) 0.46 0.15 calc(h - 45));
+  --swatch-lavender:  oklch(from var(--pink-base, #ec4899) 0.50 0.15 calc(h - 58));
+  --swatch-stone:     oklch(from var(--pink-base, #ec4899) 0.50 0.04 h);
+  --swatch-ink: #ffffff;
+  /* Dark ink for the light-tier swatches (Catppuccin-Latte precedent). */
+  --swatch-ink-rosewater: oklch(from var(--pink-base, #ec4899) 0.22 0.04 h);
+  --swatch-ink-peach:     oklch(from var(--pink-base, #ec4899) 0.22 0.04 h);
+  --swatch-ink-yellow:    oklch(from var(--pink-base, #ec4899) 0.22 0.04 h);
+  --swatch-ink-sapphire:  oklch(from var(--pink-base, #ec4899) 0.22 0.04 h);
+  --swatch-ink-teal:      oklch(from var(--pink-base, #ec4899) 0.22 0.04 h);
+  --swatch-ink-green:     oklch(from var(--pink-base, #ec4899) 0.22 0.04 h);
+
+  /* Members / shared / charts — three most-separated arc positions for the two
+     members + shared (white-text safe at L<=0.56); five spread chart series. */
+  --member-a:     oklch(from var(--pink-base, #ec4899) 0.54 0.18 h);
+  --member-b:     oklch(from var(--pink-base, #ec4899) 0.54 0.14 calc(h - 45));
+  --event-shared: oklch(from var(--pink-base, #ec4899) 0.56 0.15 calc(h + 28));
+  --chart-1: oklch(from var(--pink-base, #ec4899) 0.55 0.18 h);
+  --chart-2: oklch(from var(--pink-base, #ec4899) 0.55 0.14 calc(h - 45));
+  --chart-3: oklch(from var(--pink-base, #ec4899) 0.62 0.14 calc(h + 30));
+  --chart-4: oklch(from var(--pink-base, #ec4899) 0.50 0.17 calc(h - 25));
+  --chart-5: oklch(from var(--pink-base, #ec4899) 0.62 0.12 calc(h - 58));
+}
+.dark[data-palette="pink"] {
+  --background: oklch(from var(--pink-base, #ec4899) 0.17 0.03 h);
+  --foreground: oklch(from var(--pink-base, #ec4899) 0.95 0.02 h);
+  --card: oklch(from var(--pink-base, #ec4899) 0.22 0.035 h);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(from var(--pink-base, #ec4899) 0.78 0.13 h);
+  --primary-foreground: oklch(from var(--pink-base, #ec4899) 0.2 0.05 h);
+  --secondary: oklch(from var(--pink-base, #ec4899) 0.3 0.04 h);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(from var(--pink-base, #ec4899) 0.3 0.04 h);
+  --muted-foreground: oklch(from var(--pink-base, #ec4899) 0.78 0.03 h);
+  --accent: oklch(from var(--pink-base, #ec4899) 0.32 0.05 h);
+  --accent-foreground: var(--foreground);
+  --border: oklch(from var(--pink-base, #ec4899) 0.32 0.04 h);
+  --input: oklch(from var(--pink-base, #ec4899) 0.36 0.045 h);
+  --ring: oklch(from var(--pink-base, #ec4899) 0.78 0.13 h);
+  --sidebar: oklch(from var(--pink-base, #ec4899) 0.14 0.028 h);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: oklch(from var(--pink-base, #ec4899) 0.78 0.13 h);
+  --sidebar-primary-foreground: oklch(from var(--pink-base, #ec4899) 0.2 0.05 h);
+  --sidebar-accent: oklch(from var(--pink-base, #ec4899) 0.32 0.05 h);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(from var(--pink-base, #ec4899) 0.32 0.04 h);
+  --sidebar-ring: oklch(from var(--pink-base, #ec4899) 0.78 0.13 h);
+
+  /* The 14 swatches (dark): same hue offsets, brighter on the dark plum surface,
+     with a SINGLE dark crust ink (Catppuccin-dark style — bright pastel fills). */
+  --swatch-pink:      oklch(from var(--pink-base, #ec4899) 0.70 0.16 calc(h - 2));
+  --swatch-red:       oklch(from var(--pink-base, #ec4899) 0.64 0.18 calc(h + 10));
+  --swatch-maroon:    oklch(from var(--pink-base, #ec4899) 0.63 0.13 calc(h + 5));
+  --swatch-rosewater: oklch(from var(--pink-base, #ec4899) 0.80 0.09 calc(h + 16));
+  --swatch-flamingo:  oklch(from var(--pink-base, #ec4899) 0.71 0.15 calc(h + 24));
+  --swatch-peach:     oklch(from var(--pink-base, #ec4899) 0.81 0.11 calc(h + 34));
+  --swatch-yellow:    oklch(from var(--pink-base, #ec4899) 0.87 0.06 calc(h + 33));
+  --swatch-sapphire:  oklch(from var(--pink-base, #ec4899) 0.78 0.12 calc(h - 22));
+  --swatch-blue:      oklch(from var(--pink-base, #ec4899) 0.64 0.17 calc(h - 14));
+  --swatch-sky:       oklch(from var(--pink-base, #ec4899) 0.68 0.13 calc(h - 30));
+  --swatch-teal:      oklch(from var(--pink-base, #ec4899) 0.80 0.10 calc(h - 38));
+  --swatch-green:     oklch(from var(--pink-base, #ec4899) 0.84 0.07 calc(h - 52));
+  --swatch-mauve:     oklch(from var(--pink-base, #ec4899) 0.62 0.15 calc(h - 45));
+  --swatch-lavender:  oklch(from var(--pink-base, #ec4899) 0.66 0.14 calc(h - 58));
+  --swatch-stone:     oklch(from var(--pink-base, #ec4899) 0.72 0.03 h);
+  --swatch-ink: oklch(from var(--pink-base, #ec4899) 0.16 0.03 h);
+
+  /* Members / shared / charts (dark): bright, dark-ink-text fills on the plum bg. */
+  --member-a:     oklch(from var(--pink-base, #ec4899) 0.72 0.15 h);
+  --member-b:     oklch(from var(--pink-base, #ec4899) 0.70 0.13 calc(h - 45));
+  --event-shared: oklch(from var(--pink-base, #ec4899) 0.74 0.13 calc(h + 28));
+  --chart-1: oklch(from var(--pink-base, #ec4899) 0.72 0.15 h);
+  --chart-2: oklch(from var(--pink-base, #ec4899) 0.70 0.13 calc(h - 45));
+  --chart-3: oklch(from var(--pink-base, #ec4899) 0.76 0.12 calc(h + 30));
+  --chart-4: oklch(from var(--pink-base, #ec4899) 0.68 0.15 calc(h - 25));
+  --chart-5: oklch(from var(--pink-base, #ec4899) 0.74 0.12 calc(h - 58));
+}
+
 /* Accent overrides for ALL four flavors at once: --primary follows the active
    flavor's --swatch-<accent>, foreground uses its --swatch-ink. The starts-with
    selector keeps these flavor-agnostic; placed AFTER the default .dark[data-accent]

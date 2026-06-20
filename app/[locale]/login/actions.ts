@@ -27,6 +27,7 @@ import { APPEARANCE_COOKIE, serializeAppearance } from "@/lib/theme/appearance-c
 import {
   normalizeAccent,
   normalizePalette,
+  normalizePinkBase,
   normalizeTone,
 } from "@/lib/theme/appearance";
 
@@ -37,10 +38,12 @@ type MemberRow = {
   pin_hash: string | null;
   accent: string | null;
   surface_tone: string | null;
+  pink_base: string | null;
   palette: string | null;
 };
 
-const MEMBER_COLS = "id, auth_user_id, has_secret, pin_hash, accent, surface_tone, palette";
+const MEMBER_COLS =
+  "id, auth_user_id, has_secret, pin_hash, accent, surface_tone, palette, pink_base";
 
 // Short-lived cookies binding a WebAuthn ceremony's challenge to the request.
 const CHAL_LOGIN = "wa_login_chal";
@@ -78,6 +81,7 @@ async function seedAppearanceCookie(member: {
   accent: string | null;
   surface_tone: string | null;
   palette: string | null;
+  pink_base: string | null;
 }): Promise<void> {
   const store = await cookies();
   store.set(
@@ -86,6 +90,7 @@ async function seedAppearanceCookie(member: {
       normalizeAccent(member.accent),
       normalizeTone(member.surface_tone),
       normalizePalette(member.palette),
+      normalizePinkBase(member.pink_base),
     ),
     { path: "/", maxAge: 31_536_000, sameSite: "lax" },
   );
