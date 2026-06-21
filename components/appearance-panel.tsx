@@ -90,13 +90,15 @@ export function AppearancePanel() {
           <SheetDescription>{t("appearance.description")}</SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-7 px-6 pb-8">
-          <ThemeField
-            size="lg"
-            value={themePreference}
-            onChange={setThemePref}
-            disabled={!isReady || catppuccin}
-            locked={catppuccin}
-          />
+          {/* Hidden under a Catppuccin flavor, which sets its own light/dark mode. */}
+          {!catppuccin && (
+            <ThemeField
+              size="lg"
+              value={themePreference}
+              onChange={setThemePref}
+              disabled={!isReady}
+            />
+          )}
           <PaletteField
             value={palette}
             onChange={setPalette}

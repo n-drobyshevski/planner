@@ -117,20 +117,22 @@ export function AppearanceSettings() {
         )}
       </form.Field>
 
-      {/* Theme */}
-      <form.Field
-        name="theme"
-        listeners={{ onChange: ({ value }) => setThemePref(value) }}
-      >
-        {(field) => (
-          <ThemeField
-            value={field.state.value}
-            onChange={field.handleChange}
-            disabled={disabled || catppuccin}
-            locked={catppuccin}
-          />
-        )}
-      </form.Field>
+      {/* Theme — hidden under a Catppuccin flavor, which dictates its own
+          light/dark mode (so the toggle would do nothing). */}
+      {!catppuccin && (
+        <form.Field
+          name="theme"
+          listeners={{ onChange: ({ value }) => setThemePref(value) }}
+        >
+          {(field) => (
+            <ThemeField
+              value={field.state.value}
+              onChange={field.handleChange}
+              disabled={disabled}
+            />
+          )}
+        </form.Field>
+      )}
 
       {/* Accent color — hidden under the `pink` palette, which owns its own
           accent via the base-color control below. */}
@@ -195,50 +197,49 @@ export function AppearanceSettings() {
         />
       )}
 
-      {/* Surface tone */}
-      <FieldSet>
-        <FieldLegend variant="label">{t("appearance.tone.legend")}</FieldLegend>
-        <FieldDescription>
-          {ownsSurfaces
-            ? t("appearance.tone.descriptionLocked")
-            : t("appearance.tone.description")}
-        </FieldDescription>
-        <form.Field
-          name="tone"
-          listeners={{ onChange: ({ value }) => setTone(value) }}
-        >
-          {(field) => (
-            <ToggleGroup
-              type="single"
-              variant="segmented"
-              value={field.state.value}
-              onValueChange={(v) =>
-                v && field.handleChange(v as (typeof TONES)[number]["id"])
-              }
-              disabled={disabled || ownsSurfaces}
-              aria-label={t("appearance.tone.ariaLabel")}
-            >
-              {TONES.map((tone) => {
-                const label = t(`appearance.tone.labels.${tone.id}`);
-                return (
-                  <ToggleGroupItem
-                    key={tone.id}
-                    value={tone.id}
-                    aria-label={label}
-                  >
-                    <span
-                      data-icon="inline-start"
-                      className="size-3 rounded-full ring-1 ring-foreground/15"
-                      style={{ backgroundColor: tone.swatch }}
-                    />
-                    {label}
-                  </ToggleGroupItem>
-                );
-              })}
-            </ToggleGroup>
-          )}
-        </form.Field>
-      </FieldSet>
+      {/* Surface tone — hidden when the palette owns its surfaces (Pink and the
+          Catppuccin flavors force their own; only `default` honors the tone). */}
+      {!ownsSurfaces && (
+        <FieldSet>
+          <FieldLegend variant="label">{t("appearance.tone.legend")}</FieldLegend>
+          <FieldDescription>{t("appearance.tone.description")}</FieldDescription>
+          <form.Field
+            name="tone"
+            listeners={{ onChange: ({ value }) => setTone(value) }}
+          >
+            {(field) => (
+              <ToggleGroup
+                type="single"
+                variant="segmented"
+                value={field.state.value}
+                onValueChange={(v) =>
+                  v && field.handleChange(v as (typeof TONES)[number]["id"])
+                }
+                disabled={disabled}
+                aria-label={t("appearance.tone.ariaLabel")}
+              >
+                {TONES.map((tone) => {
+                  const label = t(`appearance.tone.labels.${tone.id}`);
+                  return (
+                    <ToggleGroupItem
+                      key={tone.id}
+                      value={tone.id}
+                      aria-label={label}
+                    >
+                      <span
+                        data-icon="inline-start"
+                        className="size-3 rounded-full ring-1 ring-foreground/15"
+                        style={{ backgroundColor: tone.swatch }}
+                      />
+                      {label}
+                    </ToggleGroupItem>
+                  );
+                })}
+              </ToggleGroup>
+            )}
+          </form.Field>
+        </FieldSet>
+      )}
 
       {/* Live preview — real controls on the live surface, so palette, accent,
           theme, and tone choices read on the same components they affect. */}
