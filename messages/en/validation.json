@@ -9,5 +9,6 @@
   "loginNotConfigured": "Login isn't configured for this profile.",
   "noPasskey": "No passkey is registered for this profile. Sign in with your password, then add one in Settings.",
   "passkeyFailed": "Passkey sign-in failed. Please try again.",
-  "notSignedIn": "You need to be signed in to do that."
+  "notSignedIn": "You need to be signed in to do that.",
+  "tooManyAttempts": "Too many attempts — please wait a moment and try again."
 }

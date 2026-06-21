@@ -1,4 +1,9 @@
 import type { AccentId, Palette, SurfaceTone } from "@/lib/types";
+import {
+  APPEARANCE_COOKIE,
+  ERROR_THEME_INIT_SCRIPT_DOCUMENT,
+  ERROR_THEME_INIT_SCRIPT_PARENT,
+} from "./appearance-scripts";
 
 /**
  * Cookie-backed appearance so the root layout can stay a static (prerenderable)
@@ -7,8 +12,11 @@ import type { AccentId, Palette, SurfaceTone } from "@/lib/types";
  * rendering of the whole document), we persist accent/tone/palette in a cookie
  * and re-apply them client-side before paint via a tiny blocking script — the
  * same no-flash trick next-themes uses for the `.dark` class.
+ *
+ * The inline-script bodies live in the dependency-free `./appearance-scripts` so
+ * `next.config.ts` can hash them for the CSP; re-exported here for callers.
  */
-export const APPEARANCE_COOKIE = "planner-appearance";
+export { APPEARANCE_COOKIE, APPEARANCE_INIT_SCRIPT } from "./appearance-scripts";
 
 /** Serialize as a `~`-delimited tuple `accent~tone~palette~pinkBase`; none of the
  *  ids contain `~`. The 4th slot is the `pink` palette's base hex, empty when
@@ -37,45 +45,16 @@ export function writeAppearanceCookie(
 }
 
 /**
- * Blocking inline script for the document <head>: reads the appearance cookie
- * and sets the <html> data attributes (and, for the `pink` palette, the
- * `--pink-base` inline style) before first paint, mirroring the `data-tone` rule
- * (a non-default palette owns its surfaces, so only the default palette honors
- * the chosen tone). Tolerates the legacy 3-field cookie. Unknown/missing cookie
- * leaves the static defaults already rendered on <html>. Kept tiny and
- * dependency-free.
- */
-export const APPEARANCE_INIT_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )${APPEARANCE_COOKIE}=([^;]*)/);if(!m)return;var p=m[1].split("~");if(p.length<3)return;var a=p[0],t=p[1],pal=p[2],pb=p[3]||"",el=document.documentElement;if(a)el.dataset.accent=a;if(pal)el.dataset.palette=pal;el.dataset.tone=pal==="default"?t:"warm";if(pal==="pink"&&/^#[0-9A-Fa-f]{6}$/.test(pb))el.style.setProperty("--pink-base",pb);else el.style.removeProperty("--pink-base");}catch(e){}})();`;
-
-/**
  * Combined appearance + dark pre-paint script for the error pages that render
- * OUTSIDE the app providers (the root `not-found.tsx` and `global-error.tsx`). It
- * mirrors APPEARANCE_INIT_SCRIPT (reads `planner-appearance` and stamps
- * `data-accent`/`data-palette`/`data-tone` + `--pink-base`) AND resolves the
- * next-themes `.dark` class itself — those pages aren't inside ThemeProvider, so
- * nothing else applies it. Dark follows next-themes' own rule: the `theme` key in
- * localStorage, falling back to the system `prefers-color-scheme`.
- *
- * `target` is where to apply it: `"documentElement"` for global-error, which owns
- * `<html>` and runs this from `<head>`; or `"parent"` for the root not-found, which
- * can't own `<html>` (Next's DefaultLayout does) and renders this as the first child
- * of a themed wrapper `<div>` — `document.currentScript.parentElement` is that
- * wrapper. Tiny and dependency-free; any failure degrades to the base (light) theme.
+ * OUTSIDE the app providers (the root `not-found.tsx` and `global-error.tsx`).
+ * The two emitted variants are precomputed constants in `./appearance-scripts`
+ * (so they're hashable for the CSP); this just selects one by where it applies:
+ * `"documentElement"` for global-error (owns `<html>`, runs from `<head>`), or
+ * `"parent"` for the root not-found (renders as the first child of a themed
+ * wrapper `<div>`, so it targets `document.currentScript.parentElement`).
  */
 export function errorThemeInitScript(target: "documentElement" | "parent"): string {
-  const el =
-    target === "documentElement"
-      ? "document.documentElement"
-      : "document.currentScript.parentElement";
-  return (
-    `(function(){try{var el=${el};` +
-    `var m=document.cookie.match(/(?:^|; )${APPEARANCE_COOKIE}=([^;]*)/);` +
-    `if(m){var p=m[1].split("~");if(p.length>=3){var a=p[0],t=p[1],pal=p[2],pb=p[3]||"";` +
-    `if(a)el.dataset.accent=a;if(pal)el.dataset.palette=pal;` +
-    `el.dataset.tone=pal==="default"?t:"warm";` +
-    `if(pal==="pink"&&/^#[0-9A-Fa-f]{6}$/.test(pb))el.style.setProperty("--pink-base",pb);}}` +
-    `var th=localStorage.getItem("theme");` +
-    `if(th==="dark"||((!th||th==="system")&&matchMedia("(prefers-color-scheme: dark)").matches))el.classList.add("dark");` +
-    `}catch(e){}})();`
-  );
+  return target === "documentElement"
+    ? ERROR_THEME_INIT_SCRIPT_DOCUMENT
+    : ERROR_THEME_INIT_SCRIPT_PARENT;
 }

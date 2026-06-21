@@ -5,6 +5,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createIpRateLimiter } from "@/lib/rate-limit/ip-bucket";
 import { getCredentialsByEmail } from "@/lib/auth/profiles";
 import { sha256Hex } from "@/lib/auth/pin";
 import { hashSecret, verifySecret } from "@/lib/auth/secret";
@@ -64,6 +65,27 @@ async function setEphemeral(name: string, value: string): Promise<void> {
 async function clearEphemeral(...names: string[]): Promise<void> {
   const store = await cookies();
   for (const n of names) store.set(n, "", { path: "/", maxAge: 0 });
+}
+
+// Coarse per-IP throttle on the credential-checking auth entry points. The
+// session bridge means a guessed member passphrase yields a full session, and
+// every passphrase attempt runs scrypt (slow by design) — so an unthrottled
+// endpoint is both a brute-force and a CPU-exhaustion (DoS) vector. A 5-request
+// burst then ~1 attempt/30s is invisible to a real user (who succeeds first try)
+// but kills automated guessing. Per-instance in-memory (Vercel Fluid Compute),
+// like the public timeslot-request limiter — coarse defense, not distributed.
+// `beginPasskeyLogin` is intentionally NOT gated: it only mints a random
+// challenge (no member/credential oracle); its paired `finishPasskeyLogin` is.
+const authLimiter = createIpRateLimiter({ capacity: 5, refillPerSec: 1 / 30 });
+
+/** True when this caller's IP has exhausted its auth-attempt budget. */
+async function authThrottled(): Promise<boolean> {
+  const h = await headers();
+  const fwd = h.get("x-forwarded-for");
+  const ip = fwd
+    ? fwd.split(",")[0]!.trim()
+    : h.get("x-real-ip")?.trim() || "unknown";
+  return !authLimiter.check(ip).ok;
 }
 
 /**
@@ -201,6 +223,8 @@ export async function signIn(
     namespace: "validation",
   });
 
+  if (await authThrottled()) return { error: tv("tooManyAttempts") };
+
   const name = nickname.trim();
   if (!name) return { error: tv("enterName") };
 
@@ -235,6 +259,8 @@ export async function switchAccountAction(
     locale: await getLocale(),
     namespace: "validation",
   });
+
+  if (await authThrottled()) return { error: tv("tooManyAttempts") };
 
   const admin = createAdminClient();
   const { data: member } = await admin
@@ -309,6 +335,8 @@ export async function finishPasskeyLogin(
     locale: await getLocale(),
     namespace: "validation",
   });
+
+  if (await authThrottled()) return { error: tv("tooManyAttempts") };
 
   const store = await cookies();
   const challenge = store.get(CHAL_LOGIN)?.value;
@@ -513,6 +541,9 @@ export async function setPassphrase(
   const member = await requireSessionMember();
   if (!member) return { error: tv("notSignedIn") };
   if (!secret) return { error: tv("enterPassword") };
+  // Server-side floor mirroring the client form schema — the client min-length
+  // check is UX, not enforcement (a direct action call bypasses it).
+  if (secret.length < 8) return { error: tv("passwordMin") };
 
   const { salt, hash } = await hashSecret(secret);
   const admin = createAdminClient();
