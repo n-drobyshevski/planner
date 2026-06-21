@@ -18,6 +18,15 @@ import type {
 
 const RP_NAME = "Planner";
 
+// User-verification stance (deliberate, reviewed 2026-06): UV is "preferred" on
+// both ceremonies and not required on verify. This is a consumer planner for two
+// people, and the security property we rely on is passkey *possession* +
+// phishing-resistance; the session is additionally bridged behind a per-member
+// secret. Mandating UV ("required") would reject otherwise-valid authenticators
+// that can't or won't gesture (some cross-device/older platform authenticators)
+// for marginal benefit here. Revisit to "required" if the threat model changes
+// (e.g. shared devices or sensitive data added).
+
 /**
  * Derive the WebAuthn relying party from the incoming request. rpID is the
  * registrable domain (host without port) and origin is the full scheme+host the

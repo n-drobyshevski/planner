@@ -1,0 +1,12 @@
+-- Security hardening: revoke the stray EXECUTE grant on the trigger function
+-- `tasks_check_sequential_done()`.
+--
+-- A prior `CREATE OR REPLACE` re-granted Postgres's default `PUBLIC EXECUTE`
+-- without re-revoking, so prod drifted to `anon`/`authenticated` being able to
+-- call it via `/rest/v1/rpc/...` (flagged by the Supabase linter,
+-- 0028_anon_security_definer_function_executable). Its four sibling trigger
+-- functions are correctly locked to postgres/service_role. Direct invocation is
+-- not actually exploitable (Postgres refuses to call a `RETURNS trigger` function
+-- directly: SQLSTATE 0A000), but trigger functions need no EXECUTE grant at all —
+-- bring it in line with its siblings and clear the advisory.
+revoke all on function public.tasks_check_sequential_done() from public, anon, authenticated;
