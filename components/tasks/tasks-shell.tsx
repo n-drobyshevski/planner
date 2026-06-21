@@ -67,6 +67,11 @@ const CheckpointDialog = dynamic(loadCheckpointDialog, {
   ssr: false,
   loading: () => null,
 });
+// The read-only details panel (a clicked task's summary). Portaled → null
+// fallback; warmed on idle so the first click feels instant.
+const loadTaskDetails = () =>
+  import("./task-details").then((m) => m.TaskDetails);
+const TaskDetails = dynamic(loadTaskDetails, { ssr: false, loading: () => null });
 
 // The Flows view carries the SVG/zoom weight, so it's code-split out of the
 // initial /tasks JS and warmed on idle so the first switch is instant.
@@ -84,6 +89,7 @@ const TaskBoard = dynamic(loadTaskBoard, { ssr: false, loading: () => null });
 /** Overlays + the Board/Flows views, warmed during idle so first open is instant. */
 const OVERLAY_PRELOADS = [
   loadTaskDialog,
+  loadTaskDetails,
   loadScheduleTaskDialog,
   loadCheckpointDialog,
   loadTaskFlows,
@@ -304,6 +310,11 @@ export function TasksShell({
     (t: TaskRow) => progressById.get(t.id) ?? null,
     [progressById],
   );
+  // The details panel's target, re-resolved live (like editingTask) so inline
+  // edits made from the panel reflect immediately.
+  const detailsTask = dialogs.details
+    ? (tasks.find((t) => t.id === dialogs.details) ?? null)
+    : null;
   const editorState = dialogs.editor;
   const editingTask =
     editorState?.mode === "edit"
@@ -319,7 +330,9 @@ export function TasksShell({
 
   // One grouped prop for the views instead of a six-way handler drill.
   const actions: TaskActions = {
-    open: (t) => dialogs.openEdit(t.id),
+    // Click a task → its read-only details panel (mirrors the calendar's
+    // event-click → EventDetails). "Edit" inside the panel opens the full editor.
+    open: (t) => dialogs.openDetails(t.id),
     toggleDone: (t) => void mutations.toggleDone(t),
     move: (t, boardId, position) => void mutations.move(t, boardId, position),
     reorderFlow: (t, flowPos) => void mutations.reorderFlow(t, flowPos),
@@ -541,6 +554,91 @@ export function TasksShell({
             onOpenSubtask={(id) => dialogs.openEdit(id)}
           />
         )}
+
+      {detailsTask && workspace.data?.currentMember && (
+        <TaskDetails
+          open
+          onOpenChange={(o) => {
+            if (!o) dialogs.closeDetails();
+          }}
+          task={detailsTask}
+          color={colorOf(detailsTask)}
+          assigneeColor={
+            detailsTask.assigneeId
+              ? (memberMap.get(detailsTask.assigneeId)?.color ?? null)
+              : null
+          }
+          assigneeName={
+            detailsTask.assigneeId
+              ? (memberMap.get(detailsTask.assigneeId)?.name ?? null)
+              : null
+          }
+          ownerName={memberMap.get(detailsTask.ownerId)?.name ?? ""}
+          categoryName={
+            detailsTask.categoryId
+              ? (catMap.get(detailsTask.categoryId)?.name ?? null)
+              : null
+          }
+          categoryColor={
+            detailsTask.categoryId
+              ? (catMap.get(detailsTask.categoryId)?.color ?? null)
+              : null
+          }
+          boardName={
+            detailsTask.boardId
+              ? (allBoards.find((b) => b.id === detailsTask.boardId)?.name ?? null)
+              : null
+          }
+          boards={activeBoards}
+          isOwn={detailsTask.ownerId === workspace.data.currentMember.id}
+          done={detailsTask.completedAt != null}
+          blocked={dependencyBlocked.has(detailsTask.id)}
+          progress={progressFor(detailsTask)}
+          subtasks={childrenByParent.get(detailsTask.id) ?? []}
+          subtaskColorOf={colorOf}
+          blockedBy={dependencies
+            .filter((d) => d.taskId === detailsTask.id)
+            .map((d) => tasks.find((tk) => tk.id === d.dependsOnTaskId))
+            .filter((tk): tk is TaskRow => tk != null)}
+          scheduledBlocks={blocksByTask.get(detailsTask.id) ?? []}
+          onEdit={() => dialogs.editFromDetails(detailsTask.id)}
+          onDelete={() => dialogs.deleteFromDetails(detailsTask)}
+          onToggleDone={() => void mutations.toggleDone(detailsTask)}
+          onSchedule={() => dialogs.scheduleFromDetails(detailsTask)}
+          onAddSubtask={() => {
+            dialogs.openCreate(undefined, detailsTask.id);
+            dialogs.closeDetails();
+          }}
+          onChangeColor={(color) =>
+            void mutations.update(
+              detailsTask.id,
+              { color },
+              { color: detailsTask.color },
+              { color },
+            )
+          }
+          onChangePriority={(priority) =>
+            void mutations.update(
+              detailsTask.id,
+              { priority },
+              { priority: detailsTask.priority },
+              { priority },
+            )
+          }
+          onMoveToBoard={(boardId) => {
+            if (boardId === detailsTask.boardId) return;
+            // Land at the end of the target column (fractional position, like the
+            // board DnD), so the move slots in without renumbering.
+            const inTarget = collectionTasks.filter((tk) => tk.boardId === boardId);
+            const last = inTarget.length
+              ? Math.max(...inTarget.map((tk) => tk.position))
+              : null;
+            void mutations.move(detailsTask, boardId, positionBetween(last, null));
+          }}
+          onOpenSubtask={(id) => dialogs.openDetails(id)}
+          onToggleSubtaskDone={(st) => void mutations.toggleDone(st)}
+        />
+      )}
 
       {checkpointEditor &&
         workspace.data?.currentMember &&

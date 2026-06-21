@@ -10,6 +10,18 @@
     "medium": "Medium",
     "high": "High"
   },
+  "details": {
+    "untitled": "Untitled task",
+    "noColumn": "No column",
+    "starts": "Starts {date}",
+    "due": "Due {date}",
+    "noDueDate": "No due date",
+    "by": "by {name}",
+    "scheduledAt": "Scheduled {when}",
+    "more": "More",
+    "changeColor": "Change color",
+    "moveToColumn": "Move to column"
+  },
   "toolbar": {
     "view": "View",
     "board": "Board",

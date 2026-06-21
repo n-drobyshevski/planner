@@ -10,6 +10,18 @@
     "medium": "Средний",
     "high": "Высокий"
   },
+  "details": {
+    "untitled": "Задача без названия",
+    "noColumn": "Без колонки",
+    "starts": "Начало {date}",
+    "due": "Срок {date}",
+    "noDueDate": "Без срока",
+    "by": "от {name}",
+    "scheduledAt": "Запланировано {when}",
+    "more": "Ещё",
+    "changeColor": "Изменить цвет",
+    "moveToColumn": "Переместить в колонку"
+  },
   "toolbar": {
     "view": "Вид",
     "board": "Доска",
