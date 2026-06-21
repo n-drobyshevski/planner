@@ -1,0 +1,23 @@
+{
+  "header": "Active scheduled time",
+  "tracked": "Tracked",
+  "trackedCenter": "tracked",
+  "empty": {
+    "title": "No tracked time",
+    "description": "Schedule some events in this range to see where your time goes."
+  },
+  "stats": {
+    "total": "Total",
+    "dailyAvg": "Daily avg",
+    "busiestDay": "Busiest day",
+    "events": "Events",
+    "daysActive": "{active}/{total} days active"
+  },
+  "perDay": "Per day",
+  "perDayAria": "Tracked time per day for {range}",
+  "byContext": "By context",
+  "byMember": "By member",
+  "noContext": "No context",
+  "other": "Other",
+  "unknown": "Unknown"
+}

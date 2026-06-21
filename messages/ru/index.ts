@@ -2,6 +2,7 @@ import common from "./common.json";
 import nav from "./nav.json";
 import calendar from "./calendar.json";
 import tasks from "./tasks.json";
+import analytics from "./analytics.json";
 import insights from "./insights.json";
 import inbox from "./inbox.json";
 import sleep from "./sleep.json";
@@ -20,6 +21,7 @@ const messages = {
   nav,
   calendar,
   tasks,
+  analytics,
   insights,
   inbox,
   sleep,

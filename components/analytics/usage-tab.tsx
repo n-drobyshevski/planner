@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { tz } from "@date-fns/tz";
 import { Bar, BarChart, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { ChartColumnBig } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   ChartContainer,
   ChartTooltip,
@@ -104,6 +105,8 @@ export function UsageTab({
   members,
   overlayActive,
 }: UsageTabProps) {
+  const t = useTranslations("analytics");
+  const locale = useLocale();
   const reduced = usePrefersReducedMotion();
   const timeZone = useViewerTimeZone();
   const usage = React.useMemo(
@@ -112,24 +115,24 @@ export function UsageTab({
   );
 
   const total = usage.summary.totalMs;
-  const rangeLabel = formatRangeLabel(view, focusedDate, timeZone);
+  const rangeLabel = formatRangeLabel(view, focusedDate, timeZone, locale);
 
   const perDayData = React.useMemo(
     () =>
       usage.perDay.map((d) => ({
         key: String(d.dayMs),
         ms: d.ms,
-        full: formatWeekdayDayMonth(d.dayMs, timeZone),
+        full: formatWeekdayDayMonth(d.dayMs, timeZone, locale),
       })),
-    [usage.perDay, timeZone],
+    [usage.perDay, timeZone, locale],
   );
 
   const categoryData = React.useMemo(() => {
     const rows = usage.byCategory.map((c) => ({
       id: c.categoryId ?? "uncategorized",
       name: c.categoryId
-        ? (categories.get(c.categoryId)?.name ?? "Unknown")
-        : "No context",
+        ? (categories.get(c.categoryId)?.name ?? t("unknown"))
+        : t("noContext"),
       color: c.categoryId
         ? (categories.get(c.categoryId)?.color ?? NEUTRAL)
         : NEUTRAL,
@@ -138,8 +141,8 @@ export function UsageTab({
     if (rows.length <= TOP_CATEGORIES) return rows;
     const head = rows.slice(0, TOP_CATEGORIES);
     const restMs = rows.slice(TOP_CATEGORIES).reduce((s, r) => s + r.ms, 0);
-    return [...head, { id: "other", name: "Other", color: NEUTRAL, ms: restMs }];
-  }, [usage.byCategory, categories]);
+    return [...head, { id: "other", name: t("other"), color: NEUTRAL, ms: restMs }];
+  }, [usage.byCategory, categories, t]);
 
   const showMembers = overlayActive && usage.byMember.length > 1;
 
@@ -152,10 +155,8 @@ export function UsageTab({
             <EmptyMedia variant="icon">
               <ChartColumnBig />
             </EmptyMedia>
-            <EmptyTitle>No tracked time</EmptyTitle>
-            <EmptyDescription>
-              Schedule some events in this range to see where your time goes.
-            </EmptyDescription>
+            <EmptyTitle>{t("empty.title")}</EmptyTitle>
+            <EmptyDescription>{t("empty.description")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </div>
@@ -163,43 +164,50 @@ export function UsageTab({
   }
 
   const perDayConfig: ChartConfig = {
-    ms: { label: "Tracked", color: "var(--chart-1)" },
+    ms: { label: t("tracked"), color: "var(--chart-1)" },
   };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3">
       <header>
         <h3 className="font-heading text-sm font-semibold">{rangeLabel}</h3>
-        <p className="text-xs text-muted-foreground">Active scheduled time</p>
+        <p className="text-xs text-muted-foreground">{t("header")}</p>
       </header>
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard label="Total" value={formatDuration(total)} />
-        <StatCard label="Daily avg" value={formatDuration(usage.summary.dailyAverageMs)} />
+        <StatCard label={t("stats.total")} value={formatDuration(total, locale)} />
         <StatCard
-          label="Busiest day"
-          value={usage.summary.busiestDay ? formatDuration(usage.summary.busiestDay.ms) : "—"}
+          label={t("stats.dailyAvg")}
+          value={formatDuration(usage.summary.dailyAverageMs, locale)}
+        />
+        <StatCard
+          label={t("stats.busiestDay")}
+          value={
+            usage.summary.busiestDay
+              ? formatDuration(usage.summary.busiestDay.ms, locale)
+              : "—"
+          }
           hint={
             usage.summary.busiestDay
-              ? format(usage.summary.busiestDay.dayMs, "EEE d MMM", { in: tz(timeZone) })
+              ? formatWeekdayDayMonth(usage.summary.busiestDay.dayMs, timeZone, locale)
               : undefined
           }
         />
         <StatCard
-          label="Events"
+          label={t("stats.events")}
           value={String(usage.summary.eventCount)}
-          hint={`${usage.summary.activeDays}/${days.length} days active`}
+          hint={t("stats.daysActive", { active: usage.summary.activeDays, total: days.length })}
         />
       </div>
 
       {/* Per-day */}
       <section className="flex flex-col gap-1.5">
-        <SectionLabel>Per day</SectionLabel>
+        <SectionLabel>{t("perDay")}</SectionLabel>
         <ChartContainer
           config={perDayConfig}
           className="aspect-auto h-[140px] w-full"
-          aria-label={`Tracked time per day for ${rangeLabel}`}
+          aria-label={t("perDayAria", { range: rangeLabel })}
         >
           <BarChart data={perDayData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
             <XAxis
@@ -222,7 +230,7 @@ export function UsageTab({
                   }
                   formatter={(value) => (
                     <span className="font-mono font-medium tabular-nums">
-                      {formatDuration(Number(value))}
+                      {formatDuration(Number(value), locale)}
                     </span>
                   )}
                 />
@@ -240,7 +248,7 @@ export function UsageTab({
 
       {/* By context */}
       <section className="flex flex-col gap-2">
-        <SectionLabel>By context</SectionLabel>
+        <SectionLabel>{t("byContext")}</SectionLabel>
         <div className="relative mx-auto h-[150px] w-full">
           <ChartContainer config={{}} className="aspect-square h-[150px] w-full">
             <PieChart>
@@ -261,7 +269,7 @@ export function UsageTab({
                             {p.name}
                           </span>
                           <span className="font-mono tabular-nums">
-                            {formatDuration(Number(value))}
+                            {formatDuration(Number(value), locale)}
                           </span>
                         </div>
                       );
@@ -287,9 +295,9 @@ export function UsageTab({
           {/* Center total (overlay; doesn't intercept hover) */}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-base font-semibold tabular-nums leading-none">
-              {formatDuration(total)}
+              {formatDuration(total, locale)}
             </span>
-            <span className="mt-0.5 text-[11px] text-muted-foreground">tracked</span>
+            <span className="mt-0.5 text-[11px] text-muted-foreground">{t("trackedCenter")}</span>
           </div>
         </div>
         <ul className="flex flex-col gap-1">
@@ -302,7 +310,7 @@ export function UsageTab({
               />
               <span className="min-w-0 flex-1 truncate">{d.name}</span>
               <span className="font-mono tabular-nums text-muted-foreground">
-                {formatDuration(d.ms)}
+                {formatDuration(d.ms, locale)}
               </span>
               <span className="w-9 text-right font-mono tabular-nums text-muted-foreground/70">
                 {Math.round((d.ms / total) * 100)}%
@@ -315,7 +323,7 @@ export function UsageTab({
       {/* By member (only while overlaying others) */}
       {showMembers && (
         <section className="flex flex-col gap-2">
-          <SectionLabel>By member</SectionLabel>
+          <SectionLabel>{t("byMember")}</SectionLabel>
           <ul className="flex flex-col gap-2">
             {usage.byMember.map((m) => {
               const member = members.get(m.ownerId);
@@ -325,10 +333,10 @@ export function UsageTab({
                 <li key={m.ownerId} className="flex flex-col gap-1 text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0 flex-1 truncate">
-                      {member?.name ?? "Unknown"}
+                      {member?.name ?? t("unknown")}
                     </span>
                     <span className="font-mono tabular-nums text-muted-foreground">
-                      {formatDuration(m.ms)}
+                      {formatDuration(m.ms, locale)}
                     </span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
