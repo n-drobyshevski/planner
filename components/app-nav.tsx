@@ -38,8 +38,9 @@ export function AppNav() {
   const active = items.find(({ href }) => pathname.startsWith(href)) ?? items[0];
   const ActiveIcon = active.icon;
   const activeLabel = t(`surface.${active.labelKey}`);
-  // A quiet, warm-stone count — a number with a spoken label, never a bare red
-  // dot. Reserved terracotta stays for the active surface, not this.
+  // A small red (destructive-token) notification pip on the closed trigger. The
+  // exact count lives on the Inbox row of the open menu, and is folded into the
+  // trigger's aria-label so the signal is never color/shape alone.
   const inboxCount = useInboxCount();
   const inboxLabel = inboxCount > 0 ? t("inboxCount", { count: inboxCount }) : undefined;
 
@@ -49,25 +50,34 @@ export function AppNav() {
         <Button
           variant="outline"
           data-app-nav
-          aria-label={t("switcher.ariaLabel", { surface: activeLabel })}
-          className="h-8 gap-2 pl-1 pr-2.5"
+          aria-label={[
+            t("switcher.ariaLabel", { surface: activeLabel }),
+            inboxLabel,
+          ]
+            .filter(Boolean)
+            .join(". ")}
+          className="h-8 gap-1 px-1.5"
         >
           {/* The brand tile now lives inside the surface switcher, so the logo
               and the mode selector read as one control. It carries the active
-              surface's icon and updates as you switch. */}
-          <span className="flex size-6 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              surface's icon and updates as you switch. The closed trigger is
+              icon-only — the open menu and the aria-label both name the surface,
+              so the label text would only be redundant chrome here. */}
+          <span className="relative flex size-6 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ActiveIcon className="size-4" />
+            {/* A red pip (theme-aware --destructive token) signals a waiting
+                inbox item when you're elsewhere. The exact count stays on the
+                Inbox row in the open menu; the count is also folded into the
+                trigger's aria-label, so this dot is decorative for screen
+                readers. The background ring lifts it off both the tile and the
+                paper toolbar where it overflows the corner. */}
+            {inboxCount > 0 && active.href !== "/inbox" && (
+              <span
+                aria-hidden
+                className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive ring-2 ring-background"
+              />
+            )}
           </span>
-          {/* Phones: brand tile + chevron only — the header row is tight and the
-              aria-label already names the active surface. */}
-          <span className="hidden sm:inline">{activeLabel}</span>
-          {/* Surface the inbox count on the closed switcher when you're elsewhere,
-              so a waiting item is discoverable without opening the menu. */}
-          {inboxCount > 0 && active.href !== "/inbox" && (
-            <Badge variant="secondary" aria-label={inboxLabel} className="tabular-nums">
-              {inboxCount}
-            </Badge>
-          )}
           <ChevronDown className="size-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
