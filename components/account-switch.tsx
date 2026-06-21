@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PinInput } from "@/components/auth/pin-input";
+import { PasswordInput } from "@/components/auth/password-input";
 import { switchAccountAction } from "@/app/[locale]/login/actions";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import type { Locale } from "@/i18n/routing";
@@ -23,19 +23,19 @@ import type { Member } from "@/lib/types";
 export interface AccountSwitch {
   /** Workspace members the session can switch into (auth-linked, not current). */
   switchable: Member[];
-  /** Begin a switch: opens the PIN dialog when the target has a PIN, else now. */
+  /** Begin a switch: opens the password dialog when the target has one, else now. */
   onSelectSwitch: (member: Member) => void;
   /** True while a switch is in flight (disable the triggers). */
   pending: boolean;
-  /** The PIN prompt — render as a SIBLING of the menu, never inside it. */
+  /** The password prompt — render as a SIBLING of the menu, never inside it. */
   dialog: ReactNode;
 }
 
 /**
  * Account-switching shared by the desktop profile menu and the phone-only `⋯`
- * menus. The PIN `dialog` is returned separately so callers render it outside the
- * dropdown: selecting a menu item closes (unmounts) the dropdown, which would tear
- * a nested dialog down mid-flow.
+ * menus. The password `dialog` is returned separately so callers render it outside
+ * the dropdown: selecting a menu item closes (unmounts) the dropdown, which would
+ * tear a nested dialog down mid-flow.
  */
 export function useAccountSwitch(): AccountSwitch {
   const t = useTranslations("nav");
@@ -48,15 +48,15 @@ export function useAccountSwitch(): AccountSwitch {
     (m) => m.id !== current?.id && m.authUserId,
   );
 
-  // The member whose PIN we're collecting before switching (null = no dialog).
-  const [pinTarget, setPinTarget] = useState<Member | null>(null);
-  const [pin, setPin] = useState("");
+  // The member whose password we're collecting before switching (null = no dialog).
+  const [passwordTarget, setPasswordTarget] = useState<Member | null>(null);
+  const [password, setPassword] = useState("");
   const [pending, startTransition] = useTransition();
 
-  function runSwitch(member: Member, pinValue: string) {
+  function runSwitch(member: Member, passwordValue: string) {
     if (pending) return;
     startTransition(async () => {
-      const res = await switchAccountAction(member.id, pinValue);
+      const res = await switchAccountAction(member.id, passwordValue);
       if (res && "error" in res) {
         toast.error(res.error);
         return;
@@ -70,9 +70,9 @@ export function useAccountSwitch(): AccountSwitch {
   }
 
   function onSelectSwitch(member: Member) {
-    if (member.hasPin) {
-      setPin("");
-      setPinTarget(member);
+    if (member.hasPassword) {
+      setPassword("");
+      setPasswordTarget(member);
     } else {
       runSwitch(member, "");
     }
@@ -82,35 +82,42 @@ export function useAccountSwitch(): AccountSwitch {
     // Controlled as a sibling of the menu (not nested in its content) so the
     // dropdown can close cleanly without a focus race.
     <Dialog
-      open={pinTarget !== null}
+      open={passwordTarget !== null}
       onOpenChange={(open) => {
-        if (!open) setPinTarget(null);
+        if (!open) setPasswordTarget(null);
       }}
     >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {t("userMenu.switchDialog.title", { name: pinTarget?.name ?? "" })}
+            {t("userMenu.switchDialog.title", { name: passwordTarget?.name ?? "" })}
           </DialogTitle>
           <DialogDescription>
-            {t("userMenu.switchDialog.description", { name: pinTarget?.name ?? "" })}
+            {t("userMenu.switchDialog.description", { name: passwordTarget?.name ?? "" })}
           </DialogDescription>
         </DialogHeader>
         <form
           className="flex flex-col gap-1.5"
           onSubmit={(e) => {
             e.preventDefault();
-            if (pinTarget) runSwitch(pinTarget, pin);
+            if (passwordTarget) runSwitch(passwordTarget, password);
           }}
         >
-          <PinInput value={pin} onChange={setPin} disabled={pending} autoFocus />
+          <PasswordInput
+            label={t("userMenu.switchDialog.passwordLabel")}
+            value={password}
+            onChange={setPassword}
+            disabled={pending}
+            autoFocus
+            autoComplete="current-password"
+          />
           <DialogFooter className="mt-4">
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={pending}>
                 {t("userMenu.switchDialog.cancel")}
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={pending || pin.length !== 8}>
+            <Button type="submit" disabled={pending || password.length === 0}>
               {pending
                 ? t("userMenu.switchDialog.switching")
                 : t("userMenu.switchDialog.submit")}

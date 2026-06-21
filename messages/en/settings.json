@@ -13,7 +13,7 @@
   },
   "profile": {
     "title": "Profile",
-    "description": "Your name and the PIN used when switching to your profile.",
+    "description": "Your name and the password used when switching to your profile.",
     "displayName": {
       "legend": "Display name",
       "description": "Shown on your calendar, your avatar, and when switching profiles.",
@@ -25,42 +25,46 @@
       "description": "Tints your avatar and your events on the calendar (unless an event sets its own color).",
       "ariaLabel": "Profile color"
     },
-    "pin": {
-      "legend": "PIN",
-      "descriptionSet": "An 8-digit PIN is required when switching to your profile.",
-      "descriptionUnset": "No PIN set — add one to lock your profile when switching.",
-      "set": "Set PIN",
-      "change": "Change PIN",
-      "remove": "Remove PIN",
+    "password": {
+      "legend": "Password",
+      "descriptionSet": "A password is required when switching to your profile.",
+      "descriptionUnset": "No password set — add one to lock your profile when switching.",
+      "set": "Set password",
+      "change": "Change password",
+      "remove": "Remove password",
       "dialog": {
         "set": {
-          "title": "Set PIN",
-          "description": "Choose an 8-digit PIN to require when switching to your profile.",
-          "submit": "Set PIN"
+          "title": "Set password",
+          "description": "Choose a password to require when switching to your profile.",
+          "submit": "Set password"
         },
         "change": {
-          "title": "Change PIN",
-          "description": "Enter your current PIN, then choose a new one.",
-          "submit": "Change PIN"
+          "title": "Change password",
+          "description": "Enter your current password, then choose a new one.",
+          "submit": "Change password"
         },
         "remove": {
-          "title": "Remove PIN",
-          "description": "Enter your current PIN to remove it. Your profile won't be locked.",
-          "submit": "Remove PIN"
+          "title": "Remove password",
+          "description": "Enter your current password to remove it. Your profile won't be locked.",
+          "submit": "Remove password"
         }
       },
-      "currentLabel": "Current PIN",
-      "newLabel": "New PIN",
-      "newLabelLong": "New 8-digit PIN",
-      "confirmLabel": "Confirm PIN",
-      "showLabel": "Show {label}",
-      "hideLabel": "Hide {label}",
-      "mismatch": "PINs don't match.",
-      "incorrect": "Incorrect PIN."
+      "currentLabel": "Current password",
+      "newLabel": "New password",
+      "confirmLabel": "Confirm password",
+      "tooShort": "Use at least 8 characters.",
+      "mismatch": "Passwords don't match.",
+      "incorrect": "Incorrect password.",
+      "strength": {
+        "label": "Strength",
+        "weak": "Weak",
+        "fair": "Fair",
+        "strong": "Strong"
+      }
     },
     "passkeys": {
       "legend": "Passkeys",
-      "description": "Sign in with Face ID, a fingerprint, or your device — the strongest, fastest way in. Your PIN stays as a fallback.",
+      "description": "Sign in with Face ID, a fingerprint, or your device — the strongest, fastest way in. Your password stays as a fallback.",
       "unsupported": "This device or browser doesn't support passkeys.",
       "add": "Add a passkey",
       "remove": "Remove passkey",

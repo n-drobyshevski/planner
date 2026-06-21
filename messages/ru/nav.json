@@ -17,7 +17,8 @@
     "signOut": "Выйти",
     "switchDialog": {
       "title": "Войти как {name}",
-      "description": "Введи PIN-код {name}, чтобы переключиться на этот аккаунт.",
+      "description": "Введи пароль {name}, чтобы переключиться на этот аккаунт.",
+      "passwordLabel": "Пароль",
       "cancel": "Отмена",
       "submit": "Переключиться",
       "switching": "Переключаемся…"

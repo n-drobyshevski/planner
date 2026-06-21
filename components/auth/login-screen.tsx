@@ -10,14 +10,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { PinInput } from "@/components/auth/pin-input";
+import { PasswordInput } from "@/components/auth/password-input";
 import { signIn } from "@/app/[locale]/login/actions";
 import { passkeyLogin, browserSupportsWebAuthn } from "@/lib/auth/passkey-client";
 
 /**
- * Nickname + PIN sign-in. The member is found by name; their PIN (when set) is
- * verified server-side before the session is established. On success the action
- * redirects, so a returned value only ever signals failure.
+ * Nickname + password sign-in. The member is found by name; their password (when
+ * set) is verified server-side before the session is established. On success the
+ * action redirects, so a returned value only ever signals failure.
  */
 export function LoginScreen() {
   const t = useTranslations("auth");
@@ -51,19 +51,21 @@ export function LoginScreen() {
     () =>
       z.object({
         name: z.string().trim().min(1, tv("nameRequired")),
-        // Blank = no PIN set; otherwise the full 8 digits (verified server-side).
-        pin: z.literal("").or(z.string().length(8, tv("pinLength"))),
+        // Blank = no password set; otherwise whatever they typed (verified
+        // server-side). No length rule here — it would block a shorter stored
+        // secret and login isn't where a policy belongs.
+        password: z.string(),
       }),
     [tv],
   );
 
   const form = useForm({
-    defaultValues: { name: "", pin: "" },
+    defaultValues: { name: "", password: "" },
     validators: { onSubmit: loginFormSchema },
     onSubmit: ({ value }) => {
       if (pending) return;
       startTransition(async () => {
-        const res = await signIn(value.name.trim(), value.pin);
+        const res = await signIn(value.name.trim(), value.password);
         if (res && "error" in res) toast.error(res.error);
       });
     },
@@ -122,25 +124,26 @@ export function LoginScreen() {
             }}
           </form.Field>
 
-          <form.Field name="pin">
+          <form.Field name="password">
             {(field) => {
               const isInvalid =
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
-                <div className="flex flex-col items-center gap-1.5">
-                  <PinInput
+                <div className="flex flex-col gap-1.5">
+                  <PasswordInput
+                    id="login-password"
+                    name={field.name}
+                    label={t("passwordLabel")}
                     value={field.state.value}
                     onChange={field.handleChange}
                     disabled={pending}
+                    autoComplete="current-password"
                   />
                   {isInvalid ? (
-                    <FieldError
-                      className="self-start"
-                      errors={field.state.meta.errors}
-                    />
+                    <FieldError errors={field.state.meta.errors} />
                   ) : (
-                    <span className="self-start text-xs text-muted-foreground">
-                      {t("pinHint")}
+                    <span className="text-xs text-muted-foreground">
+                      {t("passwordHint")}
                     </span>
                   )}
                 </div>

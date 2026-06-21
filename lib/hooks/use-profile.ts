@@ -31,11 +31,11 @@ function patchCachedMember(
 }
 
 /**
- * Profile edits for the signed-in member: display name and the 8-digit PIN
- * "UX gate". The member row in Supabase is the source of truth; changes patch
- * the query cache optimistically and roll back on failure (mirrors
- * usePreferences). PIN values are hashed (sha256Hex) before they leave the
- * client; only `pin_hash` is ever written.
+ * Profile edits for the signed-in member: display name and the password gate
+ * used when switching profiles. The member row in Supabase is the source of
+ * truth; changes patch the query cache optimistically and roll back on failure
+ * (mirrors usePreferences). The password is hashed server-side (salted scrypt in
+ * member_secrets); the plaintext only crosses the wire to the server action.
  */
 export function useProfile() {
   const workspace = useWorkspace();
@@ -88,23 +88,25 @@ export function useProfile() {
     [member, optimistic],
   );
 
-  /** Compare a candidate PIN against the stored secret (verified server-side, scrypt). */
-  const verifyCurrentPin = useCallback(
-    (pin: string): Promise<boolean> => verifyCurrentSecret(pin),
+  /** Compare a candidate password against the stored secret (server-side, scrypt). */
+  const verifyCurrentPassword = useCallback(
+    (password: string): Promise<boolean> => verifyCurrentSecret(password),
     [],
   );
 
-  /** Set a new PIN (string) or clear it (null). Hashed with salted scrypt server-side. */
-  const savePin = useCallback(
-    async (pin: string | null) => {
+  /** Set a new password (string) or clear it (null). Hashed with salted scrypt server-side. */
+  const savePassword = useCallback(
+    async (password: string | null) => {
       if (!member) return false;
       return optimistic(
-        { hasPin: pin != null },
+        { hasPassword: password != null },
         async () => {
-          const res = pin ? await setPassphrase(pin) : await removePassphrase();
+          const res = password
+            ? await setPassphrase(password)
+            : await removePassphrase();
           if ("error" in res) throw new Error(res.error);
         },
-        pin ? "PIN updated" : "PIN removed",
+        password ? "Password updated" : "Password removed",
       );
     },
     [member, optimistic],
@@ -116,7 +118,7 @@ export function useProfile() {
     isReady: member != null,
     saveName,
     saveColor,
-    verifyCurrentPin,
-    savePin,
+    verifyCurrentPassword,
+    savePassword,
   };
 }

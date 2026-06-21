@@ -19,7 +19,7 @@ const member = (id: string, color: string): Member => ({
   authUserId: null,
   name: id,
   color,
-  hasPin: false,
+  hasPassword: false,
   hasPasskey: false,
   locale: "en",
   themePreference: "system",

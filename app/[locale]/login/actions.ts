@@ -96,7 +96,7 @@ async function seedAppearanceCookie(member: {
   );
 }
 
-export type SignInResult = { error: string; needsPin?: boolean };
+export type SignInResult = { error: string; needsPassword?: boolean };
 
 /**
  * Mint a Supabase session for a verified member: resolve the server-held
@@ -180,21 +180,21 @@ async function authenticateMember(
   });
 
   const { required, ok } = await checkSecret(member, secret);
-  if (required && !secret) return { error: tv("enterPin"), needsPin: true };
-  if (!ok) return { error: tv("incorrectPin") };
+  if (required && !secret) return { error: tv("enterPassword"), needsPassword: true };
+  if (!ok) return { error: tv("incorrectPassword") };
 
   return mintSession(member);
 }
 
 /**
- * Sign in by typed nickname + PIN/passphrase. Looks the member up by their
- * current name, verifies the secret (when one is set), then signs in with the
+ * Sign in by typed nickname + password. Looks the member up by their current
+ * name, verifies the secret (when one is set), then signs in with the
  * server-held credentials linked to that member's auth user. On success this
  * redirects to /calendar.
  */
 export async function signIn(
   nickname: string,
-  pin: string,
+  password: string,
 ): Promise<SignInResult | void> {
   const tv = await getTranslations({
     locale: await getLocale(),
@@ -214,7 +214,7 @@ export async function signIn(
 
   if (!member) return { error: tv("memberNotFound") };
 
-  const failure = await authenticateMember(member as MemberRow, pin);
+  const failure = await authenticateMember(member as MemberRow, password);
   if (failure) return failure;
 
   redirect({ href: "/calendar", locale: await getLocale() });
@@ -229,7 +229,7 @@ export async function signIn(
  */
 export async function switchAccountAction(
   memberId: string,
-  pin: string,
+  password: string,
 ): Promise<SignInResult | void> {
   const tv = await getTranslations({
     locale: await getLocale(),
@@ -245,7 +245,7 @@ export async function switchAccountAction(
 
   if (!member) return { error: tv("memberNotFound") };
 
-  const failure = await authenticateMember(member as MemberRow, pin);
+  const failure = await authenticateMember(member as MemberRow, password);
   if (failure) return failure;
   // Success: no redirect — the client hard-navigates to reset cached state.
 }
@@ -512,7 +512,7 @@ export async function setPassphrase(
   const tv = await getTranslations({ locale: await getLocale(), namespace: "validation" });
   const member = await requireSessionMember();
   if (!member) return { error: tv("notSignedIn") };
-  if (!secret) return { error: tv("enterPin") };
+  if (!secret) return { error: tv("enterPassword") };
 
   const { salt, hash } = await hashSecret(secret);
   const admin = createAdminClient();

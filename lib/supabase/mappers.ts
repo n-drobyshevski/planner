@@ -46,7 +46,7 @@ export function mapMember(r: Row): Member {
     authUserId: (r.auth_user_id as string | null) ?? null,
     name: r.name as string,
     color: r.color as string,
-    hasPin: r.has_secret === true || r.pin_hash != null,
+    hasPassword: r.has_secret === true || r.pin_hash != null,
     hasPasskey: r.has_passkey === true,
     locale: (r.locale as AppLocale | null) ?? "en",
     themePreference: (r.theme_preference as ThemePreference | null) ?? "system",

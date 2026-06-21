@@ -4,7 +4,7 @@ import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
-import { Check, Cloud, Eye, EyeOff, KeyRound, Laptop, Trash2 } from "lucide-react";
+import { Check, Cloud, KeyRound, Laptop, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDayMonthYear, formatRelativeToNow } from "@/lib/datetime/format";
@@ -19,12 +19,8 @@ import { FieldSet, FieldLegend, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SWATCHES } from "@/components/shared/color-swatch-picker";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
+import { PasswordInput } from "@/components/auth/password-input";
+import { PasswordStrength } from "@/components/auth/password-strength";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -36,14 +32,22 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { useProfile } from "@/lib/hooks/use-profile";
 
-type PinMode = "set" | "change" | "remove";
+type PasswordMode = "set" | "change" | "remove";
 
 export function ProfileSettings() {
   const t = useTranslations("settings");
   const tCommon = useTranslations("common");
-  const { member, isReady, saveName, saveColor, verifyCurrentPin, savePin } =
-    useProfile();
-  const [pinMode, setPinMode] = React.useState<PinMode | null>(null);
+  const {
+    member,
+    isReady,
+    saveName,
+    saveColor,
+    verifyCurrentPassword,
+    savePassword,
+  } = useProfile();
+  const [passwordMode, setPasswordMode] = React.useState<PasswordMode | null>(
+    null,
+  );
 
   return (
     <>
@@ -75,27 +79,27 @@ export function ProfileSettings() {
         )}
       </FieldSet>
 
-      {/* PIN */}
+      {/* Password */}
       <FieldSet>
-        <FieldLegend variant="label">{t("profile.pin.legend")}</FieldLegend>
+        <FieldLegend variant="label">{t("profile.password.legend")}</FieldLegend>
         <FieldDescription>
-          {member?.hasPin
-            ? t("profile.pin.descriptionSet")
-            : t("profile.pin.descriptionUnset")}
+          {member?.hasPassword
+            ? t("profile.password.descriptionSet")
+            : t("profile.password.descriptionUnset")}
         </FieldDescription>
         <div className="flex flex-wrap gap-2">
-          {member?.hasPin ? (
+          {member?.hasPassword ? (
             <>
-              <Button variant="outline" disabled={!isReady} onClick={() => setPinMode("change")}>
-                {t("profile.pin.change")}
+              <Button variant="outline" disabled={!isReady} onClick={() => setPasswordMode("change")}>
+                {t("profile.password.change")}
               </Button>
-              <Button variant="ghost" disabled={!isReady} onClick={() => setPinMode("remove")}>
-                {t("profile.pin.remove")}
+              <Button variant="ghost" disabled={!isReady} onClick={() => setPasswordMode("remove")}>
+                {t("profile.password.remove")}
               </Button>
             </>
           ) : (
-            <Button disabled={!isReady} onClick={() => setPinMode("set")}>
-              {t("profile.pin.set")}
+            <Button disabled={!isReady} onClick={() => setPasswordMode("set")}>
+              {t("profile.password.set")}
             </Button>
           )}
         </div>
@@ -105,11 +109,11 @@ export function ProfileSettings() {
       <PasskeysSection isReady={isReady} />
       </SettingsSection>
 
-      <PinDialog
-        mode={pinMode}
-        onClose={() => setPinMode(null)}
-        verifyCurrentPin={verifyCurrentPin}
-        savePin={savePin}
+      <PasswordDialog
+        mode={passwordMode}
+        onClose={() => setPasswordMode(null)}
+        verifyCurrentPassword={verifyCurrentPassword}
+        savePassword={savePassword}
       />
     </>
   );
@@ -350,16 +354,16 @@ function ColorPicker({
   );
 }
 
-function PinDialog({
+function PasswordDialog({
   mode,
   onClose,
-  verifyCurrentPin,
-  savePin,
+  verifyCurrentPassword,
+  savePassword,
 }: {
-  mode: PinMode | null;
+  mode: PasswordMode | null;
   onClose: () => void;
-  verifyCurrentPin: (pin: string) => Promise<boolean>;
-  savePin: (pin: string | null) => Promise<boolean>;
+  verifyCurrentPassword: (password: string) => Promise<boolean>;
+  savePassword: (password: string | null) => Promise<boolean>;
 }) {
   const t = useTranslations("settings");
   return (
@@ -367,18 +371,18 @@ function PinDialog({
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>
-            {mode ? t(`profile.pin.dialog.${mode}.title`) : ""}
+            {mode ? t(`profile.password.dialog.${mode}.title`) : ""}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            {mode ? t(`profile.pin.dialog.${mode}.description`) : ""}
+            {mode ? t(`profile.password.dialog.${mode}.description`) : ""}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         {/* Remounts per open (Radix unmounts closed content), so fields reset. */}
         {mode && (
-          <PinForm
+          <PasswordForm
             mode={mode}
-            verifyCurrentPin={verifyCurrentPin}
-            savePin={savePin}
+            verifyCurrentPassword={verifyCurrentPassword}
+            savePassword={savePassword}
             onClose={onClose}
           />
         )}
@@ -387,9 +391,13 @@ function PinDialog({
   );
 }
 
-/** New/confirm coupling lives in the schema; PIN lengths gate the button.
- *  The mismatch message is passed in so the (hook-free) schema stays localizable. */
-function pinFormSchema(mode: PinMode, mismatchMessage: string) {
+/** Minimum 8 characters; the new/confirm pair must match. Both messages are
+ *  passed in so the (hook-free) schema stays localizable. */
+function passwordFormSchema(
+  mode: PasswordMode,
+  minMessage: string,
+  mismatchMessage: string,
+) {
   const needsNew = mode === "set" || mode === "change";
   return z
     .object({
@@ -398,7 +406,11 @@ function pinFormSchema(mode: PinMode, mismatchMessage: string) {
       confirm: z.string(),
     })
     .superRefine((v, ctx) => {
-      if (needsNew && v.next !== v.confirm) {
+      if (!needsNew) return;
+      if (v.next.length < 8) {
+        ctx.addIssue({ code: "custom", path: ["next"], message: minMessage });
+      }
+      if (v.next !== v.confirm) {
         ctx.addIssue({
           code: "custom",
           path: ["confirm"],
@@ -408,15 +420,15 @@ function pinFormSchema(mode: PinMode, mismatchMessage: string) {
     });
 }
 
-function PinForm({
+function PasswordForm({
   mode,
-  verifyCurrentPin,
-  savePin,
+  verifyCurrentPassword,
+  savePassword,
   onClose,
 }: {
-  mode: PinMode;
-  verifyCurrentPin: (pin: string) => Promise<boolean>;
-  savePin: (pin: string | null) => Promise<boolean>;
+  mode: PasswordMode;
+  verifyCurrentPassword: (password: string) => Promise<boolean>;
+  savePassword: (password: string | null) => Promise<boolean>;
   onClose: () => void;
 }) {
   const t = useTranslations("settings");
@@ -424,34 +436,41 @@ function PinForm({
   const needsCurrent = mode === "change" || mode === "remove";
   const needsNew = mode === "set" || mode === "change";
 
-  // Failures the schema can't know about (wrong current PIN, server error).
+  // Failures the schema can't know about (wrong current password, server error).
   const [error, setError] = React.useState<string | null>(null);
 
   const form = useForm({
     defaultValues: { current: "", next: "", confirm: "" },
-    validators: { onSubmit: pinFormSchema(mode, t("profile.pin.mismatch")) },
+    validators: {
+      onSubmit: passwordFormSchema(
+        mode,
+        t("profile.password.tooShort"),
+        t("profile.password.mismatch"),
+      ),
+    },
     onSubmit: async ({ value }) => {
       setError(null);
-      if (needsCurrent && !(await verifyCurrentPin(value.current))) {
-        setError(t("profile.pin.incorrect"));
+      if (needsCurrent && !(await verifyCurrentPassword(value.current))) {
+        setError(t("profile.password.incorrect"));
         return;
       }
-      const ok = await savePin(mode === "remove" ? null : value.next);
+      const ok = await savePassword(mode === "remove" ? null : value.next);
       if (ok) onClose();
     },
   });
 
   return (
     <>
-      <ResponsiveDialogBody className="flex flex-col items-center gap-5 py-3">
+      <ResponsiveDialogBody className="flex flex-col gap-5 py-3">
         {needsCurrent && (
           <form.Field name="current">
             {(field) => (
-              <PinInput
-                label={t("profile.pin.currentLabel")}
+              <PasswordInput
+                label={t("profile.password.currentLabel")}
                 value={field.state.value}
                 onChange={field.handleChange}
                 autoFocus
+                autoComplete="current-password"
               />
             )}
           </form.Field>
@@ -460,28 +479,38 @@ function PinForm({
           <>
             <form.Field name="next">
               {(field) => (
-                <PinInput
-                  label={mode === "change" ? t("profile.pin.newLabel") : t("profile.pin.newLabelLong")}
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  autoFocus={!needsCurrent}
-                />
+                <div className="flex flex-col gap-2">
+                  <PasswordInput
+                    label={t("profile.password.newLabel")}
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                    autoFocus={!needsCurrent}
+                    autoComplete="new-password"
+                  />
+                  <PasswordStrength value={field.state.value} />
+                </div>
               )}
             </form.Field>
             <form.Field name="confirm">
               {(field) => (
-                <PinInput
-                  label={t("profile.pin.confirmLabel")}
+                <PasswordInput
+                  label={t("profile.password.confirmLabel")}
                   value={field.state.value}
                   onChange={field.handleChange}
+                  autoComplete="new-password"
                 />
               )}
             </form.Field>
           </>
         )}
-        <form.Subscribe selector={(s) => s.fieldMeta.confirm?.errors}>
-          {(errors) => {
-            const message = error ?? errors?.[0]?.message;
+        <form.Subscribe
+          selector={(s) =>
+            [s.fieldMeta.next?.errors, s.fieldMeta.confirm?.errors] as const
+          }
+        >
+          {([nextErrors, confirmErrors]) => {
+            const message =
+              error ?? nextErrors?.[0]?.message ?? confirmErrors?.[0]?.message;
             return message ? (
               <p role="alert" className="text-sm text-destructive">
                 {message}
@@ -497,9 +526,9 @@ function PinForm({
           {([isSubmitting, values]) => {
             const canSubmit =
               !isSubmitting &&
-              (!needsCurrent || values.current.length === 8) &&
+              (!needsCurrent || values.current.length > 0) &&
               (!needsNew ||
-                (values.next.length === 8 && values.confirm.length === 8));
+                (values.next.length >= 8 && values.confirm.length >= 8));
             return (
               <>
                 <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
@@ -510,7 +539,7 @@ function PinForm({
                   disabled={!canSubmit}
                   variant={mode === "remove" ? "destructive" : "default"}
                 >
-                  {isSubmitting ? tCommon("saving") : t(`profile.pin.dialog.${mode}.submit`)}
+                  {isSubmitting ? tCommon("saving") : t(`profile.password.dialog.${mode}.submit`)}
                 </Button>
               </>
             );
@@ -518,55 +547,5 @@ function PinForm({
         </form.Subscribe>
       </ResponsiveDialogFooter>
     </>
-  );
-}
-
-function PinInput({
-  label,
-  value,
-  onChange,
-  autoFocus,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  autoFocus?: boolean;
-}) {
-  const t = useTranslations("settings");
-  const [show, setShow] = React.useState(false);
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <button
-          type="button"
-          onClick={() => setShow((s) => !s)}
-          className="flex items-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={show ? t("profile.pin.hideLabel", { label }) : t("profile.pin.showLabel", { label })}
-          aria-pressed={show}
-        >
-          {show ? (
-            <EyeOff className="size-3.5" aria-hidden />
-          ) : (
-            <Eye className="size-3.5" aria-hidden />
-          )}
-        </button>
-      </div>
-      <InputOTP maxLength={8} value={value} onChange={onChange} autoFocus={autoFocus}>
-        <InputOTPGroup>
-          <InputOTPSlot index={0} mask={!show} />
-          <InputOTPSlot index={1} mask={!show} />
-          <InputOTPSlot index={2} mask={!show} />
-          <InputOTPSlot index={3} mask={!show} />
-        </InputOTPGroup>
-        <InputOTPSeparator />
-        <InputOTPGroup>
-          <InputOTPSlot index={4} mask={!show} />
-          <InputOTPSlot index={5} mask={!show} />
-          <InputOTPSlot index={6} mask={!show} />
-          <InputOTPSlot index={7} mask={!show} />
-        </InputOTPGroup>
-      </InputOTP>
-    </div>
   );
 }

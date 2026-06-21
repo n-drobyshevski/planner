@@ -17,7 +17,8 @@
     "signOut": "Sign out",
     "switchDialog": {
       "title": "Switch to {name}",
-      "description": "Enter {name}'s PIN to switch to their account.",
+      "description": "Enter {name}'s password to switch to their account.",
+      "passwordLabel": "Password",
       "cancel": "Cancel",
       "submit": "Switch",
       "switching": "Switching…"
