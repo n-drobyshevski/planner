@@ -173,27 +173,36 @@
 
   /* The 14 accent swatches — picker dots AND (via toPaletteColor) event/task/
      category/member colors. Catppuccin palette blocks remap these so everything
-     re-tints to the active flavor; in the default palette they stay these warm
-     hexes (so rendering is unchanged). --swatch-ink is the legible text/check
-     color over a filled swatch (white here; flavors use their dark crust). */
-  --swatch-rosewater: #b0645a;
-  --swatch-flamingo: #bf5d5d;
-  --swatch-pink: #be185d;
-  --swatch-mauve: #7c3aed;
-  --swatch-red: #c62828;
-  --swatch-maroon: #a23a4a;
-  --swatch-peach: #c0492a;
-  --swatch-yellow: #b45309;
-  --swatch-green: #15803d;
-  --swatch-teal: #0f766e;
-  --swatch-sky: #0e7490;
-  --swatch-sapphire: #1668a8;
-  --swatch-blue: #0369a1;
-  --swatch-lavender: #6d5dd6;
-  /* Warm-neutral brand-default accent; mid-dark so white ink stays valid in
-     both themes (the default-palette swatches do not lighten for dark, the same
-     way --swatch-peach / --member-a stay #c0492a). */
-  --swatch-stone: #57534e;
+     re-tints to the active flavor; in the default palette they're a gently
+     lightened take on the ACCENTS hexes (lightness raised in OKLCH, hue + chroma
+     held) so colour-coded fills sit more quietly behind the schedule. These
+     match the canonical ACCENTS[].swatch hexes (lib/theme/appearance.ts); items
+     render through these vars, and pre-lightening hexes still resolve via
+     LEGACY_ACCENT_HEX there, so no data migration was needed. Each value keeps
+     white ink ≥4.6:1 on the
+     rendered (chroma-trimmed, see eventFillStyle) fill. rosewater + flamingo were
+     below white-on-fill AA at their old values, so they nudge slightly *darker*
+     here to reach AA. --swatch-ink is the legible text/check colour over a filled
+     swatch (white here; flavors use their dark crust). */
+  --swatch-rosewater: #ab6056;
+  --swatch-flamingo: #b75556;
+  --swatch-pink: #d02f6b;
+  --swatch-mauve: #8749fb;
+  --swatch-red: #d43834;
+  --swatch-maroon: #b34958;
+  --swatch-peach: #c54e2f;
+  --swatch-yellow: #b95813;
+  --swatch-green: #1f8643;
+  --swatch-teal: #23827a;
+  --swatch-sky: #217e9b;
+  --swatch-sapphire: #2a77b8;
+  --swatch-blue: #2078b1;
+  --swatch-lavender: #7162db;
+  /* Warm-neutral brand-default accent; lightened for category use while the
+     brand accent --primary / --ring stays #57534e. Mid-tone so white ink stays
+     valid in both themes (the default-palette swatches do not lighten for dark,
+     the same way --member-a stays #c0492a). */
+  --swatch-stone: #65615c;
   --swatch-ink: #ffffff;
 }
 

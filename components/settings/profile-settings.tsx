@@ -22,6 +22,7 @@ import { FieldSet, FieldLegend, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SWATCHES } from "@/components/shared/color-swatch-picker";
+import { accentIdForHex } from "@/lib/theme/appearance";
 import { PasswordInput } from "@/components/auth/password-input";
 import { PasswordStrength } from "@/components/auth/password-strength";
 import {
@@ -336,7 +337,7 @@ function ColorPicker({
   return (
     <div role="radiogroup" aria-label={t("profile.color.ariaLabel")} className="flex flex-wrap gap-3">
       {SWATCHES.map((s) => {
-        const selected = value.toLowerCase() === s.value.toLowerCase();
+        const selected = accentIdForHex(value) === s.id;
         return (
           <button
             key={s.id}

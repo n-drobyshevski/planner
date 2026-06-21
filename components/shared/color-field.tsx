@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { toPaletteColor } from "@/lib/theme/appearance";
+import { accentIdForHex, toPaletteColor } from "@/lib/theme/appearance";
 import { ColorSwatchPicker, SWATCHES } from "./color-swatch-picker";
 
 /**
@@ -33,7 +33,7 @@ export function ColorField({
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
   const swatch = value
-    ? SWATCHES.find((s) => s.value.toLowerCase() === value.toLowerCase())
+    ? SWATCHES.find((s) => s.id === accentIdForHex(value))
     : undefined;
   const label =
     swatch?.label ?? (value ? t("colorField.custom") : t("colorField.default"));

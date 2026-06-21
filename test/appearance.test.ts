@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  accentIdForHex,
   eventFillStyle,
   normalizePalette,
   normalizePinkBase,
@@ -78,6 +79,25 @@ describe("eventFillStyle", () => {
       borderColor: "#123456",
       color: "var(--foreground)",
     });
+  });
+});
+
+describe("accentIdForHex", () => {
+  it("resolves the current (lightened) swatch hex to its token", () => {
+    expect(accentIdForHex("#23827a")).toBe("teal"); // current teal
+    expect(accentIdForHex("#c54e2f")).toBe("peach"); // current peach
+  });
+
+  it("still resolves the pre-lightening (legacy) hex to the same token", () => {
+    expect(accentIdForHex("#0f766e")).toBe("teal"); // legacy teal
+    expect(accentIdForHex("#c0492a")).toBe("peach"); // legacy peach
+  });
+
+  it("is case-insensitive and returns undefined for custom/empty colors", () => {
+    expect(accentIdForHex("#C0492A")).toBe("peach");
+    expect(accentIdForHex("#123456")).toBeUndefined();
+    expect(accentIdForHex(null)).toBeUndefined();
+    expect(accentIdForHex(undefined)).toBeUndefined();
   });
 });
 

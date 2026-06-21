@@ -25,36 +25,37 @@ export const DEFAULT_PINK_BASE = "#ec4899";
 export interface AccentPreset {
   id: AccentId;
   label: string;
-  /** The default-(warm)-palette light hex — the picker dot's color in the default
-   *  palette and the reverse-map key for adapting stored item colors. Catppuccin
-   *  flavors remap it via the --swatch-* vars in globals.css. */
+  /** The canonical default-palette hex for this accent — the lightened value the
+   *  `--swatch-<id>` var paints (see app/globals.css) and the hex new picks store.
+   *  Pre-lightening hexes still resolve via LEGACY_ACCENT_HEX. Catppuccin flavors
+   *  remap the var, not this hex. */
   swatch: string;
 }
 
 /**
  * The accent picker: warm `stone` (the warm-neutral brand default, not a
  * Catppuccin hue) followed by the 14 Catppuccin accent colors (Catppuccin's
- * canonical order). `swatch` is the warm default-palette interpretation of each;
+ * canonical order). `swatch` is the lightened default-palette hex each renders as;
  * `stone` is the default and lives in :root, `peach` (the former brand terracotta)
  * gets a restore block. The literal Catppuccin hex per flavor lives in the
  * [data-palette="catppuccin-*"] --swatch-* blocks in app/globals.css.
  */
 export const ACCENTS: readonly AccentPreset[] = [
-  { id: "stone", label: "Stone", swatch: "#57534e" },
-  { id: "rosewater", label: "Rosewater", swatch: "#b0645a" },
-  { id: "flamingo", label: "Flamingo", swatch: "#bf5d5d" },
-  { id: "pink", label: "Pink", swatch: "#be185d" },
-  { id: "mauve", label: "Mauve", swatch: "#7c3aed" },
-  { id: "red", label: "Red", swatch: "#c62828" },
-  { id: "maroon", label: "Maroon", swatch: "#a23a4a" },
-  { id: "peach", label: "Peach", swatch: "#c0492a" },
-  { id: "yellow", label: "Yellow", swatch: "#b45309" },
-  { id: "green", label: "Green", swatch: "#15803d" },
-  { id: "teal", label: "Teal", swatch: "#0f766e" },
-  { id: "sky", label: "Sky", swatch: "#0e7490" },
-  { id: "sapphire", label: "Sapphire", swatch: "#1668a8" },
-  { id: "blue", label: "Blue", swatch: "#0369a1" },
-  { id: "lavender", label: "Lavender", swatch: "#6d5dd6" },
+  { id: "stone", label: "Stone", swatch: "#65615c" },
+  { id: "rosewater", label: "Rosewater", swatch: "#ab6056" },
+  { id: "flamingo", label: "Flamingo", swatch: "#b75556" },
+  { id: "pink", label: "Pink", swatch: "#d02f6b" },
+  { id: "mauve", label: "Mauve", swatch: "#8749fb" },
+  { id: "red", label: "Red", swatch: "#d43834" },
+  { id: "maroon", label: "Maroon", swatch: "#b34958" },
+  { id: "peach", label: "Peach", swatch: "#c54e2f" },
+  { id: "yellow", label: "Yellow", swatch: "#b95813" },
+  { id: "green", label: "Green", swatch: "#1f8643" },
+  { id: "teal", label: "Teal", swatch: "#23827a" },
+  { id: "sky", label: "Sky", swatch: "#217e9b" },
+  { id: "sapphire", label: "Sapphire", swatch: "#2a77b8" },
+  { id: "blue", label: "Blue", swatch: "#2078b1" },
+  { id: "lavender", label: "Lavender", swatch: "#7162db" },
 ] as const;
 
 export interface TonePreset {
@@ -148,12 +149,39 @@ const PALETTE_IDS = new Set<string>(PALETTES.map((p) => p.id));
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
-/** Default-palette hex → accent token. Every pickable color comes from ACCENTS
- *  (the swatch picker derives from it, seeds use these hexes), so this covers
- *  all stored item/category/member colors. */
-const TOKEN_BY_HEX = new Map<string, AccentId>(
-  ACCENTS.map((a) => [a.swatch.toLowerCase(), a.id]),
-);
+/**
+ * The pre-lightening swatch hexes (before the default palette was lightened on
+ * 2026-06-21). New picks store the lightened `ACCENTS[].swatch`, but items
+ * coloured before that change still hold these — both must resolve to the same
+ * accent token so old items keep re-tinting (and highlighting in the picker).
+ * Kept indefinitely as a cheap compatibility shim, which is why the lightening
+ * needed no data migration.
+ */
+const LEGACY_ACCENT_HEX: Record<AccentId, string> = {
+  stone: "#57534e", rosewater: "#b0645a", flamingo: "#bf5d5d", pink: "#be185d",
+  mauve: "#7c3aed", red: "#c62828", maroon: "#a23a4a", peach: "#c0492a",
+  yellow: "#b45309", green: "#15803d", teal: "#0f766e", sky: "#0e7490",
+  sapphire: "#1668a8", blue: "#0369a1", lavender: "#6d5dd6",
+};
+
+/** Accent hex (current lightened OR legacy) → token. Every pickable color comes
+ *  from ACCENTS; the legacy entries cover items stored before the palette was
+ *  lightened, so this covers all stored item/category/member colors. */
+const TOKEN_BY_HEX = new Map<string, AccentId>([
+  ...ACCENTS.map((a) => [a.swatch.toLowerCase(), a.id] as const),
+  ...Object.entries(LEGACY_ACCENT_HEX).map(
+    ([id, hex]) => [hex.toLowerCase(), id as AccentId] as const,
+  ),
+]);
+
+/** The accent token a stored item hex maps to (current or legacy), or undefined
+ *  for custom colors. Lets the pickers highlight the right swatch and ColorField
+ *  resolve its label regardless of when the item was coloured. */
+export function accentIdForHex(
+  hex: string | null | undefined,
+): AccentId | undefined {
+  return hex ? TOKEN_BY_HEX.get(hex.toLowerCase()) : undefined;
+}
 
 /**
  * Map a stored accent hex to its palette-aware CSS var so the color re-tints with
@@ -165,7 +193,7 @@ export function toPaletteColor(
   hex: string | null | undefined,
 ): string | undefined {
   if (!hex) return undefined;
-  const token = TOKEN_BY_HEX.get(hex.toLowerCase());
+  const token = accentIdForHex(hex);
   return token ? `var(--swatch-${token})` : hex;
 }
 
@@ -192,7 +220,7 @@ export function toPaletteStroke(hex: string): string {
  * so this is a no-op there. Unknown hexes use the palette default ink.
  */
 export function toPaletteInk(hex: string | null | undefined): string {
-  const token = hex ? TOKEN_BY_HEX.get(hex.toLowerCase()) : undefined;
+  const token = accentIdForHex(hex);
   return token
     ? `var(--swatch-ink-${token}, var(--swatch-ink))`
     : "var(--swatch-ink)";

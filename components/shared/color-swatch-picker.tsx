@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Check, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ACCENTS } from "@/lib/theme/appearance";
+import { ACCENTS, accentIdForHex } from "@/lib/theme/appearance";
 
 /**
  * The selectable colors for events/tasks. Derived from the appearance ACCENTS so
@@ -48,7 +48,7 @@ export function ColorSwatchPicker({
         <Ban className="size-4" />
       </button>
       {SWATCHES.map((s) => {
-        const selected = value?.toLowerCase() === s.value.toLowerCase();
+        const selected = accentIdForHex(value) === s.id;
         return (
           <button
             key={s.value}
