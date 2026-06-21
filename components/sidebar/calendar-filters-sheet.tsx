@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Sheet,
   SheetContent,
@@ -29,13 +30,14 @@ export function CalendarFiltersSheet({
   members: Member[];
   categories: Category[];
 }) {
+  const t = useTranslations("calendar");
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[80dvh]">
         <SheetHeader>
-          <SheetTitle>Filters</SheetTitle>
+          <SheetTitle>{t("toolbar.filters")}</SheetTitle>
           <SheetDescription className="sr-only">
-            Show or hide calendars and contexts.
+            {t("sidebar.filtersDescription")}
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-safe">

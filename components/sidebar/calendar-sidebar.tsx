@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Plus, SquarePen, Focus, Eye, Trash2, CalendarPlus, Users, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -102,17 +103,18 @@ const ToggleRow = React.forwardRef<
 
 /** Trailing glyph marking a Context as Shared (joint events; both can edit). */
 function SharedBadge() {
+  const t = useTranslations("calendar");
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
           className="mr-0.5 flex size-7 shrink-0 items-center justify-center text-muted-foreground"
-          aria-label="Shared context — both attend and can edit"
+          aria-label={t("sidebar.sharedBadgeAria")}
         >
           <Users className="size-3.5" />
         </span>
       </TooltipTrigger>
-      <TooltipContent>Shared — you both attend and can edit</TooltipContent>
+      <TooltipContent>{t("sidebar.sharedBadgeTooltip")}</TooltipContent>
     </Tooltip>
   );
 }
@@ -142,6 +144,8 @@ export function CalendarFiltersContent({
   const toggleCategory = useUiStore((s) => s.toggleCategory);
   const setHiddenCategoryIds = useUiStore((s) => s.setHiddenCategoryIds);
   const mutations = useSidebarMutations(workspaceId);
+  const t = useTranslations("calendar");
+  const tc = useTranslations("common");
 
   const [renaming, setRenaming] = React.useState<RenameTarget | null>(null);
   const [deleting, setDeleting] = React.useState<{ id: string; name: string } | null>(null);
@@ -151,7 +155,7 @@ export function CalendarFiltersContent({
 
   const ownMember = members.find((m) => m.id === currentMemberId) ?? null;
   const otherMembers = members.filter((m) => m.id !== currentMemberId);
-  const otherName = otherMembers[0]?.name ?? "the other member";
+  const otherName = otherMembers[0]?.name ?? t("sidebar.theOtherMember");
 
   /** Give a Context a default time-block on the calendar. */
   function addToCalendar(c: Category) {
@@ -164,21 +168,21 @@ export function CalendarFiltersContent({
 
   const categoryVisibility = (id: string): ItemAction[] => [
     {
-      label: "Show only this",
+      label: t("sidebar.menu.showOnly"),
       icon: Focus,
       onSelect: () =>
         setHiddenCategoryIds(
           new Set(categories.filter((c) => c.id !== id).map((c) => c.id)),
         ),
     },
-    { label: "Show all", icon: Eye, onSelect: () => setHiddenCategoryIds(new Set()) },
+    { label: t("sidebar.menu.showAll"), icon: Eye, onSelect: () => setHiddenCategoryIds(new Set()) },
   ];
 
   return (
     <>
       <section className="flex flex-col gap-0.5">
         <h3 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          My calendar
+          {t("sidebar.myCalendar")}
         </h3>
         {ownMember && (
           <ItemContextMenu
@@ -187,7 +191,7 @@ export function CalendarFiltersContent({
             onColorChange={(c) => c && void mutations.recolorMember(ownMember.id, c)}
             actions={[
               {
-                label: "Rename",
+                label: t("sidebar.menu.rename"),
                 icon: SquarePen,
                 onSelect: () =>
                   setRenaming({ kind: "member", id: ownMember.id, name: ownMember.name }),
@@ -208,7 +212,7 @@ export function CalendarFiltersContent({
       {otherMembers.length > 0 && (
         <section className="flex flex-col gap-0.5">
           <h3 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Other calendars
+            {t("sidebar.otherCalendars")}
           </h3>
           {otherMembers.map((m) => (
             <ToggleRow
@@ -225,12 +229,12 @@ export function CalendarFiltersContent({
       <section className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between px-2 pb-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Contexts
+            {t("sidebar.contexts")}
           </h3>
           <AddCategoryPopover workspaceId={workspaceId} currentMemberId={currentMemberId} />
         </div>
         {categories.length === 0 ? (
-          <p className="px-2 text-xs text-muted-foreground">No contexts yet</p>
+          <p className="px-2 text-xs text-muted-foreground">{t("sidebar.noContextsYet")}</p>
         ) : (
           categories.map((c) => {
             const shared = c.ownerId === null;
@@ -242,31 +246,31 @@ export function CalendarFiltersContent({
                 onColorChange={(color) => color && void mutations.recolorCategory(c.id, color)}
                 actions={[
                   {
-                    label: "Rename",
+                    label: t("sidebar.menu.rename"),
                     icon: SquarePen,
                     onSelect: () => setRenaming({ kind: "category", id: c.id, name: c.name }),
                   },
                   {
-                    label: "Add to calendar",
+                    label: t("sidebar.menu.addToCalendar"),
                     icon: CalendarPlus,
                     onSelect: () => addToCalendar(c),
                   },
                   shared
                     ? {
-                        label: "Make personal",
+                        label: t("sidebar.menu.makePersonal"),
                         icon: User,
                         onSelect: () =>
                           setConverting({ id: c.id, name: c.name, toShared: false }),
                       }
                     : {
-                        label: "Make shared",
+                        label: t("sidebar.menu.makeShared"),
                         icon: Users,
                         onSelect: () =>
                           setConverting({ id: c.id, name: c.name, toShared: true }),
                       },
                   ...categoryVisibility(c.id),
                   {
-                    label: "Delete",
+                    label: t("sidebar.menu.delete"),
                     icon: Trash2,
                     destructive: true,
                     onSelect: () => setDeleting({ id: c.id, name: c.name }),
@@ -299,14 +303,13 @@ export function CalendarFiltersContent({
       <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this context?</AlertDialogTitle>
+            <AlertDialogTitle>{t("sidebar.deleteContext.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{deleting?.name}&rdquo; and its calendar time-blocks will be
-              removed; its items become uncategorized. You can undo this.
+              {t("sidebar.deleteContext.description", { name: deleting?.name ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleting) void mutations.deleteCategory(deleting.id);
@@ -314,7 +317,7 @@ export function CalendarFiltersContent({
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -324,24 +327,21 @@ export function CalendarFiltersContent({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {converting?.toShared ? "Make this context shared?" : "Make this context personal?"}
+              {converting?.toShared
+                ? t("sidebar.convert.makeSharedTitle")
+                : t("sidebar.convert.makePersonalTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {converting?.toShared ? (
-                <>
-                  You&rsquo;ll both see and edit every event in &ldquo;{converting?.name}&rdquo;,
-                  and they&rsquo;ll show on both calendars.
-                </>
-              ) : (
-                <>
-                  &ldquo;{converting?.name}&rdquo; returns to your calendar only. Events {otherName}{" "}
-                  added here stay theirs and leave your shared view.
-                </>
-              )}
+              {converting?.toShared
+                ? t("sidebar.convert.makeSharedDescription", { name: converting?.name ?? "" })
+                : t("sidebar.convert.makePersonalDescription", {
+                    name: converting?.name ?? "",
+                    otherName,
+                  })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (converting)
@@ -352,7 +352,9 @@ export function CalendarFiltersContent({
                 setConverting(null);
               }}
             >
-              {converting?.toShared ? "Make shared" : "Make personal"}
+              {converting?.toShared
+                ? t("sidebar.menu.makeShared")
+                : t("sidebar.menu.makePersonal")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -391,15 +393,18 @@ function RenameDialog({
   onClose: () => void;
   onSubmit: (target: RenameTarget, name: string) => void;
 }) {
+  const t = useTranslations("calendar");
   return (
     <ResponsiveDialog open={target !== null} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>
-            {target?.kind === "member" ? "Rename calendar" : "Rename context"}
+            {target?.kind === "member"
+              ? t("sidebar.rename.renameCalendar")
+              : t("sidebar.rename.renameContext")}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="sr-only">
-            Enter a new name.
+            {t("sidebar.rename.enterNewName")}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         {/* Keyed per target so the field re-initialises to the current name without a sync effect. */}
@@ -420,6 +425,7 @@ function RenameForm({
   onClose: () => void;
   onSubmit: (target: RenameTarget, name: string) => void;
 }) {
+  const tc = useTranslations("common");
   const [name, setName] = React.useState(target.name);
 
   const save = () => {
@@ -441,10 +447,10 @@ function RenameForm({
       </ResponsiveDialogBody>
       <ResponsiveDialogFooter>
         <Button variant="outline" onClick={onClose}>
-          Cancel
+          {tc("cancel")}
         </Button>
         <Button onClick={save} disabled={!name.trim()}>
-          Save
+          {tc("save")}
         </Button>
       </ResponsiveDialogFooter>
     </>
@@ -458,6 +464,7 @@ function AddCategoryPopover({
   workspaceId: string;
   currentMemberId: string;
 }) {
+  const t = useTranslations("calendar");
   const qc = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -490,7 +497,7 @@ function AddCategoryPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-6" aria-label="Add context">
+        <Button variant="ghost" size="icon" className="size-6" aria-label={t("sidebar.addContext")}>
           <Plus />
         </Button>
       </PopoverTrigger>
@@ -499,7 +506,7 @@ function AddCategoryPopover({
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Context name"
+            placeholder={t("sidebar.contextName")}
             onKeyDown={(e) => e.key === "Enter" && add()}
             autoFocus
           />
@@ -508,7 +515,7 @@ function AddCategoryPopover({
               <button
                 key={c}
                 type="button"
-                aria-label={`Color ${c}`}
+                aria-label={t("sidebar.colorAria", { color: c })}
                 onClick={() => setColor(c)}
                 className={cn(
                   "size-6 rounded-full ring-offset-2 ring-offset-popover",
@@ -525,21 +532,19 @@ function AddCategoryPopover({
               ) : (
                 <User className="size-4 text-muted-foreground" />
               )}
-              <span>{shared ? "Shared" : "Personal"}</span>
+              <span>{shared ? t("sidebar.shared") : t("sidebar.personal")}</span>
             </span>
             <Switch
               checked={shared}
               onCheckedChange={setShared}
-              aria-label="Shared context — you both attend and can edit"
+              aria-label={t("sidebar.sharedToggleAria")}
             />
           </label>
           <p className="text-xs text-muted-foreground">
-            {shared
-              ? "You both attend and can edit every event in it."
-              : "Only on your calendar; only you can edit its events."}
+            {shared ? t("sidebar.sharedHelp") : t("sidebar.personalHelp")}
           </p>
           <Button onClick={add} disabled={pending || !name.trim()} size="sm">
-            Add context
+            {t("sidebar.addContext")}
           </Button>
         </div>
       </PopoverContent>

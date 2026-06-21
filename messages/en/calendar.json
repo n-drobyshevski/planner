@@ -128,5 +128,47 @@
   "present": {
     "banner": "Present mode — showing only what a public viewer sees",
     "exit": "Exit"
+  },
+  "sidebar": {
+    "myCalendar": "My calendar",
+    "otherCalendars": "Other calendars",
+    "contexts": "Contexts",
+    "noContextsYet": "No contexts yet",
+    "addContext": "Add context",
+    "contextName": "Context name",
+    "colorAria": "Color {color}",
+    "shared": "Shared",
+    "personal": "Personal",
+    "sharedToggleAria": "Shared context — you both attend and can edit",
+    "sharedHelp": "You both attend and can edit every event in it.",
+    "personalHelp": "Only on your calendar; only you can edit its events.",
+    "sharedBadgeAria": "Shared context — both attend and can edit",
+    "sharedBadgeTooltip": "Shared — you both attend and can edit",
+    "theOtherMember": "the other member",
+    "filtersDescription": "Show or hide calendars and contexts.",
+    "menu": {
+      "showOnly": "Show only this",
+      "showAll": "Show all",
+      "rename": "Rename",
+      "addToCalendar": "Add to calendar",
+      "makeShared": "Make shared",
+      "makePersonal": "Make personal",
+      "delete": "Delete"
+    },
+    "rename": {
+      "renameCalendar": "Rename calendar",
+      "renameContext": "Rename context",
+      "enterNewName": "Enter a new name."
+    },
+    "deleteContext": {
+      "title": "Delete this context?",
+      "description": "“{name}” and its calendar time-blocks will be removed; its items become uncategorized. You can undo this."
+    },
+    "convert": {
+      "makeSharedTitle": "Make this context shared?",
+      "makePersonalTitle": "Make this context personal?",
+      "makeSharedDescription": "You’ll both see and edit every event in “{name}”, and they’ll show on both calendars.",
+      "makePersonalDescription": "“{name}” returns to your calendar only. Events {otherName} added here stay theirs and leave your shared view."
+    }
   }
 }
