@@ -153,9 +153,10 @@ export function usePreferences() {
   const nightWindowEndHour = sleepPrefs?.nightWindowEndHour ?? 12;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
-  // its own (Latte light, the rest dark); `default` defers to themePreference.
-  const desiredTheme =
-    palette === "default" ? themePreference : paletteMode(palette) ?? "dark";
+  // its own (Latte light, the rest dark); `default` and `pink` defer to the
+  // member's themePreference (paletteMode → null for both). Mirrors the
+  // setPalette fallback so the reconcile and the picker agree.
+  const desiredTheme = paletteMode(palette) ?? themePreference;
 
   const themeReconciled = useRef(false);
   useEffect(() => {
