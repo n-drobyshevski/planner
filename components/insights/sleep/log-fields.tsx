@@ -6,10 +6,17 @@ import { useTranslations } from "next-intl";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { TimeField } from "@/components/ui/time-field";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/** The two 1–4 scales (quality, tiredness) share one segmented layout. */
-const SCALE_LEVELS = [1, 2, 3, 4] as const;
+import { RatingScale } from "./rating-scale";
+
+/**
+ * Quality is a 7-point scale (the psychometric sweet spot — reliability and
+ * discrimination plateau around 7); tiredness restores the validated Karolinska
+ * Sleepiness Scale (1–9). They no longer share one width, so each has its own
+ * level array; the segmented {@link RatingScale} renders both.
+ */
+const QUALITY_LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;
+const FATIGUE_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 
 /** One night's form values; empty string / null = not provided. */
 export interface SleepLogDraft {
@@ -79,9 +86,10 @@ export function draftToInstants(
 
 /**
  * Shared quality/fatigue/times/note fields for the morning check-in card and
- * the backfill dialog. Quality and tiredness are twin 1..4 segmented controls
- * (number + word per level, tap the selected one again to clear) — four levels
- * fit a phone where the old nine-point sleepiness scale needed a select.
+ * the backfill dialog. Quality (1–7) and tiredness (Karolinska 1–9) are
+ * segmented {@link RatingScale} bars — numbers in the segments, anchor words
+ * beneath, and a live caption — so the wider scales still fit a phone; tap the
+ * selected level again to clear.
  */
 export function SleepLogFields({
   draft,
@@ -99,55 +107,27 @@ export function SleepLogFields({
     <div className="flex flex-col gap-4">
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-quality`}>{t("fields.quality")}</FieldLabel>
-        <ToggleGroup
+        <RatingScale
           id={`${idPrefix}-quality`}
-          type="single"
-          variant="outline"
-          aria-label={t("fields.qualityAriaLabel")}
-          className="flex-wrap justify-start"
-          value={draft.quality !== null ? String(draft.quality) : ""}
-          onValueChange={(v) =>
-            onChange({ ...draft, quality: v === "" ? null : Number(v) })
-          }
-        >
-          {SCALE_LEVELS.map((n) => (
-            <ToggleGroupItem
-              key={n}
-              value={String(n)}
-              className="min-h-11 px-3 tabular-nums pointer-fine:min-h-9"
-              aria-label={t(`fields.qualityOptions.${n}`)}
-            >
-              {t(`fields.qualityOptions.${n}`)}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+          ariaLabel={t("fields.qualityAriaLabel")}
+          levels={QUALITY_LEVELS}
+          value={draft.quality}
+          labelFor={(n) => t(`fields.qualityOptions.${n}`)}
+          onValueChange={(quality) => onChange({ ...draft, quality })}
+        />
         <FieldDescription>{t("fields.qualityDescription")}</FieldDescription>
       </Field>
 
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-fatigue`}>{t("fields.fatigue")}</FieldLabel>
-        <ToggleGroup
+        <RatingScale
           id={`${idPrefix}-fatigue`}
-          type="single"
-          variant="outline"
-          aria-label={t("fields.fatigueAriaLabel")}
-          className="flex-wrap justify-start"
-          value={draft.fatigue !== null ? String(draft.fatigue) : ""}
-          onValueChange={(v) =>
-            onChange({ ...draft, fatigue: v === "" ? null : Number(v) })
-          }
-        >
-          {SCALE_LEVELS.map((n) => (
-            <ToggleGroupItem
-              key={n}
-              value={String(n)}
-              className="min-h-11 px-3 tabular-nums pointer-fine:min-h-9"
-              aria-label={t(`fields.fatigueOptions.${n}`)}
-            >
-              {t(`fields.fatigueOptions.${n}`)}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+          ariaLabel={t("fields.fatigueAriaLabel")}
+          levels={FATIGUE_LEVELS}
+          value={draft.fatigue}
+          labelFor={(n) => t(`fields.fatigueOptions.${n}`)}
+          onValueChange={(fatigue) => onChange({ ...draft, fatigue })}
+        />
         <FieldDescription>{t("fields.fatigueDescription")}</FieldDescription>
       </Field>
 

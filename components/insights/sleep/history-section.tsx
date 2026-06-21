@@ -104,7 +104,11 @@ export function HistorySection({
               {insightsXAxis({
                 tickFormatter: (v) => bucketTick(Number(v), "day", timeZone, locale),
               })}
-              <YAxis hide domain={[0, 4]} />
+              {/* Quality (1–7) and fatigue (Karolinska 1–9) live on different
+                  scales, so each line gets its own hidden axis — the shapes
+                  stay faithful without implying the heights are comparable. */}
+              <YAxis yAxisId="quality" hide domain={[0, 7]} />
+              <YAxis yAxisId="fatigue" hide domain={[0, 9]} />
               <ChartTooltip
                 cursor={false}
                 content={
@@ -117,6 +121,7 @@ export function HistorySection({
                 }
               />
               <Line
+                yAxisId="quality"
                 dataKey="quality"
                 type="monotone"
                 stroke="var(--color-quality)"
@@ -125,6 +130,7 @@ export function HistorySection({
                 isAnimationActive={!reduced}
               />
               <Line
+                yAxisId="fatigue"
                 dataKey="fatigue"
                 type="monotone"
                 stroke="var(--color-fatigue)"

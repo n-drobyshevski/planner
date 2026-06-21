@@ -71,9 +71,9 @@ function loggedNight(
 describe("computeSleepHints", () => {
   it("returns [] below the minimum logged sample", () => {
     const logs = [
-      loggedNight(23, 0, 7, 0, 4),
+      loggedNight(23, 0, 7, 0, 7),
       loggedNight(0, 0, 6, 0, 1),
-      loggedNight(23, 0, 7, 0, 4),
+      loggedNight(23, 0, 7, 0, 7),
       loggedNight(0, 0, 6, 0, 1),
     ];
     expect(logs.length).toBeLessThan(HINTS_MIN_LOGGED);
@@ -81,9 +81,9 @@ describe("computeSleepHints", () => {
   });
 
   it("flags short nights when they score worse (duration hint)", () => {
-    // 4× 8h (≥ 465min target) quality 4, 4× 6h quality 2 → diff 2.0
+    // 4× 8h (≥ 465min target) quality 7, 4× 6h quality 2 → diff 5.0
     const logs = [
-      ...Array.from({ length: 4 }, () => loggedNight(23, 0, 7, 0, 4)),
+      ...Array.from({ length: 4 }, () => loggedNight(23, 0, 7, 0, 7)),
       ...Array.from({ length: 4 }, () => loggedNight(0, 0, 6, 0, 2)),
     ];
     const out = computeSleepHints(input({ logs }));
@@ -97,7 +97,7 @@ describe("computeSleepHints", () => {
   it("also reports the opposite correlation direction", () => {
     const logs = [
       ...Array.from({ length: 4 }, () => loggedNight(23, 0, 7, 0, 2)),
-      ...Array.from({ length: 4 }, () => loggedNight(0, 0, 6, 0, 4)),
+      ...Array.from({ length: 4 }, () => loggedNight(0, 0, 6, 0, 7)),
     ];
     const out = computeSleepHints(input({ logs }));
     expect(out.map((h) => h.kind)).toContain("duration");
@@ -105,7 +105,7 @@ describe("computeSleepHints", () => {
 
   it("stays silent when a duration group is too small", () => {
     const logs = [
-      ...Array.from({ length: 7 }, () => loggedNight(23, 0, 7, 0, 4)),
+      ...Array.from({ length: 7 }, () => loggedNight(23, 0, 7, 0, 7)),
       loggedNight(0, 0, 6, 0, 2),
     ];
     expect(computeSleepHints(input({ logs }))).toEqual([]);
@@ -118,7 +118,7 @@ describe("computeSleepHints", () => {
         return { ...l, ...times(l.date, 23, 0, 7, 0) };
       }),
       ...Array.from({ length: 4 }, () => {
-        const l = log({ fatigue: 4 });
+        const l = log({ fatigue: 7 });
         return { ...l, ...times(l.date, 0, 0, 6, 0) };
       }),
     ];
@@ -160,9 +160,9 @@ describe("computeSleepHints", () => {
     // Misaligned: 510min (495 asleep, dist 45). Three per group (the
     // compareGroups minimum).
     const logs = [
-      loggedNight(22, 0, 7, 15, 4),
-      loggedNight(22, 0, 7, 15, 4),
-      loggedNight(22, 0, 7, 15, 4),
+      loggedNight(22, 0, 7, 15, 7),
+      loggedNight(22, 0, 7, 15, 7),
+      loggedNight(22, 0, 7, 15, 7),
       loggedNight(22, 0, 6, 30, 2),
       loggedNight(22, 0, 6, 30, 2),
       loggedNight(22, 0, 6, 30, 2),
@@ -175,8 +175,8 @@ describe("computeSleepHints", () => {
   it("stays silent when a comparison group has fewer than three nights", () => {
     // Two aligned vs three misaligned — below the n≥3 per-group floor.
     const logs = [
-      loggedNight(22, 0, 7, 15, 4),
-      loggedNight(22, 0, 7, 15, 4),
+      loggedNight(22, 0, 7, 15, 7),
+      loggedNight(22, 0, 7, 15, 7),
       loggedNight(22, 0, 6, 30, 2),
       loggedNight(22, 0, 6, 30, 2),
       loggedNight(22, 0, 6, 30, 2),
@@ -190,7 +190,7 @@ describe("computeSleepHints", () => {
     // emptying the aligned group and silencing the hint. 495min → dist 45
     // (misaligned) either way.
     const logs = [
-      ...Array.from({ length: 3 }, () => log({ quality: 4 })),
+      ...Array.from({ length: 3 }, () => log({ quality: 7 })),
       ...Array.from({ length: 3 }, () => log({ quality: 2 })),
     ];
     const nights: DerivedNight[] = logs.map((l, i) => ({
@@ -209,7 +209,7 @@ describe("computeSleepHints", () => {
   it("falls back to derived nights for duration when times are not logged", () => {
     // Logs carry only scores; durations come from derived nights by dateKey.
     const logs = [
-      ...Array.from({ length: 4 }, () => log({ quality: 4 })),
+      ...Array.from({ length: 4 }, () => log({ quality: 7 })),
       ...Array.from({ length: 4 }, () => log({ quality: 2 })),
     ];
     const nights: DerivedNight[] = logs.map((l, i) => ({
@@ -226,9 +226,9 @@ describe("computeSleepHints", () => {
   it("orders by severity then kind and respects the cap", () => {
     // Short+misaligned+late-varied vs long+aligned+steady → all three fire.
     const logs = [
-      loggedNight(22, 0, 7, 15, 4),
-      loggedNight(22, 0, 7, 15, 4),
-      loggedNight(22, 0, 7, 15, 4),
+      loggedNight(22, 0, 7, 15, 7),
+      loggedNight(22, 0, 7, 15, 7),
+      loggedNight(22, 0, 7, 15, 7),
       loggedNight(0, 30, 6, 0, 1),
       loggedNight(0, 30, 6, 0, 1),
       loggedNight(0, 30, 6, 0, 1),

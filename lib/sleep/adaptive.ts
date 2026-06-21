@@ -59,12 +59,16 @@ export const HINTS_CAP = 3;
 export const HINTS_WINDOW_DAYS = 30;
 
 const MIN_MS = 60_000;
-/** smallest group-mean differences that count as a real effect (1..4 scales) */
-const QUALITY_EFFECT = 0.5;
-const FATIGUE_EFFECT = 0.6;
+/**
+ * Smallest group-mean differences that count as a real effect. Calibrated as a
+ * fraction of each scale's width: quality is 1–7 (6 spans), fatigue is the
+ * Karolinska 1–9 (8 spans), so fatigue gates sit proportionally higher.
+ */
+const QUALITY_EFFECT = 1.0;
+const FATIGUE_EFFECT = 1.5;
 /** effect sizes that escalate a comparison hint to "attention" */
-const QUALITY_ATTENTION = 1.2;
-const FATIGUE_ATTENTION = 1.2;
+const QUALITY_ATTENTION = 2.4;
+const FATIGUE_ATTENTION = 3.0;
 /** bedtime spread (population σ, minutes) thresholds */
 const SPREAD_INFO_MIN = 35;
 const SPREAD_ATTENTION_MIN = 60;

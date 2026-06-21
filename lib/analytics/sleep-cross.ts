@@ -19,7 +19,8 @@ export interface SleepDayPair {
   wakeDayMs: number;
   /** wokeAt − bedtimeAt when both are present, else null */
   durationMs: number | null;
-  /** 1–4 rating, or null when unrated */
+  /** 1–7 rating, or null when unrated (Spearman ρ is rank-based, so the scale
+   *  width doesn't matter — finer scales just reduce ties) */
   quality: number | null;
   /** the day the member woke INTO (the wake date itself) */
   nextDay: {
