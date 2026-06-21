@@ -12,6 +12,7 @@ import {
   removePassphrase,
   verifyCurrentSecret,
 } from "@/app/[locale]/login/actions";
+import { passkeyEnroll } from "@/lib/auth/passkey-client";
 import { useNotify } from "@/lib/hooks/use-notify";
 import type { Member } from "@/lib/types";
 
@@ -112,6 +113,23 @@ export function useProfile() {
     [member, optimistic],
   );
 
+  /**
+   * Register a passkey for the signed-in member and, on success, flip
+   * `hasPasskey` in the workspace cache so every reader (the post-login nudge,
+   * Settings) updates at once. Unlike the edits above this can't be optimistic —
+   * the native ceremony runs first and the user may cancel it — so the cache is
+   * patched only after the server confirms. The caller owns the toast.
+   */
+  const enrollPasskey = useCallback(async () => {
+    const res = await passkeyEnroll();
+    if ("ok" in res && member) {
+      qc.setQueryData<WorkspaceData>(qk.workspace, (d) =>
+        patchCachedMember(d, member.id, { hasPasskey: true }),
+      );
+    }
+    return res;
+  }, [member, qc]);
+
   return {
     member,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
@@ -120,5 +138,6 @@ export function useProfile() {
     saveColor,
     verifyCurrentPassword,
     savePassword,
+    enrollPasskey,
   };
 }

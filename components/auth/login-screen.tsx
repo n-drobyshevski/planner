@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
@@ -12,7 +12,13 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { signIn } from "@/app/[locale]/login/actions";
-import { passkeyLogin, browserSupportsWebAuthn } from "@/lib/auth/passkey-client";
+import {
+  passkeyLogin,
+  passkeyAutofill,
+  browserSupportsWebAuthn,
+  browserSupportsWebAuthnAutofill,
+} from "@/lib/auth/passkey-client";
+import { clearPasskeyNudgeDismissals } from "@/lib/auth/passkey-nudge-state";
 
 /**
  * Nickname + password sign-in. The member is found by name; their password (when
@@ -32,13 +38,38 @@ export function LoginScreen() {
   const [passkeySupported, setPasskeySupported] = useState(false);
   useEffect(() => setPasskeySupported(browserSupportsWebAuthn()), []);
 
+  // Hard-navigate so per-member React Query caches reset (mirrors account switch).
+  const goToCalendar = () => window.location.assign(`/${locale}/calendar`);
+
+  // Reaching the login screen means a fresh session is about to start, so reset
+  // the "Not now" decisions on the post-login passkey nudge (see passkey-nudge).
+  useEffect(() => clearPasskeyNudgeDismissals(), []);
+
+  // Conditional UI: arm a background passkey request on mount so the browser can
+  // offer a saved passkey inline from the name field's autofill. It must fail
+  // silently — someone who ignores the suggestion and types a password should
+  // never see an error. The ref keeps StrictMode's double-invoke from arming it
+  // twice; the explicit button below auto-cancels this via SimpleWebAuthn's
+  // internal abort service when it starts a modal ceremony.
+  const autofillArmed = useRef(false);
+  useEffect(() => {
+    if (autofillArmed.current) return;
+    autofillArmed.current = true;
+    void browserSupportsWebAuthnAutofill().then((ok) => {
+      if (!ok) return;
+      void passkeyAutofill().then((res) => {
+        if ("ok" in res) goToCalendar();
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const runPasskey = () => {
     setPasskeyPending(true);
     // Usernameless: the browser shows the saved passkeys and the user picks one.
     void passkeyLogin().then((res) => {
       if ("ok" in res) {
-        // Hard-navigate so per-member React Query caches reset (mirrors switch).
-        window.location.assign(`/${locale}/calendar`);
+        goToCalendar();
         return;
       }
       setPasskeyPending(false);
@@ -114,7 +145,7 @@ export function LoginScreen() {
                     onBlur={field.handleBlur}
                     placeholder={t("namePlaceholder")}
                     autoFocus
-                    autoComplete="username"
+                    autoComplete="username webauthn"
                     aria-label={t("nameLabel")}
                     aria-invalid={isInvalid || undefined}
                   />

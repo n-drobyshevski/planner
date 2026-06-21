@@ -8,7 +8,10 @@ import { Check, Cloud, KeyRound, Laptop, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDayMonthYear, formatRelativeToNow } from "@/lib/datetime/format";
-import { passkeyEnroll, browserSupportsWebAuthn } from "@/lib/auth/passkey-client";
+import {
+  browserSupportsWebAuthn,
+  type CeremonyResult,
+} from "@/lib/auth/passkey-client";
 import {
   listPasskeys,
   removePasskey,
@@ -44,6 +47,7 @@ export function ProfileSettings() {
     saveColor,
     verifyCurrentPassword,
     savePassword,
+    enrollPasskey,
   } = useProfile();
   const [passwordMode, setPasswordMode] = React.useState<PasswordMode | null>(
     null,
@@ -106,7 +110,7 @@ export function ProfileSettings() {
       </FieldSet>
 
       {/* Passkeys */}
-      <PasskeysSection isReady={isReady} />
+      <PasskeysSection isReady={isReady} enrollPasskey={enrollPasskey} />
       </SettingsSection>
 
       <PasswordDialog
@@ -124,7 +128,13 @@ export function ProfileSettings() {
  * phishing-resistant login factor; the PIN above is the fallback. Only renders
  * its controls when the browser supports WebAuthn.
  */
-function PasskeysSection({ isReady }: { isReady: boolean }) {
+function PasskeysSection({
+  isReady,
+  enrollPasskey,
+}: {
+  isReady: boolean;
+  enrollPasskey: () => Promise<CeremonyResult>;
+}) {
   const t = useTranslations("settings");
   const locale = useLocale();
   const [supported, setSupported] = React.useState(false);
@@ -141,7 +151,9 @@ function PasskeysSection({ isReady }: { isReady: boolean }) {
 
   const add = () => {
     setBusy(true);
-    void passkeyEnroll().then((res) => {
+    // Routes through useProfile so a successful enroll also flips the member's
+    // hasPasskey flag in the workspace cache (hides the post-login nudge).
+    void enrollPasskey().then((res) => {
       setBusy(false);
       if ("ok" in res) {
         toast.success(t("profile.passkeys.added"));

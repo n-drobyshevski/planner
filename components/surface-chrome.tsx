@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { AppNav } from "@/components/app-nav";
 import { AppearancePanel } from "@/components/appearance-panel";
+import { PasskeyNudge } from "@/components/auth/passkey-nudge";
 import { ToolbarUserMenu } from "@/components/toolbar-user-menu";
 import { SlotTarget, ToolbarSlotsProvider } from "@/components/toolbar-slots";
 import { useSurfaceSwipe } from "@/hooks/use-surface-swipe";
@@ -78,6 +79,8 @@ export function SurfaceChrome({ children }: { children: React.ReactNode }) {
       </div>
       {/* Global Shift+T appearance panel; renders nothing until opened. */}
       <AppearancePanel />
+      {/* Post-login "add a passkey" nudge; renders nothing unless applicable. */}
+      <PasskeyNudge />
     </ToolbarSlotsProvider>
   );
 }
