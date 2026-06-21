@@ -36,6 +36,9 @@ yarn-error.log*
 .pnpm-debug.log*
 /.next-*.log
 
+# debug screenshots (root-level scratch PNGs)
+/*.png
+
 # env files (can opt-in for committing if needed)
 .env*
 
