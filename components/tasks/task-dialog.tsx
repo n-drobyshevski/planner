@@ -43,12 +43,8 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
-import { Trash2, CalendarPlus, ChevronDown } from "lucide-react";
+import { DisclosureSection } from "@/components/ui/disclosure-section";
+import { Trash2, CalendarPlus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import { SubtaskEditor } from "./subtask-editor";
@@ -56,7 +52,11 @@ import { TaskDependenciesField } from "./task-dependencies-field";
 import { AttributeFields } from "@/components/shared/attribute-fields";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { taskFormSchema, type TaskFormValues } from "@/lib/tasks/schemas";
-import { parseAttributes, hasAnyAttribute } from "@/lib/attributes/schema";
+import {
+  ATTRIBUTE_KEYS,
+  parseAttributes,
+  hasAnyAttribute,
+} from "@/lib/attributes/schema";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { formatTime, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import type {
@@ -564,25 +564,31 @@ export function TaskDialog(props: TaskDialogProps) {
               </Field>
             )}
 
-            {/* More options — status (edit only) and the two flags tucked behind
-                progressive disclosure so the form mirrors the Event dialog. */}
-            <Collapsible open={showMore} onOpenChange={setShowMore}>
-              <CollapsibleTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+            {/* More options — the column and the two flags tucked behind
+                progressive disclosure so the form mirrors the Event dialog; the
+                collapsed header previews what's set. */}
+            <form.Subscribe
+              selector={(s) => {
+                const parts: string[] = [];
+                const bid = s.values.boardId;
+                if (effectiveBoards.length > 0 && bid && bid !== effectiveBoards[0].id) {
+                  const board = effectiveBoards.find((b) => b.id === bid);
+                  if (board) parts.push(board.name);
+                }
+                if (s.values.isMilestone) parts.push(t("taskDialog.milestoneLabel"));
+                if (s.values.isPrivate) parts.push(t("taskDialog.privateLabel"));
+                return parts.join(" · ");
+              }}
+            >
+              {(moreSummary) => (
+                <DisclosureSection
+                  title={t("taskDialog.moreOptions")}
+                  open={showMore}
+                  onOpenChange={setShowMore}
+                  summary={moreSummary}
                 >
-                  {t("taskDialog.moreOptions")}
-                  <ChevronDown
-                    className={`size-4 transition-transform ${showMore ? "rotate-180" : ""}`}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <FieldSection className="pt-4">
-                  {effectiveBoards.length > 0 && (
+                  <FieldSection>
+                    {effectiveBoards.length > 0 && (
                     <form.Field name="boardId">
                       {(field) => (
                         <Field>
@@ -644,38 +650,39 @@ export function TaskDialog(props: TaskDialogProps) {
                       </Field>
                     )}
                   </form.Field>
-                </FieldSection>
-              </CollapsibleContent>
-            </Collapsible>
+                  </FieldSection>
+                </DisclosureSection>
+              )}
+            </form.Subscribe>
 
             {/* Optimization details — optional attributes feeding /insights.
                 Scheduled blocks inherit them (scheduleTaskBlocks). */}
-            <Collapsible open={showOptimization} onOpenChange={setShowOptimization}>
-              <CollapsibleTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+            <form.Subscribe
+              selector={(s) =>
+                ATTRIBUTE_KEYS.filter((k) => s.values.attributes[k] != null)
+                  .map((k) => tc(`attributes.${k}.label`))
+                  .join(" · ")
+              }
+            >
+              {(attrSummary) => (
+                <DisclosureSection
+                  title={t("taskDialog.optimizationDetails")}
+                  open={showOptimization}
+                  onOpenChange={setShowOptimization}
+                  summary={attrSummary}
                 >
-                  {t("taskDialog.optimizationDetails")}
-                  <ChevronDown
-                    className={`size-4 transition-transform ${showOptimization ? "rotate-180" : ""}`}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <form.Field name="attributes">
-                  {(field) => (
-                    <AttributeFields
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      idPrefix="task"
-                    />
-                  )}
-                </form.Field>
-              </CollapsibleContent>
-            </Collapsible>
+                  <form.Field name="attributes">
+                    {(field) => (
+                      <AttributeFields
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        idPrefix="task"
+                      />
+                    )}
+                  </form.Field>
+                </DisclosureSection>
+              )}
+            </form.Subscribe>
           </FieldGroup>
 
           {mode === "edit" && task && (

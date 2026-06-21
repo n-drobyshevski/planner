@@ -31,12 +31,7 @@ import {
   SelectGroup,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
-import { Separator } from "@/components/ui/separator";
+import { DisclosureSection } from "@/components/ui/disclosure-section";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Lock,
@@ -44,7 +39,6 @@ import {
   EyeOff,
   Trash2,
   Users,
-  ChevronDown,
   Plus,
   CircleDashed,
   CircleCheck,
@@ -60,6 +54,7 @@ import { toPaletteColor } from "@/lib/theme/appearance";
 import { AttributeFields } from "@/components/shared/attribute-fields";
 import { CreateContextDialog } from "@/components/shared/create-context-dialog";
 import {
+  ATTRIBUTE_KEYS,
   attributesEqual,
   hasAnyAttribute,
   parseAttributes,
@@ -789,121 +784,122 @@ export function EventDialog(props: EventDialogProps) {
                     </div>
                     </div>
 
-                    <Separator />
-
-                    {/* More options — progressive disclosure for the secondary fields */}
-                    <Collapsible open={readOnly ? true : showMore} onOpenChange={setShowMore}>
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    {/* More options — progressive disclosure for the secondary
+                        fields; the collapsed header previews what's set. */}
+                    <form.Subscribe
+                      selector={(s) =>
+                        [
+                          s.values.location.trim() && t("dialog.location"),
+                          s.values.recurrence !== null && t("dialog.summaryRepeats"),
+                          s.values.description.trim() && t("dialog.notes"),
+                          s.values.inactive && t("details.inactive"),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      }
+                    >
+                      {(moreSummary) => (
+                        <DisclosureSection
+                          title={t("dialog.moreOptions")}
+                          open={showMore}
+                          onOpenChange={setShowMore}
+                          forceOpen={readOnly}
+                          summary={moreSummary}
+                          contentClassName="flex flex-col gap-4"
                         >
-                          {t("dialog.moreOptions")}
-                          <ChevronDown
-                            className={`size-4 transition-transform ${
-                              readOnly || showMore ? "rotate-180" : ""
-                            }`}
-                          />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="flex flex-col gap-4 pt-4">
-                        <form.Field name="location">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor="ev-location">{t("dialog.location")}</FieldLabel>
-                              <Input
-                                id="ev-location"
-                                value={field.state.value}
-                                onChange={(e) => field.handleChange(e.target.value)}
-                                onBlur={field.handleBlur}
-                                placeholder={t("dialog.locationPlaceholder")}
-                              />
-                            </Field>
-                          )}
-                        </form.Field>
+                          <form.Field name="location">
+                            {(field) => (
+                              <Field>
+                                <FieldLabel htmlFor="ev-location">{t("dialog.location")}</FieldLabel>
+                                <Input
+                                  id="ev-location"
+                                  value={field.state.value}
+                                  onChange={(e) => field.handleChange(e.target.value)}
+                                  onBlur={field.handleBlur}
+                                  placeholder={t("dialog.locationPlaceholder")}
+                                />
+                              </Field>
+                            )}
+                          </form.Field>
 
-                        <form.Field name="description">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor="ev-notes">{t("dialog.notes")}</FieldLabel>
-                              <Textarea
-                                id="ev-notes"
-                                value={field.state.value}
-                                onChange={(e) => field.handleChange(e.target.value)}
-                                onBlur={field.handleBlur}
-                                rows={2}
-                              />
-                            </Field>
-                          )}
-                        </form.Field>
+                          <form.Field name="description">
+                            {(field) => (
+                              <Field>
+                                <FieldLabel htmlFor="ev-notes">{t("dialog.notes")}</FieldLabel>
+                                <Textarea
+                                  id="ev-notes"
+                                  value={field.state.value}
+                                  onChange={(e) => field.handleChange(e.target.value)}
+                                  onBlur={field.handleBlur}
+                                  rows={2}
+                                />
+                              </Field>
+                            )}
+                          </form.Field>
 
-                        <form.Subscribe
-                          selector={(s) => computeEventTimes(s.values, timeZone).start}
-                        >
-                          {(startMs) => (
-                            <form.Field name="recurrence">
+                          <form.Subscribe
+                            selector={(s) => computeEventTimes(s.values, timeZone).start}
+                          >
+                            {(startMs) => (
+                              <form.Field name="recurrence">
+                                {(field) => (
+                                  <RecurrenceEditor
+                                    value={field.state.value}
+                                    onChange={field.handleChange}
+                                    startMs={startMs}
+                                  />
+                                )}
+                              </form.Field>
+                            )}
+                          </form.Subscribe>
+
+                          <form.Field name="inactive">
+                            {(field) => (
+                              <Field orientation="horizontal">
+                                <Switch
+                                  id="ev-inactive"
+                                  checked={field.state.value}
+                                  onCheckedChange={field.handleChange}
+                                />
+                                <FieldLabel htmlFor="ev-inactive">{t("dialog.inactive")}</FieldLabel>
+                              </Field>
+                            )}
+                          </form.Field>
+                        </DisclosureSection>
+                      )}
+                    </form.Subscribe>
+
+                    {/* Optimization details — optional attributes feeding
+                        /insights. Hidden for contexts: backdrops never count as
+                        tracked time. */}
+                    {!isContext && (
+                      <form.Subscribe
+                        selector={(s) =>
+                          ATTRIBUTE_KEYS.filter((k) => s.values.attributes[k] != null)
+                            .map((k) => tc(`attributes.${k}.label`))
+                            .join(" · ")
+                        }
+                      >
+                        {(attrSummary) => (
+                          <DisclosureSection
+                            title={t("dialog.optimizationDetails")}
+                            open={showOptimization}
+                            onOpenChange={setShowOptimization}
+                            forceOpen={readOnly}
+                            summary={attrSummary}
+                          >
+                            <form.Field name="attributes">
                               {(field) => (
-                                <RecurrenceEditor
+                                <AttributeFields
                                   value={field.state.value}
                                   onChange={field.handleChange}
-                                  startMs={startMs}
+                                  idPrefix="ev"
                                 />
                               )}
                             </form.Field>
-                          )}
-                        </form.Subscribe>
-
-                        <form.Field name="inactive">
-                          {(field) => (
-                            <Field orientation="horizontal">
-                              <Switch
-                                id="ev-inactive"
-                                checked={field.state.value}
-                                onCheckedChange={field.handleChange}
-                              />
-                              <FieldLabel htmlFor="ev-inactive">{t("dialog.inactive")}</FieldLabel>
-                            </Field>
-                          )}
-                        </form.Field>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    {/* Optimization details — optional attributes feeding /insights.
-                        Hidden for contexts: backdrops never count as tracked time. */}
-                    {!isContext && (
-                      <Collapsible
-                        open={readOnly ? true : showOptimization}
-                        onOpenChange={setShowOptimization}
-                      >
-                        <CollapsibleTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
-                          >
-                            {t("dialog.optimizationDetails")}
-                            <ChevronDown
-                              className={`size-4 transition-transform ${
-                                readOnly || showOptimization ? "rotate-180" : ""
-                              }`}
-                            />
-                          </Button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="pt-4">
-                          <form.Field name="attributes">
-                            {(field) => (
-                              <AttributeFields
-                                value={field.state.value}
-                                onChange={field.handleChange}
-                                idPrefix="ev"
-                              />
-                            )}
-                          </form.Field>
-                        </CollapsibleContent>
-                      </Collapsible>
+                          </DisclosureSection>
+                        )}
+                      </form.Subscribe>
                     )}
                   </FieldGroup>
                   </fieldset>

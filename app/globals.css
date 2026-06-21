@@ -93,6 +93,33 @@
   --dur-slow: 300ms; /* drawer, sheet, accordion, layout settle (== duration-300) */
 }
 
+/* ---- Collapsible (progressive-disclosure sections) ----
+   Radix Collapsible exposes --radix-collapsible-content-height; animate height
+   from/to it (plus a fade) so the dialog "More options" / "Optimization details"
+   sections glide open instead of snapping. Slow/quint sits in the accordion band
+   of the motion system; the global prefers-reduced-motion rule above forces the
+   duration to ~0ms, so no per-rule guard is needed. */
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
 :root {
   --radius: 0.75rem; /* rounded + soft */
 

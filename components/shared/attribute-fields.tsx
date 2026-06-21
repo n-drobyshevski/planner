@@ -32,15 +32,24 @@ export function AttributeFields({
   // day-detail attribute chips) — the ATTRIBUTE_META registry stays language-free.
   const ta = useTranslations("common");
   return (
-    <div className="flex flex-col gap-4">
-      <FieldDescription>
+    // Two-up on desktop so the four rating scales sit in two rows rather than a
+    // tall stack; single column on mobile. The clear-hint spans both columns as
+    // one helper line under the section header.
+    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+      <FieldDescription className="sm:col-span-2">
         {t("attributes.clearHint")}
       </FieldDescription>
       {ATTRIBUTE_META.map((meta) => {
         const current = value[meta.key];
         const fieldLabel = ta(`attributes.${meta.key}.label`);
         return (
-          <Field key={meta.key}>
+          // The wider scales (4 options, e.g. Energy/Satisfaction) span both
+          // columns so their options never wrap mid-row; the compact 2–3 option
+          // scales pair up beside each other.
+          <Field
+            key={meta.key}
+            className={meta.options.length >= 4 ? "sm:col-span-2" : undefined}
+          >
             <FieldLabel htmlFor={`${idPrefix}-attr-${meta.key}`}>
               {fieldLabel}
             </FieldLabel>

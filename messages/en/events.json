@@ -63,6 +63,7 @@
     "hideFromPublic": "Hide from public links",
     "hideFromPublicHint": "Keep this off any shared public calendar, even when it isn't private.",
     "moreOptions": "More options",
+    "summaryRepeats": "Repeats",
     "status": "Status",
     "statusPlanned": "Planned",
     "statusConfirmed": "Confirmed",

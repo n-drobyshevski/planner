@@ -63,6 +63,7 @@
     "hideFromPublic": "Скрыть из публичных ссылок",
     "hideFromPublicHint": "Не показывать в публичном календаре, даже если событие не приватное.",
     "moreOptions": "Ещё",
+    "summaryRepeats": "Повторяется",
     "status": "Статус",
     "statusPlanned": "Запланировано",
     "statusConfirmed": "Подтверждено",
