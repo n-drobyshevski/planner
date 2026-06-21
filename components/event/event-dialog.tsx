@@ -14,7 +14,6 @@ import {
 import {
   Field,
   FieldGroup,
-  FieldSection,
   FieldLabel,
   FieldDescription,
   FieldError,
@@ -385,7 +384,7 @@ export function EventDialog(props: EventDialogProps) {
     <>
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
         {/* The title states the purpose; no separate description is needed. */}
-        <ResponsiveDialogContent aria-describedby={undefined}>
+        <ResponsiveDialogContent size="wide" aria-describedby={undefined}>
           <form.Subscribe selector={(s) => s.values.itemKind}>
             {(itemKind) => {
               const isContext = itemKind === "context";
@@ -522,7 +521,7 @@ export function EventDialog(props: EventDialogProps) {
                                 }
                                 aria-invalid={isInvalid || undefined}
                                 autoFocus
-                                className="h-auto border-0 bg-transparent px-0 py-1 text-lg font-medium md:text-lg shadow-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-transparent"
+                                className="-mx-2.5 h-auto border-0 bg-transparent px-2.5 py-1.5 text-lg font-medium md:text-lg shadow-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-transparent"
                               />
                               {isInvalid && <FieldError errors={field.state.meta.errors} />}
                             </div>
@@ -531,6 +530,11 @@ export function EventDialog(props: EventDialogProps) {
                       </form.Field>
                     </div>
 
+                    {/* Essentials | filing — two columns on desktop, stacked on
+                        mobile (the sheet). Left holds the schedule; right holds how
+                        the item is filed and shared. */}
+                    <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 md:grid-cols-2">
+                    <div className="flex flex-col gap-6">
                     {/* When — start / end. De-boxed: just the label + rows, and
                         all-day simply drops the time fields (no phantom spacer). */}
                     <form.Subscribe selector={(s) => s.values.allDay}>
@@ -558,7 +562,7 @@ export function EventDialog(props: EventDialogProps) {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className="w-9 shrink-0 text-sm text-muted-foreground">
+                            <span className="min-w-14 shrink-0 whitespace-nowrap text-sm text-muted-foreground">
                               {t("dialog.start")}
                             </span>
                             <form.Field name="startDate">
@@ -586,7 +590,7 @@ export function EventDialog(props: EventDialogProps) {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className="w-9 shrink-0 text-sm text-muted-foreground">
+                            <span className="min-w-14 shrink-0 whitespace-nowrap text-sm text-muted-foreground">
                               {t("dialog.end")}
                             </span>
                             <form.Field name="endDate">
@@ -626,8 +630,44 @@ export function EventDialog(props: EventDialogProps) {
                       )}
                     </form.Subscribe>
 
-                    {/* Filing + sharing — how the item is categorised, its state, and who sees it. */}
-                    <FieldSection>
+                    {/* Status — promoted to a primary control. "Is this settled or
+                        pencilled in?" is a real coordination signal. Each state carries
+                        a non-colour cue (dotted / check / slash), matching the grid:
+                        planned = dotted outline, cancelled = struck-through stripes. It
+                        sits with When: both describe the event itself, not its filing. */}
+                    <form.Field name="status">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel>{t("dialog.status")}</FieldLabel>
+                          <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
+                            value={field.state.value}
+                            onValueChange={(v) => v && field.handleChange(v as EventStatus)}
+                            className="flex-wrap justify-start"
+                          >
+                            <ToggleGroupItem value="planned">
+                              <CircleDashed data-icon="inline-start" />
+                              {t("dialog.statusPlanned")}
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="confirmed">
+                              <CircleCheck data-icon="inline-start" />
+                              {t("dialog.statusConfirmed")}
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="cancelled">
+                              <CircleSlash data-icon="inline-start" />
+                              {t("dialog.statusCancelled")}
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                        </Field>
+                      )}
+                    </form.Field>
+                    </div>
+
+                    {/* Filing + sharing — how the item is categorised and who sees it.
+                        The column is the grouping, so no section legend. */}
+                    <div className="flex flex-col gap-6">
                     {/* Context — full width (colour now lives beside the title). */}
                     <form.Field name="categoryId">
                       {(field) => (
@@ -662,39 +702,6 @@ export function EventDialog(props: EventDialogProps) {
                               </SelectGroup>
                             </SelectContent>
                           </Select>
-                        </Field>
-                      )}
-                    </form.Field>
-
-                    {/* Status — promoted to a primary control. "Is this settled or
-                        pencilled in?" is a real coordination signal. Each state carries
-                        a non-colour cue (dotted / check / slash), matching the grid:
-                        planned = dotted outline, cancelled = struck-through stripes. */}
-                    <form.Field name="status">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel>{t("dialog.status")}</FieldLabel>
-                          <ToggleGroup
-                            type="single"
-                            variant="outline"
-                            size="sm"
-                            value={field.state.value}
-                            onValueChange={(v) => v && field.handleChange(v as EventStatus)}
-                            className="flex-wrap justify-start"
-                          >
-                            <ToggleGroupItem value="planned">
-                              <CircleDashed data-icon="inline-start" />
-                              {t("dialog.statusPlanned")}
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="confirmed">
-                              <CircleCheck data-icon="inline-start" />
-                              {t("dialog.statusConfirmed")}
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="cancelled">
-                              <CircleSlash data-icon="inline-start" />
-                              {t("dialog.statusCancelled")}
-                            </ToggleGroupItem>
-                          </ToggleGroup>
                         </Field>
                       )}
                     </form.Field>
@@ -779,7 +786,8 @@ export function EventDialog(props: EventDialogProps) {
                         </Field>
                       )}
                     </form.Field>
-                    </FieldSection>
+                    </div>
+                    </div>
 
                     <Separator />
 
@@ -790,7 +798,7 @@ export function EventDialog(props: EventDialogProps) {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                          className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                         >
                           {t("dialog.moreOptions")}
                           <ChevronDown
@@ -874,7 +882,7 @@ export function EventDialog(props: EventDialogProps) {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                            className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                           >
                             {t("dialog.optimizationDetails")}
                             <ChevronDown

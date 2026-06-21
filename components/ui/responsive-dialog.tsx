@@ -82,12 +82,20 @@ function ResponsiveDialogClose(props: React.ComponentProps<typeof DialogClose>) 
  * Shared shell: a flex column capped at the viewport so the Header and Footer
  * stay pinned while the Body scrolls. On mobile it's a bottom sheet; on desktop
  * a centered card (wider than the default — sm:max-w-lg — for form-heavy use).
+ *
+ * `size` only affects the desktop dialog width: "default" stays at sm:max-w-lg,
+ * "wide" opens to sm:max-w-3xl for two-column form bodies. It is deliberately
+ * ignored on mobile — the bottom sheet is always full-width, and applying a
+ * sm:max-w-* class there would wrongly constrain the sheet between 640–767px.
  */
 function ResponsiveDialogContent({
   className,
   children,
+  size = "default",
   ...props
-}: React.ComponentProps<typeof DialogContent>) {
+}: React.ComponentProps<typeof DialogContent> & {
+  size?: "default" | "wide";
+}) {
   const isMobile = useResponsive();
   const base = "flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0";
   if (isMobile) {
@@ -97,10 +105,11 @@ function ResponsiveDialogContent({
       </SheetContent>
     );
   }
-  // Default desktop width is sm:max-w-lg, but a caller's className wins (e.g. a
-  // narrower sm:max-w-sm / sm:max-w-md) — twMerge resolves the later class.
+  // A caller's className still wins over the size-derived width (e.g. a narrower
+  // sm:max-w-sm / sm:max-w-md) — twMerge resolves the later class.
+  const width = size === "wide" ? "sm:max-w-3xl" : "sm:max-w-lg";
   return (
-    <DialogContent className={cn(base, "sm:max-w-lg", className)} {...props}>
+    <DialogContent className={cn(base, width, className)} {...props}>
       {children}
     </DialogContent>
   );

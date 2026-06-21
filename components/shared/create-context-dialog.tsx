@@ -92,7 +92,7 @@ export function CreateContextDialog({
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-      <ResponsiveDialogContent>
+      <ResponsiveDialogContent size="wide">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>{t("createContext.title")}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
@@ -102,85 +102,92 @@ export function CreateContextDialog({
 
         <ResponsiveDialogBody>
           <FieldGroup>
-            <form.Field name="name">
-              {(field) => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-                return (
-                  <Field data-invalid={isInvalid || undefined}>
-                    <FieldLabel htmlFor="ctx-name" className="sr-only">
-                      {t("createContext.nameLabel")}
-                    </FieldLabel>
-                    <Input
-                      id="ctx-name"
-                      name={field.name}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      placeholder={t("createContext.namePlaceholder")}
-                      onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
-                      aria-invalid={isInvalid || undefined}
-                      autoFocus
-                    />
-                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                  </Field>
-                );
-              }}
-            </form.Field>
+            {/* Two columns on desktop, stacked on mobile (the sheet). Name + the
+                shared/personal toggle sit left; the colour swatches take the right,
+                where the extra width lets the palette breathe on fewer rows. */}
+            <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 md:grid-cols-2">
+              <div className="flex flex-col gap-6">
+                <form.Field name="name">
+                  {(field) => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+                    return (
+                      <Field data-invalid={isInvalid || undefined}>
+                        <FieldLabel htmlFor="ctx-name" className="sr-only">
+                          {t("createContext.nameLabel")}
+                        </FieldLabel>
+                        <Input
+                          id="ctx-name"
+                          name={field.name}
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          onBlur={field.handleBlur}
+                          placeholder={t("createContext.namePlaceholder")}
+                          onKeyDown={(e) => e.key === "Enter" && void form.handleSubmit()}
+                          aria-invalid={isInvalid || undefined}
+                          autoFocus
+                        />
+                        {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                      </Field>
+                    );
+                  }}
+                </form.Field>
 
-            <form.Field name="color">
-              {(field) => (
-                <Field>
-                  <FieldLabel>{t("createContext.colorLabel")}</FieldLabel>
-                  <div className="flex flex-wrap gap-2">
-                    {PALETTE.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        aria-label={t("createContext.colorAriaLabel", { color: c })}
-                        aria-pressed={field.state.value === c}
-                        onClick={() => field.handleChange(c)}
-                        className={cn(
-                          "size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          field.state.value === c && "ring-2 ring-foreground",
-                        )}
-                        style={{ backgroundColor: toPaletteColor(c) }}
+                <form.Field name="shared">
+                  {(field) => (
+                    <Field orientation="horizontal">
+                      <FieldContent>
+                        <FieldLabel htmlFor="ctx-shared" className="flex items-center gap-2">
+                          {field.state.value ? (
+                            <Users className="size-4 text-muted-foreground" />
+                          ) : (
+                            <User className="size-4 text-muted-foreground" />
+                          )}
+                          {field.state.value
+                            ? t("createContext.shared")
+                            : t("createContext.personal")}
+                        </FieldLabel>
+                        <FieldDescription>
+                          {field.state.value
+                            ? t("createContext.sharedHint")
+                            : t("createContext.personalHint")}
+                        </FieldDescription>
+                      </FieldContent>
+                      <Switch
+                        id="ctx-shared"
+                        checked={field.state.value}
+                        onCheckedChange={field.handleChange}
+                        aria-label={t("createContext.sharedSwitchAriaLabel")}
                       />
-                    ))}
-                  </div>
-                </Field>
-              )}
-            </form.Field>
+                    </Field>
+                  )}
+                </form.Field>
+              </div>
 
-            <form.Field name="shared">
-              {(field) => (
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldLabel htmlFor="ctx-shared" className="flex items-center gap-2">
-                      {field.state.value ? (
-                        <Users className="size-4 text-muted-foreground" />
-                      ) : (
-                        <User className="size-4 text-muted-foreground" />
-                      )}
-                      {field.state.value
-                        ? t("createContext.shared")
-                        : t("createContext.personal")}
-                    </FieldLabel>
-                    <FieldDescription>
-                      {field.state.value
-                        ? t("createContext.sharedHint")
-                        : t("createContext.personalHint")}
-                    </FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    id="ctx-shared"
-                    checked={field.state.value}
-                    onCheckedChange={field.handleChange}
-                    aria-label={t("createContext.sharedSwitchAriaLabel")}
-                  />
-                </Field>
-              )}
-            </form.Field>
+              <form.Field name="color">
+                {(field) => (
+                  <Field>
+                    <FieldLabel>{t("createContext.colorLabel")}</FieldLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {PALETTE.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          aria-label={t("createContext.colorAriaLabel", { color: c })}
+                          aria-pressed={field.state.value === c}
+                          onClick={() => field.handleChange(c)}
+                          className={cn(
+                            "size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            field.state.value === c && "ring-2 ring-foreground",
+                          )}
+                          style={{ backgroundColor: toPaletteColor(c) }}
+                        />
+                      ))}
+                    </div>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
           </FieldGroup>
         </ResponsiveDialogBody>
 

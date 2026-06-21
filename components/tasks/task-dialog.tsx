@@ -289,7 +289,7 @@ export function TaskDialog(props: TaskDialogProps) {
   return (
     <>
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-        <ResponsiveDialogContent>
+        <ResponsiveDialogContent size="wide">
           <ResponsiveDialogHeader>
             <div className="flex items-center justify-between gap-3">
               <ResponsiveDialogTitle>
@@ -377,27 +377,61 @@ export function TaskDialog(props: TaskDialogProps) {
               </Field>
             )}
 
-            <form.Field name="description">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="task-notes">{t("taskDialog.notesLabel")}</FieldLabel>
-                  <Textarea
-                    id="task-notes"
-                    name={field.name}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    rows={2}
-                    placeholder={t("taskDialog.notesPlaceholder")}
-                  />
-                </Field>
-              )}
-            </form.Field>
+            {/* Essentials | filing — two columns on desktop, stacked on mobile
+                (the sheet). Left holds notes + scheduling dates; right holds
+                assignment, context, and priority. The column is the grouping, so
+                the former "Details" legend is dropped. */}
+            <div className="grid grid-cols-1 items-start gap-x-6 gap-y-6 md:grid-cols-2">
+              <div className="flex flex-col gap-6">
+                <form.Field name="description">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="task-notes">{t("taskDialog.notesLabel")}</FieldLabel>
+                      <Textarea
+                        id="task-notes"
+                        name={field.name}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        rows={2}
+                        placeholder={t("taskDialog.notesPlaceholder")}
+                      />
+                    </Field>
+                  )}
+                </form.Field>
 
-            {/* Details — assignment, scheduling, and priority grouped together
-                so the core fields above stay uncluttered. */}
-            <FieldSection title={t("taskDialog.detailsLabel")}>
-              <div className="grid grid-cols-2 gap-3">
+                <form.Field name="startDate">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="task-start">{t("taskDialog.startDateLabel")}</FieldLabel>
+                      <DatePicker
+                        id="task-start"
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        clearable
+                        aria-label={t("taskDialog.startDateLabel")}
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="dueDate">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="task-due">{t("taskDialog.dueDateLabel")}</FieldLabel>
+                      <DatePicker
+                        id="task-due"
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        clearable
+                        aria-label={t("taskDialog.dueDateLabel")}
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+              </div>
+
+              <div className="flex flex-col gap-6">
                 <form.Field name="assigneeId">
                   {(field) => (
                     <Field>
@@ -472,66 +506,34 @@ export function TaskDialog(props: TaskDialogProps) {
                     </Field>
                   )}
                 </form.Field>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <form.Field name="startDate">
+                {/* Priority is a 4-value enum — a ToggleGroup matches the Status
+                    and visibility controls used elsewhere. The value union ("none"
+                    | "1" | "2" | "3") is unchanged, so the schema/payload contract
+                    holds; a re-tap (empty value) falls back to "none". */}
+                <form.Field name="priority">
                   {(field) => (
                     <Field>
-                      <FieldLabel htmlFor="task-start">{t("taskDialog.startDateLabel")}</FieldLabel>
-                      <DatePicker
-                        id="task-start"
+                      <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
+                      <ToggleGroup
+                        type="single"
+                        variant="segmented"
                         value={field.state.value}
-                        onChange={field.handleChange}
-                        clearable
-                        aria-label={t("taskDialog.startDateLabel")}
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-
-                <form.Field name="dueDate">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="task-due">{t("taskDialog.dueDateLabel")}</FieldLabel>
-                      <DatePicker
-                        id="task-due"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        clearable
-                        aria-label={t("taskDialog.dueDateLabel")}
-                      />
+                        onValueChange={(v) =>
+                          field.handleChange((v || "none") as TaskFormValues["priority"])
+                        }
+                        className="justify-start"
+                      >
+                        <ToggleGroupItem value="none">{t("priority.none")}</ToggleGroupItem>
+                        <ToggleGroupItem value="1">{t("priority.low")}</ToggleGroupItem>
+                        <ToggleGroupItem value="2">{t("priority.medium")}</ToggleGroupItem>
+                        <ToggleGroupItem value="3">{t("priority.high")}</ToggleGroupItem>
+                      </ToggleGroup>
                     </Field>
                   )}
                 </form.Field>
               </div>
-
-              {/* Priority is a 4-value enum — a ToggleGroup matches the Status and
-                  visibility controls used elsewhere. The value union ("none" | "1"
-                  | "2" | "3") is unchanged, so the schema/payload contract holds; a
-                  re-tap (empty value) falls back to "none". */}
-              <form.Field name="priority">
-                {(field) => (
-                  <Field>
-                    <FieldLabel>{t("taskDialog.priorityLabel")}</FieldLabel>
-                    <ToggleGroup
-                      type="single"
-                      variant="segmented"
-                      value={field.state.value}
-                      onValueChange={(v) =>
-                        field.handleChange((v || "none") as TaskFormValues["priority"])
-                      }
-                      className="justify-start"
-                    >
-                      <ToggleGroupItem value="none">{t("priority.none")}</ToggleGroupItem>
-                      <ToggleGroupItem value="1">{t("priority.low")}</ToggleGroupItem>
-                      <ToggleGroupItem value="2">{t("priority.medium")}</ToggleGroupItem>
-                      <ToggleGroupItem value="3">{t("priority.high")}</ToggleGroupItem>
-                    </ToggleGroup>
-                  </Field>
-                )}
-              </form.Field>
-            </FieldSection>
+            </div>
 
             {/* Optional calendar placement, shown only when the dialog was opened
                 from a calendar slot. Off by default: a new task lands in the list,
@@ -570,7 +572,7 @@ export function TaskDialog(props: TaskDialogProps) {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                 >
                   {t("taskDialog.moreOptions")}
                   <ChevronDown
@@ -654,7 +656,7 @@ export function TaskDialog(props: TaskDialogProps) {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-between px-0 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  className="-mx-2.5 w-full justify-between px-2.5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
                 >
                   {t("taskDialog.optimizationDetails")}
                   <ChevronDown
