@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
@@ -26,7 +34,6 @@ import { positionBetween } from "@/lib/tasks/ordering";
 import { combineDateTime } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { TasksToolbar, type TasksView } from "./tasks-toolbar";
-import { TaskBoard } from "./task-board";
 import { TaskList } from "./task-list";
 import { LoadError } from "@/components/shared/load-error";
 import {
@@ -62,17 +69,25 @@ const CheckpointDialog = dynamic(loadCheckpointDialog, {
 });
 
 // The Flows view carries the SVG/zoom weight, so it's code-split out of the
-// initial /tasks JS (Board/List stay inline as the common defaults) and warmed
-// on idle so the first switch is instant.
+// initial /tasks JS and warmed on idle so the first switch is instant.
 const loadTaskFlows = () => import("./task-flows").then((m) => m.TaskFlows);
 const TaskFlows = dynamic(loadTaskFlows, { ssr: false, loading: () => null });
 
-/** Overlays + the Flows view, warmed during idle so their first open is instant. */
+// The Board view pulls in @dnd-kit (sensors, collision, sortable). Code-split it
+// so that weight stays out of the hydration bundle — even when Board is the
+// (desktop) default it then loads off the critical path and inits inside the
+// mount transition. Warmed on idle so switching to/showing Board stays instant;
+// List remains inline as the lighter, mobile-default view.
+const loadTaskBoard = () => import("./task-board").then((m) => m.TaskBoard);
+const TaskBoard = dynamic(loadTaskBoard, { ssr: false, loading: () => null });
+
+/** Overlays + the Board/Flows views, warmed during idle so first open is instant. */
 const OVERLAY_PRELOADS = [
   loadTaskDialog,
   loadScheduleTaskDialog,
   loadCheckpointDialog,
   loadTaskFlows,
+  loadTaskBoard,
 ];
 
 export function TasksShell({
@@ -103,7 +118,13 @@ export function TasksShell({
   const [mounted, setMounted] = useState(false);
   const autoApplied = useRef(false);
 
-  useEffect(() => setMounted(true), []);
+  // Mount the heavy view tree (Board + dnd-kit / List / Flows) in a transition so
+  // it's a low-priority, interruptible render — the browser can service the first
+  // interaction instead of stalling on one long synchronous mount right after
+  // hydration (the main INP driver on this surface).
+  useEffect(() => {
+    startTransition(() => setMounted(true));
+  }, []);
   // Warm the task/schedule dialog chunks during idle so first open is instant.
   useIdlePreload(OVERLAY_PRELOADS);
 
@@ -153,7 +174,12 @@ export function TasksShell({
     () => new Map(categories.map((c) => [c.id, c])),
     [categories],
   );
-  const colorOf = (t: TaskRow) => resolveTaskColor(t, catMap, memberMap);
+  // Stable identity (catMap/memberMap rarely change) so a card isn't re-rendered
+  // by a new `colorOf` closure every time an unrelated task mutates.
+  const colorOf = useCallback(
+    (t: TaskRow) => resolveTaskColor(t, catMap, memberMap),
+    [catMap, memberMap],
+  );
 
   // The active collection: the URL/selected one if it still exists, else the
   // first. Deriving (rather than syncing into state) means a deleted/stale
@@ -218,11 +244,17 @@ export function TasksShell({
   const topLevel = childrenByParent.get(null) ?? [];
 
   // Tasks blocked by an unmet dependency (a blocker not yet complete). Computed
-  // over the whole workspace so a cross-collection blocker still counts.
+  // over the whole workspace so a cross-collection blocker still counts. Fed by a
+  // deferred task snapshot so this whole-workspace rescan runs at low priority and
+  // doesn't block the paint of the interaction that triggered it (e.g. a toggle);
+  // the blocked-state styling catching up a frame later is imperceptible.
+  const deferredTasks = useDeferredValue(tasks);
   const dependencyBlocked = useMemo(() => {
-    const completeById = new Map(tasks.map((tk) => [tk.id, tk.completedAt != null]));
+    const completeById = new Map(
+      deferredTasks.map((tk) => [tk.id, tk.completedAt != null]),
+    );
     return dependencyBlockedIds(dependencies, (id) => completeById.get(id) ?? false);
-  }, [dependencies, tasks]);
+  }, [dependencies, deferredTasks]);
 
   // Status events grouped by task id, for the Flows view's per-lane timelines.
   const eventsByTask = useMemo(() => {
@@ -256,11 +288,22 @@ export function TasksShell({
     return map;
   }, [checkpoints]);
   // Whole-subtree progress (all descendants), so a card with nested subtasks
-  // reflects everything beneath it, not just its direct children.
-  const progressFor = (t: TaskRow) => {
-    const p = progressDeep(t.id, childrenByParent);
-    return p.total ? p : null;
-  };
+  // reflects everything beneath it, not just its direct children. Precomputed
+  // once per tree change into an id→progress map so each card is an O(1) lookup
+  // instead of re-walking its subtree on every render (was O(N·subtree) across a
+  // board re-render); `progressFor` keeps a stable identity for unchanged trees.
+  const progressById = useMemo(() => {
+    const map = new Map<string, { done: number; total: number }>();
+    for (const t of collectionTasks) {
+      const p = progressDeep(t.id, childrenByParent);
+      if (p.total) map.set(t.id, p);
+    }
+    return map;
+  }, [collectionTasks, childrenByParent]);
+  const progressFor = useCallback(
+    (t: TaskRow) => progressById.get(t.id) ?? null,
+    [progressById],
+  );
   const editorState = dialogs.editor;
   const editingTask =
     editorState?.mode === "edit"

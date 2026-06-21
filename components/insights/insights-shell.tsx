@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import dynamic from "next/dynamic";
@@ -36,8 +36,6 @@ import { ChartSkeleton } from "./chart-skeleton";
 import { InsightsTabSkeleton } from "./insights-tab-skeleton";
 import { cn } from "@/lib/utils";
 import type { Category, Member, Occurrence, TaskRow, TimeWindow } from "@/lib/types";
-
-const emptySubscribe = () => () => {};
 
 // Session-level gate for the content crossfade (mirrors components/crossfade.tsx):
 // flipped true after the first insights content paints, so the very first paint
@@ -129,13 +127,14 @@ function InsightsShellInner({
   const [tab, setTab] = useState<InsightsTab>(initialTab);
 
   // SSR renders without the member's zone/data; paint the frame and fill in
-  // after mount. Read "mounted" as an external store (server snapshot false,
-  // client true) — no setState-in-effect needed.
-  const mounted = useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false,
-  );
+  // after mount. The flip is wrapped in startTransition so mounting the (heavy,
+  // recharts-backed) tab tree is a low-priority, interruptible render — the
+  // browser can service the first interaction instead of being blocked by one
+  // long synchronous mount right after hydration (INP/FID).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    startTransition(() => setMounted(true));
+  }, []);
 
   // Enter-only crossfade on tab / period change (the keyed content remounts and
   // fades in). The session-level `insightsPainted` flag (module scope) gates the

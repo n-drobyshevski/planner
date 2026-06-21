@@ -90,7 +90,11 @@ export function useBoardDnd(
   }
 
   function onDragOver(e: DragOverEvent) {
-    setNestTarget(nestTargetId(e.over ? String(e.over.id) : null));
+    // Fires on every pointer move during a drag. `setState` bails on an equal
+    // value, but compute first and pass the updater so React only schedules a
+    // board re-render when the resolved nest target actually changes.
+    const next = nestTargetId(e.over ? String(e.over.id) : null);
+    setNestTarget((prev) => (prev === next ? prev : next));
   }
 
   function onDragEnd(e: DragEndEvent) {

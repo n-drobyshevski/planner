@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import dynamic from "next/dynamic";
@@ -850,6 +850,22 @@ export function CalendarShell({
       appearancePanelOpen
     )
       return;
+    // Fast path: bail before any DOM read on keys no shortcut below claims (the
+    // overwhelming majority of keydowns while navigating). Keeps the per-keypress
+    // cost to a few comparisons instead of an `activeElement`/`closest` query.
+    const k = e.key;
+    const maybeHandled =
+      k === "?" ||
+      k === "Escape" ||
+      k === "Delete" ||
+      k === "Backspace" ||
+      k === "ArrowLeft" ||
+      k === "ArrowRight" ||
+      k === "m" ||
+      k === "M" ||
+      k === "p" ||
+      k === "P";
+    if (!maybeHandled) return;
     const ae = document.activeElement;
     if (
       ae instanceof HTMLElement &&
@@ -920,7 +936,13 @@ export function CalendarShell({
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  useEffect(() => setMounted(true), []);
+  // Flip in a transition so mounting the canvas (rrule expansion + per-day layout
+  // packing + the EventBlock tree) is a low-priority, interruptible render — the
+  // browser can service the first interaction instead of stalling on one long
+  // synchronous mount right after hydration (calendar FID).
+  useEffect(() => {
+    startTransition(() => setMounted(true));
+  }, []);
 
   // First time a second event joins the selection, surface the group-op modifiers
   // contextually (they're otherwise only in the ? sheet). One toast, ever — the
