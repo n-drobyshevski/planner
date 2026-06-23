@@ -72,6 +72,26 @@ removed. RLS is the backstop for all of them.
 > Note: the member must be signed in to planr.page when authorizing. If not, the
 > consent page bounces to `/login`; log in, then re-initiate from claude.ai.
 
+## Restricting to Claude only
+
+Supabase's dynamic client registration lets *any* client register — there is no
+native "only Claude" toggle, and OAuth-client redirect URIs are separate from the
+general Redirect URLs allowlist. So the lock lives in our consent/decision layer:
+a **redirect-host allowlist** (`lib/mcp/env.ts:isAllowedClientRedirect`), enforced
+authoritatively in `app/api/oauth/decision/route.ts` and mirrored on the consent
+screen.
+
+- Default: only `claude.ai` (covers claude.ai web, Desktop, mobile, Cowork — all
+  redirect to `https://claude.ai/api/mcp/auth_callback`). Any other client is
+  refused at consent even though it can register.
+- `MCP_ALLOWED_REDIRECT_HOSTS` — comma-separated host override; `*` disables the
+  guard (consent screen only).
+- `MCP_ALLOW_LOOPBACK_REDIRECT=true` — also allow `localhost`/`127.0.0.1`
+  redirects. **Claude Code** needs this (RFC 8252 loopback), but so does any
+  native client, so it's off by default.
+
+The consent screen also shows the client's redirect host, per the MCP auth spec.
+
 ## Verifying
 
 - Local protocol check: `npx @modelcontextprotocol/inspector` against
