@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
-import { isMcpEnabled } from "@/lib/mcp/env";
+import { isMcpEnabled, isAllowedClientRedirect } from "@/lib/mcp/env";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -104,6 +104,24 @@ async function ConsentFlow({
     redirect(details.redirect_url);
   }
 
+  // "Claude only" guard (mirrors the authoritative check in /api/oauth/decision):
+  // refuse clients whose redirect host isn't allowlisted.
+  if (!isAllowedClientRedirect(details.redirect_uri)) {
+    return (
+      <NoticeCard
+        title="Client not allowed"
+        body={`"${details.client.name}" (${details.redirect_uri}) isn't on the allowed list, so it can't connect to this planner.`}
+      />
+    );
+  }
+
+  let redirectHost = details.redirect_uri;
+  try {
+    redirectHost = new URL(details.redirect_uri).host;
+  } catch {
+    /* show the raw value if it doesn't parse */
+  }
+
   const scopes = details.scope?.trim() ? details.scope.trim().split(/\s+/) : [];
 
   return (
@@ -124,6 +142,10 @@ async function ConsentFlow({
         <div className="flex justify-between gap-4">
           <dt className="text-muted-foreground">Signed in as</dt>
           <dd className="truncate text-right">{details.user.email}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted-foreground">Redirects to</dt>
+          <dd className="truncate text-right">{redirectHost}</dd>
         </div>
         {scopes.length > 0 && (
           <div>

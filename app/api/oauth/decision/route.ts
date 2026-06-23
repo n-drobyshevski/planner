@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isMcpEnabled } from "@/lib/mcp/env";
+import { isMcpEnabled, isAllowedClientRedirect } from "@/lib/mcp/env";
 
 /**
  * Completes the OAuth consent decision from /oauth/consent. Approving issues the
@@ -26,6 +26,26 @@ export async function POST(request: Request): Promise<Response> {
   const { data: claimsData } = await supabase.auth.getClaims();
   if (!claimsData?.claims) {
     return NextResponse.redirect(new URL("/login", request.url), { status: 303 });
+  }
+
+  // "Claude only" guard (authoritative): never approve a client whose redirect
+  // host isn't allowlisted, even if the page UI were bypassed. Re-fetch the
+  // details server-side rather than trusting anything from the form.
+  if (decision === "approve") {
+    const { data: details } =
+      await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+    const redirectUri =
+      details && "redirect_uri" in details ? details.redirect_uri : undefined;
+    if (!isAllowedClientRedirect(redirectUri)) {
+      const denied = await supabase.auth.oauth.denyAuthorization(authorizationId);
+      if (denied.data) {
+        return NextResponse.redirect(denied.data.redirect_url, { status: 303 });
+      }
+      return NextResponse.json(
+        { error: "This client is not allowed to connect." },
+        { status: 403 },
+      );
+    }
   }
 
   const { data, error } =
