@@ -1,0 +1,45 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { isMcpEnabled } from "@/lib/mcp/env";
+
+/**
+ * Completes the OAuth consent decision from /oauth/consent. Approving issues the
+ * authorization code via Supabase and redirects the user back to the client
+ * (claude.ai); denying redirects back with an error. Under /api, so outside the
+ * proxy's locale + auth handling — it relies on the cookie session directly.
+ */
+export async function POST(request: Request): Promise<Response> {
+  if (!isMcpEnabled()) {
+    return NextResponse.json({ error: "Not enabled" }, { status: 404 });
+  }
+
+  const form = await request.formData();
+  const decision = form.get("decision");
+  const authorizationId = form.get("authorization_id");
+
+  if (typeof authorizationId !== "string" || !authorizationId) {
+    return NextResponse.json({ error: "Missing authorization_id" }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+
+  const { data: claimsData } = await supabase.auth.getClaims();
+  if (!claimsData?.claims) {
+    return NextResponse.redirect(new URL("/login", request.url), { status: 303 });
+  }
+
+  const { data, error } =
+    decision === "approve"
+      ? await supabase.auth.oauth.approveAuthorization(authorizationId)
+      : await supabase.auth.oauth.denyAuthorization(authorizationId);
+
+  if (error || !data) {
+    return NextResponse.json(
+      { error: error?.message ?? "Authorization failed" },
+      { status: 400 },
+    );
+  }
+
+  // 303 so the POST becomes a GET on the client's callback URL.
+  return NextResponse.redirect(data.redirect_url, { status: 303 });
+}
