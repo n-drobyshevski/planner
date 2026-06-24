@@ -1,0 +1,24 @@
+{
+  "title": "Authorize {client}",
+  "subtitle": "wants to access your planner",
+  "signedInAs": "Signed in as",
+  "redirectsTo": "Redirects to",
+  "canAccessTitle": "What it can access",
+  "capCalendar": "View and edit your calendar events",
+  "capTasks": "View and edit your tasks",
+  "capSleep": "View your sleep log and summaries",
+  "grantNote": "Access is granted as you, within your own permissions. You can revoke it any time in Supabase.",
+  "allow": "Allow access",
+  "deny": "Deny",
+  "goToCalendar": "Go to calendar",
+  "states": {
+    "unavailableTitle": "Connector unavailable",
+    "unavailableBody": "The Claude connector isn't enabled for this workspace.",
+    "missingTitle": "No connection request",
+    "missingBody": "Open this page from the connect flow in Claude. There's nothing to authorize directly.",
+    "expiredTitle": "This request has expired",
+    "expiredBody": "Authorization requests are valid for only a few minutes and can be used once. Start the connection again from Claude to get a fresh one.",
+    "notAllowedTitle": "App not allowed",
+    "notAllowedBody": "{client} ({uri}) isn't on the allowed list, so it can't connect to this planner."
+  }
+}
