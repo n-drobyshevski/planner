@@ -12,6 +12,7 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { signIn } from "@/app/[locale]/login/actions";
+import { safeAuthorizationId, postLoginPath } from "@/lib/auth/oauth-return";
 import {
   passkeyLogin,
   passkeyAutofill,
@@ -38,8 +39,20 @@ export function LoginScreen() {
   const [passkeySupported, setPasskeySupported] = useState(false);
   useEffect(() => setPasskeySupported(browserSupportsWebAuthn()), []);
 
+  // The OAuth consent flow bounces unauthenticated users here with an
+  // `authorization_id` preserved in the URL; read it (client-side, validated) so
+  // we can resume the flow after login instead of dropping the user on /calendar.
+  const currentAuthorizationId = () =>
+    typeof window === "undefined"
+      ? null
+      : safeAuthorizationId(
+          new URLSearchParams(window.location.search).get("authorization_id"),
+        );
+
   // Hard-navigate so per-member React Query caches reset (mirrors account switch).
-  const goToCalendar = () => window.location.assign(`/${locale}/calendar`);
+  // Returns to the consent screen when resuming OAuth, else the calendar.
+  const goAfterLogin = () =>
+    window.location.assign(postLoginPath(locale, currentAuthorizationId()));
 
   // Reaching the login screen means a fresh session is about to start, so reset
   // the "Not now" decisions on the post-login passkey nudge (see passkey-nudge).
@@ -58,7 +71,7 @@ export function LoginScreen() {
     void browserSupportsWebAuthnAutofill().then((ok) => {
       if (!ok) return;
       void passkeyAutofill().then((res) => {
-        if ("ok" in res) goToCalendar();
+        if ("ok" in res) goAfterLogin();
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,7 +82,7 @@ export function LoginScreen() {
     // Usernameless: the browser shows the saved passkeys and the user picks one.
     void passkeyLogin().then((res) => {
       if ("ok" in res) {
-        goToCalendar();
+        goAfterLogin();
         return;
       }
       setPasskeyPending(false);
@@ -96,7 +109,11 @@ export function LoginScreen() {
     onSubmit: ({ value }) => {
       if (pending) return;
       startTransition(async () => {
-        const res = await signIn(value.name.trim(), value.password);
+        const res = await signIn(
+          value.name.trim(),
+          value.password,
+          currentAuthorizationId() ?? undefined,
+        );
         if (res && "error" in res) toast.error(res.error);
       });
     },

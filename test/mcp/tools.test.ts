@@ -39,7 +39,8 @@ function collectTools() {
     if (!cb) throw new Error(`tool ${name} not registered`);
     const res = await cb(args, {});
     const text = res.content[0].text;
-    let data: unknown = undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let data: any = undefined;
     try {
       data = JSON.parse(text);
     } catch {
