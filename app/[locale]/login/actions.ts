@@ -18,6 +18,7 @@ import {
 } from "@/lib/auth/webauthn";
 import { resolveProvider } from "@/lib/auth/aaguids";
 import { parseUserAgent } from "@/lib/auth/user-agent";
+import { safeAuthorizationId } from "@/lib/auth/oauth-return";
 import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
@@ -212,11 +213,13 @@ async function authenticateMember(
  * Sign in by typed nickname + password. Looks the member up by their current
  * name, verifies the secret (when one is set), then signs in with the
  * server-held credentials linked to that member's auth user. On success this
- * redirects to /calendar.
+ * redirects to /calendar — or back to the OAuth consent screen when resuming a
+ * connector authorization (`authorizationId`).
  */
 export async function signIn(
   nickname: string,
   password: string,
+  authorizationId?: string,
 ): Promise<SignInResult | void> {
   const tv = await getTranslations({
     locale: await getLocale(),
@@ -241,7 +244,13 @@ export async function signIn(
   const failure = await authenticateMember(member as MemberRow, password);
   if (failure) return failure;
 
-  redirect({ href: "/calendar", locale: await getLocale() });
+  // Resume an OAuth consent flow if one was in progress; else go to the calendar.
+  // The id is validated and the path is hardcoded, so there's no open redirect.
+  const consentId = safeAuthorizationId(authorizationId);
+  const href = consentId
+    ? `/oauth/consent?authorization_id=${encodeURIComponent(consentId)}`
+    : "/calendar";
+  redirect({ href, locale: await getLocale() });
 }
 
 /**
