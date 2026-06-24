@@ -122,6 +122,15 @@ async function ConsentFlow({
     /* show the raw value if it doesn't parse */
   }
 
+  // Show the member's name, not the raw auth email — the @planner.local seed
+  // emails are internal identifiers that don't match member nicknames.
+  const { data: member } = await supabase
+    .from("members")
+    .select("name")
+    .eq("auth_user_id", details.user.id)
+    .maybeSingle();
+  const accountLabel = (member?.name as string | undefined) ?? details.user.email;
+
   const scopes = details.scope?.trim() ? details.scope.trim().split(/\s+/) : [];
 
   return (
@@ -141,7 +150,7 @@ async function ConsentFlow({
       <dl className="mt-6 space-y-3 text-sm">
         <div className="flex justify-between gap-4">
           <dt className="text-muted-foreground">Signed in as</dt>
-          <dd className="truncate text-right">{details.user.email}</dd>
+          <dd className="truncate text-right">{accountLabel}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-muted-foreground">Redirects to</dt>
