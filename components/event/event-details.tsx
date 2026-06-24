@@ -347,7 +347,7 @@ export function EventDetails({
           </div>
         </ResponsiveDialogBody>
 
-        <ResponsiveDialogFooter className="sm:justify-between">
+        <ResponsiveDialogFooter className="flex-row justify-between sm:justify-between">
           {isOwn ? (
             <>
               <Button
@@ -358,7 +358,7 @@ export function EventDetails({
                 <Trash2 data-icon="inline-start" />
                 {tc("delete")}
               </Button>
-              <div className="flex gap-2 max-sm:w-full">
+              <div className="flex gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -457,7 +457,7 @@ export function EventDetails({
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button onClick={onEdit} className="max-sm:h-11 max-sm:flex-1">
+                <Button onClick={onEdit} className="max-sm:h-11">
                   <Pencil data-icon="inline-start" />
                   {tc("edit")}
                 </Button>
