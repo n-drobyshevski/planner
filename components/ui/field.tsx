@@ -2,8 +2,10 @@
 
 import { useMemo } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { AnimatePresence, m } from "motion/react"
 
 import { cn } from "@/lib/utils"
+import { tweenFast } from "@/lib/motion"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 
@@ -162,7 +164,7 @@ function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="field-description"
       className={cn(
-        "text-left text-sm leading-normal font-normal text-muted-foreground group-has-data-horizontal/field:text-balance [[data-variant=legend]+&]:-mt-1.5",
+        "text-left text-sm leading-normal font-normal text-pretty text-muted-foreground group-has-data-horizontal/field:text-balance [[data-variant=legend]+&]:-mt-1.5",
         "last:mt-0 nth-last-2:-mt-1",
         "[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
         className
@@ -206,9 +208,18 @@ function FieldError({
   className,
   children,
   errors,
+  visible,
+  id,
   ...props
 }: React.ComponentProps<"div"> & {
   errors?: Array<{ message?: string } | undefined>
+  /**
+   * When controlled, the component stays mounted and animates presence so the
+   * message exits softly (fade + slide-up) instead of vanishing. Callers pass
+   * the field's touched-and-invalid signal and drop the outer `&&` guard. When
+   * omitted, falls back to the static CSS enter-only render.
+   */
+  visible?: boolean
 }) {
   const content = useMemo(() => {
     if (children) {
@@ -237,6 +248,29 @@ function FieldError({
     )
   }, [children, errors])
 
+  // Controlled: stay mounted and animate presence so the message exits softly
+  // (fade + slide-up, shorter than the enter) rather than snapping away.
+  // Reduced-motion collapses both ends via the global MotionConfig.
+  if (visible !== undefined) {
+    return (
+      <AnimatePresence initial={false}>
+        {visible && content && (
+          <m.div
+            role="alert"
+            id={id}
+            data-slot="field-error"
+            className={cn("text-sm font-normal text-destructive", className)}
+            initial={{ opacity: 0, y: -4, filter: "blur(2px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)", transition: tweenFast }}
+            exit={{ opacity: 0, y: -4, filter: "blur(2px)", transition: { duration: 0.12, ease: "easeIn" } }}
+          >
+            {content}
+          </m.div>
+        )}
+      </AnimatePresence>
+    )
+  }
+
   if (!content) {
     return null
   }
@@ -244,6 +278,7 @@ function FieldError({
   return (
     <div
       role="alert"
+      id={id}
       data-slot="field-error"
       // Validation errors fade + slide in when they appear, so the message reads
       // as a response to the field rather than a layout jump. Reduced-motion

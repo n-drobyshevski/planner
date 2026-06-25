@@ -9,6 +9,7 @@ import {
   ResponsiveDialogTitle,
   ResponsiveDialogBody,
   ResponsiveDialogFooter,
+  useIsMobileNow,
 } from "@/components/ui/responsive-dialog";
 import {
   AlertDialog,
@@ -44,9 +45,10 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DisclosureSection } from "@/components/ui/disclosure-section";
-import { Trash2, CalendarPlus } from "lucide-react";
+import { Trash2, CalendarPlus, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { Spinner } from "@/components/ui/spinner";
+import { PendingIcon } from "@/components/ui/pending-icon";
+import { CreateContextDialog } from "@/components/shared/create-context-dialog";
 import { SubtaskEditor } from "./subtask-editor";
 import { TaskDependenciesField } from "./task-dependencies-field";
 import { AttributeFields } from "@/components/shared/attribute-fields";
@@ -69,6 +71,9 @@ import type {
 } from "@/lib/types";
 import type { ById } from "@/lib/tasks/tree";
 import type { TaskInput } from "@/lib/supabase/mappers";
+
+/** Sentinel Select value for the inline "Create new context…" action. */
+const CREATE_CONTEXT_VALUE = "__create__";
 
 export interface TaskDialogProps {
   open: boolean;
@@ -138,6 +143,10 @@ export function TaskDialog(props: TaskDialogProps) {
   const tc = useTranslations("common");
   const mutations = useTaskMutations(workspaceId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [creatingContext, setCreatingContext] = useState(false);
+  // Gate the title's autoFocus off the mobile sheet (see Event dialog) so opening
+  // it doesn't pop the OS keyboard over the fields.
+  const isMobile = useIsMobileNow();
   // Pending ownership transfer: the member the task would be handed to. Set by
   // the Owner picker, confirmed via the alert dialog below.
   const [transferTo, setTransferTo] = useState<string | null>(null);
@@ -319,7 +328,16 @@ export function TaskDialog(props: TaskDialogProps) {
             </div>
           </ResponsiveDialogHeader>
 
-          <ResponsiveDialogBody>
+          <ResponsiveDialogBody
+            onKeyDown={(e) => {
+              // ⌘/Ctrl+Enter saves from anywhere in the form (power-save). Plain
+              // Enter is scoped to the title input so the notes Textarea keeps it.
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                void form.handleSubmit();
+              }
+            }}
+          >
           <FieldGroup>
             <form.Field name="title">
               {(field) => {
@@ -334,14 +352,22 @@ export function TaskDialog(props: TaskDialogProps) {
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}
                       onBlur={field.handleBlur}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                          e.preventDefault();
+                          void form.handleSubmit();
+                        }
+                      }}
                       placeholder={t("taskDialog.titlePlaceholder")}
-                      autoFocus
+                      autoFocus={!isMobile}
                       aria-invalid={isInvalid || undefined}
                       aria-describedby={isInvalid ? "task-title-error" : undefined}
                     />
-                    {isInvalid && (
-                      <FieldError id="task-title-error" errors={field.state.meta.errors} />
-                    )}
+                    <FieldError
+                      id="task-title-error"
+                      errors={field.state.meta.errors}
+                      visible={isInvalid}
+                    />
                   </Field>
                 );
               }}
@@ -488,7 +514,14 @@ export function TaskDialog(props: TaskDialogProps) {
                   {(field) => (
                     <Field>
                       <FieldLabel>{t("taskDialog.contextLabel")}</FieldLabel>
-                      <Select value={field.state.value} onValueChange={field.handleChange}>
+                      <Select
+                        value={field.state.value}
+                        onValueChange={(v) =>
+                          v === CREATE_CONTEXT_VALUE
+                            ? setCreatingContext(true)
+                            : field.handleChange(v)
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder={t("taskDialog.noContext")} />
                         </SelectTrigger>
@@ -500,6 +533,13 @@ export function TaskDialog(props: TaskDialogProps) {
                                 {c.name}
                               </SelectItem>
                             ))}
+                            <SelectItem
+                              value={CREATE_CONTEXT_VALUE}
+                              className="text-muted-foreground"
+                            >
+                              <Plus className="size-4" />
+                              {t("taskDialog.createContext")}
+                            </SelectItem>
                           </SelectGroup>
                         </SelectContent>
                       </Select>
@@ -522,7 +562,7 @@ export function TaskDialog(props: TaskDialogProps) {
                         onValueChange={(v) =>
                           field.handleChange((v || "none") as TaskFormValues["priority"])
                         }
-                        className="justify-start"
+                        className="justify-start max-sm:[&_[data-slot=toggle-group-item]]:h-11"
                       >
                         <ToggleGroupItem value="none">{t("priority.none")}</ToggleGroupItem>
                         <ToggleGroupItem value="1">{t("priority.low")}</ToggleGroupItem>
@@ -772,7 +812,7 @@ export function TaskDialog(props: TaskDialogProps) {
                         Compiler doesn't treat the submit body — Date.now() included —
                         as render-scoped. */}
                     <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
-                      {isSubmitting && <Spinner data-icon="inline-start" />}
+                      <PendingIcon pending={isSubmitting} />
                       {mode === "create" ? tc("create") : tc("save")}
                     </Button>
                   </div>
@@ -782,6 +822,14 @@ export function TaskDialog(props: TaskDialogProps) {
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
       </ResponsiveDialog>
+
+      <CreateContextDialog
+        open={creatingContext}
+        onOpenChange={setCreatingContext}
+        workspaceId={workspaceId}
+        currentMemberId={currentMemberId}
+        onCreated={(id) => form.setFieldValue("categoryId", id)}
+      />
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

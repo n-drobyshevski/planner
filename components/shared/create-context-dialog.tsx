@@ -4,7 +4,7 @@ import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { useTranslations } from "next-intl";
 import { Users, User } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
+import { PendingIcon } from "@/components/ui/pending-icon";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveDialog,
@@ -127,7 +127,7 @@ export function CreateContextDialog({
                           aria-invalid={isInvalid || undefined}
                           autoFocus
                         />
-                        {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                        <FieldError errors={field.state.meta.errors} visible={isInvalid} />
                       </Field>
                     );
                   }}
@@ -177,7 +177,10 @@ export function CreateContextDialog({
                           aria-pressed={field.state.value === c}
                           onClick={() => field.handleChange(c)}
                           className={cn(
-                            "size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            "relative size-7 rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96]",
+                            // ~36px tap target (gap is 8px, 4px/side meets the
+                            // neighbor without overlapping) — visible size unchanged.
+                            "after:absolute after:-inset-1 after:content-['']",
                             field.state.value === c && "ring-2 ring-foreground",
                           )}
                           style={{ backgroundColor: toPaletteColor(c) }}
@@ -208,9 +211,7 @@ export function CreateContextDialog({
                   onClick={() => void form.handleSubmit()}
                   disabled={isSubmitting || !name.trim()}
                 >
-                  {isSubmitting && (
-                    <Spinner data-icon="inline-start" />
-                  )}
+                  <PendingIcon pending={isSubmitting} />
                   {t("createContext.submit")}
                 </Button>
               </>

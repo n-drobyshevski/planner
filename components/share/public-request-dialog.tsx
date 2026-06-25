@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
+import { TimeField } from "@/components/ui/time-field";
 import {
   Dialog,
   DialogContent,
@@ -154,20 +155,20 @@ export function PublicRequestDialog({
               <div className="flex gap-3">
                 <div className="flex-1 space-y-1.5">
                   <Label htmlFor="req-start">{t("dialog.fromLabel")}</Label>
-                  <Input
+                  <TimeField
                     id="req-start"
-                    type="time"
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    onChange={setStartTime}
+                    aria-label={t("dialog.fromLabel")}
                   />
                 </div>
                 <div className="flex-1 space-y-1.5">
                   <Label htmlFor="req-end">{t("dialog.toLabel")}</Label>
-                  <Input
+                  <TimeField
                     id="req-end"
-                    type="time"
                     value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
+                    onChange={setEndTime}
+                    aria-label={t("dialog.toLabel")}
                   />
                 </div>
               </div>

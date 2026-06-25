@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { useTranslations } from "next-intl";
-import { Spinner } from "@/components/ui/spinner";
+import { PendingIcon } from "@/components/ui/pending-icon";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -130,7 +130,7 @@ export function BoardEditorDialog({
                       aria-invalid={isInvalid || undefined}
                       autoFocus
                     />
-                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                    <FieldError errors={field.state.meta.errors} visible={isInvalid} />
                   </Field>
                 );
               }}
@@ -150,7 +150,7 @@ export function BoardEditorDialog({
                         aria-pressed={field.state.value === s}
                         onClick={() => field.handleChange(s)}
                         className={cn(
-                          "flex h-7 items-center rounded-md border border-border px-2 ring-offset-2 ring-offset-background transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          "flex h-7 items-center rounded-md border border-border px-2 ring-offset-2 ring-offset-background transition-[background-color,transform] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96]",
                           field.state.value === s && "border-foreground/30 ring-2 ring-foreground",
                         )}
                       >
@@ -195,7 +195,7 @@ export function BoardEditorDialog({
                   onClick={() => void form.handleSubmit()}
                   disabled={isSubmitting || !name.trim()}
                 >
-                  {isSubmitting && <Spinner data-icon="inline-start" />}
+                  <PendingIcon pending={isSubmitting} />
                   {mode === "create" ? t("boardEditor.add") : tc("save")}
                 </Button>
               </>

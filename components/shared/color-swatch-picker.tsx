@@ -40,8 +40,11 @@ export function ColorSwatchPicker({
         aria-pressed={isDefault}
         title={t("colorPicker.default")}
         className={cn(
-          "flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground",
-          "transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "relative flex size-7 items-center justify-center rounded-full border bg-background text-muted-foreground",
+          // Extend the tap target to ~32px (gap is 6px, so 2px/side stays clear
+          // of neighbors) without growing the visible swatch.
+          "after:absolute after:-inset-0.5 after:content-['']",
+          "transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96]",
           isDefault && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
         )}
       >
@@ -59,8 +62,11 @@ export function ColorSwatchPicker({
             title={s.label}
             style={{ backgroundColor: `var(--swatch-${s.id})` }}
             className={cn(
-              "flex size-7 items-center justify-center rounded-full",
-              "transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "relative flex size-7 items-center justify-center rounded-full",
+              // Extend the tap target to ~32px (gap is 6px, so 2px/side stays
+              // clear of neighbors) without growing the visible swatch.
+              "after:absolute after:-inset-0.5 after:content-['']",
+              "transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96]",
               selected && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
             )}
           >

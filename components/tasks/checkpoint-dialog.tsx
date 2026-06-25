@@ -35,7 +35,7 @@ import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { PendingIcon } from "@/components/ui/pending-icon";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ColorField } from "@/components/shared/color-field";
 import { useCheckpointMutations } from "@/lib/hooks/use-checkpoint-mutations";
@@ -192,9 +192,11 @@ export function CheckpointDialog(props: CheckpointDialogProps) {
                         aria-invalid={isInvalid || undefined}
                         aria-describedby={isInvalid ? "cp-title-error" : undefined}
                       />
-                      {isInvalid && (
-                        <FieldError id="cp-title-error" errors={field.state.meta.errors} />
-                      )}
+                      <FieldError
+                        id="cp-title-error"
+                        errors={field.state.meta.errors}
+                        visible={isInvalid}
+                      />
                     </Field>
                   );
                 }}
@@ -212,9 +214,11 @@ export function CheckpointDialog(props: CheckpointDialogProps) {
                         onChange={field.handleChange}
                         aria-label={t("checkpointDialog.dateLabel")}
                       />
-                      {isInvalid && (
-                        <FieldError id="cp-date-error" errors={field.state.meta.errors} />
-                      )}
+                      <FieldError
+                        id="cp-date-error"
+                        errors={field.state.meta.errors}
+                        visible={isInvalid}
+                      />
                     </Field>
                   );
                 }}
@@ -229,7 +233,7 @@ export function CheckpointDialog(props: CheckpointDialogProps) {
                       variant="segmented"
                       value={field.state.value}
                       onValueChange={(v) => v && field.handleChange(v as CheckpointShape)}
-                      className="justify-start"
+                      className="justify-start max-sm:[&_[data-slot=toggle-group-item]]:size-11"
                     >
                       {SHAPES.map((shape) => {
                         const Icon = SHAPE_ICON[shape];
@@ -304,7 +308,7 @@ export function CheckpointDialog(props: CheckpointDialogProps) {
                       {tc("cancel")}
                     </Button>
                     <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
-                      {isSubmitting && <Spinner data-icon="inline-start" />}
+                      <PendingIcon pending={isSubmitting} />
                       {mode === "create" ? tc("create") : tc("save")}
                     </Button>
                   </div>

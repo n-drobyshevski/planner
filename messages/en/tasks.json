@@ -226,6 +226,7 @@
     "transferAction": "Transfer",
     "contextLabel": "Context",
     "noContext": "No context",
+    "createContext": "Create new context…",
     "priorityLabel": "Priority",
     "dueDateLabel": "Due date",
     "startDateLabel": "Start date",

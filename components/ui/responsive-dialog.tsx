@@ -197,4 +197,8 @@ export {
   ResponsiveDialogFooter,
   ResponsiveDialogTitle,
   ResponsiveDialogDescription,
+  // Synchronous mobile check, safe to call from a dialog's owner (above the
+  // ResponsiveContext provider) — e.g. to gate autoFocus on the bottom sheet so
+  // opening it doesn't pop the OS keyboard and shove the sheet over the fields.
+  useIsMobileNow,
 };

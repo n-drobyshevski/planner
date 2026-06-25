@@ -33,7 +33,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CalendarPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Spinner } from "@/components/ui/spinner";
+import { PendingIcon } from "@/components/ui/pending-icon";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import {
   scheduleTaskFormSchema,
@@ -161,7 +161,7 @@ export function ScheduleTaskDialog({
                       onChange={field.handleChange}
                       aria-label={t("schedule.dateLabel")}
                     />
-                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                    <FieldError errors={field.state.meta.errors} visible={isInvalid} />
                   </Field>
                 );
               }}
@@ -179,7 +179,7 @@ export function ScheduleTaskDialog({
                       onChange={field.handleChange}
                       aria-label={t("schedule.startLabel")}
                     />
-                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                    <FieldError errors={field.state.meta.errors} visible={isInvalid} />
                   </Field>
                 );
               }}
@@ -195,7 +195,7 @@ export function ScheduleTaskDialog({
                   variant="segmented"
                   value={field.state.value}
                   onValueChange={(v) => v && field.handleChange(v as Mode)}
-                  className="justify-start"
+                  className="justify-start max-sm:[&_[data-slot=toggle-group-item]]:h-11"
                 >
                   <ToggleGroupItem value="single">{t("schedule.oneBlock")}</ToggleGroupItem>
                   <ToggleGroupItem value="split">{t("schedule.split")}</ToggleGroupItem>
@@ -246,6 +246,7 @@ export function ScheduleTaskDialog({
                             type="number"
                             min={2}
                             max={12}
+                            className="tabular-nums"
                             value={field.state.value}
                             onChange={(e) => field.handleChange(e.target.value)}
                             onBlur={field.handleBlur}
@@ -292,11 +293,7 @@ export function ScheduleTaskDialog({
                   {tc("cancel")}
                 </Button>
                 <Button onClick={() => void form.handleSubmit()} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Spinner data-icon="inline-start" />
-                  ) : (
-                    <CalendarPlus data-icon="inline-start" />
-                  )}
+                  <PendingIcon pending={isSubmitting} icon={<CalendarPlus />} />
                   {t("schedule.title")}
                 </Button>
               </>

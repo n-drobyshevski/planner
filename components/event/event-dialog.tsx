@@ -10,6 +10,7 @@ import {
   ResponsiveDialogTitle,
   ResponsiveDialogBody,
   ResponsiveDialogFooter,
+  useIsMobileNow,
 } from "@/components/ui/responsive-dialog";
 import {
   Field,
@@ -44,7 +45,7 @@ import {
   CircleCheck,
   CircleSlash,
 } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
+import { PendingIcon } from "@/components/ui/pending-icon";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
@@ -139,6 +140,10 @@ export function EventDialog(props: EventDialogProps) {
   const tc = useTranslations("common");
   const mutations = useEventMutations(workspaceId);
   const timeZone = useViewerTimeZone();
+  // Gate the title's autoFocus: on the mobile bottom sheet, focusing on open
+  // pops the OS keyboard and shoves the sheet over the fields. Desktop keeps the
+  // quick-add focus.
+  const isMobile = useIsMobileNow();
 
   const isRecurringEdit = mode === "edit" && Boolean(event?.rrule);
 
@@ -432,7 +437,21 @@ export function EventDialog(props: EventDialogProps) {
                     </div>
                   </ResponsiveDialogHeader>
 
-                  <ResponsiveDialogBody>
+                  <ResponsiveDialogBody
+                    onKeyDown={(e) => {
+                      // ⌘/Ctrl+Enter saves from anywhere in the form (power-save).
+                      // Plain Enter is scoped to the title input below so Enter
+                      // inside the notes Textarea still inserts a newline.
+                      if (
+                        !readOnly &&
+                        (e.metaKey || e.ctrlKey) &&
+                        e.key === "Enter"
+                      ) {
+                        e.preventDefault();
+                        void form.handleSubmit();
+                      }
+                    }}
+                  >
                   {readOnly && (
                     <div className="mb-3 flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                       <Lock className="size-4 shrink-0" />
@@ -465,7 +484,13 @@ export function EventDialog(props: EventDialogProps) {
                                 <button
                                   type="button"
                                   aria-label={t("dialog.color")}
-                                  className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                                  /* Extend the 28px dot's hit area toward 44px (≈40×44)
+                                     with a pseudo-element, asymmetrically: full
+                                     vertical + leftward into the dialog padding, none
+                                     rightward — the title input below uses -mx-2.5 and
+                                     sits flush against the swatch, so a symmetric inset
+                                     would overlap the input's hit area. */
+                                  className="relative mt-1 flex size-7 shrink-0 items-center justify-center rounded-full transition-transform before:absolute before:-inset-y-2 before:-left-3 before:right-0 before:content-[''] hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50"
                                 >
                                   <span
                                     aria-hidden
@@ -506,6 +531,15 @@ export function EventDialog(props: EventDialogProps) {
                                 value={field.state.value}
                                 onChange={(e) => field.handleChange(e.target.value)}
                                 onBlur={field.handleBlur}
+                                onKeyDown={(e) => {
+                                  // Enter from the title saves the quick-add. Skip
+                                  // mid-IME-composition so it doesn't submit while
+                                  // committing a CJK/transliterated candidate.
+                                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                    e.preventDefault();
+                                    void form.handleSubmit();
+                                  }
+                                }}
                                 placeholder={
                                   isContext
                                     ? t("dialog.titlePlaceholderContext")
@@ -515,10 +549,10 @@ export function EventDialog(props: EventDialogProps) {
                                   isContext ? t("dialog.titleAriaContext") : t("dialog.titleAriaEvent")
                                 }
                                 aria-invalid={isInvalid || undefined}
-                                autoFocus
+                                autoFocus={!isMobile}
                                 className="-mx-2.5 h-auto border-0 bg-transparent px-2.5 py-1.5 text-lg font-medium md:text-lg shadow-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-transparent"
                               />
-                              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                              <FieldError errors={field.state.meta.errors} visible={isInvalid} />
                             </div>
                           );
                         }}
@@ -615,11 +649,12 @@ export function EventDialog(props: EventDialogProps) {
                           {/* The cross-field ordering rule lands on endTime even when
                               the picker is hidden (all-day), so read it off the form. */}
                           <form.Subscribe selector={(s) => s.fieldMeta.endTime?.errors}>
-                            {(errors) =>
-                              errors && errors.length > 0 ? (
-                                <FieldError errors={errors} />
-                              ) : null
-                            }
+                            {(errors) => (
+                              <FieldError
+                                errors={errors}
+                                visible={!!errors && errors.length > 0}
+                              />
+                            )}
                           </form.Subscribe>
                         </div>
                       )}
@@ -640,7 +675,7 @@ export function EventDialog(props: EventDialogProps) {
                             size="sm"
                             value={field.state.value}
                             onValueChange={(v) => v && field.handleChange(v as EventStatus)}
-                            className="flex-wrap justify-start"
+                            className="flex-wrap justify-start max-sm:[&_[data-slot=toggle-group-item]]:h-11"
                           >
                             <ToggleGroupItem value="planned">
                               <CircleDashed data-icon="inline-start" />
@@ -721,7 +756,7 @@ export function EventDialog(props: EventDialogProps) {
                                   onValueChange={(v) =>
                                     v && field.handleChange(v as EventVisibility)
                                   }
-                                  className="flex-wrap justify-start"
+                                  className="flex-wrap justify-start max-sm:[&_[data-slot=toggle-group-item]]:h-11"
                                 >
                                   <ToggleGroupItem value="private">
                                     <Lock data-icon="inline-start" />
@@ -949,9 +984,7 @@ export function EventDialog(props: EventDialogProps) {
                         disabled={isSubmitting}
                         className="max-sm:h-11 max-sm:flex-1"
                       >
-                        {isSubmitting && (
-                          <Spinner data-icon="inline-start" />
-                        )}
+                        <PendingIcon pending={isSubmitting} />
                         {mode === "create" ? tc("create") : tc("save")}
                       </Button>
                     </div>

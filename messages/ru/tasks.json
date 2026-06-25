@@ -226,6 +226,7 @@
     "transferAction": "Передать",
     "contextLabel": "Контекст",
     "noContext": "Без контекста",
+    "createContext": "Создать новый контекст…",
     "priorityLabel": "Приоритет",
     "dueDateLabel": "Срок",
     "startDateLabel": "Дата начала",
