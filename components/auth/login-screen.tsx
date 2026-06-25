@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/auth/password-input";
+import { createClient } from "@/lib/supabase/client";
 import { signIn } from "@/app/[locale]/login/actions";
 import { safeAuthorizationId, postLoginPath } from "@/lib/auth/oauth-return";
 import {
@@ -57,6 +58,24 @@ export function LoginScreen() {
   // Reaching the login screen means a fresh session is about to start, so reset
   // the "Not now" decisions on the post-login passkey nudge (see passkey-nudge).
   useEffect(() => clearPasskeyNudgeDismissals(), []);
+
+  // The proxy no longer bounces already-authenticated users off the login routes
+  // (they're kept off the Supabase gate so they stay edge-static), so guard it
+  // here. getClaims is a local verify (no Auth-server roundtrip) and runs after
+  // hydration, so the static shell still paints instantly — the redirect only
+  // fires for the rare already-signed-in visitor.
+  useEffect(() => {
+    let cancelled = false;
+    void createClient()
+      .auth.getClaims()
+      .then(({ data }) => {
+        if (!cancelled && data?.claims) goAfterLogin();
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Conditional UI: arm a background passkey request on mount so the browser can
   // offer a saved passkey inline from the name field's autofill. It must fail

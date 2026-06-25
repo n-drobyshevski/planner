@@ -123,6 +123,23 @@ async function ConsentFlow({
     );
   }
 
+  // Start the display-name lookup concurrently with the authorization fetch — it
+  // only needs the verified `claims.sub`, so it never blocks on (the slower)
+  // getAuthorizationDetails. Awaited only on the success path below; the eager
+  // `.catch` keeps an early-return path from leaving an unhandled rejection.
+  const authUserId = claimsData.claims.sub as string;
+  // `Promise.resolve` adopts the lazy PostgREST thenable into a real promise that
+  // runs the query exactly once and exposes `.catch`, so an early-return path that
+  // never awaits it can't leave an unhandled rejection.
+  const memberPromise = Promise.resolve(
+    supabase
+      .from("members")
+      .select("name")
+      .eq("auth_user_id", authUserId)
+      .maybeSingle(),
+  );
+  memberPromise.catch(() => {});
+
   const { data: details, error } =
     await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
 
@@ -165,12 +182,14 @@ async function ConsentFlow({
   }
 
   // Show the member's name, not the raw auth email (internal @planner.local seed).
-  const { data: member } = await supabase
-    .from("members")
-    .select("name")
-    .eq("auth_user_id", details.user.id)
-    .maybeSingle();
-  const accountLabel = (member?.name as string | undefined) ?? details.user.email;
+  // Resolved from the concurrent query started above; trust the name only if it
+  // belongs to the actual consenting user (always true for self-consent), else
+  // fall back to the email.
+  const { data: member } = await memberPromise;
+  const accountLabel =
+    details.user.id === authUserId
+      ? ((member?.name as string | undefined) ?? details.user.email)
+      : details.user.email;
 
   let redirectHost = details.redirect_uri;
   try {
