@@ -19,10 +19,16 @@ design system is the 44 shadcn/ui primitives in `components/ui/`. There is no
 
 ## Component scoping
 
-- Synth discovery finds **229** PascalCase exports (all shadcn sub-parts). `cfg.componentSrcMap`
-  nulls the **185** sub-parts so only the **44 top-level** components get cards. The bundle still
-  exports all 229 (synth entry = `export *` from every file), so the design agent can still
+- Synth discovery finds **230** PascalCase exports (all shadcn sub-parts). `cfg.componentSrcMap`
+  nulls the **185** sub-parts so only the **45 top-level** components get cards. The bundle still
+  exports all 230 (synth entry = `export *` from every file), so the design agent can still
   compose `DialogContent`, `SelectItem`, etc. — they just don't each get a card.
+- **2026-06-25**: `components/ui/disclosure-section.tsx` added → `DisclosureSection` (single
+  export, no sub-parts, so NO `componentSrcMap` change needed — discovery picked it up as the
+  45th top-level card). Authored preview in `previews/DisclosureSection.tsx` (3 cells: open w/
+  Field+Textarea, collapsed w/ summary, forceOpen read-only), graded good. The same-day
+  responsive-dialog/sheet/toggle/toggle-group restyles changed no API/preview → stayed
+  `unchanged`; their new look shipped via the always-written bundle/styling files.
 - IMPORTANT: synth-mode auto-discovery (`deriveComponentsFromSrc`) only runs when the component
   list is empty. Do NOT add non-null `componentSrcMap` pins — a single pin short-circuits
   discovery and you get only the pinned components. (Discovery already honors the `null` excludes.)
