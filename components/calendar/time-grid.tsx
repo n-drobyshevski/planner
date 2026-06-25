@@ -25,6 +25,11 @@ import {
 import { DayColumn } from "./day-column";
 import { resizeOccurrence, resizePreviewSegment } from "@/lib/calendar/resize";
 import { movedStartTotal, previewSegments, shiftedMemberStart } from "@/lib/calendar/move";
+import {
+  dragModifierHintSeen,
+  markDragModifierHintSeen,
+} from "@/lib/calendar/drag-hint";
+import { useNotify } from "@/lib/hooks/use-notify";
 import { useUiStore } from "@/stores/ui-store";
 import { useTimelineZoom } from "@/hooks/use-timeline-zoom";
 import type { ContextLabel, Occurrence } from "@/lib/types";
@@ -108,6 +113,7 @@ interface Props {
 }
 
 const SCHED_MIN = 60; // default minutes for a task dropped onto the grid
+const KEY_NUDGE_MIN = 15; // Shift+↑/↓ keyboard reschedule step
 
 /** A member of a group (multi-selection) move: its start geometry, captured once. */
 interface GroupMember {
@@ -193,7 +199,16 @@ export function TimeGrid({
   unavailableBands,
 }: Props) {
   const t = useTranslations("calendar");
+  const notify = useNotify();
   const locale = useLocale();
+
+  // Teach the drag modifiers once: after a plain (no-modifier) move, let the user
+  // know Ctrl-drag duplicates and Alt-drag hits the whole series. One time, ever.
+  const maybeTeachDragModifiers = () => {
+    if (dragModifierHintSeen()) return;
+    markDragModifierHintSeen();
+    notify.message(t("dragHint.title"), { description: t("dragHint.body") });
+  };
   const dfLocale = dateFnsLocale(locale);
   const colsRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -214,6 +229,15 @@ export function TimeGrid({
   const [armed, setArmed] = useState(false);
   const timeZone = useViewerTimeZone();
   const secondaryTimeZone = useSecondaryTimeZone();
+
+  // Occurrence-by-key lookup, used by both the pointer drag handlers and the
+  // keyboard reschedule. Declared up here so every closure that reads it (the
+  // roving-nav handler included) sits after the memo — keeping React Compiler's
+  // manual-memoization check happy.
+  const byKey = useMemo(
+    () => new Map(occurrences.map((o) => [o.key, o])),
+    [occurrences],
+  );
 
   // Keys of blocks that just landed from a drag/resize commit. They get a brief
   // one-shot position transition in DayColumn (a calm settle into place instead
@@ -348,11 +372,67 @@ export function TimeGrid({
       focusBlock(entryBlock(blocks));
       return;
     }
+    // Shift+arrow reschedules the focused event instead of moving focus: ↑/↓
+    // nudge the start by 15 min, ←/→ shift by one day. This is the keyboard
+    // equivalent of a drag-move, so it goes through the same `onReschedule`
+    // (recurring events open the scope prompt, exactly as a drag does).
+    if (e.shiftKey) {
+      const occ = byKey.get(active!.dataset.occKey ?? "");
+      if (occ && occ.kind !== "context" && !occ.allDay && canEdit(occ)) {
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          rescheduleByKeyboard(
+            occ,
+            (e.key === "ArrowDown" ? 1 : -1) * KEY_NUDGE_MIN * 60_000,
+          );
+          return;
+        }
+        // Day shift uses the visible day-column bases so the delta stays
+        // calendar-correct across DST (each base is computed in the view's tz).
+        let col: HTMLElement | null = active!;
+        while (col && col.parentElement !== root) col = col.parentElement;
+        const curCol = col ? Array.from(root.children).indexOf(col) : -1;
+        const targetCol = curCol + (e.key === "ArrowRight" ? 1 : -1);
+        if (curCol >= 0 && targetCol >= 0 && targetCol < days.length) {
+          rescheduleByKeyboard(occ, days[targetCol] - days[curCol]);
+        }
+        return;
+      }
+      // Not reschedulable (partner's block, all-day, or a context): fall through
+      // to plain focus navigation below.
+    }
     const i = blocks.indexOf(active!);
     if (e.key === "ArrowDown") focusBlock(blocks[Math.min(i + 1, blocks.length - 1)]);
     else if (e.key === "ArrowUp") focusBlock(blocks[Math.max(i - 1, 0)]);
     else focusBlock(adjacentColumnBlock(active!, e.key === "ArrowRight" ? 1 : -1) ?? active!);
   };
+
+  // Keyboard reschedule shares the drag-commit path. After the optimistic move
+  // re-expands occurrences the block gets a new key (occurrenceDate == new start
+  // for a single event), so remember it and re-focus once the new list renders —
+  // letting the user keep nudging. Recurring moves open the scope prompt (focus
+  // goes to the dialog), so don't predict a key there.
+  const pendingRefocus = useRef<string | null>(null);
+  const rescheduleByKeyboard = (occ: Occurrence, deltaMs: number) => {
+    if (deltaMs === 0) return;
+    const newStart = occ.start + deltaMs;
+    pendingRefocus.current = occ.isRecurring ? null : `${occ.eventId}:${newStart}`;
+    onReschedule(occ, newStart, occ.end + deltaMs);
+  };
+  useEffect(() => {
+    const key = pendingRefocus.current;
+    if (!key) return;
+    pendingRefocus.current = null;
+    const root = colsRef.current;
+    if (!root) return;
+    const el =
+      root.querySelector<HTMLElement>(
+        `[data-occ-key="${CSS.escape(key)}"][role="button"]`,
+      ) ??
+      root.querySelector<HTMLElement>(
+        `[data-occ-key^="${CSS.escape(`${key.split(":")[0]}:`)}"][role="button"]`,
+      );
+    if (el) focusBlock(el);
+  }, [occurrences]);
 
   // Cancel any in-progress single-touch grid gesture so a two-finger pinch
   // (zoom) never also creates or moves an event.
@@ -388,10 +468,6 @@ export function TimeGrid({
   // Contexts are timed backdrops in the grid body; never show them all-day
   // (all-day contexts are deferred — they'd otherwise render as a flat chip).
   const allDay = occurrences.filter((o) => o.allDay && o.kind !== "context");
-  const byKey = useMemo(
-    () => new Map(occurrences.map((o) => [o.key, o])),
-    [occurrences],
-  );
 
   function geom(clientX: number, clientY: number) {
     const rect = colsRef.current!.getBoundingClientRect();
@@ -789,6 +865,7 @@ export function TimeGrid({
       } else {
         settle([occ.key]);
         onReschedule(occ, start, end);
+        maybeTeachDragModifiers();
       }
     } else {
       const occ = byKey.get(d.occKey!);

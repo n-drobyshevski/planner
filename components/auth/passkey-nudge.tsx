@@ -74,7 +74,7 @@ export function PasskeyNudge() {
   };
 
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {visible && (
         <m.aside
           variants={fadeRise}

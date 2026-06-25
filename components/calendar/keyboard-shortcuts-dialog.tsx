@@ -60,6 +60,8 @@ const GROUPS: { titleKey: string; items: { labelKey: string; keys: string[] }[] 
       { labelKey: "create", keys: ["drag"] },
       { labelKey: "duplicate", keys: ["Ctrl", "drag"] },
       { labelKey: "wholeSeries", keys: ["Alt", "drag"] },
+      { labelKey: "nudgeTime", keys: ["Shift", "↑", "↓"] },
+      { labelKey: "nudgeDay", keys: ["Shift", "←", "→"] },
     ],
   },
 ];

@@ -37,7 +37,12 @@
     "private": "Private",
     "shared": "Shared",
     "untitledEvent": "Untitled event",
-    "series": "Series"
+    "series": "Series",
+    "masked": "Hidden title"
+  },
+  "dragHint": {
+    "title": "Tip: drag with a modifier",
+    "body": "Hold Ctrl while dragging to duplicate, or Alt to move the whole series."
   },
   "block": {
     "timeRange": "{start} to {end}",
@@ -122,7 +127,9 @@
       "resize": "Resize (drag the top or bottom edge)",
       "create": "Create an event in an empty slot",
       "duplicate": "Duplicate to the drop spot",
-      "wholeSeries": "Act on the whole recurring series"
+      "wholeSeries": "Act on the whole recurring series",
+      "nudgeTime": "Reschedule the focused event by 15 min",
+      "nudgeDay": "Move the focused event a day earlier / later"
     }
   },
   "present": {

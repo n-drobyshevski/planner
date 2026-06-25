@@ -57,7 +57,7 @@ export function FullPageMessage({
         </span>
         <h1 className="text-base font-semibold text-foreground">{title}</h1>
         {description ? (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm text-pretty text-muted-foreground">{description}</p>
         ) : null}
         {children ? (
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2">

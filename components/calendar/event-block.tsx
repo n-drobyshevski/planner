@@ -176,15 +176,25 @@ export const EventBlock = forwardRef<
               )}
             </span>
           ))}
+        {/* Masking (Shift+M) must hide the title from the DOM and the
+            accessibility tree, not just blur it — a CSS blur leaves the real
+            text readable to screen readers, dev tools, and the screenshot a11y
+            layer. So swap in a redaction and label the span generically. */}
         <span
+          aria-label={maskTitles ? t("labels.masked") : undefined}
           className={cn(
             "truncate font-semibold leading-tight",
             taskDone && "line-through opacity-80",
             occ.status === "cancelled" && "line-through",
-            maskTitles && "blur-[5px] select-none",
           )}
         >
-          {occ.title}
+          {maskTitles ? (
+            <span aria-hidden className="tracking-widest opacity-60 select-none">
+              {"•".repeat(Math.min(Math.max(occ.title.length, 3), 10))}
+            </span>
+          ) : (
+            occ.title
+          )}
         </span>
         {/* Privacy / sharing as glyphs, not colour alone: a lock = private (only
             you), the partners icon = a joint/shared event both of you can see. */}
