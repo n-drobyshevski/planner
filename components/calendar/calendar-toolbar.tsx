@@ -63,6 +63,7 @@ export function CalendarToolbar({
   onToggleBacklog,
   onOpenFilters,
   onOpenShortcuts,
+  sidebarOpen,
   backlogOpen,
   workspace,
 }: {
@@ -77,6 +78,7 @@ export function CalendarToolbar({
   onToggleBacklog: () => void;
   onOpenFilters: () => void;
   onOpenShortcuts: () => void;
+  sidebarOpen: boolean;
   backlogOpen: boolean;
   workspace: WorkspaceData | null;
 }) {
@@ -97,8 +99,12 @@ export function CalendarToolbar({
           size="icon"
           aria-label={t("toolbar.toggleSidebar")}
           title={t("toolbar.toggleSidebarTitle")}
+          aria-pressed={sidebarOpen}
           onClick={onToggleSidebar}
-          className="hidden md:inline-flex"
+          className={cn(
+            "hidden md:inline-flex",
+            sidebarOpen && "bg-accent text-accent-foreground",
+          )}
         >
           <PanelLeft />
         </Button>

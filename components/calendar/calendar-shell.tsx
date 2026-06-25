@@ -1057,12 +1057,14 @@ export function CalendarShell({
         onToggleBacklog={() => setBacklogOpen(!backlogOpen)}
         onOpenFilters={() => setFiltersOpen(true)}
         onOpenShortcuts={() => setShortcutsOpen(true)}
+        sidebarOpen={sidebarOpen}
         backlogOpen={backlogOpen}
         workspace={workspace.data ?? null}
       />
       <div className="flex min-h-0 flex-1">
-        {sidebarOpen && workspace.data && (
+        {workspace.data && (
           <CalendarSidebar
+            open={sidebarOpen}
             workspaceId={workspace.data.workspaceId}
             currentMemberId={viewerId}
             members={workspace.data.members}
@@ -1151,8 +1153,9 @@ export function CalendarShell({
             <div className="h-full" />
           )}
         </main>
-        {backlogOpen && workspace.data && (
+        {workspace.data && (
           <TaskBacklogRail
+            open={backlogOpen}
             userKey={viewerId}
             tasks={backlogTasks}
             colorOf={taskColorOf}

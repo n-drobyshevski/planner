@@ -141,6 +141,7 @@
     "otherCalendars": "Other calendars",
     "contexts": "Contexts",
     "noContextsYet": "No contexts yet",
+    "noContextsHint": "Add one with + above to color-code and filter your events.",
     "addContext": "Add context",
     "contextName": "Context name",
     "colorAria": "Color {color}",

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Plus, SquarePen, Focus, Eye, Trash2, CalendarPlus, Users, User } from "lucide-react";
+import { Plus, SquarePen, Focus, Eye, Trash2, CalendarPlus, Users, User, Tags } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -73,7 +73,7 @@ const ToggleRow = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex items-center rounded-md hover:bg-sidebar-accent",
+        "flex items-center rounded-md transition-colors duration-150 ease-out-quint hover:bg-sidebar-accent motion-reduce:transition-none",
         className,
       )}
       {...rest}
@@ -82,7 +82,7 @@ const ToggleRow = React.forwardRef<
         type="button"
         onClick={onToggle}
         aria-pressed={active}
-        className="flex min-h-11 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm md:min-h-0"
+        className="flex min-h-11 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm outline-none transition-[transform,background-color] duration-150 ease-out-quint focus-visible:ring-3 focus-visible:ring-ring/30 active:translate-y-px active:bg-sidebar-accent motion-reduce:transition-none md:min-h-0"
       >
         <span
           className="size-3.5 shrink-0 rounded-[4px] border-2"
@@ -234,7 +234,13 @@ export function CalendarFiltersContent({
           <AddCategoryPopover workspaceId={workspaceId} currentMemberId={currentMemberId} />
         </div>
         {categories.length === 0 ? (
-          <p className="px-2 text-xs text-muted-foreground">{t("sidebar.noContextsYet")}</p>
+          <div className="flex flex-col items-center gap-1.5 px-2 py-6 text-center">
+            <Tags aria-hidden className="size-5 text-muted-foreground" />
+            <p className="text-sm text-foreground">{t("sidebar.noContextsYet")}</p>
+            <p className="max-w-[26ch] text-pretty text-xs text-muted-foreground">
+              {t("sidebar.noContextsHint")}
+            </p>
+          </div>
         ) : (
           categories.map((c) => {
             const shared = c.ownerId === null;
@@ -368,17 +374,33 @@ export function CalendarFiltersContent({
  * presented as a bottom sheet (see CalendarFiltersSheet). Drag the inner edge to
  * resize; the width is remembered per device + per user.
  */
-export function CalendarSidebar(props: FiltersProps) {
-  const { width, beginResize } = useSidebarWidth("left", props.currentMemberId);
+export function CalendarSidebar({ open, ...props }: FiltersProps & { open: boolean }) {
+  const { width, beginResize, nudge, resizing } = useSidebarWidth("left", props.currentMemberId);
   return (
     <aside
-      style={{ width }}
-      className="relative hidden shrink-0 flex-col border-r bg-sidebar md:flex"
+      // Width-wipe on open/close (the grid absorbs the freed space); the transition
+      // is suppressed mid-resize so dragging the edge stays 1:1 with the pointer.
+      style={{ width: open ? width : 0 }}
+      aria-hidden={!open ? true : undefined}
+      inert={!open ? true : undefined}
+      className={cn(
+        "relative hidden shrink-0 flex-col overflow-hidden bg-sidebar md:flex",
+        !resizing && "transition-[width] duration-200 ease-out-quint motion-reduce:transition-none",
+      )}
     >
-      <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-3">
+      {/* Pinned to the open width + border on the inner edge, so the content clips
+          cleanly under overflow-hidden as the panel collapses (no squish, no 1px
+          phantom border at width 0). Fades with the wipe. */}
+      <div
+        style={{ width }}
+        className={cn(
+          "flex flex-1 flex-col gap-5 overflow-y-auto border-r p-3 transition-opacity duration-200 ease-out-quint motion-reduce:transition-none",
+          open ? "opacity-100" : "opacity-0",
+        )}
+      >
         <CalendarFiltersContent {...props} />
       </div>
-      <SidebarResizeHandle side="left" onPointerDown={beginResize} />
+      <SidebarResizeHandle side="left" width={width} onPointerDown={beginResize} onNudge={nudge} />
     </aside>
   );
 }
@@ -510,19 +532,28 @@ function AddCategoryPopover({
             onKeyDown={(e) => e.key === "Enter" && add()}
             autoFocus
           />
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {PALETTE.map((c) => (
               <button
                 key={c}
                 type="button"
                 aria-label={t("sidebar.colorAria", { color: c })}
+                aria-pressed={color === c}
                 onClick={() => setColor(c)}
-                className={cn(
-                  "size-6 rounded-full ring-offset-2 ring-offset-popover",
-                  color === c && "ring-2 ring-foreground",
-                )}
-                style={{ backgroundColor: toPaletteColor(c) }}
-              />
+                // Centered hit box (≥44px on touch) around the 24px swatch, so the
+                // tap target clears the minimum without enlarging the dot itself.
+                className="group flex size-9 items-center justify-center rounded-full outline-none transition-transform duration-150 ease-out-quint active:scale-[0.96] motion-reduce:transition-none max-sm:size-11"
+              >
+                <span
+                  className={cn(
+                    "size-6 rounded-full ring-offset-2 ring-offset-popover transition-shadow duration-150",
+                    color === c
+                      ? "ring-2 ring-foreground"
+                      : "group-focus-visible:ring-2 group-focus-visible:ring-ring",
+                  )}
+                  style={{ backgroundColor: toPaletteColor(c) }}
+                />
+              </button>
             ))}
           </div>
           <label className="flex items-center justify-between gap-2 text-sm">

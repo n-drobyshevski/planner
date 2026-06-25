@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
+import { m } from "motion/react";
+import type { Variants } from "motion/react";
 import {
   CalendarPlus,
   CalendarClock,
@@ -35,6 +37,7 @@ import {
 import { type UsageTabProps } from "@/components/analytics/usage-tab";
 import { PRIORITY } from "@/components/tasks/task-card";
 import { useSidebarWidth, SidebarResizeHandle } from "@/lib/hooks/use-sidebar-width";
+import { listStagger, listItem, fade } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { toPaletteColor, toPaletteInk } from "@/lib/theme/appearance";
 import { dateKeyInZone, isDateTokenPast, DAY_IN_MS } from "@/lib/datetime/local";
@@ -228,6 +231,15 @@ const BacklogCard = React.forwardRef<
 type DueGroup = "overdue" | "week" | "later" | "none";
 const GROUP_ORDER: DueGroup[] = ["overdue", "week", "later", "none"];
 
+/** Stagger container for a group's cards: gentle on mount (tab-change / sheet-open),
+ *  newly-added cards animate in on their own; existing cards never replay. The
+ *  cards (not the sticky group header) carry the transform, so sticky stays intact.
+ *  Reduced motion is dropped globally by <MotionConfig reducedMotion="user">. */
+const cardListVariants = (count: number): Variants => ({
+  initial: {},
+  animate: { transition: listStagger(count) },
+});
+
 /**
  * The list of open tasks, shared by the desktop rail and the mobile sheet. On
  * desktop the cards are HTML5 drag sources (drop on the grid to schedule); on
@@ -331,39 +343,45 @@ function BacklogList({
               {group.items.length}
             </span>
           </h3>
-          <div className="flex flex-col gap-1.5 pt-1.5">
+          <m.div
+            className="flex flex-col gap-1.5 pt-1.5"
+            initial="initial"
+            animate="animate"
+            variants={cardListVariants(group.items.length)}
+          >
             {group.items.map((task) => {
               const assignee = task.assigneeId
                 ? members.get(task.assigneeId) ?? null
                 : null;
               const done = task.completedAt != null;
               return (
-                <ItemContextMenu
-                  key={task.id}
-                  title={task.title}
-                  color={task.color}
-                  onColorChange={(c) => onChangeColor(task, c)}
-                  actions={[
-                    { label: t("contextMenu.schedule"), icon: CalendarPlus, onSelect: () => onSchedule(task) },
-                    {
-                      label: done ? t("contextMenu.markNotDone") : t("contextMenu.markDone"),
-                      icon: done ? Circle : CheckCircle2,
-                      onSelect: () => onToggleDone(task),
-                    },
-                    { label: tc("delete"), icon: Trash2, destructive: true, onSelect: () => onDelete(task) },
-                  ]}
-                >
-                  <BacklogCard
-                    task={task}
-                    color={colorOf(task)}
-                    assignee={assignee}
-                    draggable={draggable}
-                    onSchedule={() => onSchedule(task)}
-                  />
-                </ItemContextMenu>
+                <m.div key={task.id} variants={listItem}>
+                  <ItemContextMenu
+                    title={task.title}
+                    color={task.color}
+                    onColorChange={(c) => onChangeColor(task, c)}
+                    actions={[
+                      { label: t("contextMenu.schedule"), icon: CalendarPlus, onSelect: () => onSchedule(task) },
+                      {
+                        label: done ? t("contextMenu.markNotDone") : t("contextMenu.markDone"),
+                        icon: done ? Circle : CheckCircle2,
+                        onSelect: () => onToggleDone(task),
+                      },
+                      { label: tc("delete"), icon: Trash2, destructive: true, onSelect: () => onDelete(task) },
+                    ]}
+                  >
+                    <BacklogCard
+                      task={task}
+                      color={colorOf(task)}
+                      assignee={assignee}
+                      draggable={draggable}
+                      onSchedule={() => onSchedule(task)}
+                    />
+                  </ItemContextMenu>
+                </m.div>
               );
             })}
-          </div>
+          </m.div>
         </section>
       ))}
     </div>
@@ -381,21 +399,35 @@ function BacklogList({
 export function TaskBacklogRail({
   userKey,
   analytics,
+  open,
   ...props
-}: BacklogProps & { userKey: string | undefined; analytics: UsageTabProps }) {
+}: BacklogProps & { userKey: string | undefined; analytics: UsageTabProps; open: boolean }) {
   const t = useTranslations("tasks");
-  const { width, beginResize } = useSidebarWidth("right", userKey);
+  const { width, beginResize, nudge, resizing } = useSidebarWidth("right", userKey);
   const [tab, setTab] = React.useState<"tasks" | "insights">("tasks");
   const count = props.tasks.length;
   return (
     <aside
-      style={{ width }}
-      className="relative hidden shrink-0 flex-col border-l bg-sidebar md:flex"
+      // Width-wipe on open/close (mirrors the left sidebar); transition suppressed
+      // mid-resize so the drag edge tracks the pointer 1:1.
+      style={{ width: open ? width : 0 }}
+      aria-hidden={!open ? true : undefined}
+      inert={!open ? true : undefined}
+      className={cn(
+        "relative hidden shrink-0 flex-col overflow-hidden bg-sidebar md:flex",
+        !resizing && "transition-[width] duration-200 ease-out-quint motion-reduce:transition-none",
+      )}
     >
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(v as "tasks" | "insights")}
-        className="flex min-h-0 flex-1 flex-col gap-0"
+        // Pinned to the open width + boundary border on the inner edge, so content
+        // clips cleanly under overflow-hidden as the rail collapses; fades with the wipe.
+        style={{ width }}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col gap-0 border-l transition-opacity duration-200 ease-out-quint motion-reduce:transition-none",
+          open ? "opacity-100" : "opacity-0",
+        )}
       >
         <div className="border-b px-3 py-2">
           <TabsList className="w-full">
@@ -426,10 +458,19 @@ export function TaskBacklogRail({
           <BacklogList {...props} draggable />
         </TabsContent>
         <TabsContent value="insights" className="flex min-h-0 flex-1 flex-col">
-          <UsageTab {...analytics} />
+          {/* Fades in on tab-switch (Radix remounts inactive content), matching the
+              canvas crossfade. The tasks tab is revealed by its own card stagger. */}
+          <m.div
+            className="flex min-h-0 flex-1 flex-col"
+            variants={fade}
+            initial="initial"
+            animate="animate"
+          >
+            <UsageTab {...analytics} />
+          </m.div>
         </TabsContent>
       </Tabs>
-      <SidebarResizeHandle side="right" onPointerDown={beginResize} />
+      <SidebarResizeHandle side="right" width={width} onPointerDown={beginResize} onNudge={nudge} />
     </aside>
   );
 }
