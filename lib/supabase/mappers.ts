@@ -74,6 +74,8 @@ export function mapMemberSleepPrefs(r: Row): MemberSleepPrefs {
     sleepCategoryId: (r.sleep_category_id as string | null) ?? null,
     nightWindowStartHour: (r.night_window_start_hour as number | null) ?? 20,
     nightWindowEndHour: (r.night_window_end_hour as number | null) ?? 12,
+    // Default-true: an unset column (legacy row) reads as enabled.
+    autoAdjustSleepOnFeedback: r.auto_adjust_sleep_on_feedback !== false,
   };
 }
 
@@ -92,6 +94,7 @@ export interface MemberSleepPrefsInput {
   sleepCategoryId?: string | null;
   nightWindowStartHour?: number;
   nightWindowEndHour?: number;
+  autoAdjustSleepOnFeedback?: boolean;
 }
 
 export function memberSleepPrefsInputToRow(input: MemberSleepPrefsInput): Row {
@@ -102,6 +105,8 @@ export function memberSleepPrefsInputToRow(input: MemberSleepPrefsInput): Row {
   if ("sleepCategoryId" in input) row.sleep_category_id = input.sleepCategoryId ?? null;
   if ("nightWindowStartHour" in input) row.night_window_start_hour = input.nightWindowStartHour;
   if ("nightWindowEndHour" in input) row.night_window_end_hour = input.nightWindowEndHour;
+  if ("autoAdjustSleepOnFeedback" in input)
+    row.auto_adjust_sleep_on_feedback = input.autoAdjustSleepOnFeedback;
   return row;
 }
 

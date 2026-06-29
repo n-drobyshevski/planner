@@ -22,6 +22,7 @@ import {
   useUpsertSleepLog,
 } from "@/lib/hooks/use-sleep-logs";
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
+import { useSleepBlockSync } from "@/lib/hooks/use-sleep-block-sync";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
 import {
   buildSleepDayPairs,
@@ -98,6 +99,30 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
   const upsert = useUpsertSleepLog(wsId, viewerId);
   const deleteLog = useDeleteSleepLog(wsId, viewerId);
 
+  // When on (default), logging a check-in with both times snaps that night's
+  // calendar sleep block to match — see useSleepBlockSync. Read from the same
+  // member-private prefs the rest of the tab uses; null prefs read as enabled.
+  const autoAdjust = sleepPrefs?.autoAdjustSleepOnFeedback ?? true;
+  const syncSleepBlock = useSleepBlockSync(wsId, viewerId, sharedCategoryIds, timeZone);
+
+  // Single save path for every check-in (morning card + backfill dialog): persist
+  // the log, then adjust the calendar block when enabled and both times are set.
+  // The log save is silent on success; the calendar mutation carries the one
+  // undoable toast, so there's no double confirmation.
+  const handleLogSave = useCallback(
+    async (input: Parameters<typeof upsert>[0]) => {
+      await upsert(input);
+      if (autoAdjust && input.bedtimeAt != null && input.wokeAt != null) {
+        await syncSleepBlock({
+          date: input.date,
+          bedtimeAt: input.bedtimeAt,
+          wokeAt: input.wokeAt,
+        });
+      }
+    },
+    [upsert, autoAdjust, syncSleepBlock],
+  );
+
   // The optimistic upsert makes hasLogToday true the instant a check-in save
   // starts; without this flag the card would unmount mid-save and a failure
   // would remount it empty, losing the draft. Pending keeps it mounted until
@@ -107,12 +132,12 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
     async (input: Parameters<typeof upsert>[0]) => {
       setCheckinPending(true);
       try {
-        await upsert(input);
+        await handleLogSave(input);
       } finally {
         setCheckinPending(false);
       }
     },
-    [upsert],
+    [handleLogSave],
   );
 
   // What counts as the viewer's sleep: with a dedicated sleep category set,
@@ -356,7 +381,7 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
                 timeZone={timeZone}
                 nights={nights}
                 logs={logs}
-                onSave={upsert}
+                onSave={handleLogSave}
                 onDelete={deleteLog}
               />
             }
@@ -384,7 +409,7 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
               timeZone={timeZone}
               nights={nights}
               logs={logs}
-              onSave={upsert}
+              onSave={handleLogSave}
               onDelete={deleteLog}
             />
           </EmptyContent>

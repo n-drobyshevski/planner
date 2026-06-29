@@ -112,6 +112,8 @@ export interface MemberSleepPrefs {
   sleepCategoryId: string | null;
   nightWindowStartHour: number;
   nightWindowEndHour: number;
+  /** When true, a check-in with both times snaps that night's calendar sleep block to match. */
+  autoAdjustSleepOnFeedback: boolean;
 }
 
 /**

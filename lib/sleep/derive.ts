@@ -56,6 +56,26 @@ export interface DeriveOptions {
   preFiltered?: boolean;
 }
 
+/**
+ * The wall-clock night window for a wake date: [previous day `startHour`, wake
+ * day `endHour`) in `timeZone`. Built via TZDate so the boundaries stay put
+ * across DST transitions (Berlin fall-back 25h / spring-forward 23h), and so
+ * `d − 1` rolling into the previous month normalizes correctly. Shared by
+ * `deriveNights` (the chart) and the check-in → calendar sync, so both agree on
+ * which span a logged night belongs to byte-for-byte.
+ */
+export function nightWindowFor(
+  dateKey: string,
+  timeZone: string,
+  startHour: number = NIGHT_START_HOUR,
+  endHour: number = NIGHT_END_HOUR,
+): { winStart: number; winEnd: number } {
+  const [y, mo, d] = dateKey.split("-").map(Number);
+  const winStart = new TZDate(y, mo - 1, d - 1, startHour, 0, 0, timeZone).getTime();
+  const winEnd = new TZDate(y, mo - 1, d, endHour, 0, 0, timeZone).getTime();
+  return { winStart, winEnd };
+}
+
 export function deriveNights(
   occurrences: Occurrence[],
   days: number[],
@@ -72,11 +92,7 @@ export function deriveNights(
 
   return days.map((dayStartMs) => {
     const dateKey = dateKeyInZone(dayStartMs, timeZone);
-    const [y, mo, d] = dateKey.split("-").map(Number);
-    // TZDate normalizes out-of-range days (d − 1 may roll into the previous
-    // month), and wall-clock 20:00/12:00 stay put across DST transitions.
-    const winStart = new TZDate(y, mo - 1, d - 1, startHour, 0, 0, timeZone).getTime();
-    const winEnd = new TZDate(y, mo - 1, d, endHour, 0, 0, timeZone).getTime();
+    const { winStart, winEnd } = nightWindowFor(dateKey, timeZone, startHour, endHour);
 
     // Clip to the window and merge overlapping/touching spans into blocks.
     const blocks: { start: number; end: number }[] = [];

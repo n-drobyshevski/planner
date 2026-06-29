@@ -503,6 +503,7 @@
   },
   "sleep": {
     "privacyNote": "Sleep is personal — this tab shows yours only, and your check-ins are never visible to your partner.",
+    "blockTitle": "Sleep",
     "debtHeadline": "You're carrying about {ms} of recent sleep debt.",
     "debtSupport": "Tonight's recommendation below already accounts for it.",
     "correlationHeadline": "{metric} {strength} after more {side}.",

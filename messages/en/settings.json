@@ -225,6 +225,11 @@
       "startLabel": "Night starts after",
       "endLabel": "Night ends by",
       "description": "Derived nights collect sleep between these wall-clock hours — the start on the evening before, the end on the wake day. Widen it if you sleep past noon or keep unusual hours."
+    },
+    "autoAdjust": {
+      "label": "Update calendar from check-ins",
+      "description": "When you log a bedtime and wake time, snap that night's sleep block to match. If there's no block yet, one is added to your sleep category.",
+      "descriptionInactive": "When you log a bedtime and wake time, snap that night's sleep block to match. With no sleep category set, a new block is added as an inactive event."
     }
   },
   "sharing": {

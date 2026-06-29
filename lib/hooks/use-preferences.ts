@@ -44,6 +44,7 @@ const SLEEP_PREFS_DEFAULTS = {
   sleepCategoryId: null,
   nightWindowStartHour: 20,
   nightWindowEndHour: 12,
+  autoAdjustSleepOnFeedback: true,
 } as const;
 
 function applyAppearance(
@@ -151,6 +152,9 @@ export function usePreferences() {
   const sleepCategoryId = sleepPrefs?.sleepCategoryId ?? null;
   const nightWindowStartHour = sleepPrefs?.nightWindowStartHour ?? 20;
   const nightWindowEndHour = sleepPrefs?.nightWindowEndHour ?? 12;
+  // Sleep ↔ calendar: whether a check-in with both times snaps that night's
+  // calendar sleep block to match (default on; null prefs read as enabled).
+  const autoAdjustSleepOnFeedback = sleepPrefs?.autoAdjustSleepOnFeedback ?? true;
 
   // The light/dark mode to assert into next-themes: a Catppuccin flavor dictates
   // its own (Latte light, the rest dark); `default` and `pink` defer to the
@@ -353,6 +357,13 @@ export function usePreferences() {
     [persistSleepPrefs],
   );
 
+  const setAutoAdjustSleepOnFeedback = useCallback(
+    (next: boolean) => {
+      void persistSleepPrefs({ autoAdjustSleepOnFeedback: next });
+    },
+    [persistSleepPrefs],
+  );
+
   const setPalette = useCallback(
     (next: Palette) => {
       // Crossfade the whole flavor swap (surfaces + light/dark + accent) as one
@@ -414,6 +425,8 @@ export function usePreferences() {
     nightWindowStartHour,
     /** Night window end hour on the wake day (4..16, default 12). */
     nightWindowEndHour,
+    /** Whether a sleep check-in with both times snaps that night's calendar block. */
+    autoAdjustSleepOnFeedback,
     setThemePref,
     setAccent,
     setTone,
@@ -430,6 +443,7 @@ export function usePreferences() {
     setSleepCategory,
     setNightWindowStart,
     setNightWindowEnd,
+    setAutoAdjustSleepOnFeedback,
     /** false until the signed-in member is resolved (controls disabled meanwhile). */
     isReady: member != null,
   };

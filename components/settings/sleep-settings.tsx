@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { SettingsSection } from "@/components/settings/settings-section";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldLabel,
   FieldSet,
@@ -18,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { formatDuration } from "@/lib/datetime/format";
 import { usePreferences } from "@/lib/hooks/use-preferences";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
@@ -51,12 +53,14 @@ export function SleepSettings() {
     sleepCategoryId,
     nightWindowStartHour,
     nightWindowEndHour,
+    autoAdjustSleepOnFeedback,
     setSleepCycleLength,
     setSleepOnsetLatency,
     setTargetSleepCycles,
     setSleepCategory,
     setNightWindowStart,
     setNightWindowEnd,
+    setAutoAdjustSleepOnFeedback,
     isReady,
   } = usePreferences();
   const disabled = !isReady;
@@ -80,6 +84,7 @@ export function SleepSettings() {
     categoryId: sleepCategoryId ?? NO_SLEEP_CATEGORY,
     windowStart: String(nightWindowStartHour),
     windowEnd: String(nightWindowEndHour),
+    autoAdjust: autoAdjustSleepOnFeedback,
   };
 
   const form = useForm({ defaultValues: current });
@@ -97,6 +102,7 @@ export function SleepSettings() {
     sleepCategoryId,
     nightWindowStartHour,
     nightWindowEndHour,
+    autoAdjustSleepOnFeedback,
   ]);
 
   return (
@@ -288,6 +294,36 @@ export function SleepSettings() {
             {t("sleep.nightWindow.description")}
           </FieldDescription>
         </FieldSet>
+
+        <form.Field
+          name="autoAdjust"
+          listeners={{
+            onChange: ({ value }) => setAutoAdjustSleepOnFeedback(value),
+          }}
+        >
+          {(field) => (
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="sleep-auto-adjust">
+                  {t("sleep.autoAdjust.label")}
+                </FieldLabel>
+                <FieldDescription>
+                  {t(
+                    sleepCategoryId === null
+                      ? "sleep.autoAdjust.descriptionInactive"
+                      : "sleep.autoAdjust.description",
+                  )}
+                </FieldDescription>
+              </FieldContent>
+              <Switch
+                id="sleep-auto-adjust"
+                checked={field.state.value}
+                onCheckedChange={field.handleChange}
+                disabled={disabled}
+              />
+            </Field>
+          )}
+        </form.Field>
     </SettingsSection>
   );
 }
