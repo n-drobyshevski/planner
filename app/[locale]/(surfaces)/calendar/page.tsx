@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { cacheLife } from "next/cache";
 import { CalendarShell } from "@/components/calendar/calendar-shell";
+import { CalendarDataSeed } from "./calendar-data-seed";
 import { CalendarSkeleton } from "@/components/shared/surface-skeletons";
 import {
   parseViewParam,
@@ -36,12 +37,19 @@ async function CalendarRoute({
   // *today* when ?date= is absent — request-time and non-deterministic, so it
   // must not run inside "use cache" (it would freeze "today" into the entry);
   // resolved out here it just keys one entry per day.
+  const view = parseViewParam(sp.view);
+  const dateMs = parseDateParam(sp.date);
+  // Server-seed the workspace + focused window into React Query (dynamic,
+  // per-user) so the grid paints without the client fetch waterfall. The cached
+  // shell below is unchanged — no per-user data crosses into "use cache".
   return (
-    <CachedCalendar
-      view={parseViewParam(sp.view)}
-      dateMs={parseDateParam(sp.date)}
-      viewFromUrl={isCalendarViewParam(sp.view)}
-    />
+    <CalendarDataSeed view={view} dateMs={dateMs}>
+      <CachedCalendar
+        view={view}
+        dateMs={dateMs}
+        viewFromUrl={isCalendarViewParam(sp.view)}
+      />
+    </CalendarDataSeed>
   );
 }
 

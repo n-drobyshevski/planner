@@ -44,13 +44,9 @@ import { CalendarCanvas } from "./calendar-canvas";
 import { CalendarPager, type CalendarPagerHandle } from "./calendar-pager";
 import { CalendarSidebar } from "@/components/sidebar/calendar-sidebar";
 import { Users, User, CopyPlus, Eye } from "lucide-react";
-import { EventDetails } from "@/components/event/event-details";
 import type { ItemAction } from "@/components/shared/item-context-menu";
 import { TaskBacklogRail, TaskBacklogSheet } from "@/components/tasks/task-backlog-rail";
-import {
-  RecurrenceScopePrompt,
-  type RecurrenceScope,
-} from "@/components/event/recurrence-scope-prompt";
+import type { RecurrenceScope } from "@/components/event/recurrence-scope-prompt";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,9 +88,24 @@ const KeyboardShortcutsDialog = dynamic(
   () => import("./keyboard-shortcuts-dialog").then((m) => m.KeyboardShortcutsDialog),
   { ssr: false, loading: () => null },
 );
+// The event details panel (single-click an event) and the recurrence scope
+// prompts are split out of the initial /calendar chunk too: deferring them
+// shrinks the JS the grid must hydrate behind, so first paint comes sooner.
+// EventDetails opens on the common single-click, so it's warmed on idle below;
+// the scope prompts are rare (only recurring-event edit/delete/copy).
+const loadEventDetails = () =>
+  import("@/components/event/event-details").then((m) => m.EventDetails);
+const EventDetails = dynamic(loadEventDetails, { ssr: false, loading: () => null });
+const RecurrenceScopePrompt = dynamic(
+  () =>
+    import("@/components/event/recurrence-scope-prompt").then(
+      (m) => m.RecurrenceScopePrompt,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 /** Overlays warmed during idle so their first open is instant. */
-const OVERLAY_PRELOADS = [loadEventDialog, loadScheduleTaskDialog];
+const OVERLAY_PRELOADS = [loadEventDialog, loadScheduleTaskDialog, loadEventDetails];
 
 type EditorState =
   | {

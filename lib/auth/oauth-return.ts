@@ -10,6 +10,8 @@
  * query value), so there is no open-redirect surface — a caller can never steer
  * the destination, only supply the token.
  */
+import { routing } from "@/i18n/routing";
+
 const AUTHORIZATION_ID_RE = /^[A-Za-z0-9._~-]{8,128}$/;
 
 /** Returns the id if it's a well-formed authorization token, else null. */
@@ -20,13 +22,17 @@ export function safeAuthorizationId(
 }
 
 /** Post-login destination: the consent screen when resuming an OAuth flow,
- *  otherwise the calendar. `locale` is prefixed for the client hard-navigation. */
+ *  otherwise the calendar. The path carries an explicit locale prefix ONLY for
+ *  non-default locales (`as-needed` routing) — emitting `/en/…` for the default
+ *  locale would make next-intl 307-redirect it down to the unprefixed path, an
+ *  extra cold-proxy hop on every English post-login hard-navigation. */
 export function postLoginPath(
   locale: string,
   authorizationId: string | null | undefined,
 ): string {
+  const prefix = locale === routing.defaultLocale ? "" : `/${locale}`;
   const id = safeAuthorizationId(authorizationId);
   return id
-    ? `/${locale}/oauth/consent?authorization_id=${encodeURIComponent(id)}`
-    : `/${locale}/calendar`;
+    ? `${prefix}/oauth/consent?authorization_id=${encodeURIComponent(id)}`
+    : `${prefix}/calendar`;
 }

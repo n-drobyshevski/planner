@@ -26,18 +26,24 @@ describe("safeAuthorizationId", () => {
 });
 
 describe("postLoginPath", () => {
-  it("returns the locale calendar when there is no authorization id", () => {
-    expect(postLoginPath("en", null)).toBe("/en/calendar");
+  it("returns the calendar when there is no authorization id", () => {
+    // Default locale (en) is unprefixed under `as-needed` routing — emitting
+    // `/en/…` would trigger a next-intl redirect down to the bare path.
+    expect(postLoginPath("en", null)).toBe("/calendar");
+    // Non-default locales keep their explicit prefix.
     expect(postLoginPath("ru", undefined)).toBe("/ru/calendar");
   });
 
-  it("returns the locale consent path with the id when resuming OAuth", () => {
+  it("returns the consent path with the id when resuming OAuth", () => {
     expect(postLoginPath("en", "dlladgt6ntwg5wx6gdo6mwdqbeipf2xf")).toBe(
-      "/en/oauth/consent?authorization_id=dlladgt6ntwg5wx6gdo6mwdqbeipf2xf",
+      "/oauth/consent?authorization_id=dlladgt6ntwg5wx6gdo6mwdqbeipf2xf",
+    );
+    expect(postLoginPath("ru", "dlladgt6ntwg5wx6gdo6mwdqbeipf2xf")).toBe(
+      "/ru/oauth/consent?authorization_id=dlladgt6ntwg5wx6gdo6mwdqbeipf2xf",
     );
   });
 
   it("never routes to consent for an invalid id (falls back to calendar)", () => {
-    expect(postLoginPath("en", "https://evil.com")).toBe("/en/calendar");
+    expect(postLoginPath("en", "https://evil.com")).toBe("/calendar");
   });
 });
