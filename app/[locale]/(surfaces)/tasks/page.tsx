@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { cacheLife } from "next/cache";
 import { TasksShell } from "@/components/tasks/tasks-shell";
+import { TasksDataSeed } from "./tasks-data-seed";
 import { TasksSkeleton } from "@/components/shared/surface-skeletons";
 import type { TasksView } from "@/components/tasks/tasks-toolbar";
 
@@ -32,12 +33,18 @@ async function TasksRoute({
     sp.view === "list" ? "list" : sp.view === "flows" ? "flows" : "board";
   const viewFromUrl =
     sp.view === "list" || sp.view === "board" || sp.view === "flows";
+  // Server-seed the workspace + tasks (and, for ?view=flows, the Flows datasets)
+  // into React Query (dynamic, per-user) so the board/list paints without the
+  // client fetch waterfall. The cached shell below is unchanged — no per-user
+  // data crosses into "use cache".
   return (
-    <CachedTasks
-      view={initialView}
-      viewFromUrl={viewFromUrl}
-      collectionId={sp.collection ?? null}
-    />
+    <TasksDataSeed view={initialView}>
+      <CachedTasks
+        view={initialView}
+        viewFromUrl={viewFromUrl}
+        collectionId={sp.collection ?? null}
+      />
+    </TasksDataSeed>
   );
 }
 
