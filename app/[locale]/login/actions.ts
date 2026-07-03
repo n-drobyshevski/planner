@@ -6,6 +6,7 @@ import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createIpRateLimiter } from "@/lib/rate-limit/ip-bucket";
+import { loginThrottledDb, recordLoginFailure } from "@/lib/rate-limit/login-attempts";
 import { getCredentialsByEmail } from "@/lib/auth/profiles";
 import { sha256Hex } from "@/lib/auth/pin";
 import { passkeyOnly } from "@/lib/auth/passkey-gate";
@@ -80,14 +81,22 @@ async function clearEphemeral(...names: string[]): Promise<void> {
 // challenge (no member/credential oracle); its paired `finishPasskeyLogin` is.
 const authLimiter = createIpRateLimiter({ capacity: 5, refillPerSec: 1 / 30 });
 
-/** True when this caller's IP has exhausted its auth-attempt budget. */
-async function authThrottled(): Promise<boolean> {
+/**
+ * Best-effort client IP. On Vercel the platform controls x-forwarded-for's
+ * first hop; elsewhere it's client-suppliable, which is why the durable
+ * limiter also keys on the member (lib/rate-limit/login-attempts.ts).
+ */
+async function clientIp(): Promise<string> {
   const h = await headers();
   const fwd = h.get("x-forwarded-for");
-  const ip = fwd
+  return fwd
     ? fwd.split(",")[0]!.trim()
     : h.get("x-real-ip")?.trim() || "unknown";
-  return !authLimiter.check(ip).ok;
+}
+
+/** True when this caller's IP has exhausted its auth-attempt budget. */
+async function authThrottled(): Promise<boolean> {
+  return !authLimiter.check(await clientIp()).ok;
 }
 
 /**
@@ -245,10 +254,23 @@ export async function signIn(
     .limit(1)
     .maybeSingle();
 
-  if (!member) return { error: tv("memberNotFound") };
+  const ip = await clientIp();
+  if (!member) {
+    // Name guessing burns the caller's durable IP budget even without a match.
+    await recordLoginFailure(ip, null);
+    return { error: tv("memberNotFound") };
+  }
+
+  // Durable gate before authenticateMember: it caps both the guess budget and
+  // the scrypt CPU an attacker can burn, across instances and cold starts.
+  if (await loginThrottledDb(ip, member.id)) return { error: tv("tooManyAttempts") };
 
   const failure = await authenticateMember(member as MemberRow, password);
-  if (failure) return failure;
+  if (failure) {
+    // A blank password is the normal two-step prompt, not a wrong guess.
+    if (!failure.needsPassword) await recordLoginFailure(ip, member.id);
+    return failure;
+  }
 
   // Resume an OAuth consent flow if one was in progress; else go to the calendar.
   // The id is validated and the path is hardcoded, so there's no open redirect.
@@ -284,10 +306,19 @@ export async function switchAccountAction(
     .eq("id", memberId)
     .maybeSingle();
 
-  if (!member) return { error: tv("memberNotFound") };
+  const ip = await clientIp();
+  if (!member) {
+    await recordLoginFailure(ip, null);
+    return { error: tv("memberNotFound") };
+  }
+
+  if (await loginThrottledDb(ip, member.id)) return { error: tv("tooManyAttempts") };
 
   const failure = await authenticateMember(member as MemberRow, password);
-  if (failure) return failure;
+  if (failure) {
+    if (!failure.needsPassword) await recordLoginFailure(ip, member.id);
+    return failure;
+  }
   // Success: no redirect — the client hard-navigates to reset cached state.
 }
 
@@ -358,8 +389,16 @@ export async function finishPasskeyLogin(
   await clearEphemeral(CHAL_LOGIN);
   if (!challenge) return { error: tv("passkeyFailed") };
 
+  const ip = await clientIp();
   const owner = await loadCredentialByItsId(response.id);
-  if (!owner) return { error: tv("passkeyFailed") };
+  if (!owner) {
+    await recordLoginFailure(ip, null);
+    return { error: tv("passkeyFailed") };
+  }
+
+  if (await loginThrottledDb(ip, owner.memberId)) {
+    return { error: tv("tooManyAttempts") };
+  }
 
   const admin = createAdminClient();
   const { data: member } = await admin
@@ -377,9 +416,13 @@ export async function finishPasskeyLogin(
       credential: owner.credential,
     });
   } catch {
+    await recordLoginFailure(ip, owner.memberId);
     return { error: tv("passkeyFailed") };
   }
-  if (!verified.verified) return { error: tv("passkeyFailed") };
+  if (!verified.verified) {
+    await recordLoginFailure(ip, owner.memberId);
+    return { error: tv("passkeyFailed") };
+  }
 
   await admin
     .from("webauthn_credentials")
