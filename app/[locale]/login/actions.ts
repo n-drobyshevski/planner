@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createIpRateLimiter } from "@/lib/rate-limit/ip-bucket";
 import { getCredentialsByEmail } from "@/lib/auth/profiles";
 import { sha256Hex } from "@/lib/auth/pin";
+import { passkeyOnly } from "@/lib/auth/passkey-gate";
 import { hashSecret, verifySecret } from "@/lib/auth/secret";
 import {
   buildAuthenticationOptions,
@@ -37,7 +38,7 @@ type MemberRow = {
   id: string;
   auth_user_id: string | null;
   has_secret: boolean;
-  pin_hash: string | null;
+  has_passkey: boolean;
   accent: string | null;
   surface_tone: string | null;
   pink_base: string | null;
@@ -45,7 +46,7 @@ type MemberRow = {
 };
 
 const MEMBER_COLS =
-  "id, auth_user_id, has_secret, pin_hash, accent, surface_tone, palette, pink_base";
+  "id, auth_user_id, has_secret, has_passkey, accent, surface_tone, palette, pink_base";
 
 // Short-lived cookies binding a WebAuthn ceremony's challenge to the request.
 const CHAL_LOGIN = "wa_login_chal";
@@ -151,9 +152,9 @@ async function mintSession(member: MemberRow): Promise<SignInResult | null> {
 
 /**
  * Verify a member's passphrase. The salted-scrypt digest in member_secrets is
- * authoritative; a legacy unsalted-SHA256 pin_hash is accepted once and silently
- * upgraded to scrypt on the spot. Returns whether a secret was required and
- * whether the candidate matched.
+ * authoritative; a legacy unsalted-SHA256 digest (member_secrets.legacy_pin_sha256)
+ * is accepted once and silently upgraded to scrypt on the spot. Returns whether
+ * a secret was required and whether the candidate matched.
  */
 async function checkSecret(
   member: MemberRow,
@@ -165,23 +166,23 @@ async function checkSecret(
   const admin = createAdminClient();
   const { data: row } = await admin
     .from("member_secrets")
-    .select("secret_hash, secret_salt")
+    .select("secret_hash, secret_salt, legacy_pin_sha256")
     .eq("member_id", member.id)
     .maybeSingle();
 
-  if (row) {
+  if (row?.secret_hash && row.secret_salt) {
     return { required: true, ok: await verifySecret(secret, row.secret_salt, row.secret_hash) };
   }
 
-  // Legacy path: verify against the old SHA-256 pin_hash, then upgrade.
-  if (member.pin_hash && (await sha256Hex(secret)) === member.pin_hash) {
+  // Legacy path: verify against the old SHA-256 digest, then upgrade.
+  if (row?.legacy_pin_sha256 && (await sha256Hex(secret)) === row.legacy_pin_sha256) {
     const { salt, hash } = await hashSecret(secret);
     await admin.from("member_secrets").upsert({
       member_id: member.id,
       secret_hash: hash,
       secret_salt: salt,
+      legacy_pin_sha256: null,
     });
-    await admin.from("members").update({ pin_hash: null }).eq("id", member.id);
     return { required: true, ok: true };
   }
 
@@ -201,6 +202,11 @@ async function authenticateMember(
     locale: await getLocale(),
     namespace: "validation",
   });
+
+  // A member who relies solely on a passkey must present it: a nickname is not
+  // a secret, and letting the typed-name path mint their session would defeat
+  // the phishing-resistant factor they enrolled.
+  if (passkeyOnly(member)) return { error: tv("usePasskey") };
 
   const { required, ok } = await checkSecret(member, secret);
   if (required && !secret) return { error: tv("enterPassword"), needsPassword: true };
@@ -560,10 +566,7 @@ export async function setPassphrase(
     .from("member_secrets")
     .upsert({ member_id: member.id, secret_hash: hash, secret_salt: salt, updated_at: new Date().toISOString() });
   if (error) return { error: error.message };
-  await admin
-    .from("members")
-    .update({ has_secret: true, pin_hash: null })
-    .eq("id", member.id);
+  await admin.from("members").update({ has_secret: true }).eq("id", member.id);
   return { ok: true };
 }
 
@@ -575,10 +578,7 @@ export async function removePassphrase(): Promise<{ ok: true } | { error: string
 
   const admin = createAdminClient();
   await admin.from("member_secrets").delete().eq("member_id", member.id);
-  await admin
-    .from("members")
-    .update({ has_secret: false, pin_hash: null })
-    .eq("id", member.id);
+  await admin.from("members").update({ has_secret: false }).eq("id", member.id);
   return { ok: true };
 }
 
@@ -589,16 +589,13 @@ export async function verifyCurrentSecret(secret: string): Promise<boolean> {
   const admin = createAdminClient();
   const { data: row } = await admin
     .from("member_secrets")
-    .select("secret_hash, secret_salt")
+    .select("secret_hash, secret_salt, legacy_pin_sha256")
     .eq("member_id", member.id)
     .maybeSingle();
-  if (row) return verifySecret(secret, row.secret_salt, row.secret_hash);
-  // Legacy pin_hash (not yet upgraded).
-  const { data: m } = await admin
-    .from("members")
-    .select("pin_hash")
-    .eq("id", member.id)
-    .maybeSingle();
-  if (m?.pin_hash) return (await sha256Hex(secret)) === m.pin_hash;
+  if (row?.secret_hash && row.secret_salt) {
+    return verifySecret(secret, row.secret_salt, row.secret_hash);
+  }
+  // Legacy digest (not yet upgraded — the upgrade happens on the login path).
+  if (row?.legacy_pin_sha256) return (await sha256Hex(secret)) === row.legacy_pin_sha256;
   return false;
 }
