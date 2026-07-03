@@ -153,7 +153,12 @@ async function mintSession(member: MemberRow): Promise<SignInResult | null> {
 
   const sb = await createClient();
   const { error } = await sb.auth.signInWithPassword(cred);
-  if (error) return { error: error.message };
+  if (error) {
+    // Config drift: the server-held credential no longer matches the auth
+    // user. Log the real cause; never surface backend error text to the form.
+    console.error("[planner] session bridge sign-in failed:", error);
+    return { error: tv("loginNotConfigured") };
+  }
 
   await seedAppearanceCookie(member);
   return null;
@@ -524,7 +529,10 @@ export async function finishPasskeyEnrollment(
     created_os: ua.os,
     created_browser: ua.browser,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("[planner] passkey enrollment insert failed:", error);
+    return { error: tv("genericError") };
+  }
 
   await admin.from("members").update({ has_passkey: true }).eq("id", member.id);
   return { ok: true };
@@ -608,7 +616,10 @@ export async function setPassphrase(
   const { error } = await admin
     .from("member_secrets")
     .upsert({ member_id: member.id, secret_hash: hash, secret_salt: salt, updated_at: new Date().toISOString() });
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("[planner] member_secrets upsert failed:", error);
+    return { error: tv("genericError") };
+  }
   await admin.from("members").update({ has_secret: true }).eq("id", member.id);
   return { ok: true };
 }
