@@ -48,7 +48,7 @@ export function SummaryCard() {
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">
         You have a free evening on Friday — a good window for the dentist
-        appointment you've been putting off.
+        appointment you&apos;ve been putting off.
       </CardContent>
     </Card>
   );
