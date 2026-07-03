@@ -51,7 +51,7 @@ export function Disabled() {
     <div className="w-80 flex items-center gap-2.5">
       <Checkbox id="cb-disabled" disabled defaultChecked />
       <Label htmlFor="cb-disabled" className="opacity-50">
-        Synced from Mara's calendar
+        Synced from Mara&apos;s calendar
       </Label>
     </div>
   );

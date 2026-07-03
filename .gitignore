@@ -42,6 +42,12 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# supabase CLI local link state (leaks the linked project ref)
+/supabase/.temp/
+
+# npm lockfile — this repo uses pnpm (pnpm-lock.yaml is the source of truth)
+/package-lock.json
+
 # vercel
 .vercel
 

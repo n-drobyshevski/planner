@@ -56,7 +56,13 @@ export async function fetchWorkspaceBundle(
 ): Promise<WorkspaceBundle> {
   const [wsRes, memRes, catRes, collRes, boardRes, sleepPrefsRes] = await Promise.all([
     sb.from("workspaces").select("*").limit(1).single(),
-    sb.from("members").select("*").order("created_at"),
+    // Explicit columns: members_select is workspace-wide, so never ship a
+    // column the UI doesn't render (auth material stays in member_secrets).
+    sb.from("members")
+      .select(
+        "id, workspace_id, auth_user_id, name, color, has_secret, has_passkey, locale, theme_preference, accent, surface_tone, palette, pink_base, timezone, secondary_timezone, show_inactive_in_month, show_success_toasts, context_label, created_at",
+      )
+      .order("created_at"),
     sb.from("categories").select("*").order("sort_order"),
     sb.from("collections").select("*").order("sort_order"),
     sb.from("boards").select("*").order("position"),

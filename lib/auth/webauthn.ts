@@ -34,6 +34,8 @@ const RP_NAME = "Planner";
  * extra config; override with WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN if a request is
  * served behind a proxy that rewrites Host.
  */
+let warnedDerivedRp = false;
+
 export async function getRelyingParty(): Promise<{
   rpID: string;
   origin: string;
@@ -41,6 +43,17 @@ export async function getRelyingParty(): Promise<{
   const envRpId = process.env.WEBAUTHN_RP_ID;
   const envOrigin = process.env.WEBAUTHN_ORIGIN;
   if (envRpId && envOrigin) return { rpID: envRpId, origin: envOrigin };
+
+  // Header derivation is fine on Vercel (the platform owns x-forwarded-*), but
+  // behind a pass-through proxy those headers are client-suppliable — the RP
+  // would then be attacker-influenced during verification. Nudge once per
+  // instance toward pinning; don't throw, correct deploys may rely on this.
+  if (process.env.NODE_ENV === "production" && !warnedDerivedRp) {
+    warnedDerivedRp = true;
+    console.warn(
+      "[planner] WEBAUTHN_RP_ID/WEBAUTHN_ORIGIN unset — relying party derived from forwarded headers; pin both in production.",
+    );
+  }
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost";

@@ -6,8 +6,10 @@ import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createIpRateLimiter } from "@/lib/rate-limit/ip-bucket";
+import { loginThrottledDb, recordLoginFailure } from "@/lib/rate-limit/login-attempts";
 import { getCredentialsByEmail } from "@/lib/auth/profiles";
 import { sha256Hex } from "@/lib/auth/pin";
+import { passkeyOnly } from "@/lib/auth/passkey-gate";
 import { hashSecret, verifySecret } from "@/lib/auth/secret";
 import {
   buildAuthenticationOptions,
@@ -37,7 +39,7 @@ type MemberRow = {
   id: string;
   auth_user_id: string | null;
   has_secret: boolean;
-  pin_hash: string | null;
+  has_passkey: boolean;
   accent: string | null;
   surface_tone: string | null;
   pink_base: string | null;
@@ -45,7 +47,7 @@ type MemberRow = {
 };
 
 const MEMBER_COLS =
-  "id, auth_user_id, has_secret, pin_hash, accent, surface_tone, palette, pink_base";
+  "id, auth_user_id, has_secret, has_passkey, accent, surface_tone, palette, pink_base";
 
 // Short-lived cookies binding a WebAuthn ceremony's challenge to the request.
 const CHAL_LOGIN = "wa_login_chal";
@@ -79,14 +81,22 @@ async function clearEphemeral(...names: string[]): Promise<void> {
 // challenge (no member/credential oracle); its paired `finishPasskeyLogin` is.
 const authLimiter = createIpRateLimiter({ capacity: 5, refillPerSec: 1 / 30 });
 
-/** True when this caller's IP has exhausted its auth-attempt budget. */
-async function authThrottled(): Promise<boolean> {
+/**
+ * Best-effort client IP. On Vercel the platform controls x-forwarded-for's
+ * first hop; elsewhere it's client-suppliable, which is why the durable
+ * limiter also keys on the member (lib/rate-limit/login-attempts.ts).
+ */
+async function clientIp(): Promise<string> {
   const h = await headers();
   const fwd = h.get("x-forwarded-for");
-  const ip = fwd
+  return fwd
     ? fwd.split(",")[0]!.trim()
     : h.get("x-real-ip")?.trim() || "unknown";
-  return !authLimiter.check(ip).ok;
+}
+
+/** True when this caller's IP has exhausted its auth-attempt budget. */
+async function authThrottled(): Promise<boolean> {
+  return !authLimiter.check(await clientIp()).ok;
 }
 
 /**
@@ -143,7 +153,12 @@ async function mintSession(member: MemberRow): Promise<SignInResult | null> {
 
   const sb = await createClient();
   const { error } = await sb.auth.signInWithPassword(cred);
-  if (error) return { error: error.message };
+  if (error) {
+    // Config drift: the server-held credential no longer matches the auth
+    // user. Log the real cause; never surface backend error text to the form.
+    console.error("[planner] session bridge sign-in failed:", error);
+    return { error: tv("loginNotConfigured") };
+  }
 
   await seedAppearanceCookie(member);
   return null;
@@ -151,9 +166,9 @@ async function mintSession(member: MemberRow): Promise<SignInResult | null> {
 
 /**
  * Verify a member's passphrase. The salted-scrypt digest in member_secrets is
- * authoritative; a legacy unsalted-SHA256 pin_hash is accepted once and silently
- * upgraded to scrypt on the spot. Returns whether a secret was required and
- * whether the candidate matched.
+ * authoritative; a legacy unsalted-SHA256 digest (member_secrets.legacy_pin_sha256)
+ * is accepted once and silently upgraded to scrypt on the spot. Returns whether
+ * a secret was required and whether the candidate matched.
  */
 async function checkSecret(
   member: MemberRow,
@@ -165,23 +180,23 @@ async function checkSecret(
   const admin = createAdminClient();
   const { data: row } = await admin
     .from("member_secrets")
-    .select("secret_hash, secret_salt")
+    .select("secret_hash, secret_salt, legacy_pin_sha256")
     .eq("member_id", member.id)
     .maybeSingle();
 
-  if (row) {
+  if (row?.secret_hash && row.secret_salt) {
     return { required: true, ok: await verifySecret(secret, row.secret_salt, row.secret_hash) };
   }
 
-  // Legacy path: verify against the old SHA-256 pin_hash, then upgrade.
-  if (member.pin_hash && (await sha256Hex(secret)) === member.pin_hash) {
+  // Legacy path: verify against the old SHA-256 digest, then upgrade.
+  if (row?.legacy_pin_sha256 && (await sha256Hex(secret)) === row.legacy_pin_sha256) {
     const { salt, hash } = await hashSecret(secret);
     await admin.from("member_secrets").upsert({
       member_id: member.id,
       secret_hash: hash,
       secret_salt: salt,
+      legacy_pin_sha256: null,
     });
-    await admin.from("members").update({ pin_hash: null }).eq("id", member.id);
     return { required: true, ok: true };
   }
 
@@ -201,6 +216,11 @@ async function authenticateMember(
     locale: await getLocale(),
     namespace: "validation",
   });
+
+  // A member who relies solely on a passkey must present it: a nickname is not
+  // a secret, and letting the typed-name path mint their session would defeat
+  // the phishing-resistant factor they enrolled.
+  if (passkeyOnly(member)) return { error: tv("usePasskey") };
 
   const { required, ok } = await checkSecret(member, secret);
   if (required && !secret) return { error: tv("enterPassword"), needsPassword: true };
@@ -239,10 +259,23 @@ export async function signIn(
     .limit(1)
     .maybeSingle();
 
-  if (!member) return { error: tv("memberNotFound") };
+  const ip = await clientIp();
+  if (!member) {
+    // Name guessing burns the caller's durable IP budget even without a match.
+    await recordLoginFailure(ip, null);
+    return { error: tv("memberNotFound") };
+  }
+
+  // Durable gate before authenticateMember: it caps both the guess budget and
+  // the scrypt CPU an attacker can burn, across instances and cold starts.
+  if (await loginThrottledDb(ip, member.id)) return { error: tv("tooManyAttempts") };
 
   const failure = await authenticateMember(member as MemberRow, password);
-  if (failure) return failure;
+  if (failure) {
+    // A blank password is the normal two-step prompt, not a wrong guess.
+    if (!failure.needsPassword) await recordLoginFailure(ip, member.id);
+    return failure;
+  }
 
   // Resume an OAuth consent flow if one was in progress; else go to the calendar.
   // The id is validated and the path is hardcoded, so there's no open redirect.
@@ -278,10 +311,19 @@ export async function switchAccountAction(
     .eq("id", memberId)
     .maybeSingle();
 
-  if (!member) return { error: tv("memberNotFound") };
+  const ip = await clientIp();
+  if (!member) {
+    await recordLoginFailure(ip, null);
+    return { error: tv("memberNotFound") };
+  }
+
+  if (await loginThrottledDb(ip, member.id)) return { error: tv("tooManyAttempts") };
 
   const failure = await authenticateMember(member as MemberRow, password);
-  if (failure) return failure;
+  if (failure) {
+    if (!failure.needsPassword) await recordLoginFailure(ip, member.id);
+    return failure;
+  }
   // Success: no redirect — the client hard-navigates to reset cached state.
 }
 
@@ -352,8 +394,16 @@ export async function finishPasskeyLogin(
   await clearEphemeral(CHAL_LOGIN);
   if (!challenge) return { error: tv("passkeyFailed") };
 
+  const ip = await clientIp();
   const owner = await loadCredentialByItsId(response.id);
-  if (!owner) return { error: tv("passkeyFailed") };
+  if (!owner) {
+    await recordLoginFailure(ip, null);
+    return { error: tv("passkeyFailed") };
+  }
+
+  if (await loginThrottledDb(ip, owner.memberId)) {
+    return { error: tv("tooManyAttempts") };
+  }
 
   const admin = createAdminClient();
   const { data: member } = await admin
@@ -371,9 +421,13 @@ export async function finishPasskeyLogin(
       credential: owner.credential,
     });
   } catch {
+    await recordLoginFailure(ip, owner.memberId);
     return { error: tv("passkeyFailed") };
   }
-  if (!verified.verified) return { error: tv("passkeyFailed") };
+  if (!verified.verified) {
+    await recordLoginFailure(ip, owner.memberId);
+    return { error: tv("passkeyFailed") };
+  }
 
   await admin
     .from("webauthn_credentials")
@@ -475,7 +529,10 @@ export async function finishPasskeyEnrollment(
     created_os: ua.os,
     created_browser: ua.browser,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("[planner] passkey enrollment insert failed:", error);
+    return { error: tv("genericError") };
+  }
 
   await admin.from("members").update({ has_passkey: true }).eq("id", member.id);
   return { ok: true };
@@ -559,11 +616,11 @@ export async function setPassphrase(
   const { error } = await admin
     .from("member_secrets")
     .upsert({ member_id: member.id, secret_hash: hash, secret_salt: salt, updated_at: new Date().toISOString() });
-  if (error) return { error: error.message };
-  await admin
-    .from("members")
-    .update({ has_secret: true, pin_hash: null })
-    .eq("id", member.id);
+  if (error) {
+    console.error("[planner] member_secrets upsert failed:", error);
+    return { error: tv("genericError") };
+  }
+  await admin.from("members").update({ has_secret: true }).eq("id", member.id);
   return { ok: true };
 }
 
@@ -575,10 +632,7 @@ export async function removePassphrase(): Promise<{ ok: true } | { error: string
 
   const admin = createAdminClient();
   await admin.from("member_secrets").delete().eq("member_id", member.id);
-  await admin
-    .from("members")
-    .update({ has_secret: false, pin_hash: null })
-    .eq("id", member.id);
+  await admin.from("members").update({ has_secret: false }).eq("id", member.id);
   return { ok: true };
 }
 
@@ -589,16 +643,13 @@ export async function verifyCurrentSecret(secret: string): Promise<boolean> {
   const admin = createAdminClient();
   const { data: row } = await admin
     .from("member_secrets")
-    .select("secret_hash, secret_salt")
+    .select("secret_hash, secret_salt, legacy_pin_sha256")
     .eq("member_id", member.id)
     .maybeSingle();
-  if (row) return verifySecret(secret, row.secret_salt, row.secret_hash);
-  // Legacy pin_hash (not yet upgraded).
-  const { data: m } = await admin
-    .from("members")
-    .select("pin_hash")
-    .eq("id", member.id)
-    .maybeSingle();
-  if (m?.pin_hash) return (await sha256Hex(secret)) === m.pin_hash;
+  if (row?.secret_hash && row.secret_salt) {
+    return verifySecret(secret, row.secret_salt, row.secret_hash);
+  }
+  // Legacy digest (not yet upgraded — the upgrade happens on the login path).
+  if (row?.legacy_pin_sha256) return (await sha256Hex(secret)) === row.legacy_pin_sha256;
   return false;
 }

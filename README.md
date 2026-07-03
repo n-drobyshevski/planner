@@ -49,10 +49,24 @@ flow. Under the hood each profile maps to a pre-provisioned Supabase auth user, 
 sent to the other member, including over realtime. The RLS helper functions live in a
 non-exposed `private` schema (see `supabase/migrations`).
 
-> **Caveat:** whoever picks a profile *is* that member — the PIN is a UX speed-bump, not
-> strong auth. Private events are protected by RLS (never leave the database for the other
-> person), but anyone with app access can choose either profile. To add real auth later,
-> populate `members.auth_user_id` from your provider; the schema, RLS, and UI are unchanged.
+> **Caveat:** a profile with no enrolled factor can be picked by anyone with app access —
+> enroll a passkey (or passphrase) for both members. Once a profile's only factor is a
+> passkey, the typed-name path refuses it outright. Private events are protected by RLS
+> (never leave the database for the other person) regardless.
+
+### Security notes
+
+- **Disable public sign-ups** in the Supabase dashboard (Auth → Sign In / Up): this app
+  provisions exactly two auth users; there is no self-serve registration to support.
+- **Keep Supabase Auth rate limits on** (Auth → Rate Limits). The password grant is
+  publicly reachable with the anon key, so Supabase's own limits are the backstop behind
+  the app-level login throttle.
+- **Member passwords are the perimeter.** `MEMBER_*_PASSWORD` values must be unique,
+  random, ≥16 chars (`openssl rand -base64 24`). Rotating one in Supabase invalidates that
+  member's sessions — the "revoke everything" lever. Update the Vercel env var (all
+  environments) after rotating.
+- **Pin the WebAuthn relying party** in production: set `WEBAUTHN_RP_ID` and
+  `WEBAUTHN_ORIGIN` (see `.env.example`).
 
 ## Setup
 

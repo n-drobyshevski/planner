@@ -275,7 +275,6 @@ describe("mapMember — sleep prefs moved off members", () => {
       auth_user_id: null,
       name: "Nick",
       color: "#aabbcc",
-      pin_hash: null,
     }) as unknown as Record<string, unknown>;
     for (const k of [
       "sleepCycleLengthMin",
@@ -287,6 +286,27 @@ describe("mapMember — sleep prefs moved off members", () => {
     ]) {
       expect(m).not.toHaveProperty(k);
     }
+  });
+});
+
+describe("mapMember — auth factor flags", () => {
+  const base = {
+    id: "m1",
+    workspace_id: "w1",
+    auth_user_id: null,
+    name: "Nick",
+    color: "#aabbcc",
+  };
+
+  it("hasPassword tracks has_secret only (pin_hash no longer exists on members)", () => {
+    expect(mapMember({ ...base, has_secret: false, has_passkey: true })).toMatchObject({
+      hasPassword: false,
+      hasPasskey: true,
+    });
+    expect(mapMember({ ...base, has_secret: true, has_passkey: false })).toMatchObject({
+      hasPassword: true,
+      hasPasskey: false,
+    });
   });
 });
 

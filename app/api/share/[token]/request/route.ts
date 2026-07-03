@@ -10,23 +10,13 @@
 // The row lands in the owner's Inbox (RLS-scoped to them). We never touch the
 // events/requests tables directly here — only the anon RPC.
 
-import { z } from "zod";
-
 import { createPublicClient } from "@/lib/supabase/anon";
 import { createIpRateLimiter } from "@/lib/rate-limit/ip-bucket";
+import { bodySchema } from "./schema";
 
 // One limiter per server instance: a 5-request burst, then ~1/min sustained. The
 // DB enforces the real per-share limit; this just blunts a single IP hammering us.
 const ipLimiter = createIpRateLimiter({ capacity: 5, refillPerSec: 1 / 60 });
-
-const bodySchema = z
-  .object({
-    name: z.string().trim().max(120).optional(),
-    message: z.string().trim().max(1000).optional(),
-    start: z.number().int().positive(),
-    end: z.number().int().positive(),
-  })
-  .refine((b) => b.end > b.start, { message: "end must be after start" });
 
 function clientIp(request: Request): string {
   const fwd = request.headers.get("x-forwarded-for");

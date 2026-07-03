@@ -54,10 +54,8 @@ export async function POST(request: Request): Promise<Response> {
       : await supabase.auth.oauth.denyAuthorization(authorizationId);
 
   if (error || !data) {
-    return NextResponse.json(
-      { error: error?.message ?? "Authorization failed" },
-      { status: 400 },
-    );
+    console.error("[planner] oauth decision failed:", error);
+    return NextResponse.json({ error: "Authorization failed" }, { status: 400 });
   }
 
   // 303 so the POST becomes a GET on the client's callback URL.

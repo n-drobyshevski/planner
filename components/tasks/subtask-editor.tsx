@@ -180,6 +180,7 @@ export function SubtaskEditor({
       title,
       isPrivate: under.isPrivate,
       boardId: under.boardId,
+      // eslint-disable-next-line react-hooks/purity -- submit-time timestamp; addSubtask only runs from the submit handler, never during render
       position: Date.now(),
     };
     after?.();
