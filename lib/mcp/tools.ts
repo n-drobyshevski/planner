@@ -21,6 +21,9 @@ import {
 } from "@/lib/supabase/mutations";
 import { expandEvents } from "@/lib/recurrence/expand";
 import type { EventInput, TaskInput } from "@/lib/supabase/mappers";
+import { dateInputToMs, dayStartOffset, dateKeyInZone } from "@/lib/datetime/local";
+import { projectAgenda, projectAgendaTasks, type AgendaTaskStatus } from "./projection";
+import type { Board, TaskRow } from "@/lib/types";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -110,6 +113,88 @@ export function registerTools(server: McpServer): void {
       }),
   );
 
+  // -- agenda ---------------------------------------------------------------
+  server.registerTool(
+    "get_agenda",
+    {
+      title: "Get agenda",
+      description:
+        "A compact agenda for one local day (or two, with `days: 2`): your own " +
+        "events plus the partner's (per `partner`), and your own open tasks due " +
+        "in the window. The window is the local day(s) of `date` in `timeZone`, " +
+        "DST-correct — not a UTC day. Built for a machine client (e.g. a daily " +
+        "digest bot), not for browsing; use list_events/list_tasks for that.",
+      inputSchema: {
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected yyyy-MM-dd.")
+          .describe("Local calendar date, yyyy-MM-dd — the window's first day."),
+        timeZone: z.string().describe("IANA time zone, e.g. 'Europe/Berlin'."),
+        days: z
+          .union([z.literal(1), z.literal(2)])
+          .optional()
+          .describe("Window length in local days. Default: 1."),
+        partner: z
+          .enum(["none", "busy", "shared"])
+          .optional()
+          .describe(
+            "Partner visibility: 'none' (default, no partner items), 'busy' " +
+              "(times only, no titles), 'shared' (the partner's non-private " +
+              "titles too — never a private event, and never an id).",
+          ),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, memberId, workspaceId } = mcpContext(extra);
+        const days = args.days ?? 1;
+        const partnerMode = args.partner ?? "none";
+
+        const start = dateInputToMs(args.date, args.timeZone);
+        const end = dayStartOffset(start, days, args.timeZone);
+        const lastDay = dateKeyInZone(end - 1, args.timeZone);
+
+        const { events: eventRows, overrides } = await fetchWindow(sb, workspaceId, {
+          start,
+          end,
+        });
+        const occurrences = expandEvents(eventRows, overrides, { start, end });
+        const events = projectAgenda(occurrences, memberId, partnerMode);
+
+        // Board state -> a rough todo/in_progress/done status per task, so
+        // `projectAgendaTasks` can include a due-less task that's in flight.
+        const bundle = await fetchWorkspaceBundle(sb);
+        const boardsByCollection = new Map<string, Board[]>();
+        for (const b of bundle.boards) {
+          const list = boardsByCollection.get(b.collectionId) ?? [];
+          list.push(b);
+          boardsByCollection.set(b.collectionId, list);
+        }
+        for (const list of boardsByCollection.values()) {
+          list.sort((a, b) => a.position - b.position);
+        }
+        const statusOf = (t: TaskRow): AgendaTaskStatus => {
+          const cols = t.collectionId ? boardsByCollection.get(t.collectionId) : undefined;
+          const board = t.boardId ? cols?.find((b) => b.id === t.boardId) : undefined;
+          if (!board) return "todo";
+          if (board.isDone) return "done";
+          const firstOpen = cols!.find((b) => !b.isDone);
+          return firstOpen && firstOpen.id === board.id ? "todo" : "in_progress";
+        };
+
+        const allTasks = await fetchTasks(sb, workspaceId);
+        const tasks = projectAgendaTasks(
+          allTasks.map((t) => ({ ...t, status: statusOf(t) })),
+          memberId,
+          args.date,
+          lastDay,
+        );
+
+        return ok({ date: args.date, timeZone: args.timeZone, days, events, tasks });
+      }),
+  );
+
   // -- calendar: read -----------------------------------------------------
   server.registerTool(
     "list_events",
@@ -181,6 +266,18 @@ export function registerTools(server: McpServer): void {
         location: z.string().max(1000).optional(),
         categoryId: z.string().optional().describe("From get_workspace."),
         rrule: z.string().optional().describe("RFC 5545 RRULE for recurrence."),
+        isPrivate: z
+          .boolean()
+          .optional()
+          .describe("Only you can see it. Default: false (shared, unchanged)."),
+        clientRequestId: z
+          .string()
+          .max(100)
+          .optional()
+          .describe(
+            "Caller-chosen idempotency key. Re-calling with the same id returns " +
+              "the event already created for it instead of making a duplicate.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
@@ -202,6 +299,8 @@ export function registerTools(server: McpServer): void {
           location: args.location ?? null,
           categoryId: args.categoryId ?? null,
           rrule: args.rrule ?? null,
+          isPrivate: args.isPrivate ?? false,
+          clientRequestId: args.clientRequestId,
         };
         const row = await createEvent(sb, input);
         return ok({ id: row.id, title: row.title, start: toIso(row.start) });
@@ -354,6 +453,14 @@ export function registerTools(server: McpServer): void {
         categoryId: z.string().optional(),
         priority: z.number().int().min(0).max(3).optional(),
         dueDate: z.string().optional().describe("Calendar date, yyyy-MM-dd."),
+        clientRequestId: z
+          .string()
+          .max(100)
+          .optional()
+          .describe(
+            "Caller-chosen idempotency key. Re-calling with the same id returns " +
+              "the task already created for it instead of making a duplicate.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
@@ -371,6 +478,7 @@ export function registerTools(server: McpServer): void {
           categoryId: args.categoryId ?? null,
           priority: args.priority ?? null,
           dueDate: args.dueDate ?? null,
+          clientRequestId: args.clientRequestId,
         };
         const row = await createTask(sb, input);
         return ok({ id: row.id, title: row.title });
