@@ -468,6 +468,8 @@ export interface EventInput {
   taskId?: string | null;
   /** whole-object write; callers start from the parsed full bag so unknown keys survive */
   attributes?: ItemAttributes;
+  /** caller-chosen idempotency key (e.g. an MCP client's), scoped per owner */
+  clientRequestId?: string;
 }
 
 export function eventInputToRow(input: EventInput): Row {
@@ -493,6 +495,7 @@ export function eventInputToRow(input: EventInput): Row {
     recurrence_ends_at: toIsoOrNull(input.recurrenceEndsAt ?? null),
     task_id: input.taskId ?? null,
     attributes: input.attributes ?? {},
+    client_request_id: input.clientRequestId ?? null,
   };
 }
 
@@ -550,6 +553,8 @@ export interface TaskInput {
   completedAt?: number | null;
   /** whole-object write; callers start from the parsed full bag so unknown keys survive */
   attributes?: ItemAttributes;
+  /** caller-chosen idempotency key (e.g. an MCP client's), scoped per owner */
+  clientRequestId?: string;
 }
 
 export function taskInputToRow(input: TaskInput): Row {
@@ -573,6 +578,7 @@ export function taskInputToRow(input: TaskInput): Row {
     sequential: input.sequential ?? false,
     completed_at: toIsoOrNull(input.completedAt ?? null),
     attributes: input.attributes ?? {},
+    client_request_id: input.clientRequestId ?? null,
   };
 }
 

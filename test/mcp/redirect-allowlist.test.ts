@@ -45,4 +45,14 @@ describe("isAllowedClientRedirect (Claude-only guard)", () => {
     expect(isAllowedClientRedirect(undefined)).toBe(false);
     expect(isAllowedClientRedirect("not a url")).toBe(false);
   });
+
+  it("documents the suffix-matching risk: a bare PaaS domain matches ANY app on it", () => {
+    // A machine client (e.g. Anchor on Railway) must be allowlisted by its
+    // EXACT host. Adding the bare platform domain instead of
+    // "anchor-bot-production.up.railway.app" would let every other Railway
+    // app's redirect host pass too — never do this.
+    process.env.MCP_ALLOWED_REDIRECT_HOSTS = "claude.ai,up.railway.app";
+    expect(isAllowedClientRedirect("https://anchor-bot-production.up.railway.app/cb")).toBe(true);
+    expect(isAllowedClientRedirect("https://some-other-tenants-app.up.railway.app/cb")).toBe(true);
+  });
 });

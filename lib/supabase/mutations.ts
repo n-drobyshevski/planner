@@ -98,6 +98,16 @@ function guardUpdatedAt<Q extends { gte: (c: string, v: string) => Q; lt: (c: st
   return q.gte("updated_at", toIso(expectedUpdatedAt)).lt("updated_at", toIso(expectedUpdatedAt + 1));
 }
 
+/** Postgres unique_violation — see supabase/migrations/*_client_request_id.sql. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Create an event. When `input.clientRequestId` is set and a prior call already
+ * created an event for it (same owner), the unique index on
+ * `(owner_id, client_request_id)` rejects the duplicate insert and we return
+ * that existing row instead of erroring — safe to retry after a dropped
+ * response or a replayed job.
+ */
 export async function createEvent(
   sb: SupabaseClient,
   input: EventInput,
@@ -106,6 +116,26 @@ export async function createEvent(
     .from("events")
     .insert(eventInputToRow(input))
     .select()
+    .single();
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION && input.clientRequestId) {
+      return fetchEventByClientRequestId(sb, input.ownerId, input.clientRequestId);
+    }
+    throw error;
+  }
+  return mapEvent(data);
+}
+
+async function fetchEventByClientRequestId(
+  sb: SupabaseClient,
+  ownerId: string,
+  clientRequestId: string,
+): Promise<EventRow> {
+  const { data, error } = await sb
+    .from("events")
+    .select()
+    .eq("owner_id", ownerId)
+    .eq("client_request_id", clientRequestId)
     .single();
   if (error) throw error;
   return mapEvent(data);
@@ -1106,14 +1136,42 @@ export async function upsertInsightsPrefs(
 
 // --- Tasks -----------------------------------------------------------------
 
+/**
+ * Create a task. When `input.clientRequestId` is set and a prior call already
+ * created a task for it (same owner), the unique index on
+ * `(owner_id, client_request_id)` rejects the duplicate insert and we return
+ * that existing row instead of erroring — safe to retry after a dropped
+ * response or a replayed job.
+ */
 export async function createTask(
   sb: SupabaseClient,
   input: TaskInput,
 ): Promise<TaskRow> {
+  const parsed = parseInput(taskInputSchema, input);
   const { data, error } = await sb
     .from("tasks")
-    .insert(taskInputToRow(parseInput(taskInputSchema, input)))
+    .insert(taskInputToRow(parsed))
     .select()
+    .single();
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION && parsed.clientRequestId) {
+      return fetchTaskByClientRequestId(sb, parsed.ownerId, parsed.clientRequestId);
+    }
+    throw error;
+  }
+  return mapTask(data);
+}
+
+async function fetchTaskByClientRequestId(
+  sb: SupabaseClient,
+  ownerId: string,
+  clientRequestId: string,
+): Promise<TaskRow> {
+  const { data, error } = await sb
+    .from("tasks")
+    .select()
+    .eq("owner_id", ownerId)
+    .eq("client_request_id", clientRequestId)
     .single();
   if (error) throw error;
   return mapTask(data);
