@@ -10,6 +10,7 @@ import {
   Palette,
   Share2,
   User,
+  Watch,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { CalendarSettings } from "@/components/settings/calendar-settings";
 import { TimezoneSettings } from "@/components/settings/timezone-settings";
 import { SleepSettings } from "@/components/settings/sleep-settings";
+import { HealthSettings } from "@/components/settings/health-settings";
 import { SharingSettings } from "@/components/settings/sharing/sharing-settings";
 
 type SectionId =
@@ -27,6 +29,7 @@ type SectionId =
   | "calendar"
   | "time"
   | "sleep"
+  | "health"
   | "sharing";
 
 const SECTIONS: { id: SectionId; icon: LucideIcon; Component: () => React.JSX.Element }[] = [
@@ -35,6 +38,7 @@ const SECTIONS: { id: SectionId; icon: LucideIcon; Component: () => React.JSX.El
   { id: "calendar", icon: CalendarDays, Component: CalendarSettings },
   { id: "time", icon: Clock, Component: TimezoneSettings },
   { id: "sleep", icon: Moon, Component: SleepSettings },
+  { id: "health", icon: Watch, Component: HealthSettings },
   { id: "sharing", icon: Share2, Component: SharingSettings },
 ];
 

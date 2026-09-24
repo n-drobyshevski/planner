@@ -18,6 +18,8 @@ import type {
   TimeWindow,
   TimeslotRequestRow,
   PublicShareRow,
+  HealthConnection,
+  HealthDaily,
 } from "@/lib/types";
 import {
   mapEvent,
@@ -37,6 +39,8 @@ import {
   mapStatusEvent,
   mapCheckpoint,
   mapTaskDependency,
+  mapHealthConnection,
+  mapHealthDaily,
 } from "./mappers";
 
 export interface WorkspaceBundle {
@@ -416,4 +420,44 @@ export async function fetchSleepLogs(
     .order("date");
   if (error) throw error;
   return (data ?? []).map(mapSleepLog);
+}
+
+/**
+ * The viewer's Google Health connection (no secret material — reads the
+ * `health_connections_public` view). `null` means never connected.
+ */
+export async function fetchHealthConnection(
+  sb: SupabaseClient,
+  memberId: string,
+): Promise<HealthConnection | null> {
+  const { data, error } = await sb
+    .from("health_connections_public")
+    .select("*")
+    .eq("member_id", memberId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapHealthConnection(data) : null;
+}
+
+/**
+ * The viewer's synced health metrics for `date`(-`days`+1)..`date` ascending
+ * (zone-free yyyy-MM-dd tokens, like sleep_logs.date). Owner-read-only under
+ * RLS — the `eq("member_id", …)` is redundant defense-in-depth, not the only
+ * guard.
+ */
+export async function fetchHealthDaily(
+  sb: SupabaseClient,
+  memberId: string,
+  startDate: string,
+  endDate: string,
+): Promise<HealthDaily[]> {
+  const { data, error } = await sb
+    .from("health_daily")
+    .select("*")
+    .eq("member_id", memberId)
+    .gte("date", startDate)
+    .lte("date", endDate)
+    .order("date");
+  if (error) throw error;
+  return (data ?? []).map(mapHealthDaily);
 }

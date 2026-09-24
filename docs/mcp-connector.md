@@ -43,11 +43,24 @@ page) → Supabase issues the token.
 
 ## Tools
 
-Read: `get_workspace`, `list_events`, `list_tasks`, `get_sleep_summary`.
-Write: `create_event`, `update_event`, `create_task`, `update_task`,
-`complete_task`. Destructive (`delete_event`, `delete_task`) require
-`confirm: true` — called without it they return a preview of what would be
-removed. RLS is the backstop for all of them.
+Read: `get_workspace`, `list_events`, `list_tasks`, `get_sleep_summary`,
+`get_agenda`. Write: `create_event`, `update_event`, `create_task`,
+`update_task`, `complete_task`. Destructive (`delete_event`, `delete_task`)
+require `confirm: true` — called without it they return a preview of what
+would be removed. RLS is the backstop for all of them.
+
+`create_event`/`create_task` accept an optional `clientRequestId` (≤100
+chars): a caller-chosen idempotency key. Re-calling with the same id (same
+owner) returns the row already created for it instead of erroring, via a
+unique index on `(owner_id, client_request_id)` — safe for a client that
+retries after a dropped response.
+
+> The row builders only *set* `client_request_id` when a caller passes one —
+> they never write it unconditionally. That's deliberate: it means a normal
+> deploy (which writes rows well before any client passes a
+> `clientRequestId`) can't be broken by deploying the app before running
+> `supabase/migrations/*_client_request_id.sql`. Still, run the migration
+> first — don't rely on this as your deploy order.
 
 ## Enabling it (one-time setup)
 
@@ -99,6 +112,31 @@ The consent screen also shows the client's redirect host, per the MCP auth spec.
 - Cross-member RLS: as member A, confirm `get_sleep_summary` never returns B's
   nights, and that shared events/tasks appear for both.
 - Unit tests: `pnpm test test/mcp/tools.test.ts`.
+
+## Machine client: Anchor
+
+Anchor (the Telegram companion) is a hand-written MCP *client*, not a chat
+surface — it calls a fixed set of tools from code (`get_agenda`, `list_tasks`,
+`get_workspace`, `create_task`, `create_event`, `complete_task`); its LLM never
+sees the tools. It authenticates the same way Claude does — an OAuth grant
+through Supabase's OAuth server, gated by the same redirect-host allowlist —
+so it needs its **exact** Railway host (not a bare `up.railway.app` suffix,
+which would allow *any* Railway app) added to `MCP_ALLOWED_REDIRECT_HOSTS`,
+e.g.:
+
+```
+MCP_ALLOWED_REDIRECT_HOSTS=claude.ai,anchor-bot-production.up.railway.app
+```
+
+Anchor requests `partner: "shared"` on `get_agenda` (the user opted the
+partner's shared titles into this) and writes with `isPrivate: true` — items
+it creates don't show on the partner's calendar by default. Do **not** set
+`MCP_ALLOW_LOOPBACK_REDIRECT=true` for it; Anchor's OAuth callback runs on its
+own Railway host, not loopback.
+
+To revoke Anchor's access: remove its host from `MCP_ALLOWED_REDIRECT_HOSTS`
+(stops new grants) and, on the Supabase Dashboard, revoke its OAuth grant for
+that member (ends the existing one — its refresh token stops working).
 
 ## Not yet done / deferred
 

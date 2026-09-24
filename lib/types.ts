@@ -123,6 +123,9 @@ export interface MemberSleepPrefs {
  * `quality` is 1..7 (poor→great), `fatigue` is 1..9 (the Karolinska
  * Sleepiness Scale, alert→fighting sleep).
  */
+/** Where a night's bedtime/wake times came from — see 20260724000000_health_sync.sql. */
+export type SleepLogSource = "manual" | "fitbit" | "fitbit+manual";
+
 export interface SleepLog {
   id: string;
   workspaceId: string;
@@ -133,6 +136,8 @@ export interface SleepLog {
   quality: number | null;
   fatigue: number | null;
   note: string | null;
+  /** Optional: absent on literals built before the `source` column existed. */
+  source?: SleepLogSource;
   createdAt: number;
 }
 
@@ -475,4 +480,60 @@ export interface InsightsPrefs {
   dashboard: { order?: string[]; hidden?: string[] };
   suppressedKinds: string[];
   updatedAt: number;
+}
+
+// ---------------------------------------------------------------------------
+// Fitbit Air (Google Health API) sync — 20260724000000_health_sync.sql.
+// ---------------------------------------------------------------------------
+
+export type HealthConnectionStatus = "active" | "revoked" | "error";
+
+/**
+ * A member's Google Health connection, member-private under RLS — and even
+ * to the owner, secret-free: this shape mirrors `health_connections_public`
+ * (no `refreshTokenEnc`; that never leaves the server). `null` means "no row
+ * yet" (never connected), which the settings UI reads as "not connected".
+ */
+export interface HealthConnection {
+  memberId: string;
+  workspaceId: string;
+  provider: string;
+  healthUserId: string | null;
+  scopes: string[];
+  status: HealthConnectionStatus;
+  lastSyncedAt: number | null;
+  lastError: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * One member-day of synced health metrics (`health_daily`). Owner-read-only,
+ * no client writes — only `lib/health/sync.ts` (service role) ever writes
+ * this table. Every field is nullable: a day may have partial coverage (e.g.
+ * steps but no sleep) depending on what the device/phone actually reported.
+ */
+export interface HealthDaily {
+  id: string;
+  workspaceId: string;
+  memberId: string;
+  /** zone-free yyyy-MM-dd, like SleepLog.date */
+  date: string;
+  sleepStart: number | null;
+  sleepEnd: number | null;
+  minutesAsleep: number | null;
+  minutesDeep: number | null;
+  minutesLight: number | null;
+  minutesRem: number | null;
+  minutesAwake: number | null;
+  /** 0..100 */
+  efficiency: number | null;
+  hrvMs: number | null;
+  restingHr: number | null;
+  /** 0..100 */
+  spo2Avg: number | null;
+  steps: number | null;
+  activeZoneMinutes: number | null;
+  exerciseMinutes: number | null;
+  syncedAt: number;
 }

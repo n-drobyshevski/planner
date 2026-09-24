@@ -46,4 +46,9 @@ export const qk = {
   /** The owner's pending incoming timeslot requests (Phase 4); RLS-scoped. */
   timeslotRequests: (workspaceId: string) =>
     ["timeslot-requests", workspaceId] as const,
+  /** The viewer's Google Health connection status (member-private, no secrets). */
+  healthConnection: (memberId: string) => ["health-connection", memberId] as const,
+  /** The viewer's synced health metrics for a date range (member-private). */
+  healthDaily: (memberId: string, startDate: string, endDate: string) =>
+    ["health-daily", memberId, startDate, endDate] as const,
 };

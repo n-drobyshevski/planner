@@ -87,10 +87,14 @@ describe("buildSleepDayPairs", () => {
         wakeDayMs: tue,
         durationMs: 8 * HOUR,
         quality: 4,
+        hrvMs: null,
+        restingHr: null,
+        deepShare: null,
         nextDay: {
           trackedMs: 4 * HOUR,
           fragmentation: 2 * HOUR, // two 2h merged blocks → avgBlockMs
           meanSatisfaction: 4,
+          steps: null,
         },
       },
     ]);
@@ -124,6 +128,7 @@ describe("buildSleepDayPairs", () => {
       trackedMs: 0,
       fragmentation: null,
       meanSatisfaction: null,
+      steps: null,
     });
   });
 
@@ -163,23 +168,41 @@ describe("sleepCorrelations", () => {
       wakeDayMs: T0 + seq * DAY,
       durationMs: over.durationMs ?? null,
       quality: over.quality ?? null,
+      hrvMs: null,
+      restingHr: null,
+      deepShare: null,
       nextDay: {
         trackedMs: over.trackedMs ?? 0,
         fragmentation: over.fragmentation ?? null,
         meanSatisfaction: over.meanSatisfaction ?? null,
+        steps: null,
       },
     };
   }
 
-  it("returns all 6 metric × side combos in a stable order", () => {
+  it("returns all metric × side combos in a stable order", () => {
     const out = sleepCorrelations([]);
     expect(out.map((c) => `${c.metric}/${c.vs}`)).toEqual([
       "load/duration",
       "load/quality",
+      "load/hrv",
+      "load/restingHr",
+      "load/deepShare",
       "fragmentation/duration",
       "fragmentation/quality",
+      "fragmentation/hrv",
+      "fragmentation/restingHr",
+      "fragmentation/deepShare",
       "satisfaction/duration",
       "satisfaction/quality",
+      "satisfaction/hrv",
+      "satisfaction/restingHr",
+      "satisfaction/deepShare",
+      "steps/duration",
+      "steps/quality",
+      "steps/hrv",
+      "steps/restingHr",
+      "steps/deepShare",
     ]);
     for (const c of out) expect(c).toMatchObject({ rho: null, n: 0 });
   });

@@ -39,6 +39,7 @@ const taskInputBase = z.object({
   sequential: z.boolean().optional(),
   completedAt: z.number().int().nullable().optional(),
   attributes: itemAttributesSchema.optional(),
+  clientRequestId: z.string().min(1).max(100).optional(),
 });
 
 /**

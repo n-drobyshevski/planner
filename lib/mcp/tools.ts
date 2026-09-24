@@ -9,7 +9,10 @@ import {
   fetchWindow,
   fetchTasks,
   fetchSleepLogs,
+  fetchHealthConnection,
+  fetchHealthDaily,
 } from "@/lib/supabase/queries";
+import { syncMemberIfStale } from "@/lib/health/sync";
 import {
   createEvent,
   updateEvent,
@@ -21,6 +24,14 @@ import {
 } from "@/lib/supabase/mutations";
 import { expandEvents } from "@/lib/recurrence/expand";
 import type { EventInput, TaskInput } from "@/lib/supabase/mappers";
+import {
+  dateInputToMs,
+  dayStartOffset,
+  dateKeyInZone,
+  dateInputToUtcMs,
+} from "@/lib/datetime/local";
+import { projectAgenda, projectAgendaTasks, type AgendaTaskStatus } from "./projection";
+import type { Board, TaskRow } from "@/lib/types";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -30,6 +41,48 @@ const toMs = (iso: string): number => {
   return ms;
 };
 const toIso = (ms: number): string => new Date(ms).toISOString();
+
+/** Whether `Intl` accepts `tz` as an IANA time zone identifier. */
+function isValidTimeZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const DAY_MS = 86_400_000;
+
+/** Shift a zone-free "yyyy-MM-dd" token by `deltaDays` (UTC calendar arithmetic). */
+function shiftDateToken(date: string, deltaDays: number): string {
+  const [y, mo, d] = date.split("-").map(Number);
+  const ms = Date.UTC(y, mo - 1, d) + deltaDays * DAY_MS;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * Normalize an all-day [start, end) pair to zone-independent UTC-midnight
+ * calendar-date boundaries, the way `allDayDateKey` reads them back. Without
+ * this, an all-day range sent as local midnight in a non-UTC zone (as a
+ * machine client naturally would) is stored one day early or spanning two
+ * days — see `lib/datetime/local.ts` (`dateInputToUtcMs` / `allDayDateKey`).
+ *
+ * A range already on UTC-midnight boundaries is taken as floating dates and
+ * kept as is (Anchor sends that, and so do most clients writing `…T00:00Z`);
+ * re-reading it in a zone west of UTC would shift it a day early.
+ */
+function allDayRange(
+  start: number,
+  end: number,
+  timeZone: string,
+): { start: number; end: number } {
+  if (start % DAY_MS === 0 && end % DAY_MS === 0) return { start, end };
+  return {
+    start: dateInputToUtcMs(dateKeyInZone(start, timeZone)),
+    end: dateInputToUtcMs(dateKeyInZone(end, timeZone)),
+  };
+}
 
 /** Wrap data as a compact text tool result (no outputSchema → text content). */
 function ok(data: unknown): CallToolResult {
@@ -110,6 +163,98 @@ export function registerTools(server: McpServer): void {
       }),
   );
 
+  // -- agenda ---------------------------------------------------------------
+  server.registerTool(
+    "get_agenda",
+    {
+      title: "Get agenda",
+      description:
+        "A compact agenda for one local day (or two, with `days: 2`): your own " +
+        "events plus the partner's (per `partner`), and your own open tasks due " +
+        "in the window. The window is the local day(s) of `date` in `timeZone`, " +
+        "DST-correct — not a UTC day. Built for a machine client (e.g. a daily " +
+        "digest bot), not for browsing; use list_events/list_tasks for that.",
+      inputSchema: {
+        date: z.iso
+          .date()
+          .describe("Local calendar date, yyyy-MM-dd — the window's first day."),
+        timeZone: z
+          .string()
+          .refine(isValidTimeZone, "Not a valid IANA time zone.")
+          .describe("IANA time zone, e.g. 'Europe/Berlin'."),
+        days: z
+          .union([z.literal(1), z.literal(2)])
+          .optional()
+          .describe("Window length in local days. Default: 1."),
+        partner: z
+          .enum(["none", "busy", "shared"])
+          .optional()
+          .describe(
+            "Partner visibility: 'none' (default, no partner items), 'busy' " +
+              "(times only, no titles), 'shared' (the partner's non-private " +
+              "titles too — never a private event, and never an id).",
+          ),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, memberId, workspaceId } = mcpContext(extra);
+        const days = args.days ?? 1;
+        const partnerMode = args.partner ?? "none";
+
+        const start = dateInputToMs(args.date, args.timeZone);
+        const end = dayStartOffset(start, days, args.timeZone);
+        const lastDay = dateKeyInZone(end - 1, args.timeZone);
+
+        // Fetched up front (not just for board state below) so its
+        // categories give `expandEvents` the shared-category ids: without
+        // them a joint event's `isShared` never comes out true and
+        // `projectAgenda` can't recognize it as also the caller's own.
+        const bundle = await fetchWorkspaceBundle(sb);
+        const sharedCategoryIds = new Set(
+          bundle.categories.filter((c) => c.ownerId === null).map((c) => c.id),
+        );
+
+        const { events: eventRows, overrides } = await fetchWindow(sb, workspaceId, {
+          start,
+          end,
+        });
+        const occurrences = expandEvents(eventRows, overrides, { start, end }, sharedCategoryIds);
+        const events = projectAgenda(occurrences, memberId, partnerMode, args.date, lastDay);
+
+        // Board state -> a rough todo/in_progress/done status per task, so
+        // `projectAgendaTasks` can include a due-less task that's in flight.
+        const boardsByCollection = new Map<string, Board[]>();
+        for (const b of bundle.boards) {
+          const list = boardsByCollection.get(b.collectionId) ?? [];
+          list.push(b);
+          boardsByCollection.set(b.collectionId, list);
+        }
+        for (const list of boardsByCollection.values()) {
+          list.sort((a, b) => a.position - b.position);
+        }
+        const statusOf = (t: TaskRow): AgendaTaskStatus => {
+          const cols = t.collectionId ? boardsByCollection.get(t.collectionId) : undefined;
+          const board = t.boardId ? cols?.find((b) => b.id === t.boardId) : undefined;
+          if (!board) return "todo";
+          if (board.isDone) return "done";
+          const firstOpen = cols!.find((b) => !b.isDone);
+          return firstOpen && firstOpen.id === board.id ? "todo" : "in_progress";
+        };
+
+        const allTasks = await fetchTasks(sb, workspaceId);
+        const tasks = projectAgendaTasks(
+          allTasks.map((t) => ({ ...t, status: statusOf(t) })),
+          memberId,
+          args.date,
+          lastDay,
+        );
+
+        return ok({ date: args.date, timeZone: args.timeZone, days, events, tasks });
+      }),
+  );
+
   // -- calendar: read -----------------------------------------------------
   server.registerTool(
     "list_events",
@@ -181,27 +326,44 @@ export function registerTools(server: McpServer): void {
         location: z.string().max(1000).optional(),
         categoryId: z.string().optional().describe("From get_workspace."),
         rrule: z.string().optional().describe("RFC 5545 RRULE for recurrence."),
+        isPrivate: z
+          .boolean()
+          .optional()
+          .describe("Only you can see it. Default: false (shared, unchanged)."),
+        clientRequestId: z
+          .string()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            "Caller-chosen idempotency key. Re-calling with the same id returns " +
+              "the event already created for it instead of making a duplicate.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     (args, extra) =>
       guard(async () => {
         const { sb, memberId, workspaceId } = mcpContext(extra);
-        const start = toMs(args.start);
-        const end = toMs(args.end);
+        let start = toMs(args.start);
+        let end = toMs(args.end);
         if (end < start) return fail("`end` must be at or after `start`.");
+        const timeZone = args.timeZone ?? "UTC";
+        if (args.allDay) ({ start, end } = allDayRange(start, end, timeZone));
         const input: EventInput = {
           workspaceId,
           ownerId: memberId,
           title: args.title,
           start,
           end,
-          timeZone: args.timeZone ?? "UTC",
+          timeZone,
           allDay: args.allDay ?? false,
           description: args.description ?? null,
           location: args.location ?? null,
           categoryId: args.categoryId ?? null,
           rrule: args.rrule ?? null,
+          isPrivate: args.isPrivate ?? false,
+          clientRequestId: args.clientRequestId,
         };
         const row = await createEvent(sb, input);
         return ok({ id: row.id, title: row.title, start: toIso(row.start) });
@@ -353,7 +515,20 @@ export function registerTools(server: McpServer): void {
         parentId: z.string().optional().describe("Make this a subtask of this id."),
         categoryId: z.string().optional(),
         priority: z.number().int().min(0).max(3).optional(),
-        dueDate: z.string().optional().describe("Calendar date, yyyy-MM-dd."),
+        dueDate: z
+          .iso.date()
+          .nullable()
+          .optional()
+          .describe("Calendar date, yyyy-MM-dd, or null for none."),
+        clientRequestId: z
+          .string()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            "Caller-chosen idempotency key. Re-calling with the same id returns " +
+              "the task already created for it instead of making a duplicate.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
@@ -371,6 +546,7 @@ export function registerTools(server: McpServer): void {
           categoryId: args.categoryId ?? null,
           priority: args.priority ?? null,
           dueDate: args.dueDate ?? null,
+          clientRequestId: args.clientRequestId,
         };
         const row = await createTask(sb, input);
         return ok({ id: row.id, title: row.title });
@@ -484,7 +660,9 @@ export function registerTools(server: McpServer): void {
       title: "Get sleep summary",
       description:
         "Your recent sleep nights and simple aggregates (member-private; only " +
-        "ever your own data). Defaults to the last 14 logged nights.",
+        "ever your own data). Defaults to the last 14 logged nights. When a " +
+        "Fitbit Air is connected, nights also carry the synced minutesAsleep/" +
+        "stages/efficiency (freshened via a sync-on-read, best-effort).",
       inputSchema: {
         nights: z
           .number()
@@ -508,17 +686,113 @@ export function registerTools(server: McpServer): void {
         const avg = (xs: number[]) =>
           xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null;
         const qualities = recent.map((l) => l.quality).filter((q): q is number => q != null);
+
+        // Sync errors never fail this tool — it always falls back to whatever
+        // is already stored in health_daily (possibly nothing at all).
+        await syncMemberIfStale(memberId, { days: 3 });
+        const dates = recent.map((l) => l.date).sort();
+        const healthByDate = new Map(
+          dates.length > 0
+            ? (
+                await fetchHealthDaily(sb, memberId, dates[0], dates[dates.length - 1])
+              ).map((h) => [h.date, h] as const)
+            : [],
+        );
+
         return ok({
           nights: recent.length,
           avgDurationHrs: avg(durations),
           avgQuality: avg(qualities),
-          logs: recent.map((l) => ({
-            date: l.date,
-            bedtime: l.bedtimeAt ? toIso(l.bedtimeAt) : undefined,
-            woke: l.wokeAt ? toIso(l.wokeAt) : undefined,
-            quality: l.quality ?? undefined,
-            fatigue: l.fatigue ?? undefined,
-          })),
+          logs: recent.map((l) => {
+            const h = healthByDate.get(l.date);
+            return {
+              date: l.date,
+              bedtime: l.bedtimeAt ? toIso(l.bedtimeAt) : undefined,
+              woke: l.wokeAt ? toIso(l.wokeAt) : undefined,
+              quality: l.quality ?? undefined,
+              fatigue: l.fatigue ?? undefined,
+              source: l.source ?? "manual",
+              minutesAsleep: h?.minutesAsleep ?? null,
+              stages: h
+                ? { deep: h.minutesDeep, light: h.minutesLight, rem: h.minutesRem, awake: h.minutesAwake }
+                : null,
+              efficiency: h?.efficiency ?? null,
+            };
+          }),
+        });
+      }),
+  );
+
+  // -- health (Fitbit Air / Google Health) ---------------------------------
+  server.registerTool(
+    "get_health",
+    {
+      title: "Get health data",
+      description:
+        "Your synced Fitbit Air health data — sleep (with stages), HRV, " +
+        "resting heart rate, SpO2, steps, active zone minutes and exercise — " +
+        "for a range of dates ending at `date`. Member-private; only ever " +
+        "your own data. Freshens via a best-effort sync-on-read first (never " +
+        "fails the tool if that sync errors — you just get whatever is " +
+        "already stored).",
+      inputSchema: {
+        date: z.iso.date().describe("The last date to include, yyyy-MM-dd."),
+        days: z
+          .number()
+          .int()
+          .min(1)
+          .max(14)
+          .optional()
+          .describe("How many days ending at `date` to include. Default: 1."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, memberId } = mcpContext(extra);
+        const days = args.days ?? 1;
+        const startDate = shiftDateToken(args.date, -(days - 1));
+
+        await syncMemberIfStale(memberId, { days: Math.max(days, 3) });
+
+        const [connection, rows] = await Promise.all([
+          fetchHealthConnection(sb, memberId),
+          fetchHealthDaily(sb, memberId, startDate, args.date),
+        ]);
+        const byDate = new Map(rows.map((r) => [r.date, r] as const));
+
+        const daysOut = Array.from({ length: days }, (_, i) => {
+          const date = shiftDateToken(startDate, i);
+          const r = byDate.get(date);
+          const sleep =
+            r?.sleepStart != null && r?.sleepEnd != null
+              ? {
+                  start: toIso(r.sleepStart),
+                  end: toIso(r.sleepEnd),
+                  minutesAsleep: r.minutesAsleep,
+                  deep: r.minutesDeep,
+                  light: r.minutesLight,
+                  rem: r.minutesRem,
+                  awake: r.minutesAwake,
+                  efficiency: r.efficiency,
+                }
+              : null;
+          return {
+            date,
+            sleep,
+            hrvMs: r?.hrvMs ?? null,
+            restingHr: r?.restingHr ?? null,
+            spo2Avg: r?.spo2Avg ?? null,
+            steps: r?.steps ?? null,
+            activeZoneMinutes: r?.activeZoneMinutes ?? null,
+            exerciseMinutes: r?.exerciseMinutes ?? null,
+          };
+        });
+
+        return ok({
+          connected: connection !== null && connection.status !== "revoked",
+          lastSyncedAt: connection?.lastSyncedAt != null ? toIso(connection.lastSyncedAt) : null,
+          days: daysOut,
         });
       }),
   );

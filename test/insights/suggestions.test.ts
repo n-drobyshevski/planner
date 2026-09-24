@@ -543,7 +543,10 @@ function night(wakeDayMs: number, durationMs: number | null): SleepDayPair {
     wakeDayMs,
     durationMs,
     quality: null,
-    nextDay: { trackedMs: 0, fragmentation: null, meanSatisfaction: null },
+    hrvMs: null,
+    restingHr: null,
+    deepShare: null,
+    nextDay: { trackedMs: 0, fragmentation: null, meanSatisfaction: null, steps: null },
   };
 }
 
