@@ -6,7 +6,10 @@ vi.mock("@/lib/supabase/queries", () => ({
   fetchWindow: vi.fn(),
   fetchTasks: vi.fn(),
   fetchSleepLogs: vi.fn(),
+  fetchHealthConnection: vi.fn(),
+  fetchHealthDaily: vi.fn(),
 }));
+vi.mock("@/lib/health/sync", () => ({ syncMemberIfStale: vi.fn() }));
 vi.mock("@/lib/supabase/mutations", () => ({
   createEvent: vi.fn(),
   updateEvent: vi.fn(),
@@ -72,6 +75,7 @@ describe("MCP tools", () => {
         "complete_task",
         "delete_task",
         "get_sleep_summary",
+        "get_health",
       ]),
     );
   });
@@ -383,5 +387,167 @@ describe("get_agenda", () => {
     await call("get_agenda", { date: "2026-09-23", timeZone: "UTC" });
     expect(m.createEvent).not.toHaveBeenCalled();
     expect(m.createTask).not.toHaveBeenCalled();
+  });
+});
+
+describe("get_health", () => {
+  beforeEach(() => {
+    vi.mocked(q.fetchHealthConnection).mockResolvedValue(null);
+    vi.mocked(q.fetchHealthDaily).mockResolvedValue([]);
+  });
+
+  it("runs syncMemberIfStale first, scoped to the caller's own memberId from the token", async () => {
+    const sync = await import("@/lib/health/sync");
+    const call = collectTools();
+    await call("get_health", { date: "2026-09-23", days: 3 });
+    expect(sync.syncMemberIfStale).toHaveBeenCalledWith("m1", expect.objectContaining({ days: 3 }));
+    // Every read is scoped by the token's memberId — the tool has no
+    // memberId input at all, so there's no way to ask for someone else's rows.
+    expect(vi.mocked(q.fetchHealthConnection)).toHaveBeenCalledWith(expect.anything(), "m1");
+    expect(vi.mocked(q.fetchHealthDaily)).toHaveBeenCalledWith(
+      expect.anything(),
+      "m1",
+      expect.any(String),
+      expect.any(String),
+    );
+  });
+
+  it("never fails even if the sync-on-read throws (contract: syncMemberIfStale never throws, but defends anyway)", async () => {
+    const sync = await import("@/lib/health/sync");
+    vi.mocked(sync.syncMemberIfStale).mockResolvedValue(undefined);
+    const call = collectTools();
+    const res = await call("get_health", { date: "2026-09-23" });
+    expect(res.isError).toBe(false);
+  });
+
+  it("reports connected: false and a null sleep object when nothing is stored", async () => {
+    const call = collectTools();
+    const res = await call("get_health", { date: "2026-09-23" });
+    expect(res.data).toEqual({
+      connected: false,
+      lastSyncedAt: null,
+      days: [{
+        date: "2026-09-23",
+        sleep: null,
+        hrvMs: null,
+        restingHr: null,
+        spo2Avg: null,
+        steps: null,
+        activeZoneMinutes: null,
+        exerciseMinutes: null,
+      }],
+    });
+  });
+
+  it("returns ascending [date-days+1..date], filling gaps with nulls", async () => {
+    vi.mocked(q.fetchHealthConnection).mockResolvedValue({
+      memberId: "m1",
+      workspaceId: "w1",
+      provider: "google_health",
+      healthUserId: "h1",
+      scopes: [],
+      status: "active",
+      lastSyncedAt: 1_766_000_000_000,
+      lastError: null,
+      createdAt: 0,
+      updatedAt: 0,
+    } as never);
+    vi.mocked(q.fetchHealthDaily).mockResolvedValue([
+      {
+        id: "hd1",
+        workspaceId: "w1",
+        memberId: "m1",
+        date: "2026-09-22",
+        sleepStart: Date.parse("2026-09-21T22:00:00Z"),
+        sleepEnd: Date.parse("2026-09-22T06:00:00Z"),
+        minutesAsleep: 460,
+        minutesDeep: 90,
+        minutesLight: 300,
+        minutesRem: 70,
+        minutesAwake: 0,
+        efficiency: 98,
+        hrvMs: 50,
+        restingHr: 55,
+        spo2Avg: 97,
+        steps: 8000,
+        activeZoneMinutes: 20,
+        exerciseMinutes: 15,
+        syncedAt: 0,
+      },
+    ] as never);
+
+    const call = collectTools();
+    const res = await call("get_health", { date: "2026-09-23", days: 2 });
+    expect(res.data.connected).toBe(true);
+    expect(res.data.days.map((d: { date: string }) => d.date)).toEqual([
+      "2026-09-22",
+      "2026-09-23",
+    ]);
+    expect(res.data.days[0].sleep).toEqual({
+      start: "2026-09-21T22:00:00.000Z",
+      end: "2026-09-22T06:00:00.000Z",
+      minutesAsleep: 460,
+      deep: 90,
+      light: 300,
+      rem: 70,
+      awake: 0,
+      efficiency: 98,
+    });
+    expect(res.data.days[0].hrvMs).toBe(50);
+    // The 23rd wasn't in the fixture — filled with nulls, not dropped.
+    expect(res.data.days[1]).toMatchObject({ date: "2026-09-23", sleep: null, steps: null });
+  });
+});
+
+describe("get_sleep_summary + health merge", () => {
+  it("merges in synced minutesAsleep/stages/efficiency and carries each log's source", async () => {
+    vi.mocked(q.fetchSleepLogs).mockResolvedValue([
+      {
+        id: "sl1",
+        workspaceId: "w1",
+        memberId: "m1",
+        date: "2026-09-22",
+        bedtimeAt: null,
+        wokeAt: null,
+        quality: null,
+        fatigue: null,
+        note: null,
+        source: "fitbit",
+        createdAt: 0,
+      },
+    ] as never);
+    vi.mocked(q.fetchHealthDaily).mockResolvedValue([
+      {
+        id: "hd1",
+        workspaceId: "w1",
+        memberId: "m1",
+        date: "2026-09-22",
+        sleepStart: null,
+        sleepEnd: null,
+        minutesAsleep: 400,
+        minutesDeep: 80,
+        minutesLight: 260,
+        minutesRem: 60,
+        minutesAwake: 0,
+        efficiency: 95,
+        hrvMs: null,
+        restingHr: null,
+        spo2Avg: null,
+        steps: null,
+        activeZoneMinutes: null,
+        exerciseMinutes: null,
+        syncedAt: 0,
+      },
+    ] as never);
+
+    const call = collectTools();
+    const res = await call("get_sleep_summary", {});
+    expect(res.data.logs[0]).toMatchObject({
+      date: "2026-09-22",
+      source: "fitbit",
+      minutesAsleep: 400,
+      efficiency: 95,
+      stages: { deep: 80, light: 260, rem: 60, awake: 0 },
+    });
   });
 });

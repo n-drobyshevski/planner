@@ -9,7 +9,10 @@ import {
   fetchWindow,
   fetchTasks,
   fetchSleepLogs,
+  fetchHealthConnection,
+  fetchHealthDaily,
 } from "@/lib/supabase/queries";
+import { syncMemberIfStale } from "@/lib/health/sync";
 import {
   createEvent,
   updateEvent,
@@ -50,6 +53,13 @@ function isValidTimeZone(tz: string): boolean {
 }
 
 const DAY_MS = 86_400_000;
+
+/** Shift a zone-free "yyyy-MM-dd" token by `deltaDays` (UTC calendar arithmetic). */
+function shiftDateToken(date: string, deltaDays: number): string {
+  const [y, mo, d] = date.split("-").map(Number);
+  const ms = Date.UTC(y, mo - 1, d) + deltaDays * DAY_MS;
+  return new Date(ms).toISOString().slice(0, 10);
+}
 
 /**
  * Normalize an all-day [start, end) pair to zone-independent UTC-midnight
@@ -650,7 +660,9 @@ export function registerTools(server: McpServer): void {
       title: "Get sleep summary",
       description:
         "Your recent sleep nights and simple aggregates (member-private; only " +
-        "ever your own data). Defaults to the last 14 logged nights.",
+        "ever your own data). Defaults to the last 14 logged nights. When a " +
+        "Fitbit Air is connected, nights also carry the synced minutesAsleep/" +
+        "stages/efficiency (freshened via a sync-on-read, best-effort).",
       inputSchema: {
         nights: z
           .number()
@@ -674,17 +686,113 @@ export function registerTools(server: McpServer): void {
         const avg = (xs: number[]) =>
           xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null;
         const qualities = recent.map((l) => l.quality).filter((q): q is number => q != null);
+
+        // Sync errors never fail this tool — it always falls back to whatever
+        // is already stored in health_daily (possibly nothing at all).
+        await syncMemberIfStale(memberId, { days: 3 });
+        const dates = recent.map((l) => l.date).sort();
+        const healthByDate = new Map(
+          dates.length > 0
+            ? (
+                await fetchHealthDaily(sb, memberId, dates[0], dates[dates.length - 1])
+              ).map((h) => [h.date, h] as const)
+            : [],
+        );
+
         return ok({
           nights: recent.length,
           avgDurationHrs: avg(durations),
           avgQuality: avg(qualities),
-          logs: recent.map((l) => ({
-            date: l.date,
-            bedtime: l.bedtimeAt ? toIso(l.bedtimeAt) : undefined,
-            woke: l.wokeAt ? toIso(l.wokeAt) : undefined,
-            quality: l.quality ?? undefined,
-            fatigue: l.fatigue ?? undefined,
-          })),
+          logs: recent.map((l) => {
+            const h = healthByDate.get(l.date);
+            return {
+              date: l.date,
+              bedtime: l.bedtimeAt ? toIso(l.bedtimeAt) : undefined,
+              woke: l.wokeAt ? toIso(l.wokeAt) : undefined,
+              quality: l.quality ?? undefined,
+              fatigue: l.fatigue ?? undefined,
+              source: l.source ?? "manual",
+              minutesAsleep: h?.minutesAsleep ?? null,
+              stages: h
+                ? { deep: h.minutesDeep, light: h.minutesLight, rem: h.minutesRem, awake: h.minutesAwake }
+                : null,
+              efficiency: h?.efficiency ?? null,
+            };
+          }),
+        });
+      }),
+  );
+
+  // -- health (Fitbit Air / Google Health) ---------------------------------
+  server.registerTool(
+    "get_health",
+    {
+      title: "Get health data",
+      description:
+        "Your synced Fitbit Air health data — sleep (with stages), HRV, " +
+        "resting heart rate, SpO2, steps, active zone minutes and exercise — " +
+        "for a range of dates ending at `date`. Member-private; only ever " +
+        "your own data. Freshens via a best-effort sync-on-read first (never " +
+        "fails the tool if that sync errors — you just get whatever is " +
+        "already stored).",
+      inputSchema: {
+        date: z.iso.date().describe("The last date to include, yyyy-MM-dd."),
+        days: z
+          .number()
+          .int()
+          .min(1)
+          .max(14)
+          .optional()
+          .describe("How many days ending at `date` to include. Default: 1."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, memberId } = mcpContext(extra);
+        const days = args.days ?? 1;
+        const startDate = shiftDateToken(args.date, -(days - 1));
+
+        await syncMemberIfStale(memberId, { days: Math.max(days, 3) });
+
+        const [connection, rows] = await Promise.all([
+          fetchHealthConnection(sb, memberId),
+          fetchHealthDaily(sb, memberId, startDate, args.date),
+        ]);
+        const byDate = new Map(rows.map((r) => [r.date, r] as const));
+
+        const daysOut = Array.from({ length: days }, (_, i) => {
+          const date = shiftDateToken(startDate, i);
+          const r = byDate.get(date);
+          const sleep =
+            r?.sleepStart != null && r?.sleepEnd != null
+              ? {
+                  start: toIso(r.sleepStart),
+                  end: toIso(r.sleepEnd),
+                  minutesAsleep: r.minutesAsleep,
+                  deep: r.minutesDeep,
+                  light: r.minutesLight,
+                  rem: r.minutesRem,
+                  awake: r.minutesAwake,
+                  efficiency: r.efficiency,
+                }
+              : null;
+          return {
+            date,
+            sleep,
+            hrvMs: r?.hrvMs ?? null,
+            restingHr: r?.restingHr ?? null,
+            spo2Avg: r?.spo2Avg ?? null,
+            steps: r?.steps ?? null,
+            activeZoneMinutes: r?.activeZoneMinutes ?? null,
+            exerciseMinutes: r?.exerciseMinutes ?? null,
+          };
+        });
+
+        return ok({
+          connected: connection !== null && connection.status !== "revoked",
+          lastSyncedAt: connection?.lastSyncedAt != null ? toIso(connection.lastSyncedAt) : null,
+          days: daysOut,
         });
       }),
   );
