@@ -39,13 +39,6 @@ const toMs = (iso: string): number => {
 };
 const toIso = (ms: number): string => new Date(ms).toISOString();
 
-/**
- * Normalize an all-day [start, end) pair to zone-independent UTC-midnight
- * calendar-date boundaries, the way `allDayDateKey` reads them back. Without
- * this, an all-day range sent as local midnight in a non-UTC zone (as a
- * machine client naturally would) is stored one day early or spanning two
- * days — see `lib/datetime/local.ts` (`dateInputToUtcMs` / `allDayDateKey`).
- */
 /** Whether `Intl` accepts `tz` as an IANA time zone identifier. */
 function isValidTimeZone(tz: string): boolean {
   try {
@@ -56,11 +49,25 @@ function isValidTimeZone(tz: string): boolean {
   }
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Normalize an all-day [start, end) pair to zone-independent UTC-midnight
+ * calendar-date boundaries, the way `allDayDateKey` reads them back. Without
+ * this, an all-day range sent as local midnight in a non-UTC zone (as a
+ * machine client naturally would) is stored one day early or spanning two
+ * days — see `lib/datetime/local.ts` (`dateInputToUtcMs` / `allDayDateKey`).
+ *
+ * A range already on UTC-midnight boundaries is taken as floating dates and
+ * kept as is (Anchor sends that, and so do most clients writing `…T00:00Z`);
+ * re-reading it in a zone west of UTC would shift it a day early.
+ */
 function allDayRange(
   start: number,
   end: number,
   timeZone: string,
 ): { start: number; end: number } {
+  if (start % DAY_MS === 0 && end % DAY_MS === 0) return { start, end };
   return {
     start: dateInputToUtcMs(dateKeyInZone(start, timeZone)),
     end: dateInputToUtcMs(dateKeyInZone(end, timeZone)),

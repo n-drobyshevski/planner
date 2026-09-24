@@ -169,6 +169,36 @@ describe("MCP tools", () => {
     expect(input.clientRequestId).toBe("anchor:xyz");
   });
 
+  it("create_event keeps a UTC-midnight all-day range as is, even west of UTC", async () => {
+    vi.mocked(m.createEvent).mockResolvedValue({ id: "e1", title: "Trip", start: 0 } as never);
+    const call = collectTools();
+    await call("create_event", {
+      title: "Trip",
+      start: "2026-09-25T00:00:00.000Z",
+      end: "2026-09-26T00:00:00.000Z",
+      allDay: true,
+      timeZone: "America/New_York",
+    });
+    const input = vi.mocked(m.createEvent).mock.calls[0][1];
+    expect(input.start).toBe(Date.UTC(2026, 8, 25));
+    expect(input.end).toBe(Date.UTC(2026, 8, 26));
+  });
+
+  it("create_event normalizes a local-midnight all-day range to UTC-midnight dates", async () => {
+    vi.mocked(m.createEvent).mockResolvedValue({ id: "e1", title: "Trip", start: 0 } as never);
+    const call = collectTools();
+    await call("create_event", {
+      title: "Trip",
+      start: "2026-09-24T21:00:00.000Z", // 2026-09-25 00:00 in Moscow
+      end: "2026-09-25T21:00:00.000Z",
+      allDay: true,
+      timeZone: "Europe/Moscow",
+    });
+    const input = vi.mocked(m.createEvent).mock.calls[0][1];
+    expect(input.start).toBe(Date.UTC(2026, 8, 25));
+    expect(input.end).toBe(Date.UTC(2026, 8, 26));
+  });
+
   it("create_task passes clientRequestId through", async () => {
     vi.mocked(m.createTask).mockResolvedValue({ id: "t1", title: "Task" } as never);
     const call = collectTools();
