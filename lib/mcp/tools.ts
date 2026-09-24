@@ -21,7 +21,12 @@ import {
 } from "@/lib/supabase/mutations";
 import { expandEvents } from "@/lib/recurrence/expand";
 import type { EventInput, TaskInput } from "@/lib/supabase/mappers";
-import { dateInputToMs, dayStartOffset, dateKeyInZone } from "@/lib/datetime/local";
+import {
+  dateInputToMs,
+  dayStartOffset,
+  dateKeyInZone,
+  dateInputToUtcMs,
+} from "@/lib/datetime/local";
 import { projectAgenda, projectAgendaTasks, type AgendaTaskStatus } from "./projection";
 import type { Board, TaskRow } from "@/lib/types";
 
@@ -33,6 +38,34 @@ const toMs = (iso: string): number => {
   return ms;
 };
 const toIso = (ms: number): string => new Date(ms).toISOString();
+
+/**
+ * Normalize an all-day [start, end) pair to zone-independent UTC-midnight
+ * calendar-date boundaries, the way `allDayDateKey` reads them back. Without
+ * this, an all-day range sent as local midnight in a non-UTC zone (as a
+ * machine client naturally would) is stored one day early or spanning two
+ * days — see `lib/datetime/local.ts` (`dateInputToUtcMs` / `allDayDateKey`).
+ */
+/** Whether `Intl` accepts `tz` as an IANA time zone identifier. */
+function isValidTimeZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function allDayRange(
+  start: number,
+  end: number,
+  timeZone: string,
+): { start: number; end: number } {
+  return {
+    start: dateInputToUtcMs(dateKeyInZone(start, timeZone)),
+    end: dateInputToUtcMs(dateKeyInZone(end, timeZone)),
+  };
+}
 
 /** Wrap data as a compact text tool result (no outputSchema → text content). */
 function ok(data: unknown): CallToolResult {
@@ -125,11 +158,13 @@ export function registerTools(server: McpServer): void {
         "DST-correct — not a UTC day. Built for a machine client (e.g. a daily " +
         "digest bot), not for browsing; use list_events/list_tasks for that.",
       inputSchema: {
-        date: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected yyyy-MM-dd.")
+        date: z.iso
+          .date()
           .describe("Local calendar date, yyyy-MM-dd — the window's first day."),
-        timeZone: z.string().describe("IANA time zone, e.g. 'Europe/Berlin'."),
+        timeZone: z
+          .string()
+          .refine(isValidTimeZone, "Not a valid IANA time zone.")
+          .describe("IANA time zone, e.g. 'Europe/Berlin'."),
         days: z
           .union([z.literal(1), z.literal(2)])
           .optional()
@@ -155,16 +190,24 @@ export function registerTools(server: McpServer): void {
         const end = dayStartOffset(start, days, args.timeZone);
         const lastDay = dateKeyInZone(end - 1, args.timeZone);
 
+        // Fetched up front (not just for board state below) so its
+        // categories give `expandEvents` the shared-category ids: without
+        // them a joint event's `isShared` never comes out true and
+        // `projectAgenda` can't recognize it as also the caller's own.
+        const bundle = await fetchWorkspaceBundle(sb);
+        const sharedCategoryIds = new Set(
+          bundle.categories.filter((c) => c.ownerId === null).map((c) => c.id),
+        );
+
         const { events: eventRows, overrides } = await fetchWindow(sb, workspaceId, {
           start,
           end,
         });
-        const occurrences = expandEvents(eventRows, overrides, { start, end });
-        const events = projectAgenda(occurrences, memberId, partnerMode);
+        const occurrences = expandEvents(eventRows, overrides, { start, end }, sharedCategoryIds);
+        const events = projectAgenda(occurrences, memberId, partnerMode, args.date, lastDay);
 
         // Board state -> a rough todo/in_progress/done status per task, so
         // `projectAgendaTasks` can include a due-less task that's in flight.
-        const bundle = await fetchWorkspaceBundle(sb);
         const boardsByCollection = new Map<string, Board[]>();
         for (const b of bundle.boards) {
           const list = boardsByCollection.get(b.collectionId) ?? [];
@@ -272,6 +315,7 @@ export function registerTools(server: McpServer): void {
           .describe("Only you can see it. Default: false (shared, unchanged)."),
         clientRequestId: z
           .string()
+          .min(1)
           .max(100)
           .optional()
           .describe(
@@ -284,16 +328,18 @@ export function registerTools(server: McpServer): void {
     (args, extra) =>
       guard(async () => {
         const { sb, memberId, workspaceId } = mcpContext(extra);
-        const start = toMs(args.start);
-        const end = toMs(args.end);
+        let start = toMs(args.start);
+        let end = toMs(args.end);
         if (end < start) return fail("`end` must be at or after `start`.");
+        const timeZone = args.timeZone ?? "UTC";
+        if (args.allDay) ({ start, end } = allDayRange(start, end, timeZone));
         const input: EventInput = {
           workspaceId,
           ownerId: memberId,
           title: args.title,
           start,
           end,
-          timeZone: args.timeZone ?? "UTC",
+          timeZone,
           allDay: args.allDay ?? false,
           description: args.description ?? null,
           location: args.location ?? null,
@@ -452,9 +498,14 @@ export function registerTools(server: McpServer): void {
         parentId: z.string().optional().describe("Make this a subtask of this id."),
         categoryId: z.string().optional(),
         priority: z.number().int().min(0).max(3).optional(),
-        dueDate: z.string().optional().describe("Calendar date, yyyy-MM-dd."),
+        dueDate: z
+          .iso.date()
+          .nullable()
+          .optional()
+          .describe("Calendar date, yyyy-MM-dd, or null for none."),
         clientRequestId: z
           .string()
+          .min(1)
           .max(100)
           .optional()
           .describe(
