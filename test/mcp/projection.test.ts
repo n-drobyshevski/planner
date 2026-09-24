@@ -32,12 +32,20 @@ function occ(partial: Partial<Occurrence> & { title: string }): Occurrence {
   };
 }
 
+// A wide date/lastDay window that never excludes a non-all-day occurrence
+// (the all-day cross-day filter only applies when `allDay` is set) — used by
+// every test below that isn't specifically exercising that filter.
+const WIDE_DATE = "1970-01-01";
+const WIDE_LAST_DAY = "2099-12-31";
+
 describe("projectAgenda", () => {
   it("keeps the caller's own occurrences with id/title/location", () => {
     const out = projectAgenda(
       [occ({ eventId: "e1", title: "Dentist", location: "Clinic", ownerId: ME })],
       ME,
       "none",
+      WIDE_DATE,
+      WIDE_LAST_DAY,
     );
     expect(out).toEqual([
       {
@@ -54,13 +62,13 @@ describe("projectAgenda", () => {
 
   it("drops every partner occurrence in 'none' mode — never a title, id, or time leak", () => {
     const partnerOcc = occ({ title: "Therapy — sensitive", ownerId: PARTNER, isPrivate: false });
-    const out = projectAgenda([partnerOcc], ME, "none");
+    const out = projectAgenda([partnerOcc], ME, "none", WIDE_DATE, WIDE_LAST_DAY);
     expect(out).toEqual([]);
   });
 
   it("'busy' mode gives times only — no title, no id, ever", () => {
     const partnerOcc = occ({ title: "Therapy — sensitive", ownerId: PARTNER, isPrivate: false });
-    const out = projectAgenda([partnerOcc], ME, "busy");
+    const out = projectAgenda([partnerOcc], ME, "busy", WIDE_DATE, WIDE_LAST_DAY);
     expect(out).toEqual([
       {
         owner: "partner",
@@ -82,7 +90,7 @@ describe("projectAgenda", () => {
       isPrivate: false,
       location: "Home",
     });
-    const out = projectAgenda([partnerOcc], ME, "shared");
+    const out = projectAgenda([partnerOcc], ME, "shared", WIDE_DATE, WIDE_LAST_DAY);
     expect(out).toEqual([
       {
         owner: "partner",
@@ -94,10 +102,33 @@ describe("projectAgenda", () => {
     ]);
   });
 
+  it("projects a joint (isShared) occurrence as the caller's own, flagged joint: true, even when the partner owns it", () => {
+    const jointOcc = occ({
+      eventId: "e2",
+      title: "Family dinner",
+      location: "Home",
+      ownerId: PARTNER,
+      isShared: true,
+    });
+    const out = projectAgenda([jointOcc], ME, "none", WIDE_DATE, WIDE_LAST_DAY);
+    expect(out).toEqual([
+      {
+        owner: "me",
+        id: "e2",
+        title: "Family dinner",
+        start: new Date(0).toISOString(),
+        end: new Date(3_600_000).toISOString(),
+        allDay: false,
+        location: "Home",
+        joint: true,
+      },
+    ]);
+  });
+
   it("a private partner occurrence never appears, even in 'shared' mode (defense in depth)", () => {
     const privateOcc = occ({ title: "Secret", ownerId: PARTNER, isPrivate: true });
     for (const mode of ["none", "busy", "shared"] as const) {
-      const out = projectAgenda([privateOcc], ME, mode);
+      const out = projectAgenda([privateOcc], ME, mode, WIDE_DATE, WIDE_LAST_DAY);
       expect(out).toEqual([]);
     }
   });
@@ -111,13 +142,15 @@ describe("projectAgenda", () => {
       ],
       ME,
       "none",
+      WIDE_DATE,
+      WIDE_LAST_DAY,
     );
     expect(out.map((e) => (e as { title?: string }).title)).toEqual(["Keeper"]);
   });
 
   it("clips a title over 120 chars", () => {
     const longTitle = "x".repeat(200);
-    const out = projectAgenda([occ({ title: longTitle, ownerId: ME })], ME, "none");
+    const out = projectAgenda([occ({ title: longTitle, ownerId: ME })], ME, "none", WIDE_DATE, WIDE_LAST_DAY);
     expect((out[0] as { title: string }).title).toHaveLength(120);
   });
 
@@ -129,8 +162,45 @@ describe("projectAgenda", () => {
       ],
       ME,
       "none",
+      WIDE_DATE,
+      WIDE_LAST_DAY,
     );
     expect(out.map((e) => (e as { title?: string }).title)).toEqual(["First", "Second"]);
+  });
+
+  it("keeps an all-day occurrence only within [date, lastDay] — no cross-day leak", () => {
+    // All-day events are floating dates anchored to UTC midnight regardless
+    // of the caller's local time zone; the filter compares those calendar
+    // dates directly, not the real-instant window.
+    const yesterday = occ({
+      title: "Yesterday, all day",
+      ownerId: ME,
+      allDay: true,
+      start: Date.UTC(2026, 8, 22), // 2026-09-22T00:00Z
+      end: Date.UTC(2026, 8, 23), // 2026-09-23T00:00Z (exclusive)
+    });
+    const today = occ({
+      title: "Today, all day",
+      ownerId: ME,
+      allDay: true,
+      start: Date.UTC(2026, 8, 23),
+      end: Date.UTC(2026, 8, 24),
+    });
+    const tomorrow = occ({
+      title: "Tomorrow, all day",
+      ownerId: ME,
+      allDay: true,
+      start: Date.UTC(2026, 8, 24),
+      end: Date.UTC(2026, 8, 25),
+    });
+    const out = projectAgenda(
+      [yesterday, today, tomorrow],
+      ME,
+      "none",
+      "2026-09-23",
+      "2026-09-23",
+    );
+    expect(out.map((e) => (e as { title?: string }).title)).toEqual(["Today, all day"]);
   });
 });
 

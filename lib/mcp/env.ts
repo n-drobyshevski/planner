@@ -71,7 +71,10 @@ export function getAllowedRedirectHosts(): string[] {
       .map((h) => h.trim().toLowerCase())
       .filter(Boolean);
   }
-  return ["claude.ai"];
+  // ".claude.ai" keeps subdomain matching (web/desktop/mobile/Cowork all
+  // redirect under claude.ai) without making every entry suffix-matching —
+  // see the leading-dot convention in isAllowedClientRedirect below.
+  return ["claude.ai", ".claude.ai"];
 }
 
 /**
@@ -103,5 +106,9 @@ export function isAllowedClientRedirect(redirectUri: string | undefined): boolea
   ) {
     return true;
   }
-  return allowed.some((h) => host === h || host.endsWith(`.${h}`));
+  // An entry is exact-match by default (a bare PaaS host like
+  // "up.railway.app" allows only that literal host, never every app on it).
+  // Suffix matching is opt-in per entry, with a leading dot
+  // (".claude.ai" allows any subdomain of claude.ai).
+  return allowed.some((h) => (h.startsWith(".") ? host.endsWith(h) : host === h));
 }

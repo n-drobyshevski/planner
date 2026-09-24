@@ -495,7 +495,11 @@ export function eventInputToRow(input: EventInput): Row {
     recurrence_ends_at: toIsoOrNull(input.recurrenceEndsAt ?? null),
     task_id: input.taskId ?? null,
     attributes: input.attributes ?? {},
-    client_request_id: input.clientRequestId ?? null,
+    // Only set when the caller passes one — omitting the key (rather than
+    // `?? null`) means this insert/update still works against a DB that
+    // hasn't run the client_request_id migration yet, as long as no caller
+    // passes one (see supabase/migrations/*_client_request_id.sql).
+    ...(input.clientRequestId ? { client_request_id: input.clientRequestId } : {}),
   };
 }
 
@@ -578,7 +582,9 @@ export function taskInputToRow(input: TaskInput): Row {
     sequential: input.sequential ?? false,
     completed_at: toIsoOrNull(input.completedAt ?? null),
     attributes: input.attributes ?? {},
-    client_request_id: input.clientRequestId ?? null,
+    // See eventInputToRow: omit rather than null so writes still work before
+    // the client_request_id migration lands, as long as nothing sets one.
+    ...(input.clientRequestId ? { client_request_id: input.clientRequestId } : {}),
   };
 }
 

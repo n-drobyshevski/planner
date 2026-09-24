@@ -211,7 +211,7 @@ describe("get_agenda", () => {
   beforeEach(() => {
     vi.mocked(q.fetchWindow).mockResolvedValue({ events: [], overrides: [] } as never);
     vi.mocked(q.fetchTasks).mockResolvedValue([] as never);
-    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue({ boards: [] } as never);
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue({ boards: [], categories: [] } as never);
     vi.mocked(expand.expandEvents).mockReturnValue([]);
   });
 
@@ -221,6 +221,24 @@ describe("get_agenda", () => {
     const win = vi.mocked(q.fetchWindow).mock.calls[0][2];
     expect(new Date(win.start).toISOString()).toBe("2026-09-23T04:00:00.000Z");
     expect(new Date(win.end).toISOString()).toBe("2026-09-24T04:00:00.000Z");
+  });
+
+  it("windows a fall-back DST day as 25 real hours (America/New_York, Nov 1 2026)", async () => {
+    const call = collectTools();
+    await call("get_agenda", { date: "2026-11-01", timeZone: "America/New_York" });
+    const win = vi.mocked(q.fetchWindow).mock.calls[0][2];
+    expect(new Date(win.start).toISOString()).toBe("2026-11-01T04:00:00.000Z");
+    expect(new Date(win.end).toISOString()).toBe("2026-11-02T05:00:00.000Z");
+    expect(win.end - win.start).toBe(25 * 60 * 60 * 1000);
+  });
+
+  it("windows a spring-forward DST day as 23 real hours (America/New_York, Mar 8 2026)", async () => {
+    const call = collectTools();
+    await call("get_agenda", { date: "2026-03-08", timeZone: "America/New_York" });
+    const win = vi.mocked(q.fetchWindow).mock.calls[0][2];
+    expect(new Date(win.start).toISOString()).toBe("2026-03-08T05:00:00.000Z");
+    expect(new Date(win.end).toISOString()).toBe("2026-03-09T04:00:00.000Z");
+    expect(win.end - win.start).toBe(23 * 60 * 60 * 1000);
   });
 
   it("windows 2 local days when days: 2", async () => {
@@ -262,6 +280,57 @@ describe("get_agenda", () => {
     for (const e of res.data.events) {
       expect(e).not.toHaveProperty("id");
       expect(e.owner).toBe("partner");
+    }
+  });
+
+  it("expands a real recurring partner series (unmocked expandEvents) without leaking an id", async () => {
+    const real = await vi.importActual<typeof import("@/lib/recurrence/expand")>(
+      "@/lib/recurrence/expand",
+    );
+    vi.mocked(expand.expandEvents).mockImplementation(real.expandEvents);
+    vi.mocked(q.fetchWindow).mockResolvedValue({
+      events: [
+        {
+          id: "p1",
+          workspaceId: "w1",
+          ownerId: PARTNER,
+          categoryId: null,
+          title: "Standup",
+          description: "internal notes",
+          location: null,
+          isPrivate: false,
+          isShared: false,
+          hiddenFromPublic: false,
+          color: null,
+          kind: "event",
+          allDay: false,
+          inactive: false,
+          status: "confirmed",
+          start: Date.UTC(2026, 8, 23, 9, 0),
+          end: Date.UTC(2026, 8, 23, 9, 15),
+          timeZone: "UTC",
+          rrule: "FREQ=DAILY;COUNT=3",
+          recurrenceEndsAt: null,
+          taskId: null,
+          attributes: {},
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
+      overrides: [],
+    } as never);
+    const call = collectTools();
+    const res = await call("get_agenda", {
+      date: "2026-09-23",
+      timeZone: "UTC",
+      days: 2,
+      partner: "shared",
+    });
+    expect(res.data.events).toHaveLength(2); // days:2 window covers 2 of the 3 daily occurrences
+    for (const e of res.data.events) {
+      expect(e).not.toHaveProperty("id");
+      expect(e.owner).toBe("partner");
+      expect(e.title).toBe("Standup");
     }
   });
 

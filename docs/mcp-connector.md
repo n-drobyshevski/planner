@@ -55,6 +55,13 @@ owner) returns the row already created for it instead of erroring, via a
 unique index on `(owner_id, client_request_id)` — safe for a client that
 retries after a dropped response.
 
+> The row builders only *set* `client_request_id` when a caller passes one —
+> they never write it unconditionally. That's deliberate: it means a normal
+> deploy (which writes rows well before any client passes a
+> `clientRequestId`) can't be broken by deploying the app before running
+> `supabase/migrations/*_client_request_id.sql`. Still, run the migration
+> first — don't rely on this as your deploy order.
+
 ## Enabling it (one-time setup)
 
 1. **Redis** — add the Upstash/Redis Marketplace integration on Vercel (region

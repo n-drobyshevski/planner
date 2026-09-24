@@ -1,5 +1,6 @@
 import "server-only";
 import type { Occurrence, TaskRow } from "@/lib/types";
+import { allDayDateKey } from "@/lib/datetime/local";
 
 const MAX_TITLE_LEN = 120;
 
@@ -19,6 +20,8 @@ interface OwnAgendaEvent {
   end: string;
   allDay: boolean;
   location: string | null;
+  /** true when this is the partner's event too (joint/shared-category), not solely mine. */
+  joint?: true;
 }
 
 interface SharedPartnerAgendaEvent {
@@ -44,24 +47,38 @@ export type AgendaEvent =
 
 /**
  * Project a window's expanded occurrences into `get_agenda`'s event shape.
- * Inactive (e.g. sleep) and cancelled occurrences are dropped. The caller's
- * own occurrences keep id/title/location; the partner's are reshaped per
- * `partnerMode` and NEVER carry an id, description, or location — in "busy"
- * mode they don't even carry a title. A private partner occurrence is
- * dropped here as defense in depth even though RLS already withholds it
- * upstream (`fetchWindow` never returns another member's private rows).
- * Pure: takes the already-fetched/expanded occurrences and does no I/O.
+ * Inactive (e.g. sleep) and cancelled occurrences are dropped. An all-day
+ * occurrence is kept only if its (UTC-anchored, floating) calendar date
+ * actually falls within `[date, lastDay]`, so the local-time window's real-
+ * instant overlap doesn't pull in yesterday's or tomorrow's all-day items in
+ * a non-UTC zone (all-day dates are floating, not real instants). The
+ * caller's own occurrences keep id/title/location; a joint occurrence (a
+ * shared-category event or one flagged `isShared`) is projected the same
+ * way, `joint: true`, even when the partner created it — it belongs to both.
+ * Other partner occurrences are reshaped per `partnerMode` and NEVER carry
+ * an id, description, or location — in "busy" mode they don't even carry a
+ * title. A private partner occurrence is dropped here as defense in depth
+ * even though RLS already withholds it upstream (`fetchWindow` never returns
+ * another member's private rows). Pure: takes the already-fetched/expanded
+ * occurrences and does no I/O.
  */
 export function projectAgenda(
   occurrences: Occurrence[],
   memberId: string,
   partnerMode: PartnerAgendaMode,
+  date: string,
+  lastDay: string,
 ): AgendaEvent[] {
   const events: AgendaEvent[] = [];
   for (const o of occurrences) {
     if (o.inactive || o.status === "cancelled") continue;
+    if (o.allDay) {
+      const startKey = allDayDateKey(o.start);
+      const endKey = allDayDateKey(o.end - 1);
+      if (startKey > lastDay || endKey < date) continue;
+    }
 
-    if (o.ownerId === memberId) {
+    if (o.ownerId === memberId || o.isShared) {
       events.push({
         owner: "me",
         id: o.eventId,
@@ -70,6 +87,7 @@ export function projectAgenda(
         end: toIso(o.end),
         allDay: o.allDay,
         location: o.location,
+        ...(o.ownerId !== memberId ? { joint: true } : {}),
       });
       continue;
     }
