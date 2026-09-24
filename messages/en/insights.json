@@ -528,6 +528,22 @@
     "strengthStronglyLower": "strongly lower",
     "correlationsTitle": "Sleep & your days",
     "correlationsEmpty": "Once you've logged enough nights alongside rated days, this shows how your sleep duration and quality track with the next day's load, focus and satisfaction.",
-    "correlationAria": "Spearman correlation {rho} over {count} nights"
+    "correlationAria": "Spearman correlation {rho} over {count} nights",
+    "metricSteps": "Next-day steps",
+    "sideHrv": "HRV",
+    "sideRestingHr": "resting heart rate",
+    "sideDeepShare": "deep-sleep share",
+    "health": {
+      "title": "Fitbit Air trends",
+      "hrv": "HRV",
+      "hrvValue": "{ms} ms",
+      "restingHr": "Resting heart rate",
+      "restingHrValue": "{bpm} bpm",
+      "stagesLastNight": "Last night's stages",
+      "stageDeep": "Deep {minutes}m",
+      "stageRem": "REM {minutes}m",
+      "stageLight": "Light {minutes}m",
+      "stageAwake": "Awake {minutes}m"
+    }
   }
 }

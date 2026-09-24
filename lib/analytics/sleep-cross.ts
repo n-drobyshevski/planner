@@ -8,20 +8,31 @@
 // average merged-block length is the steadiest single-day signal (the share
 // metrics are too coarse over the handful of blocks one day produces). Null
 // when the day has no tracked blocks.
+//
+// Fitbit Air fields (hrvMs, restingHr, deepShare, next-day steps) are read
+// from `health_daily` keyed by the SAME zone-free date as the sleep log
+// (health_daily.date uses the wake-date convention, like sleep_logs.date) —
+// so no extra date math is needed to line them up with a pair.
 
 import { fragmentation } from "@/lib/analytics/patterns";
 import { spearman } from "@/lib/analytics/stats";
 import { dateInputToMs } from "@/lib/datetime/local";
-import type { Occurrence, SleepLog, TimeWindow } from "@/lib/types";
+import type { HealthDaily, Occurrence, SleepLog, TimeWindow } from "@/lib/types";
 
 export interface SleepDayPair {
   /** start-of-day ms of the wake date in the viewer zone */
   wakeDayMs: number;
-  /** wokeAt − bedtimeAt when both are present, else null */
+  /** minutesAsleep (synced) when present, else wokeAt − bedtimeAt, else null */
   durationMs: number | null;
   /** 1–7 rating, or null when unrated (Spearman ρ is rank-based, so the scale
    *  width doesn't matter — finer scales just reduce ties) */
   quality: number | null;
+  /** synced HRV (ms) for this night, or null when not synced */
+  hrvMs: number | null;
+  /** synced resting heart rate (bpm) for this night, or null when not synced */
+  restingHr: number | null;
+  /** minutesDeep / minutesAsleep (0..1), or null when either is missing */
+  deepShare: number | null;
   /** the day the member woke INTO (the wake date itself) */
   nextDay: {
     /** non-inactive ms clipped to the day */
@@ -30,6 +41,8 @@ export interface SleepDayPair {
     fragmentation: number | null;
     /** duration-weighted mean satisfaction; null when nothing is rated */
     meanSatisfaction: number | null;
+    /** synced step count for the day, or null when not synced */
+    steps: number | null;
   };
 }
 
@@ -51,6 +64,8 @@ export function buildSleepDayPairs(
   days: number[],
   window: TimeWindow,
   timeZone: string,
+  /** health_daily rows keyed by their zone-free `date` (same key as SleepLog.date). */
+  healthByDate?: ReadonlyMap<string, HealthDaily>,
 ): SleepDayPair[] {
   const active = occurrences.filter((o) => !o.inactive);
   const dayIndex = new Map(days.map((d, i) => [d, i]));
@@ -75,18 +90,27 @@ export function buildSleepDayPairs(
       weighted += ms * satisfaction;
     }
 
+    const health = healthByDate?.get(log.date);
+    const manualDurationMs =
+      log.bedtimeAt !== null && log.wokeAt !== null ? log.wokeAt - log.bedtimeAt : null;
+    const deepShare =
+      health?.minutesDeep != null && health?.minutesAsleep
+        ? health.minutesDeep / health.minutesAsleep
+        : null;
+
     out.push({
       wakeDayMs,
-      durationMs:
-        log.bedtimeAt !== null && log.wokeAt !== null
-          ? log.wokeAt - log.bedtimeAt
-          : null,
+      durationMs: health?.minutesAsleep != null ? health.minutesAsleep * 60_000 : manualDurationMs,
       quality: log.quality,
+      hrvMs: health?.hrvMs ?? null,
+      restingHr: health?.restingHr ?? null,
+      deepShare,
       nextDay: {
         trackedMs,
         fragmentation: fragmentation(active, { start: wakeDayMs, end: dayEnd }, timeZone)
           .avgBlockMs,
         meanSatisfaction: ratedMs > 0 ? weighted / ratedMs : null,
+        steps: health?.steps ?? null,
       },
     });
   }
@@ -94,16 +118,16 @@ export function buildSleepDayPairs(
 }
 
 export interface SleepCorrelation {
-  metric: "load" | "fragmentation" | "satisfaction";
-  vs: "duration" | "quality";
+  metric: "load" | "fragmentation" | "satisfaction" | "steps";
+  vs: "duration" | "quality" | "hrv" | "restingHr" | "deepShare";
   /** Spearman rho; null under MIN_CORRELATION_PAIRS complete pairs */
   rho: number | null;
   /** pairs where both sides were non-null */
   n: number;
 }
 
-const METRICS = ["load", "fragmentation", "satisfaction"] as const;
-const SIDES = ["duration", "quality"] as const;
+const METRICS = ["load", "fragmentation", "satisfaction", "steps"] as const;
+const SIDES = ["duration", "quality", "hrv", "restingHr", "deepShare"] as const;
 
 function metricOf(pair: SleepDayPair, metric: (typeof METRICS)[number]): number | null {
   switch (metric) {
@@ -113,11 +137,28 @@ function metricOf(pair: SleepDayPair, metric: (typeof METRICS)[number]): number 
       return pair.nextDay.fragmentation;
     case "satisfaction":
       return pair.nextDay.meanSatisfaction;
+    case "steps":
+      return pair.nextDay.steps;
+  }
+}
+
+function sideOf(pair: SleepDayPair, side: (typeof SIDES)[number]): number | null {
+  switch (side) {
+    case "duration":
+      return pair.durationMs;
+    case "quality":
+      return pair.quality;
+    case "hrv":
+      return pair.hrvMs;
+    case "restingHr":
+      return pair.restingHr;
+    case "deepShare":
+      return pair.deepShare;
   }
 }
 
 /**
- * All 6 metric × sleep-side Spearman correlations, in METRICS × SIDES order.
+ * All metric × sleep-side Spearman correlations, in METRICS × SIDES order.
  * Each combo uses only the pairs where both sides are non-null (`n`); rho is
  * null below MIN_CORRELATION_PAIRS such pairs (spearman's own gate).
  */
@@ -128,7 +169,7 @@ export function sleepCorrelations(pairs: SleepDayPair[]): SleepCorrelation[] {
       const samples: (readonly [number, number])[] = [];
       for (const p of pairs) {
         const m = metricOf(p, metric);
-        const s = vs === "duration" ? p.durationMs : p.quality;
+        const s = sideOf(p, vs);
         if (m === null || s === null) continue;
         samples.push([m, s] as const);
       }

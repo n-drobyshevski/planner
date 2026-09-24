@@ -528,6 +528,22 @@
     "strengthStronglyLower": "заметно ниже",
     "correlationsTitle": "Сон и твои дни",
     "correlationsEmpty": "Когда запишешь достаточно ночей вместе с оценёнными днями, здесь покажется, как длительность и качество твоего сна связаны с нагрузкой, фокусом и удовлетворённостью следующего дня.",
-    "correlationAria": "Корреляция Спирмена {rho} по {count} ночам"
+    "correlationAria": "Корреляция Спирмена {rho} по {count} ночам",
+    "metricSteps": "Шаги на следующий день",
+    "sideHrv": "ВСР",
+    "sideRestingHr": "пульс покоя",
+    "sideDeepShare": "доля глубокого сна",
+    "health": {
+      "title": "Тренды Fitbit Air",
+      "hrv": "ВСР",
+      "hrvValue": "{ms} мс",
+      "restingHr": "Пульс покоя",
+      "restingHrValue": "{bpm} уд/мин",
+      "stagesLastNight": "Фазы прошлой ночи",
+      "stageDeep": "Глубокий {minutes} мин",
+      "stageRem": "БДГ {minutes} мин",
+      "stageLight": "Лёгкий {minutes} мин",
+      "stageAwake": "Пробуждение {minutes} мин"
+    }
   }
 }

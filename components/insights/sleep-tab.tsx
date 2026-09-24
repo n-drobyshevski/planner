@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CircleAlert, Lock, MoonStar, RotateCw } from "lucide-react";
 
@@ -24,6 +24,10 @@ import {
 import { useWindowEvents } from "@/lib/hooks/use-window-events";
 import { useSleepBlockSync } from "@/lib/hooks/use-sleep-block-sync";
 import { useWorkspace } from "@/lib/hooks/use-workspace";
+import { useHealthDaily, useInvalidateHealthConnection } from "@/lib/hooks/use-health";
+import { syncHealthOnSleepTabOpen } from "@/lib/health/actions";
+import { qk } from "@/lib/supabase/query-keys";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   buildSleepDayPairs,
   sleepCorrelations,
@@ -43,6 +47,7 @@ import { InsightLede } from "./insight-lede";
 import { CheckinCard } from "./sleep/checkin-card";
 import { CalculatorCard } from "./sleep/calculator-card";
 import { HintsSection } from "./sleep/hints-section";
+import { HealthTrendsSection } from "./sleep/health-trends";
 import { HistorySection } from "./sleep/history-section";
 import { LogNightDialog } from "./sleep/log-night-dialog";
 import { RhythmChart } from "./sleep/rhythm-chart";
@@ -182,6 +187,42 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
     () => rawOccurrences.filter((o) => o.ownerId === viewerId),
     [rawOccurrences, viewerId],
   );
+
+  // Fitbit Air data for the same trailing window as the hints (a fixed 30
+  // days, not the period picker) — feeds both the HRV/resting-HR/stage
+  // trends and the sleep↔day correlations' new hrv/restingHr/deepShare/steps
+  // sides. Renders nothing extra when the member never connected a device.
+  const healthWin = useMemo(
+    () => ({
+      start: dateKeyInZone(dayStartOffset(now, 1 - HINTS_WINDOW_DAYS, timeZone), timeZone),
+      end: dateKeyInZone(now, timeZone),
+    }),
+    [now, timeZone],
+  );
+  const { days: healthDays } = useHealthDaily(viewerId, healthWin.start, healthWin.end);
+
+  // Sync-on-read: once per Sleep tab mount, ask the server to refresh this
+  // member's Fitbit Air data if it's gone stale (>30 min; see
+  // lib/health/sync.ts). Fire-and-forget — the action never throws, and the
+  // health query above just reflects whatever's stored either way; this only
+  // nudges it to be fresher than that.
+  const qc = useQueryClient();
+  const invalidateHealthConnection = useInvalidateHealthConnection();
+  useEffect(() => {
+    if (!viewerId) return;
+    void syncHealthOnSleepTabOpen().then(() => {
+      void qc.invalidateQueries({ queryKey: qk.healthDaily(viewerId, healthWin.start, healthWin.end) });
+      void invalidateHealthConnection(viewerId);
+    });
+    // Once per mount (viewerId change = effectively a remount via `key` upstream).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerId]);
+
+  const healthByDate = useMemo(
+    () => new Map(healthDays.map((h) => [h.date, h] as const)),
+    [healthDays],
+  );
+
   const correlations = useMemo(() => {
     const pairs = buildSleepDayPairs(
       logs,
@@ -189,9 +230,10 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
       period.days,
       period.window,
       timeZone,
+      healthByDate,
     );
     return sleepCorrelations(pairs);
-  }, [logs, viewerDayOccurrences, period.days, period.window, timeZone]);
+  }, [logs, viewerDayOccurrences, period.days, period.window, timeZone, healthByDate]);
 
   // Hints read a fixed trailing window, not the period picker: switching to
   // "this week" shouldn't make patterns vanish below the minimum sample. The
@@ -390,6 +432,7 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
             <HistorySection nights={nights} logs={periodLogs} timeZone={timeZone} />
             <HintsSection hints={hints} scoredCount={scoredCount} />
             <SleepCorrelationsSection correlations={correlations} />
+            <HealthTrendsSection days={healthDays} />
           </div>
         </>
       ) : logsError ? null : (
@@ -430,10 +473,14 @@ const CORRELATION_METRIC_KEYS: Record<SleepCorrelation["metric"], string> = {
   load: "sleep.metricLoad",
   fragmentation: "sleep.metricFragmentation",
   satisfaction: "sleep.metricSatisfaction",
+  steps: "sleep.metricSteps",
 };
 const CORRELATION_SIDE_KEYS: Record<SleepCorrelation["vs"], string> = {
   duration: "sleep.sideDuration",
   quality: "sleep.sideQuality",
+  hrv: "sleep.sideHrv",
+  restingHr: "sleep.sideRestingHr",
+  deepShare: "sleep.sideDeepShare",
 };
 
 /** |rho| → plain-language strength key; sign carries the direction separately. */
