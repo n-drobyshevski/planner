@@ -15,7 +15,10 @@ import type {
   Collection,
   Board,
   SleepLog,
+  SleepLogSource,
   MemberSleepPrefs,
+  HealthConnection,
+  HealthDaily,
   TaskRow,
   TaskStatusEvent,
   TaskCheckpoint,
@@ -121,6 +124,7 @@ export function mapSleepLog(r: Row): SleepLog {
     quality: (r.quality as number | null) ?? null,
     fatigue: (r.fatigue as number | null) ?? null,
     note: (r.note as string | null) ?? null,
+    source: (r.source as SleepLogSource | undefined) ?? "manual",
     createdAt: toMs(r.created_at),
   };
 }
@@ -687,4 +691,123 @@ export function checkpointPatchToRow(patch: Partial<CheckpointInput>): Row {
   if ("shape" in patch) row.shape = patch.shape;
   if ("position" in patch) row.position = patch.position;
   return row;
+}
+
+// ---------------------------------------------------------------------------
+// Fitbit Air (Google Health API) sync — health_connections_public / health_daily.
+// ---------------------------------------------------------------------------
+
+/** Row from `health_connections_public` (never the secret-bearing base table). */
+export function mapHealthConnection(r: Row): HealthConnection {
+  return {
+    memberId: r.member_id as string,
+    workspaceId: r.workspace_id as string,
+    provider: r.provider as string,
+    healthUserId: (r.health_user_id as string | null) ?? null,
+    scopes: (r.scopes as string[] | null) ?? [],
+    status: r.status as HealthConnection["status"],
+    lastSyncedAt: toMsOrNull(r.last_synced_at),
+    lastError: (r.last_error as string | null) ?? null,
+    createdAt: toMs(r.created_at),
+    updatedAt: toMs(r.updated_at),
+  };
+}
+
+export function mapHealthDaily(r: Row): HealthDaily {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    memberId: r.member_id as string,
+    date: r.date as string,
+    sleepStart: toMsOrNull(r.sleep_start),
+    sleepEnd: toMsOrNull(r.sleep_end),
+    minutesAsleep: (r.minutes_asleep as number | null) ?? null,
+    minutesDeep: (r.minutes_deep as number | null) ?? null,
+    minutesLight: (r.minutes_light as number | null) ?? null,
+    minutesRem: (r.minutes_rem as number | null) ?? null,
+    minutesAwake: (r.minutes_awake as number | null) ?? null,
+    efficiency: (r.efficiency as number | null) ?? null,
+    hrvMs: (r.hrv_ms as number | null) ?? null,
+    restingHr: (r.resting_hr as number | null) ?? null,
+    spo2Avg: (r.spo2_avg as number | null) ?? null,
+    steps: (r.steps as number | null) ?? null,
+    activeZoneMinutes: (r.active_zone_minutes as number | null) ?? null,
+    exerciseMinutes: (r.exercise_minutes as number | null) ?? null,
+    syncedAt: toMs(r.synced_at),
+  };
+}
+
+/** Upsert payload for one member-day of synced metrics (conflict key member_id,date). */
+export interface HealthDailyInput {
+  workspaceId: string;
+  memberId: string;
+  date: string;
+  sleepStart: number | null;
+  sleepEnd: number | null;
+  minutesAsleep: number | null;
+  minutesDeep: number | null;
+  minutesLight: number | null;
+  minutesRem: number | null;
+  minutesAwake: number | null;
+  efficiency: number | null;
+  hrvMs: number | null;
+  restingHr: number | null;
+  spo2Avg: number | null;
+  steps: number | null;
+  activeZoneMinutes: number | null;
+  exerciseMinutes: number | null;
+  source?: Record<string, unknown> | null;
+}
+
+export function healthDailyInputToRow(input: HealthDailyInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    member_id: input.memberId,
+    date: input.date,
+    sleep_start: toIsoOrNull(input.sleepStart),
+    sleep_end: toIsoOrNull(input.sleepEnd),
+    minutes_asleep: input.minutesAsleep,
+    minutes_deep: input.minutesDeep,
+    minutes_light: input.minutesLight,
+    minutes_rem: input.minutesRem,
+    minutes_awake: input.minutesAwake,
+    efficiency: input.efficiency,
+    hrv_ms: input.hrvMs,
+    resting_hr: input.restingHr,
+    spo2_avg: input.spo2Avg,
+    steps: input.steps,
+    active_zone_minutes: input.activeZoneMinutes,
+    exercise_minutes: input.exerciseMinutes,
+    source: input.source ?? { device: "Fitbit Air" },
+    synced_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Partial writer for the sync job's sleep_logs auto-fill (lib/health/sync.ts).
+ * Deliberately narrow: only ever sets bedtime_at/woke_at/source — quality,
+ * fatigue and note are never in this shape, so a `.upsert(...)` built from it
+ * can never touch them (Postgres upsert's SET list is exactly the columns the
+ * row object carries). Mirrors memberSleepPrefsInputToRow's partial-input
+ * pattern, but unconditional (the caller — resolveSleepAutoFill — already
+ * decided whether this write should happen at all).
+ */
+export interface SleepLogAutoFillInput {
+  workspaceId: string;
+  memberId: string;
+  date: string;
+  bedtimeAt: number;
+  wokeAt: number;
+  source: Extract<SleepLogSource, "fitbit" | "fitbit+manual">;
+}
+
+export function sleepLogAutoFillToRow(input: SleepLogAutoFillInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    member_id: input.memberId,
+    date: input.date,
+    bedtime_at: toIso(input.bedtimeAt),
+    woke_at: toIso(input.wokeAt),
+    source: input.source,
+  };
 }
