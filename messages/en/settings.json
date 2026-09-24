@@ -9,7 +9,8 @@
     "calendar": "Calendar",
     "time": "Time",
     "sleep": "Sleep",
-    "sharing": "Sharing"
+    "sharing": "Sharing",
+    "health": "Health"
   },
   "profile": {
     "title": "Profile",
@@ -332,6 +333,32 @@
       "cancel": "Cancel",
       "createSubmit": "Create link",
       "saveSubmit": "Save changes"
+    }
+  },
+  "health": {
+    "title": "Health",
+    "description": "Sync sleep, heart and activity data from your Fitbit Air (via Google Health) to auto-fill sleep logs and feed Insights. Private to you — your partner never sees this connection or your synced data.",
+    "statusLabel": "Google Health",
+    "loading": "Checking connection…",
+    "notConnected": "Not connected.",
+    "statusConnected": "Connected — last synced {time}.",
+    "statusConnectedNeverSynced": "Connected — not synced yet.",
+    "statusError": "Connected, but the last sync failed: {error}",
+    "genericError": "The last sync failed. Try syncing again, or reconnect if that keeps happening.",
+    "connect": "Connect",
+    "syncNow": "Sync now",
+    "disconnect": "Disconnect",
+    "syncSuccess": "Synced.",
+    "syncInProgress": "A sync is already running — try again in a moment.",
+    "syncError": "Couldn't sync. Try again in a moment.",
+    "disconnectSuccess": "Disconnected.",
+    "disconnectError": "Couldn't disconnect. Try again.",
+    "privacyNote": "Only you can see this connection and your synced data. Sleep nights it fills in never overwrite a quality rating, fatigue score or note you've entered.",
+    "disconnectConfirm": {
+      "title": "Disconnect Google Health?",
+      "description": "This revokes access at Google and deletes your synced health data. Sleep nights it already filled in stay in your sleep log.",
+      "cancel": "Cancel",
+      "confirm": "Disconnect"
     }
   }
 }
