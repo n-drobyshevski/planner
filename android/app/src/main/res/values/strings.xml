@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Planner</string>
+    <string name="app_tagline">A warm, shared calendar for two.</string>
+    <string name="sign_in">Sign in</string>
+    <string name="sign_in_not_configured">This build has no Supabase config. Set PLANR_SUPABASE_URL, PLANR_SUPABASE_ANON_KEY and PLANR_OAUTH_CLIENT_ID.</string>
+</resources>

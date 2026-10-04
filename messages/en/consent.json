@@ -12,13 +12,26 @@
   "deny": "Deny",
   "goToCalendar": "Go to calendar",
   "states": {
-    "unavailableTitle": "Connector unavailable",
-    "unavailableBody": "The Claude connector isn't enabled for this workspace.",
+    "unavailableTitle": "Connections unavailable",
+    "unavailableBody": "App connections (Claude, Planr for Android) aren't enabled for this workspace.",
     "missingTitle": "No connection request",
-    "missingBody": "Open this page from the connect flow in Claude. There's nothing to authorize directly.",
+    "missingBody": "Open this page from the sign-in flow in Claude or the Planr app. There's nothing to authorize directly.",
     "expiredTitle": "This request has expired",
-    "expiredBody": "Authorization requests are valid for only a few minutes and can be used once. Start the connection again from Claude to get a fresh one.",
+    "expiredBody": "Authorization requests are valid for only a few minutes and can be used once. Start again from the app you're connecting to get a fresh one.",
     "notAllowedTitle": "App not allowed",
     "notAllowedBody": "{client} ({uri}) isn't on the allowed list, so it can't connect to this planner."
+  },
+  "android": {
+    "title": "Planr for Android",
+    "subtitle": "wants to sign in to your planner on this device",
+    "capEverything": "Everything else you can see on the web, as you",
+    "grantNote": "The app signs in as you, with the same access you have on the web. Sign out in the app to disconnect it."
+  },
+  "appCallback": {
+    "metaTitle": "Open Planr",
+    "title": "Finish signing in in the app",
+    "body": "This link is meant for Planr for Android. If the app didn't open, make sure it's installed and up to date, then start signing in again from the app.",
+    "note": "Nothing was sent from this page. You can close it.",
+    "goToCalendar": "Open Planr on the web"
   }
 }

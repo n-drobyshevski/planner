@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agenda_empty_title">Nothing scheduled</string>
+    <string name="agenda_empty_body">Add an event with the New button, or jump to another date.</string>
+    <string name="event_detail_title">Event</string>
+</resources>

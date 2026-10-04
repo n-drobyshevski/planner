@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_tagline">Тёплый общий календарь для двоих.</string>
+    <string name="sign_in">Войти</string>
+    <string name="sign_in_not_configured">В этой сборке нет настроек Supabase. Задай PLANR_SUPABASE_URL, PLANR_SUPABASE_ANON_KEY и PLANR_OAUTH_CLIENT_ID.</string>
+</resources>

@@ -62,6 +62,7 @@ export function getSupabaseAuthIssuer(): string {
  * Default: `claude.ai` (covers claude.ai web, Desktop, mobile, and Cowork, which
  * all redirect to https://claude.ai/api/mcp/auth_callback). Override with
  * MCP_ALLOWED_REDIRECT_HOSTS (comma-separated); set to `*` to allow any client.
+ * The Android app's own callback is allowed separately (see isAndroidAppRedirect).
  */
 export function getAllowedRedirectHosts(): string[] {
   const raw = process.env.MCP_ALLOWED_REDIRECT_HOSTS;
@@ -72,6 +73,62 @@ export function getAllowedRedirectHosts(): string[] {
       .filter(Boolean);
   }
   return ["claude.ai"];
+}
+
+/** Path of the Android app's OAuth callback (an App Link on the planner's own origin). */
+export const ANDROID_APP_CALLBACK_PATH = "/app/auth/callback";
+
+/** Production origin, used when NEXT_PUBLIC_SITE_URL is unset (local dev, previews). */
+const DEFAULT_PLANNER_ORIGIN = "https://planr.page";
+
+/**
+ * The planner's own canonical origin (scheme + host + port). Derived from
+ * NEXT_PUBLIC_SITE_URL when set and parseable, else https://planr.page — the
+ * origin the Android app is built against (PLANR_WEB_ORIGIN) and the one its
+ * App Link is verified for via /.well-known/assetlinks.json.
+ */
+export function getPlannerOrigin(): string {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL;
+  if (raw && raw.trim()) {
+    try {
+      return new URL(raw.trim()).origin;
+    } catch {
+      /* malformed — fall back to the production origin */
+    }
+  }
+  return DEFAULT_PLANNER_ORIGIN;
+}
+
+/** The exact redirect URI the "Planr for Android" OAuth client registers. */
+export function getAndroidAppRedirectUri(): string {
+  return `${getPlannerOrigin()}${ANDROID_APP_CALLBACK_PATH}`;
+}
+
+/**
+ * True iff `redirectUri` is exactly the Android app's App Link callback on the
+ * planner's own origin. Matched on the full origin + path (no query, fragment, or
+ * userinfo) rather than by host, so allowing it never opens the rest of the
+ * planner's host as a redirect target. A code sent there is safe even for a
+ * rogue client registered with this URI: the verified App Link delivers it to
+ * the Planr app (whose PKCE verifier won't match), and the web fallback page
+ * never reads it.
+ */
+export function isAndroidAppRedirect(redirectUri: string | undefined): boolean {
+  if (!redirectUri) return false;
+  let url: URL;
+  try {
+    url = new URL(redirectUri);
+  } catch {
+    return false;
+  }
+  return (
+    url.origin === getPlannerOrigin() &&
+    url.pathname === ANDROID_APP_CALLBACK_PATH &&
+    !url.search &&
+    !url.hash &&
+    !url.username &&
+    !url.password
+  );
 }
 
 /**
@@ -86,9 +143,13 @@ export function mcpAllowLoopbackRedirect(): boolean {
 /**
  * True iff a client's redirect URI is permitted to be authorized. Authoritative
  * check lives in /api/oauth/decision; the consent page mirrors it for UX.
+ *
+ * The Android app's first-party callback is always allowed (independent of the
+ * host override below); everything else goes through the Claude-only host guard.
  */
 export function isAllowedClientRedirect(redirectUri: string | undefined): boolean {
   if (!redirectUri) return false;
+  if (isAndroidAppRedirect(redirectUri)) return true;
   let host: string;
   try {
     host = new URL(redirectUri).hostname.toLowerCase();

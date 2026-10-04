@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Today</string>
+    <string name="widget_today_description">Today’s events for both of you</string>
+    <string name="widget_tasks_name">Tasks</string>
+    <string name="widget_tasks_description">Open tasks, with a checkbox to complete them</string>
+    <string name="widget_quickadd_name">Quick add</string>
+    <string name="widget_quickadd_description">Add a task or an event in one tap</string>
+</resources>

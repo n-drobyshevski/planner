@@ -5,7 +5,8 @@ import { isMcpEnabled, isAllowedClientRedirect } from "@/lib/mcp/env";
 /**
  * Completes the OAuth consent decision from /oauth/consent. Approving issues the
  * authorization code via Supabase and redirects the user back to the client
- * (claude.ai); denying redirects back with an error. Under /api, so outside the
+ * (claude.ai, or the Android app's App Link callback); denying redirects back
+ * with an error. Under /api, so outside the
  * proxy's locale + auth handling — it relies on the cookie session directly.
  */
 export async function POST(request: Request): Promise<Response> {

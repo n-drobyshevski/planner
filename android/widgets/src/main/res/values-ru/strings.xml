@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_name">Сегодня</string>
+    <string name="widget_today_description">События на сегодня — твои и партнёра</string>
+    <string name="widget_tasks_name">Задачи</string>
+    <string name="widget_tasks_description">Открытые задачи — отметь выполненные прямо здесь</string>
+    <string name="widget_quickadd_name">Быстро добавить</string>
+    <string name="widget_quickadd_description">Задача или событие в одно касание</string>
+</resources>

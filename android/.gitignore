@@ -1,0 +1,17 @@
+# Gradle / build outputs
+.gradle/
+build/
+.kotlin/
+captures/
+
+# Local machine config (sdk.dir, secrets)
+local.properties
+
+# Signing material never lives in the repo
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml
+.DS_Store

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tasks_empty_title">Пока нет задач</string>
+    <string name="tasks_empty_body">Создай первую задачу, чтобы начать.</string>
+    <string name="task_detail_title">Задача</string>
+</resources>

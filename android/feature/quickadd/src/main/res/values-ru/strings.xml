@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quickadd_new_task">Новая задача</string>
+    <string name="quickadd_new_event">Новое событие</string>
+</resources>

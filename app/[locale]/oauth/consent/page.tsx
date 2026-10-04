@@ -10,10 +10,15 @@ import {
   CalendarDays,
   ListChecks,
   Moon,
+  Smartphone,
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
-import { isMcpEnabled, isAllowedClientRedirect } from "@/lib/mcp/env";
+import {
+  isMcpEnabled,
+  isAllowedClientRedirect,
+  isAndroidAppRedirect,
+} from "@/lib/mcp/env";
 import { FullPageMessage } from "@/components/shared/full-page-message";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
@@ -22,7 +27,12 @@ import { routing } from "@/i18n/routing";
 /**
  * OAuth 2.1 consent screen for Supabase's authorization server. Supabase
  * redirects here (Authorization Path = Site URL + `/oauth/consent`) with an
- * `authorization_id` when a client (e.g. Claude) requests access.
+ * `authorization_id` when a client (Claude, or the Planr Android app) requests
+ * access.
+ *
+ * Copy is client-aware: a request whose redirect is the Android app's own App
+ * Link callback reads as "Planr for Android" (that redirect, not the registered
+ * client name, is what makes it first-party); anything else names the client.
  *
  * All states are localized and calm: terminal states (unavailable / missing /
  * expired / not-allowed) reuse the app-wide `FullPageMessage`; the live request
@@ -198,27 +208,44 @@ async function ConsentFlow({
     /* fall back to the raw value if it doesn't parse */
   }
 
+  // The Android app is identified by its exact first-party callback (checked on
+  // the same URI the decision route re-validates), never by the self-asserted
+  // client name — any client may register calling itself anything.
+  const isAndroidApp = isAndroidAppRedirect(details.redirect_uri);
+
   // Plain-language capabilities: what the connection actually grants. The raw
   // OAuth scopes (openid/profile/email) are identity jargon and understate the
-  // member-scoped data access the tools have, so we describe that instead.
-  const capabilities = [
-    { icon: CalendarDays, label: t("capCalendar") },
-    { icon: ListChecks, label: t("capTasks") },
-    { icon: Moon, label: t("capSleep") },
-  ];
+  // member-scoped data access the tools have, so we describe that instead. The
+  // app's token carries the member's full web access, so it says exactly that.
+  const capabilities = isAndroidApp
+    ? [
+        { icon: CalendarDays, label: t("capCalendar") },
+        { icon: ListChecks, label: t("capTasks") },
+        { icon: Smartphone, label: t("android.capEverything") },
+      ]
+    : [
+        { icon: CalendarDays, label: t("capCalendar") },
+        { icon: ListChecks, label: t("capTasks") },
+        { icon: Moon, label: t("capSleep") },
+      ];
+  const HeaderIcon = isAndroidApp ? Smartphone : ShieldCheck;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-6 py-16">
       <div className="rounded-3xl border border-border bg-card p-6 text-card-foreground shadow-sm">
         <div className="flex items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <ShieldCheck className="size-5" aria-hidden />
+            <HeaderIcon className="size-5" aria-hidden />
           </span>
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold leading-tight">
-              {t("title", { client: details.client.name })}
+              {isAndroidApp
+                ? t("android.title")
+                : t("title", { client: details.client.name })}
             </h1>
-            <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+            <p className="text-sm text-muted-foreground">
+              {isAndroidApp ? t("android.subtitle") : t("subtitle")}
+            </p>
           </div>
         </div>
 
@@ -247,7 +274,9 @@ async function ConsentFlow({
           </ul>
         </div>
 
-        <p className="mt-5 text-xs text-muted-foreground">{t("grantNote")}</p>
+        <p className="mt-5 text-xs text-muted-foreground">
+          {isAndroidApp ? t("android.grantNote") : t("grantNote")}
+        </p>
 
         <form action="/api/oauth/decision" method="post" className="mt-6 flex gap-3">
           <input type="hidden" name="authorization_id" value={authorizationId} />

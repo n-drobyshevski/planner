@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tasks_empty_title">No tasks yet</string>
+    <string name="tasks_empty_body">Create your first task to get started.</string>
+    <string name="task_detail_title">Task</string>
+</resources>
