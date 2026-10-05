@@ -2,10 +2,8 @@ package page.planr.android.core.data.prefs
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
-import androidx.datastore.preferences.core.stringSetPreferencesKey
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Qualifier
@@ -24,9 +22,10 @@ data class InsightsFilterPrefs(
 )
 
 /**
- * Insights filters per viewer per device: the web's localStorage
- * `planner:insights:filters:v1:{viewerId}`. Keyed by viewer, so they survive a
- * sign-out like the web's do.
+ * Insights filters per viewer: the web's localStorage
+ * `planner:insights:filters:v1:{viewerId}`. Read from this device's DataStore;
+ * [AppPrefsSync] keeps the signed-in member's in step with their account copy,
+ * so they survive a reinstall.
  */
 interface InsightsPreferences {
     fun filters(viewerId: String): Flow<InsightsFilterPrefs>
@@ -44,6 +43,7 @@ annotation class InsightsPreferencesDataStore
 @Singleton
 class DataStoreInsightsPreferences @Inject constructor(
     @InsightsPreferencesDataStore private val dataStore: DataStore<Preferences>,
+    private val changes: AppPrefsChanges,
 ) : InsightsPreferences {
 
     override fun filters(viewerId: String): Flow<InsightsFilterPrefs> =
@@ -52,23 +52,17 @@ class DataStoreInsightsPreferences @Inject constructor(
             .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
             .map { prefs ->
                 InsightsFilterPrefs(
-                    hiddenCategoryIds = prefs[hiddenKey(viewerId)] ?: emptySet(),
-                    includeInactive = prefs[includeInactiveKey(viewerId)] ?: false,
+                    hiddenCategoryIds = prefs[InsightsKeys.hidden(viewerId)] ?: emptySet(),
+                    includeInactive = prefs[InsightsKeys.includeInactive(viewerId)] ?: false,
                 )
             }
             .distinctUntilChanged()
 
     override suspend fun setHiddenCategories(viewerId: String, ids: Set<String>) {
-        dataStore.edit { it[hiddenKey(viewerId)] = ids }
+        changes.localChange { dataStore.edit { it[InsightsKeys.hidden(viewerId)] = ids } }
     }
 
     override suspend fun setIncludeInactive(viewerId: String, include: Boolean) {
-        dataStore.edit { it[includeInactiveKey(viewerId)] = include }
-    }
-
-    private companion object {
-        fun hiddenKey(viewerId: String) = stringSetPreferencesKey("hidden_categories:$viewerId")
-
-        fun includeInactiveKey(viewerId: String) = booleanPreferencesKey("include_inactive:$viewerId")
+        changes.localChange { dataStore.edit { it[InsightsKeys.includeInactive(viewerId)] = include } }
     }
 }

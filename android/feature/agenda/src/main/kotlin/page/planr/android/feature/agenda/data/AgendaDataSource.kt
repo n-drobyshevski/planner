@@ -16,6 +16,7 @@ import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.model.TimeWindow
 import page.planr.android.core.recurrence.OccurrencePatch
 import page.planr.android.core.recurrence.OverrideInput
+import page.planr.android.feature.agenda.model.AgendaMode
 
 /**
  * Everything the agenda feature reads and writes, as one seam over the
@@ -34,10 +35,15 @@ interface AgendaDataSource {
     /** Expanded occurrences overlapping [window]; collecting marks it as on screen. */
     fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>>
 
-    /** Whether the partner's personal events show (device-local, default on). */
+    /** Whether the partner's personal events show (synced to the account, default on). */
     fun observeShowPartnerEvents(): Flow<Boolean>
 
     suspend fun setShowPartnerEvents(show: Boolean)
+
+    /** The last-used Day / Week mode (synced to the account, default Day). */
+    fun observeAgendaMode(): Flow<AgendaMode>
+
+    suspend fun setAgendaMode(mode: AgendaMode)
 
     /** Refetches members and categories. */
     suspend fun refreshWorkspace()

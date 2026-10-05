@@ -21,6 +21,7 @@ import page.planr.android.core.recurrence.DefaultRecurrenceExpander
 import page.planr.android.core.recurrence.OccurrencePatch
 import page.planr.android.core.recurrence.OverrideInput
 import page.planr.android.feature.agenda.data.AgendaDataSource
+import page.planr.android.feature.agenda.model.AgendaMode
 
 /**
  * In-memory [AgendaDataSource]: events live in a flow and are expanded with
@@ -35,6 +36,7 @@ class FakeAgendaDataSource(
     val events = MutableStateFlow<List<PlannerEvent>>(emptyList())
     val overrides = MutableStateFlow<List<EventOverride>>(emptyList())
     val showPartnerEvents = MutableStateFlow(true)
+    val agendaMode = MutableStateFlow(AgendaMode.Day)
 
     val observedWindows = mutableListOf<TimeWindow>()
     val refreshedWindows = mutableListOf<TimeWindow>()
@@ -66,6 +68,12 @@ class FakeAgendaDataSource(
     override fun currentSession(): SessionInfo? = session
 
     override fun observeMembers(): Flow<List<Member>> = members
+
+    override fun observeAgendaMode(): Flow<AgendaMode> = agendaMode
+
+    override suspend fun setAgendaMode(mode: AgendaMode) {
+        agendaMode.value = mode
+    }
 
     override fun observeShowPartnerEvents(): Flow<Boolean> = showPartnerEvents
 

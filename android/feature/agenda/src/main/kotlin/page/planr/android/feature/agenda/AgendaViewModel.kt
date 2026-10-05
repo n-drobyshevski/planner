@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
@@ -53,7 +54,9 @@ import page.planr.android.feature.agenda.model.viewerZone
  * The day / week agenda. Reads occurrences from the local cache (kept fresh
  * by Realtime and background sync), fetches each newly shown window from
  * Supabase, and owns navigation between periods. Mode and focus survive
- * process death through [SavedStateHandle].
+ * process death through [SavedStateHandle]; the mode is also saved to the
+ * member's settings, so the agenda reopens in the last-used one (also after a
+ * reinstall).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -65,7 +68,10 @@ class AgendaViewModel @Inject constructor(
     private val dayRequests: AgendaDayRequests,
 ) : ViewModel() {
 
-    private val mode = savedState.getStateFlow(KEY_MODE, AgendaMode.Day.name).map { AgendaMode.valueOf(it) }
+    /** This session's pick once there is one; until then the saved setting. */
+    private val mode: Flow<AgendaMode> = savedState.getStateFlow<String?>(KEY_MODE, null)
+        .flatMapLatest { picked -> picked?.let { flowOf(AgendaMode.valueOf(it)) } ?: data.observeAgendaMode() }
+        .distinctUntilChanged()
 
     /** ISO date in focus; null follows today (also across midnight). */
     private val focus = savedState.getStateFlow<String?>(KEY_FOCUS, null)
@@ -159,7 +165,7 @@ class AgendaViewModel @Inject constructor(
     }
 
     fun setMode(mode: AgendaMode) {
-        savedState[KEY_MODE] = mode.name
+        pickMode(mode)
     }
 
     fun next() = shiftBy(1)
@@ -179,7 +185,7 @@ class AgendaViewModel @Inject constructor(
 
     /** Opens [date] in the day view (from a week column header, "+N more", or a widget). */
     fun openDay(date: LocalDate) {
-        savedState[KEY_MODE] = AgendaMode.Day.name
+        pickMode(AgendaMode.Day)
         focusOn(date, AgendaMode.Day, state.value.today)
     }
 
@@ -208,6 +214,12 @@ class AgendaViewModel @Inject constructor(
             val ok = runCatchingNonCancel { undo() }
             ownNotices.send(AgendaNotice(UiText(if (ok) R.string.agenda_toast_undone else R.string.agenda_toast_couldnt_undo)))
         }
+    }
+
+    /** Shows [mode] now and saves it as the member's setting. */
+    private fun pickMode(mode: AgendaMode) {
+        savedState[KEY_MODE] = mode.name
+        viewModelScope.launch { runCatchingNonCancel { data.setAgendaMode(mode) } }
     }
 
     private fun shiftBy(periods: Int) {

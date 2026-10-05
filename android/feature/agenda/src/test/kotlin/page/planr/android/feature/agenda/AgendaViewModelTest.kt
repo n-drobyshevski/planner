@@ -136,6 +136,38 @@ class AgendaViewModelTest {
     }
 
     @Test
+    fun `opens in the saved mode and saves the one picked`() = runTest {
+        data.agendaMode.value = AgendaMode.Week
+        val vm = viewModel()
+        assertEquals(AgendaMode.Week, vm.state.value.mode)
+        assertEquals(7, vm.state.value.days.size)
+
+        vm.setMode(AgendaMode.Day)
+        runCurrent()
+        assertEquals(AgendaMode.Day, data.agendaMode.value)
+        assertEquals(AgendaMode.Day, vm.state.value.mode)
+
+        // Opening a day from the week is a pick too.
+        vm.setMode(AgendaMode.Week)
+        vm.openDay(LocalDate(2026, 10, 6))
+        runCurrent()
+        assertEquals(AgendaMode.Day, data.agendaMode.value)
+        vm.close()
+    }
+
+    @Test
+    fun `follows the saved mode until one is picked here`() = runTest {
+        val vm = viewModel()
+        assertEquals(AgendaMode.Day, vm.state.value.mode)
+
+        // Restored from the account after the screen opened (a fresh install's first sync).
+        data.agendaMode.value = AgendaMode.Week
+        runCurrent()
+        assertEquals(AgendaMode.Week, vm.state.value.mode)
+        vm.close()
+    }
+
+    @Test
     fun `mode and focus survive a restored saved state`() = runTest {
         val saved = SavedStateHandle()
         val first = viewModel(saved)

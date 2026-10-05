@@ -3,12 +3,14 @@ package page.planr.android.feature.agenda.data
 import javax.inject.Inject
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.datetime.TimeZone
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
+import page.planr.android.core.data.prefs.AgendaViewMode
 import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.OccurrenceRepository
@@ -22,6 +24,7 @@ import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.model.TimeWindow
 import page.planr.android.core.recurrence.OccurrencePatch
 import page.planr.android.core.recurrence.OverrideInput
+import page.planr.android.feature.agenda.model.AgendaMode
 
 /** [AgendaDataSource] backed by the Room-first :core:data repositories. */
 class RepositoryAgendaDataSource @Inject constructor(
@@ -44,6 +47,20 @@ class RepositoryAgendaDataSource @Inject constructor(
     override fun observeShowPartnerEvents(): Flow<Boolean> = viewPreferences.showPartnerEvents
 
     override suspend fun setShowPartnerEvents(show: Boolean) = viewPreferences.setShowPartnerEvents(show)
+
+    override fun observeAgendaMode(): Flow<AgendaMode> = viewPreferences.agendaMode.map {
+        when (it) {
+            AgendaViewMode.Day -> AgendaMode.Day
+            AgendaViewMode.Week -> AgendaMode.Week
+        }
+    }
+
+    override suspend fun setAgendaMode(mode: AgendaMode) = viewPreferences.setAgendaMode(
+        when (mode) {
+            AgendaMode.Day -> AgendaViewMode.Day
+            AgendaMode.Week -> AgendaViewMode.Week
+        },
+    )
 
     override suspend fun refreshWorkspace() = workspace.refresh()
 
