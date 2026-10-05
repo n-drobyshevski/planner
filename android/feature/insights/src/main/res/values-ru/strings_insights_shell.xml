@@ -2,4 +2,44 @@
 <resources>
     <string name="insights_shell_title">Аналитика</string>
     <string name="insights_shell_placeholder">Аналитика скоро появится.</string>
+
+    <string name="insights_tab_overview">Обзор</string>
+    <string name="insights_tab_trends">Тренды</string>
+    <string name="insights_tab_patterns">Закономерности</string>
+    <string name="insights_tab_tasks">Задачи</string>
+
+    <string name="insights_period_label">Период</string>
+    <string name="insights_period_this_week">Эта неделя</string>
+    <string name="insights_period_last_week">Прошлая неделя</string>
+    <string name="insights_period_this_month">Этот месяц</string>
+    <string name="insights_period_last_7d">Последние 7 дней</string>
+    <string name="insights_period_last_30d">Последние 30 дней</string>
+    <string name="insights_period_last_90d">Последние 90 дней</string>
+    <string name="insights_period_custom">Произвольный диапазон</string>
+    <string name="insights_period_apply">Применить</string>
+    <string name="insights_period_cancel">Отмена</string>
+    <string name="insights_period_bucket_size">Группировка</string>
+    <string name="insights_period_granularity_day">День</string>
+    <string name="insights_period_granularity_week">Неделя</string>
+    <string name="insights_period_granularity_month">Месяц</string>
+    <string name="insights_shell_period_label">%1$s · %2$s</string>
+
+    <string name="insights_filters_trigger">Фильтры</string>
+    <plurals name="insights_filters_trigger_count">
+        <item quantity="one">Фильтры, %d активен</item>
+        <item quantity="few">Фильтры, %d активны</item>
+        <item quantity="many">Фильтры, %d активно</item>
+        <item quantity="other">Фильтры, %d активно</item>
+    </plurals>
+    <string name="insights_filters_title">Фильтры</string>
+    <string name="insights_filters_description">Что учитывается в этих числах.</string>
+    <string name="insights_filters_categories">Категории</string>
+    <string name="insights_filters_include_inactive">Учитывать неактивные блоки</string>
+    <string name="insights_filters_include_inactive_hint">Считать приглушённое время, например сон</string>
+
+    <string name="insights_shell_clamped">Показаны последние 366 дней выбранного диапазона.</string>
+    <string name="insights_shell_load_error_title">Не удалось загрузить аналитику.</string>
+    <string name="insights_shell_load_error_body">Проверь соединение и попробуй снова.</string>
+    <string name="insights_shell_retry">Повторить</string>
+    <string name="insights_shell_load_error_inline">Не удалось обновить. Показаны сохранённые данные.</string>
 </resources>

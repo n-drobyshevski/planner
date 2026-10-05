@@ -15,6 +15,226 @@
       "android": {
         "insights_shell_placeholder": 0
       }
+    },
+    {
+      "web": "insights:tabs.overview",
+      "sha": "21b838a1f4d98afd",
+      "android": {
+        "insights_tab_overview": 0
+      }
+    },
+    {
+      "web": "insights:tabs.trends",
+      "sha": "94a233372aa405ea",
+      "android": {
+        "insights_tab_trends": 0
+      }
+    },
+    {
+      "web": "insights:tabs.patterns",
+      "sha": "35d346d057afb096",
+      "android": {
+        "insights_tab_patterns": 0
+      }
+    },
+    {
+      "web": "insights:tabs.tasks",
+      "sha": "4696e7d367093046",
+      "android": {
+        "insights_tab_tasks": 0
+      }
+    },
+    {
+      "web": "insights:period.label",
+      "sha": "92e355504ea295a1",
+      "android": {
+        "insights_period_label": 0
+      }
+    },
+    {
+      "web": "insights:period.thisWeek",
+      "sha": "85cf5a13659fbcb2",
+      "android": {
+        "insights_period_this_week": 0
+      }
+    },
+    {
+      "web": "insights:period.lastWeek",
+      "sha": "4ecd340328ee4b63",
+      "android": {
+        "insights_period_last_week": 0
+      }
+    },
+    {
+      "web": "insights:period.thisMonth",
+      "sha": "ca8acf814458f518",
+      "android": {
+        "insights_period_this_month": 0
+      }
+    },
+    {
+      "web": "insights:period.last7d",
+      "sha": "681e98debc6455fe",
+      "android": {
+        "insights_period_last_7d": 0
+      }
+    },
+    {
+      "web": "insights:period.last30d",
+      "sha": "a916f871b7278c09",
+      "android": {
+        "insights_period_last_30d": 0
+      }
+    },
+    {
+      "web": "insights:period.last90d",
+      "sha": "7ebe0fb3a22da3d2",
+      "android": {
+        "insights_period_last_90d": 0
+      }
+    },
+    {
+      "web": "insights:period.custom",
+      "sha": "a8daabdebe1846a5",
+      "android": {
+        "insights_period_custom": 0
+      }
+    },
+    {
+      "web": "common:apply",
+      "sha": "ae4e9b73e4271dcc",
+      "android": {
+        "insights_period_apply": 0
+      }
+    },
+    {
+      "web": "common:cancel",
+      "sha": "9cbe67cd40d373ed",
+      "android": {
+        "insights_period_cancel": 0
+      }
+    },
+    {
+      "web": "insights:toolbar.bucketSize",
+      "sha": "734f99e66a2dd1d6",
+      "android": {
+        "insights_period_bucket_size": 0
+      }
+    },
+    {
+      "web": "insights:toolbar.granularity.day",
+      "sha": "7138ea8e76e639e7",
+      "android": {
+        "insights_period_granularity_day": 0
+      }
+    },
+    {
+      "web": "insights:toolbar.granularity.week",
+      "sha": "11f0787ec7d9e79d",
+      "android": {
+        "insights_period_granularity_week": 0
+      }
+    },
+    {
+      "web": "insights:toolbar.granularity.month",
+      "sha": "90fba7f432de2a5b",
+      "android": {
+        "insights_period_granularity_month": 0
+      }
+    },
+    {
+      "web": null,
+      "source": "lib/insights/period.ts:319 label template `${preset} · ${range}`",
+      "sha": null,
+      "android": {
+        "insights_shell_period_label": 2
+      }
+    },
+    {
+      "web": "insights:filters.trigger",
+      "sha": "a56cbf3cab5b2ed7",
+      "android": {
+        "insights_filters_trigger": 0
+      }
+    },
+    {
+      "web": null,
+      "source": "NEW (filters badge a11y)",
+      "sha": null,
+      "android": {
+        "insights_filters_trigger_count": 1
+      }
+    },
+    {
+      "web": "insights:filters.title",
+      "sha": "a56cbf3cab5b2ed7",
+      "android": {
+        "insights_filters_title": 0
+      }
+    },
+    {
+      "web": "insights:filters.description",
+      "sha": "65b92098ab2ef003",
+      "android": {
+        "insights_filters_description": 0
+      }
+    },
+    {
+      "web": "insights:filters.categories",
+      "sha": "a35c0f119d87d7bf",
+      "android": {
+        "insights_filters_categories": 0
+      }
+    },
+    {
+      "web": "insights:filters.includeInactive",
+      "sha": "c77cb1a925b0cebc",
+      "android": {
+        "insights_filters_include_inactive": 0
+      }
+    },
+    {
+      "web": "insights:filters.includeInactiveHint",
+      "sha": "9559f187b505d7b5",
+      "android": {
+        "insights_filters_include_inactive_hint": 0
+      }
+    },
+    {
+      "web": "insights:shell.clamped",
+      "sha": "02903dd87cc4ab35",
+      "android": {
+        "insights_shell_clamped": 0
+      }
+    },
+    {
+      "web": "nav:loadError.title",
+      "sha": "f327170b0bd228f6",
+      "android": {
+        "insights_shell_load_error_title": 0
+      }
+    },
+    {
+      "web": "nav:loadError.body",
+      "sha": "cfaa4e17b2f14a67",
+      "android": {
+        "insights_shell_load_error_body": 0
+      }
+    },
+    {
+      "web": "nav:loadError.retry",
+      "sha": "4e62c231f7ff18bc",
+      "android": {
+        "insights_shell_retry": 0
+      }
+    },
+    {
+      "web": null,
+      "source": "NEW (refresh failed over cached data)",
+      "sha": null,
+      "android": {
+        "insights_shell_load_error_inline": 0
+      }
     }
   ]
 }
