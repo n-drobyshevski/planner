@@ -41,6 +41,8 @@ import type { SleepPrefs } from "@/lib/sleep/cycles";
 import type { Occurrence } from "@/lib/types";
 import { InsightLede } from "./insight-lede";
 import { CheckinCard } from "./sleep/checkin-card";
+import { StagesSection } from "./sleep/stages-section";
+import { isRatedLog } from "@/lib/sleep/device-times";
 import { CalculatorCard } from "./sleep/calculator-card";
 import { HintsSection } from "./sleep/hints-section";
 import { HistorySection } from "./sleep/history-section";
@@ -248,7 +250,9 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
   }, [hintsNights, hintsLogs, prefs.targetCycles, prefs.cycleLengthMin]);
 
   const todayKey = dateKeyInZone(now, timeZone);
-  const hasLogToday = logs.some((l) => l.date === todayKey);
+  // A night Health Connect filled still wants the morning ratings.
+  const todayLog = logs.find((l) => l.date === todayKey);
+  const hasLogToday = todayLog !== undefined && isRatedLog(todayLog);
   const derivedToday = nights.find((n) => n.dateKey === todayKey) ?? null;
 
   const hasAnyData =
@@ -358,6 +362,7 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
             todayKey={todayKey}
             timeZone={timeZone}
             derivedToday={derivedToday}
+            todayLog={todayLog ?? null}
             onSave={saveCheckin}
           />
         )}
@@ -388,6 +393,7 @@ export function SleepTab({ data }: { data: InsightsTabData }) {
           />
           <div className="grid grid-cols-1 items-start gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
             <HistorySection nights={nights} logs={periodLogs} timeZone={timeZone} />
+            <StagesSection logs={periodLogs} />
             <HintsSection hints={hints} scoredCount={scoredCount} />
             <SleepCorrelationsSection correlations={correlations} />
           </div>

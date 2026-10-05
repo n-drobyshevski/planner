@@ -4,6 +4,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Health Connect: sleep sessions for the Sleep insights (read only),
+         and nights older than 30 days on the first sync. -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
 
     <!-- Package visibility (Android 11+): lets the sign-in screen find a
          browser that supports Custom Tabs, so it can prefer Chrome. -->
@@ -11,6 +15,8 @@
         <intent>
             <action android:name="android.support.customtabs.action.CustomTabsService" />
         </intent>
+        <!-- Health Connect's own app (Android 13 and older). -->
+        <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
     <application
@@ -84,6 +90,27 @@
                 <data android:mimeType="text/calendar" />
             </intent-filter>
         </activity>
+
+        <!-- What Planr does with Health Connect data: Health Connect links
+             here from its permission screen (Android 13 and older)… -->
+        <activity
+            android:name=".account.health.HealthPermissionsRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <!-- …and Android 14+ from its permission usage settings. -->
+        <activity-alias
+            android:name=".account.health.ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".account.health.HealthPermissionsRationaleActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- WorkManager is configured by PlanrApplication (HiltWorkerFactory),
              so its default startup initializer is removed. The provider stays

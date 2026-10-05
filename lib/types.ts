@@ -121,7 +121,9 @@ export interface MemberSleepPrefs {
  * zone-free yyyy-MM-dd token). Member-private under RLS: the partner can
  * never read these rows. `bedtimeAt`/`wokeAt` are optional real instants;
  * `quality` is 1..7 (poor→great), `fatigue` is 1..9 (the Karolinska
- * Sleepiness Scale, alert→fighting sleep).
+ * Sleepiness Scale, alert→fighting sleep). The Android app fills times and
+ * stage minutes from Health Connect into the same row; the ratings and note
+ * stay the member's own.
  */
 export interface SleepLog {
   id: string;
@@ -133,8 +135,20 @@ export interface SleepLog {
   quality: number | null;
   fatigue: number | null;
   note: string | null;
+  /** where bedtimeAt/wokeAt came from: typed in, or synced from Health Connect */
+  timesSource: SleepTimesSource;
+  /** minutes actually asleep (device-reported; null when the source had no
+   *  stages — time in bed is not time asleep) */
+  asleepMin: number | null;
+  /** per-stage minutes from the device; null when it didn't report stages */
+  deepMin: number | null;
+  lightMin: number | null;
+  remMin: number | null;
+  awakeMin: number | null;
   createdAt: number;
 }
+
+export type SleepTimesSource = "manual" | "health_connect";
 
 export interface Category {
   id: string;

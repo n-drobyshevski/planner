@@ -54,6 +54,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.datastore.preferences)
+    // Health Connect: reads sleep sessions for sleep_logs (health/).
+    api(libs.androidx.health.connect)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)

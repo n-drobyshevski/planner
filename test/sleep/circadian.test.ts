@@ -26,6 +26,12 @@ function logOn(day: number, over: Partial<SleepLog> = {}): SleepLog {
     quality: null,
     fatigue: null,
     note: null,
+    timesSource: "manual",
+    asleepMin: null,
+    deepMin: null,
+    lightMin: null,
+    remMin: null,
+    awakeMin: null,
     createdAt: Date.UTC(2026, 5, day, 8),
     ...over,
   };

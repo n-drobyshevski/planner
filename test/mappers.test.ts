@@ -244,9 +244,46 @@ describe("sleep log mappers", () => {
     expect(row.date).toBe("2026-06-10");
     expect(row.quality).toBe(4);
     expect(row.fatigue).toBeNull();
-    expect(row.bedtime_at).toBeNull();
-    expect(row.woke_at).toBeNull();
     expect(row.note).toBeNull();
+    // No times in the input: the stored (device) times and source are left alone.
+    expect(row).not.toHaveProperty("bedtime_at");
+    expect(row).not.toHaveProperty("woke_at");
+    expect(row).not.toHaveProperty("times_source");
+  });
+
+  it("sleepLogInputToRow sends typed times as manual, and never the device's stages", () => {
+    const row = sleepLogInputToRow({
+      workspaceId: "w1",
+      memberId: "m1",
+      date: "2026-06-10",
+      bedtimeAt: null,
+      wokeAt: Date.UTC(2026, 5, 10, 5, 30),
+    });
+    expect(row.bedtime_at).toBeNull();
+    expect(row.times_source).toBe("manual");
+    for (const k of ["asleep_min", "deep_min", "light_min", "rem_min", "awake_min", "external_id"]) {
+      expect(row).not.toHaveProperty(k);
+    }
+  });
+
+  it("mapSleepLog reads the Health Connect columns", () => {
+    const log = mapSleepLog({
+      ...baseSleepRow,
+      times_source: "health_connect",
+      asleep_min: 431,
+      deep_min: 80,
+      light_min: 250,
+      rem_min: 101,
+      awake_min: 29,
+    });
+    expect(log.timesSource).toBe("health_connect");
+    expect([log.asleepMin, log.deepMin, log.lightMin, log.remMin, log.awakeMin]).toEqual([
+      431, 80, 250, 101, 29,
+    ]);
+    // Rows from before the migration read as manual with no stages.
+    const old = mapSleepLog(baseSleepRow);
+    expect(old.timesSource).toBe("manual");
+    expect(old.deepMin).toBeNull();
   });
 
   it("sleepLogInputToRow encodes instants as ISO strings", () => {

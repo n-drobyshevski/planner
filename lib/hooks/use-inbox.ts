@@ -20,6 +20,7 @@ import {
   type InboxItem,
 } from "@/lib/inbox/derive";
 import type { TimeWindow } from "@/lib/types";
+import { isRatedLog } from "@/lib/sleep/device-times";
 
 /** Fallback when sleep prefs haven't loaded (mirrors the DB defaults). */
 const DEFAULT_NIGHT = { startHour: 20, endHour: 12 };
@@ -130,7 +131,10 @@ export function useInboxItems(): { items: InboxItem[]; isLoading: boolean } {
   const sleepPrefs = ws?.sleepPrefs;
   const items = useMemo(() => {
     if (!ready || !viewerId) return [];
-    const sleepLogDates = new Set((sleepQuery.data ?? []).map((l) => l.date));
+    // Rated nights only: one Health Connect synced still asks for the ratings.
+    const sleepLogDates = new Set(
+      (sleepQuery.data ?? []).filter(isRatedLog).map((l) => l.date),
+    );
     const nightWindow = sleepPrefs
       ? {
           startHour: sleepPrefs.nightWindowStartHour,

@@ -10,6 +10,7 @@ import { deleteSleepLog, upsertSleepLog } from "@/lib/supabase/mutations";
 import type { SleepLogInput } from "@/lib/supabase/mappers";
 import { subscribeWorkspace } from "@/lib/supabase/realtime";
 import { qk } from "@/lib/supabase/query-keys";
+import { keepDeviceTimes } from "@/lib/sleep/device-times";
 import type { SleepLog } from "@/lib/types";
 
 /**
@@ -92,22 +93,39 @@ export function useUpsertSleepLog(
   const qc = useQueryClient();
 
   return useCallback(
-    async (input) => {
+    async (raw) => {
       if (!workspaceId || !memberId) return;
       const key = qk.sleepLogs(workspaceId, memberId);
       const prev = qc.getQueryData<SleepLog[]>(key);
+      const existing = prev?.find((l) => l.date === raw.date);
+      const input = keepDeviceTimes(raw, existing);
       const full: SleepLogInput = { ...input, workspaceId, memberId };
+      const sendsTimes = "bedtimeAt" in input || "wokeAt" in input;
+      // Merged over the cached row: the columns this save doesn't send
+      // (device times, stages) stay as they are, as they will on the server.
       const provisional: SleepLog = {
+        timesSource: "manual",
+        asleepMin: null,
+        deepMin: null,
+        lightMin: null,
+        remMin: null,
+        awakeMin: null,
+        bedtimeAt: null,
+        wokeAt: null,
+        createdAt: Date.now(),
+        ...existing,
         id: `optimistic:${input.date}:${++optimisticSeq}`,
         workspaceId,
         memberId,
         date: input.date,
-        bedtimeAt: input.bedtimeAt ?? null,
-        wokeAt: input.wokeAt ?? null,
+        ...(sendsTimes && {
+          bedtimeAt: input.bedtimeAt ?? null,
+          wokeAt: input.wokeAt ?? null,
+          timesSource: "manual" as const,
+        }),
         quality: input.quality ?? null,
         fatigue: input.fatigue ?? null,
         note: input.note ?? null,
-        createdAt: Date.now(),
       };
       const upsertInto = (logs: SleepLog[], row: SleepLog) =>
         [...logs.filter((l) => l.date !== row.date), row].sort((a, b) =>
