@@ -1,4 +1,5 @@
 import page.planr.buildlogic.buildConfigString
+import page.planr.buildlogic.planrAuthCallbackOrigin
 import page.planr.buildlogic.planrConfigValue
 import page.planr.buildlogic.planrWebOrigin
 
@@ -25,6 +26,7 @@ android {
         buildConfigField("String", "PLANR_SUPABASE_ANON_KEY", buildConfigString(planrConfigValue("PLANR_SUPABASE_ANON_KEY")))
         buildConfigField("String", "PLANR_OAUTH_CLIENT_ID", buildConfigString(planrConfigValue("PLANR_OAUTH_CLIENT_ID")))
         buildConfigField("String", "PLANR_WEB_ORIGIN", buildConfigString(planrWebOrigin()))
+        buildConfigField("String", "PLANR_AUTH_CALLBACK_ORIGIN", buildConfigString(planrAuthCallbackOrigin()))
     }
 
     testOptions {

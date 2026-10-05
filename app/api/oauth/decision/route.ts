@@ -37,8 +37,7 @@ export async function POST(request: Request): Promise<Response> {
       await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
     const redirectUri =
       details && "redirect_uri" in details ? details.redirect_uri : undefined;
-    const clientId = details && "client" in details ? details.client.id : undefined;
-    if (!isAllowedClientRedirect(redirectUri, clientId)) {
+    if (!isAllowedClientRedirect(redirectUri)) {
       const denied = await supabase.auth.oauth.denyAuthorization(authorizationId);
       if (denied.data) {
         return NextResponse.redirect(denied.data.redirect_url, { status: 303 });

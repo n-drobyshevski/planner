@@ -174,7 +174,7 @@ async function ConsentFlow({
   }
 
   // "Claude only" guard (mirrors the authoritative check in /api/oauth/decision).
-  if (!isAllowedClientRedirect(details.redirect_uri, details.client.id)) {
+  if (!isAllowedClientRedirect(details.redirect_uri)) {
     return (
       <FullPageMessage
         lang={locale}
@@ -203,8 +203,7 @@ async function ConsentFlow({
 
   let redirectHost = details.redirect_uri;
   try {
-    // A custom-scheme callback (the Android app's) has no host; show it whole.
-    redirectHost = new URL(details.redirect_uri).host || details.redirect_uri;
+    redirectHost = new URL(details.redirect_uri).host;
   } catch {
     /* fall back to the raw value if it doesn't parse */
   }
@@ -212,7 +211,7 @@ async function ConsentFlow({
   // The Android app is identified by its exact first-party callback (checked on
   // the same URI the decision route re-validates), never by the self-asserted
   // client name — any client may register calling itself anything.
-  const isAndroidApp = isAndroidAppRedirect(details.redirect_uri, details.client.id);
+  const isAndroidApp = isAndroidAppRedirect(details.redirect_uri);
 
   // Plain-language capabilities: what the connection actually grants. The raw
   // OAuth scopes (openid/profile/email) are identity jargon and understate the

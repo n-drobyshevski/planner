@@ -3,7 +3,7 @@ package page.planr.android.core.data.auth
 import java.net.URI
 import java.net.URLDecoder
 
-/** What the OAuth server sent back to the callback (`page.planr.android:/oauth/callback`). */
+/** What the OAuth server sent back to `/app/auth/callback`. */
 sealed interface AuthCallback {
     val state: String?
 
@@ -19,16 +19,12 @@ sealed interface AuthCallback {
 }
 
 /**
- * Parses the OAuth callback, a custom-scheme or https URI. Pure JVM
- * (java.net.URI), so it is unit-tested without Android.
+ * Parses the App Link callback. Pure JVM (java.net.URI), so it is unit-tested
+ * without Android.
  */
 object AuthCallbackParser {
 
-    /**
-     * True when [uri] is exactly the configured callback (scheme, host, port,
-     * path). A custom-scheme callback has no host or port; both sides are then
-     * null / -1 and compare equal.
-     */
+    /** True when [uri] is exactly the configured callback (scheme, host, port, path). */
     fun matches(uri: String, callbackUrl: String): Boolean {
         val actual = runCatching { URI(uri) }.getOrNull() ?: return false
         val expected = runCatching { URI(callbackUrl) }.getOrNull() ?: return false

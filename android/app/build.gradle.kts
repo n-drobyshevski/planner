@@ -1,4 +1,5 @@
 import page.planr.buildlogic.planrConfigValue
+import page.planr.buildlogic.planrAuthCallbackHost
 
 plugins {
     alias(libs.plugins.planr.android.application)
@@ -13,6 +14,9 @@ android {
         applicationId = "page.planr.android"
         versionCode = 1
         versionName = "0.1.0"
+        // App Link host for /app/auth/callback (PLANR_AUTH_CALLBACK_ORIGIN,
+        // default auth.planr.page).
+        manifestPlaceholders["planrAuthCallbackHost"] = planrAuthCallbackHost()
     }
 
     // Release signing from -P<name>=… or the environment (see README); the

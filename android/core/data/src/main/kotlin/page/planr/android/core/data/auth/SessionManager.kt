@@ -32,7 +32,7 @@ import page.planr.android.core.data.di.ApplicationScope
  *
  * - [beginSignIn] persists a fresh PKCE verifier + `state` and returns the
  *   `/oauth/authorize` URL to open in a Custom Tab.
- * - [handleCallback] takes the callback (`page.planr.android:/oauth/callback`), checks
+ * - [handleCallback] takes the App Link (`/app/auth/callback`), checks
  *   `state`, exchanges the code, resolves the member like `verifyMcpToken`
  *   (lib/mcp/auth.ts) and stores everything encrypted.
  * - [accessToken] is what supabase-kt calls before every PostgREST request and
@@ -105,7 +105,7 @@ class SessionManager @Inject constructor(
     }
 
     /**
-     * Routes an incoming callback URI. Returns false when [uri] isn't our auth
+     * Routes an incoming App Link. Returns false when [uri] isn't our auth
      * callback; otherwise completes the sign-in in the background (progress on
      * [signInProgress]) so an activity recreation can't cancel the exchange.
      */
@@ -164,7 +164,7 @@ class SessionManager @Inject constructor(
     }
 
     /**
-     * Under [stateMutex]: a cold start from the callback launches
+     * Under [stateMutex]: a cold start from the App Link launches
      * [completeSignIn] right behind this, and the restore must not overwrite
      * the fresh sign-in with "signed out".
      */

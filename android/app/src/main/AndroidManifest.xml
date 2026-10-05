@@ -28,17 +28,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- OAuth sign-in returns here: page.planr.android:/oauth/callback
-                 (RFC 8252 private-use scheme). Not an https App Link: the
-                 consent page is on planr.page too, and Chrome keeps a same-host
-                 redirect inside the Custom Tab instead of handing it to the
-                 app. SessionManager matches the full URI (Android ignores path
-                 filters without a host). -->
-            <intent-filter>
+            <!-- OAuth sign-in returns here: an App Link verified by
+                 https://auth.planr.page/.well-known/assetlinks.json. Its own
+                 host on purpose: Chrome keeps a same-host redirect (consent on
+                 planr.page → callback) inside the Custom Tab. -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="page.planr.android" />
+                <data
+                    android:scheme="https"
+                    android:host="${planrAuthCallbackHost}"
+                    android:path="/app/auth/callback" />
             </intent-filter>
         </activity>
 

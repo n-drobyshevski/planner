@@ -75,28 +75,8 @@ export function getAllowedRedirectHosts(): string[] {
   return ["claude.ai"];
 }
 
-/** Path of the Android app's OAuth callback (an App Link on the planner's own origin). */
+/** Path of the Android app's OAuth callback (an App Link). */
 export const ANDROID_APP_CALLBACK_PATH = "/app/auth/callback";
-
-/**
- * The Android app's private-use-scheme callback (RFC 8252 §7.1). This is what
- * the app signs in with: Chrome keeps a same-host navigation (consent →
- * planr.page/app/auth/callback) inside the Custom Tab instead of handing it to
- * the App Link, but always hands a custom scheme to the app.
- */
-export const ANDROID_APP_SCHEME_REDIRECT_URI = "page.planr.android:/oauth/callback";
-
-/** The "Planr for Android" OAuth client registered on the production project. */
-const DEFAULT_ANDROID_OAUTH_CLIENT_ID = "c90ca50b-da07-4a54-b3eb-b58a0936748d";
-
-/**
- * Client id of the first-party Android app (ANDROID_OAUTH_CLIENT_ID, else the
- * production client). Client ids are public; this pins the custom-scheme
- * callback to the one client we registered.
- */
-export function getAndroidOAuthClientId(): string {
-  return process.env.ANDROID_OAUTH_CLIENT_ID?.trim() || DEFAULT_ANDROID_OAUTH_CLIENT_ID;
-}
 
 /** Production origin, used when NEXT_PUBLIC_SITE_URL is unset (local dev, previews). */
 const DEFAULT_PLANNER_ORIGIN = "https://planr.page";
@@ -119,34 +99,46 @@ export function getPlannerOrigin(): string {
   return DEFAULT_PLANNER_ORIGIN;
 }
 
+/** Default host of the Android App Link callback; see getAndroidCallbackOrigin. */
+const DEFAULT_ANDROID_CALLBACK_ORIGIN = "https://auth.planr.page";
+
+/**
+ * Origin of the Android app's OAuth callback (ANDROID_CALLBACK_ORIGIN, else
+ * https://auth.planr.page). Deliberately a different host from the planner:
+ * Chrome keeps a same-host navigation (consent on planr.page → callback on
+ * planr.page) inside the Custom Tab instead of handing it to the App Link, but
+ * hands a cross-host one to the app. The same deployment serves both hosts, so
+ * /.well-known/assetlinks.json is served here too.
+ */
+export function getAndroidCallbackOrigin(): string {
+  const raw = process.env.ANDROID_CALLBACK_ORIGIN;
+  if (raw && raw.trim()) {
+    try {
+      return new URL(raw.trim()).origin;
+    } catch {
+      /* malformed — fall back to the production callback origin */
+    }
+  }
+  return DEFAULT_ANDROID_CALLBACK_ORIGIN;
+}
+
 /** The exact redirect URI the "Planr for Android" OAuth client registers. */
 export function getAndroidAppRedirectUri(): string {
-  return `${getPlannerOrigin()}${ANDROID_APP_CALLBACK_PATH}`;
+  return `${getAndroidCallbackOrigin()}${ANDROID_APP_CALLBACK_PATH}`;
 }
 
 /**
- * True iff `redirectUri` is one of the Android app's callbacks:
- *
- * - the App Link on the planner's own origin, matched on the full origin + path
- *   (no query, fragment, or userinfo) rather than by host, so allowing it never
- *   opens the rest of the planner's host as a redirect target. A code sent there
- *   is safe even for a rogue client registered with this URI: the verified App
- *   Link only reaches the Planr app (whose PKCE verifier won't match), and the
- *   web fallback page never reads it.
- * - the custom-scheme callback, but only for the registered Android client
- *   ([clientId] must equal getAndroidOAuthClientId()). Any app can claim a
- *   custom scheme and dynamic registration lets any client name it, so without
- *   the client pin a look-alike client would be shown as "Planr for Android"
- *   and its own app would receive the code.
+ * True iff `redirectUri` is exactly the Android app's App Link callback, on the
+ * callback origin (getAndroidCallbackOrigin) or, for builds made before it, the
+ * planner's own origin. Matched on the full origin + path (no query, fragment, or
+ * userinfo) rather than by host, so allowing it never opens the rest of either
+ * host as a redirect target. A code sent there is safe even for a
+ * rogue client registered with this URI: the verified App Link delivers it to
+ * the Planr app (whose PKCE verifier won't match), and the web fallback page
+ * never reads it.
  */
-export function isAndroidAppRedirect(
-  redirectUri: string | undefined,
-  clientId?: string,
-): boolean {
+export function isAndroidAppRedirect(redirectUri: string | undefined): boolean {
   if (!redirectUri) return false;
-  if (redirectUri === ANDROID_APP_SCHEME_REDIRECT_URI) {
-    return clientId !== undefined && clientId === getAndroidOAuthClientId();
-  }
   let url: URL;
   try {
     url = new URL(redirectUri);
@@ -154,7 +146,7 @@ export function isAndroidAppRedirect(
     return false;
   }
   return (
-    url.origin === getPlannerOrigin() &&
+    (url.origin === getAndroidCallbackOrigin() || url.origin === getPlannerOrigin()) &&
     url.pathname === ANDROID_APP_CALLBACK_PATH &&
     !url.search &&
     !url.hash &&
@@ -176,29 +168,31 @@ export function mcpAllowLoopbackRedirect(): boolean {
  * True iff a client's redirect URI is permitted to be authorized. Authoritative
  * check lives in /api/oauth/decision; the consent page mirrors it for UX.
  *
- * The Android app's first-party callbacks are always allowed (independent of the
- * host override below; the custom scheme only with the app's client id);
- * everything else goes through the Claude-only host guard.
+ * The Android app's first-party callback is always allowed (independent of the
+ * host override below); everything else goes through the Claude-only host guard.
  */
-export function isAllowedClientRedirect(
-  redirectUri: string | undefined,
-  clientId?: string,
-): boolean {
+export function isAllowedClientRedirect(redirectUri: string | undefined): boolean {
   if (!redirectUri) return false;
-  if (isAndroidAppRedirect(redirectUri, clientId)) return true;
-  let host: string;
+  if (isAndroidAppRedirect(redirectUri)) return true;
+  let url: URL;
   try {
-    host = new URL(redirectUri).hostname.toLowerCase();
+    url = new URL(redirectUri);
   } catch {
     return false;
   }
+  const host = url.hostname.toLowerCase();
   const allowed = getAllowedRedirectHosts();
   if (allowed.includes("*")) return true;
+  // The host alone isn't enough: `com.evil://claude.ai/cb` has hostname
+  // claude.ai but is delivered to whichever app claims `com.evil`. Allowlisted
+  // hosts must be https; plain http only for opted-in loopback.
   if (
     mcpAllowLoopbackRedirect() &&
-    (host === "localhost" || host === "127.0.0.1" || host === "::1")
+    (url.protocol === "http:" || url.protocol === "https:") &&
+    (host === "localhost" || host === "127.0.0.1" || host === "[::1]")
   ) {
     return true;
   }
+  if (url.protocol !== "https:") return false;
   return allowed.some((h) => host === h || host.endsWith(`.${h}`));
 }

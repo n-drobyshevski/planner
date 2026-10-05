@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
-  ANDROID_APP_SCHEME_REDIRECT_URI,
   getAndroidAppRedirectUri,
-  getAndroidOAuthClientId,
+  getAndroidCallbackOrigin,
   getPlannerOrigin,
   isAllowedClientRedirect,
   isAndroidAppRedirect,
@@ -16,7 +15,7 @@ beforeEach(() => {
   delete process.env.MCP_ALLOWED_REDIRECT_HOSTS;
   delete process.env.MCP_ALLOW_LOOPBACK_REDIRECT;
   delete process.env.NEXT_PUBLIC_SITE_URL;
-  delete process.env.ANDROID_OAUTH_CLIENT_ID;
+  delete process.env.ANDROID_CALLBACK_ORIGIN;
 });
 
 describe("isAllowedClientRedirect (Claude-only guard)", () => {
@@ -50,6 +49,15 @@ describe("isAllowedClientRedirect (Claude-only guard)", () => {
     expect(isAllowedClientRedirect("https://anything.example.com/cb")).toBe(true);
   });
 
+  it("requires https for allowlisted hosts (no custom scheme or plain http)", () => {
+    // hostname is claude.ai, but the code would go to the app claiming com.evil.
+    expect(isAllowedClientRedirect("com.evil://claude.ai/api/mcp/auth_callback")).toBe(false);
+    expect(isAllowedClientRedirect("http://claude.ai/api/mcp/auth_callback")).toBe(false);
+    process.env.MCP_ALLOW_LOOPBACK_REDIRECT = "true";
+    expect(isAllowedClientRedirect("evil://localhost/cb")).toBe(false);
+    expect(isAllowedClientRedirect("http://[::1]:8080/callback")).toBe(true);
+  });
+
   it("rejects empty or unparseable redirect URIs", () => {
     expect(isAllowedClientRedirect(undefined)).toBe(false);
     expect(isAllowedClientRedirect("not a url")).toBe(false);
@@ -59,19 +67,34 @@ describe("isAllowedClientRedirect (Claude-only guard)", () => {
 describe("Android app redirect (first-party App Link)", () => {
   it("derives the planner origin from NEXT_PUBLIC_SITE_URL, else planr.page", () => {
     expect(getPlannerOrigin()).toBe("https://planr.page");
-    expect(getAndroidAppRedirectUri()).toBe("https://planr.page/app/auth/callback");
 
     process.env.NEXT_PUBLIC_SITE_URL = "https://staging.planr.page/";
     expect(getPlannerOrigin()).toBe("https://staging.planr.page");
-    expect(getAndroidAppRedirectUri()).toBe(
-      "https://staging.planr.page/app/auth/callback",
-    );
 
     process.env.NEXT_PUBLIC_SITE_URL = "not a url";
     expect(getPlannerOrigin()).toBe("https://planr.page");
   });
 
+  it("puts the callback on its own host (auth.planr.page by default)", () => {
+    // A different host from the consent page, so Chrome hands it to the App Link.
+    expect(getAndroidCallbackOrigin()).toBe("https://auth.planr.page");
+    expect(getAndroidAppRedirectUri()).toBe("https://auth.planr.page/app/auth/callback");
+
+    process.env.ANDROID_CALLBACK_ORIGIN = "https://auth.staging.planr.page/";
+    expect(getAndroidAppRedirectUri()).toBe(
+      "https://auth.staging.planr.page/app/auth/callback",
+    );
+
+    process.env.ANDROID_CALLBACK_ORIGIN = "not a url";
+    expect(getAndroidCallbackOrigin()).toBe("https://auth.planr.page");
+  });
+
   it("allows the exact callback by default", () => {
+    expect(isAllowedClientRedirect("https://auth.planr.page/app/auth/callback")).toBe(true);
+    expect(isAndroidAppRedirect("https://AUTH.planr.page:443/app/auth/callback")).toBe(true);
+  });
+
+  it("still allows the callback on the planner origin (builds before auth.planr.page)", () => {
     expect(isAllowedClientRedirect("https://planr.page/app/auth/callback")).toBe(true);
     expect(isAndroidAppRedirect("https://PLANR.page:443/app/auth/callback")).toBe(true);
   });
@@ -86,6 +109,7 @@ describe("Android app redirect (first-party App Link)", () => {
 
   it("stays allowed when the Claude host list is overridden", () => {
     process.env.MCP_ALLOWED_REDIRECT_HOSTS = "claude.com";
+    expect(isAllowedClientRedirect("https://auth.planr.page/app/auth/callback")).toBe(true);
     expect(isAllowedClientRedirect("https://planr.page/app/auth/callback")).toBe(true);
   });
 
@@ -102,63 +126,15 @@ describe("Android app redirect (first-party App Link)", () => {
       "https://planr.page:8443/app/auth/callback",
       "https://evil.planr.page/app/auth/callback",
       "https://planr.page.evil.com/app/auth/callback",
+      "https://auth.planr.page/",
+      "https://auth.planr.page/app/auth/callback/extra",
+      "https://auth.planr.page/app/auth/callback?next=https://evil.example.com",
+      "http://auth.planr.page/app/auth/callback",
+      "https://evil.auth.planr.page/app/auth/callback",
       "page.planr.android://app/auth/callback",
+      "page.planr.android:/oauth/callback",
     ]) {
       expect(isAllowedClientRedirect(uri), uri).toBe(false);
     }
-  });
-});
-
-describe("Android app redirect (custom scheme, pinned to the app's client)", () => {
-  const appClient = "c90ca50b-da07-4a54-b3eb-b58a0936748d";
-
-  it("allows the scheme callback only for the registered Android client", () => {
-    expect(ANDROID_APP_SCHEME_REDIRECT_URI).toBe("page.planr.android:/oauth/callback");
-    expect(getAndroidOAuthClientId()).toBe(appClient);
-    expect(isAndroidAppRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(true);
-    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(true);
-  });
-
-  it("refuses a look-alike client using the same scheme callback", () => {
-    // Dynamic registration lets any client name this URI, and any app can claim
-    // the scheme — without the client pin it would be shown as Planr for Android.
-    expect(isAndroidAppRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, "rogue-client")).toBe(false);
-    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, "rogue-client")).toBe(
-      false,
-    );
-    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI)).toBe(false);
-  });
-
-  it("follows ANDROID_OAUTH_CLIENT_ID", () => {
-    process.env.ANDROID_OAUTH_CLIENT_ID = "staging-client";
-    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, "staging-client")).toBe(
-      true,
-    );
-    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(false);
-  });
-
-  it("stays allowed when the Claude host list is overridden", () => {
-    process.env.MCP_ALLOWED_REDIRECT_HOSTS = "claude.com";
-    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(true);
-  });
-
-  it("matches the exact URI only", () => {
-    for (const uri of [
-      "page.planr.android:/oauth/callback/",
-      "page.planr.android:/oauth/callback?x=1",
-      "page.planr.android:/oauth/callback#frag",
-      "page.planr.android:/oauth/other",
-      "page.planr.android://oauth/callback",
-      "PAGE.PLANR.ANDROID:/oauth/callback",
-      "page.planr.evil:/oauth/callback",
-    ]) {
-      expect(isAllowedClientRedirect(uri, appClient), uri).toBe(false);
-    }
-  });
-
-  it("keeps the App Link form working for any client (older builds)", () => {
-    expect(isAllowedClientRedirect("https://planr.page/app/auth/callback", "other")).toBe(
-      true,
-    );
   });
 });
