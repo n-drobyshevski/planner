@@ -87,6 +87,7 @@ dependencies {
     implementation(projects.core.data)
     implementation(projects.feature.agenda)
     implementation(projects.feature.tasks)
+    implementation(projects.feature.insights)
     implementation(projects.feature.quickadd)
     implementation(projects.widgets)
 

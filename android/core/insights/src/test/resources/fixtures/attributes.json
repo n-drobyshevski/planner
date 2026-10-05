@@ -1,0 +1,36 @@
+{
+ "version": 1,
+ "generatedBy": "scripts/export-insights-fixtures.ts",
+ "area": "attributes",
+ "sections": {
+  "parse": [
+   {"name":"empty object","input":{"raw":{}},"expected":{}},
+   {"name":"all valid","input":{"raw":{"energy":3,"flexibility":"movable","focus":"deep","satisfaction":4}},"expected":{"energy":3,"flexibility":"movable","focus":"deep","satisfaction":4}},
+   {"name":"energy 1 and satisfaction 1","input":{"raw":{"energy":1,"satisfaction":1}},"expected":{"energy":1,"satisfaction":1}},
+   {"name":"energy 4, focus shallow","input":{"raw":{"energy":4,"focus":"shallow"}},"expected":{"energy":4,"focus":"shallow"}},
+   {"name":"flexibility fixed","input":{"raw":{"flexibility":"fixed"}},"expected":{"flexibility":"fixed"}},
+   {"name":"flexibility flexible","input":{"raw":{"flexibility":"flexible"}},"expected":{"flexibility":"flexible"}},
+   {"name":"energy as word","input":{"raw":{"energy":"high"}},"expected":{}},
+   {"name":"energy as numeric string","input":{"raw":{"energy":"3"}},"expected":{}},
+   {"name":"satisfaction 3.0","input":{"raw":{"satisfaction":3}},"expected":{"satisfaction":3}},
+   {"name":"energy 2.5","input":{"raw":{"energy":2.5}},"expected":{}},
+   {"name":"energy 0","input":{"raw":{"energy":0}},"expected":{}},
+   {"name":"satisfaction 5","input":{"raw":{"satisfaction":5}},"expected":{}},
+   {"name":"energy true","input":{"raw":{"energy":true}},"expected":{}},
+   {"name":"energy null","input":{"raw":{"energy":null}},"expected":{}},
+   {"name":"focus true","input":{"raw":{"focus":true}},"expected":{}},
+   {"name":"focus uppercase","input":{"raw":{"focus":"Deep"}},"expected":{}},
+   {"name":"flexibility unknown word","input":{"raw":{"flexibility":"rigid"}},"expected":{}},
+   {"name":"nested object value","input":{"raw":{"energy":{"value":2},"focus":"deep"}},"expected":{"focus":"deep"}},
+   {"name":"array value","input":{"raw":{"satisfaction":[3],"flexibility":"movable"}},"expected":{"flexibility":"movable"}},
+   {"name":"unknown keys only","input":{"raw":{"mood":"great","effort":3}},"expected":{}},
+   {"name":"unknown keys beside valid","input":{"raw":{"mood":"great","energy":2}},"expected":{"energy":2}},
+   {"name":"junk beside valid","input":{"raw":{"energy":"high","satisfaction":2,"focus":7}},"expected":{"satisfaction":2}},
+   {"name":"raw array","input":{"raw":[]},"expected":{}},
+   {"name":"raw string","input":{"raw":"x"},"expected":{}},
+   {"name":"raw null","input":{"raw":null},"expected":{}},
+   {"name":"raw number","input":{"raw":3},"expected":{}},
+   {"name":"negative energy","input":{"raw":{"energy":-1}},"expected":{}}
+  ]
+ }
+}

@@ -30,6 +30,13 @@ import { activeStreak, bucketTrend, consistency, dayAnomalies } from "@/lib/anal
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { deriveTrendsLede } from "@/lib/insights/ledes";
+import {
+  busiestBucket,
+  categoryTotals,
+  perDayFromBuckets,
+  showMomentum,
+  topCategory,
+} from "@/lib/insights/view-selectors";
 import { ChartCard } from "./chart-card";
 import {
   INSIGHTS_CHART_MARGIN,
@@ -82,10 +89,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
   const trend = useMemo(() => bucketTrend(buckets), [buckets]);
   // Day-level momentum only at day granularity, where buckets ≡ days.
   const perDay = useMemo(
-    () =>
-      granularity === "day"
-        ? buckets.map((b) => ({ dayMs: b.start, ms: b.ms }))
-        : null,
+    () => perDayFromBuckets(buckets, granularity),
     [buckets, granularity],
   );
   const streak = useMemo(() => (perDay ? activeStreak(perDay) : null), [perDay]);
@@ -105,15 +109,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
       })),
     [catTrend, granularity, timeZone, locale],
   );
-  const catTotals = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const r of catTrend.rows) {
-      for (const [k, ms] of Object.entries(r.byKey)) {
-        totals.set(k, (totals.get(k) ?? 0) + ms);
-      }
-    }
-    return totals;
-  }, [catTrend]);
+  const catTotals = useMemo(() => categoryTotals(catTrend), [catTrend]);
 
   if (total === 0)
     return (
@@ -140,7 +136,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
     return { key: k, label: meta.name, color: meta.color };
   });
 
-  const busiest = rows.reduce((a, b) => (b.ms > a.ms ? b : a), rows[0]);
+  const busiest = busiestBucket(rows);
   const trendClause =
     trend.direction === "up"
       ? t("trends.trendUp")
@@ -149,11 +145,8 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         : trend.direction === "flat"
           ? t("trends.trendFlat")
           : "";
-  const topCat = catSeries.length
-    ? catSeries.reduce((a, b) =>
-        (catTotals.get(b.key) ?? 0) > (catTotals.get(a.key) ?? 0) ? b : a,
-      )
-    : null;
+  const topKey = topCategory(catTrend, catTotals);
+  const topCat = topKey === null ? null : (catSeries.find((s) => s.key === topKey) ?? null);
 
   const lede = deriveTrendsLede({
     trend,
@@ -300,11 +293,7 @@ export function TrendsTab({ data }: { data: InsightsTabData }) {
         )}
       </ChartCard>
 
-      {perDay &&
-        (streak ||
-          steadiness !== null ||
-          anomalies.length > 0 ||
-          trend.direction !== null) && (
+      {showMomentum(perDay, streak, steadiness, anomalies, trend) && (
         <section className="space-y-1.5">
           <SectionLabel>{t("trends.momentum")}</SectionLabel>
           <dl className="flex flex-wrap gap-x-6 gap-y-2">

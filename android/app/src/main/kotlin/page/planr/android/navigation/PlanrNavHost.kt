@@ -23,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.datetime.LocalDate
 import page.planr.android.account.AccountMenuButton
 import page.planr.android.feature.agenda.navigation.agendaGraph
+import page.planr.android.feature.insights.insightsScreen
 import page.planr.android.feature.quickadd.QuickAddKind
 import page.planr.android.feature.quickadd.QuickAddSheet
 import page.planr.android.feature.tasks.navigateToTask
@@ -32,9 +33,9 @@ import page.planr.android.signin.SignInScreen
 import page.planr.android.feature.quickadd.R as QuickAddR
 
 /**
- * App navigation. Signed out, only sign-in; signed in, the Agenda and Tasks
- * tabs (bottom bar on their roots, hidden on detail screens) with Quick add
- * behind each tab's floating button. The agenda is always the root of the
+ * App navigation. Signed out, only sign-in; signed in, the Agenda, Tasks and
+ * Insights tabs (bottom bar on their roots, hidden on detail screens) with
+ * Quick add behind the floating button of the tabs that have one. The agenda is always the root of the
  * signed-in back stack, so switching tabs saves and restores each tab's stack
  * against it. Losing the session (the account menu's "Sign out", or a
  * refresh token the server rejected) clears the back stack back to sign-in.
@@ -119,6 +120,17 @@ fun PlanrNavHost(
                 accountAction = { AccountMenuButton() },
             )
             taskDetailScreen(onBack = { navController.popBackStack() })
+            insightsScreen(
+                onOpenDay = { date ->
+                    // selectTab saves the Insights stack (its ViewModel and saved state),
+                    // unlike open(), so coming back keeps the period and tab.
+                    navController.selectTab(TopLevelTab.Agenda)
+                    onOpenDay(date)
+                },
+                onOpenAgenda = { navController.selectTab(TopLevelTab.Agenda) },
+                onOpenTasks = { navController.selectTab(TopLevelTab.Tasks) },
+                accountAction = { AccountMenuButton() },
+            )
         }
     }
 

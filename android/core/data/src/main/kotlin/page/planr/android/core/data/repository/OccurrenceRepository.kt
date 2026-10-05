@@ -43,6 +43,14 @@ class OccurrenceRepository @Inject constructor(
         viewerZone: TimeZone = TimeZone.currentSystemDefault(),
     ): Flow<List<Occurrence>> = occurrences(window, viewerZone).onStart { visibleWindow.show(window) }
 
+    /**
+     * Like [observeOccurrences] but does NOT mark [window] as the one on screen:
+     * Insights reads long background windows (current + previous period) that
+     * a Realtime reconnect should not refetch.
+     */
+    fun observeUntracked(window: TimeWindow, viewerZone: TimeZone): Flow<List<Occurrence>> =
+        occurrences(window, viewerZone)
+
     /** One-shot read from Room, for widgets (does not touch the visible window). */
     suspend fun snapshot(
         window: TimeWindow,

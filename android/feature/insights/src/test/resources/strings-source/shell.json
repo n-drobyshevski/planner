@@ -1,0 +1,20 @@
+{
+  "file": "strings_insights_shell.xml",
+  "entries": [
+    {
+      "web": "nav:surface.insights",
+      "sha": "536cfca3d1c73680",
+      "android": {
+        "insights_shell_title": 0
+      }
+    },
+    {
+      "web": null,
+      "source": "NEW (pre-launch placeholder; removed when INSIGHTS_LIVE goes)",
+      "sha": null,
+      "android": {
+        "insights_shell_placeholder": 0
+      }
+    }
+  ]
+}

@@ -38,6 +38,8 @@ data class PlanrColors(
     val sidebar: Color,
     /** Raised surfaces (cards, sheets). */
     val card: Color,
+    /** Insights chart tokens. */
+    val chart: ChartColors,
     val isDark: Boolean,
 )
 
@@ -48,6 +50,7 @@ val LightPlanrColors = PlanrColors(
     hairline = PlanrTokens.StoneInk.copy(alpha = 0.10f),
     sidebar = PlanrTokens.Sidebar,
     card = PlanrTokens.CardWhite,
+    chart = LightChartColors,
     isDark = false,
 )
 
@@ -58,6 +61,7 @@ val DarkPlanrColors = PlanrColors(
     hairline = PlanrTokens.WarmPaper.copy(alpha = 0.10f),
     sidebar = PlanrTokens.WarmCharcoal,
     card = PlanrTokens.Stone800,
+    chart = DarkChartColors,
     isDark = true,
 )
 

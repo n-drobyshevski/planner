@@ -15,17 +15,23 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import page.planr.android.core.data.prefs.DataStoreInsightsPreferences
 import page.planr.android.core.data.prefs.DataStoreViewPreferences
+import page.planr.android.core.data.prefs.InsightsPreferences
+import page.planr.android.core.data.prefs.InsightsPreferencesDataStore
 import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.prefs.ViewPreferencesDataStore
 
-/** Device-local display preferences ([ViewPreferences]). */
+/** Device-local display preferences ([ViewPreferences], [InsightsPreferences]). */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class PreferencesModule {
 
     @Binds
     abstract fun bindViewPreferences(impl: DataStoreViewPreferences): ViewPreferences
+
+    @Binds
+    abstract fun bindInsightsPreferences(impl: DataStoreInsightsPreferences): InsightsPreferences
 
     companion object {
         @Provides
@@ -35,6 +41,15 @@ abstract class PreferencesModule {
             PreferenceDataStoreFactory.create(
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 produceFile = { context.preferencesDataStoreFile("planr_view") },
+            )
+
+        @Provides
+        @Singleton
+        @InsightsPreferencesDataStore
+        fun provideInsightsPreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+            PreferenceDataStoreFactory.create(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+                produceFile = { context.preferencesDataStoreFile("planr_insights") },
             )
     }
 }
