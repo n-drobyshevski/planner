@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker-preview colours only (the live widgets take theirs from
+     :core:design's PlanrGlanceColors). Same tokens as PlanrTokens. -->
+<resources>
+    <color name="planr_widget_surface">#FAF8F5</color>
+    <color name="planr_widget_ink">#292524</color>
+    <color name="planr_widget_muted">#57514B</color>
+    <color name="planr_widget_accent">#57534E</color>
+    <color name="planr_widget_on_accent">#FFFFFF</color>
+    <color name="planr_widget_secondary">#F2EDE7</color>
+    <color name="planr_widget_on_secondary">#44403C</color>
+    <color name="planr_widget_outline">#D6CFC6</color>
+    <color name="planr_widget_member_a">#C0492A</color>
+    <color name="planr_widget_member_b">#0F766E</color>
+    <color name="planr_widget_shared">#B45309</color>
+</resources>

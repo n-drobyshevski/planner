@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window theme only: paints warm paper / charcoal before Compose draws,
+         so there is no white flash. Edge-to-edge is enabled in MainActivity. -->
+    <style name="Theme.Planr" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/planr_window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

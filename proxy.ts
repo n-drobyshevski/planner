@@ -47,6 +47,9 @@ export const config = {
     // `/oauth/consent` CANNOT be excluded — their URLs only resolve via the next-intl
     // rewrite — so they stay matched but Supabase-skipped (see `proxy` above). The
     // consent pages self-guard auth and bounce to /login themselves when signed out.
-    "/((?!api|_next|_vercel|share|ru/login|ru/oauth/consent|.*\\..*).*)",
+    // `/app/auth/callback` is the Android app's OAuth App Link: a static, anonymous
+    // fallback page under its own root layout (app/app/) that must be served
+    // verbatim — never locale-rewritten nor bounced to /login with its `code`.
+    "/((?!api|_next|_vercel|share|app/auth/callback|ru/login|ru/oauth/consent|.*\\..*).*)",
   ],
 };

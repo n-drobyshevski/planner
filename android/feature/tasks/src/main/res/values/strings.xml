@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ported from messages/en (tasks, events, toasts, common). -->
+<resources>
+    <!-- List -->
+    <string name="tasks_title">Tasks</string>
+    <string name="tasks_new_task">New task</string>
+    <string name="tasks_empty_title">No tasks yet</string>
+    <string name="tasks_empty_body">Create your first task to get started.</string>
+    <string name="tasks_filtered_empty_title">No matching tasks</string>
+    <string name="tasks_filtered_empty_body">No tasks match the current filters.</string>
+    <string name="tasks_filtered_clear">Clear filters</string>
+    <string name="tasks_loading">Loading…</string>
+
+    <!-- Filters -->
+    <string name="tasks_filter_scope">Whose tasks</string>
+    <string name="tasks_filter_state">State</string>
+    <string name="tasks_filter_all">All</string>
+    <string name="tasks_filter_mine">Mine</string>
+    <string name="tasks_filter_partner">Partner</string>
+    <string name="tasks_filter_shared">Shared</string>
+    <string name="tasks_filter_open">Open</string>
+    <string name="tasks_filter_done">Done</string>
+
+    <!-- Sections -->
+    <string name="tasks_group_overdue">Overdue</string>
+    <string name="tasks_group_this_week">This week</string>
+    <string name="tasks_group_later">Later</string>
+    <string name="tasks_group_no_date">No date</string>
+    <string name="tasks_group_done">Done</string>
+
+    <!-- Card -->
+    <string name="task_card_mark_done">Mark as done</string>
+    <string name="task_card_mark_not_done">Mark as not done</string>
+    <string name="task_card_private">Private</string>
+    <string name="task_card_overdue">Overdue</string>
+    <string name="task_card_due">Due %1$s</string>
+    <string name="task_card_progress">%1$d/%2$d</string>
+    <string name="task_card_assignee">Assigned to %1$s</string>
+
+    <!-- Priority -->
+    <string name="task_priority_none">None</string>
+    <string name="task_priority_low">Low</string>
+    <string name="task_priority_medium">Medium</string>
+    <string name="task_priority_high">High</string>
+
+    <!-- Notices -->
+    <string name="task_completed">Task completed</string>
+    <string name="task_reopened">Task reopened</string>
+    <string name="task_updated">Task updated</string>
+    <string name="task_stale">This task changed elsewhere. The latest version is shown.</string>
+    <string name="task_failed">Something went wrong</string>
+    <string name="task_undo">Undo</string>
+
+    <!-- Detail -->
+    <string name="task_detail_title">Task</string>
+    <string name="task_detail_edit_title">Edit task</string>
+    <string name="task_detail_back">Back</string>
+    <string name="task_detail_save">Save</string>
+    <string name="task_detail_saving">Saving…</string>
+    <string name="task_detail_not_found_title">Task not found</string>
+    <string name="task_detail_not_found_body">It may have been deleted or made private.</string>
+    <string name="task_detail_read_only">Read-only · %1$s</string>
+    <string name="task_detail_untitled">Untitled task</string>
+    <string name="task_field_title">Title</string>
+    <string name="task_field_title_placeholder">What needs doing?</string>
+    <string name="task_field_title_required">Add a title.</string>
+    <string name="task_field_notes">Notes</string>
+    <string name="task_field_notes_placeholder">Add details</string>
+    <string name="task_field_status">Status</string>
+    <string name="task_status_open">Open</string>
+    <string name="task_status_done">Done</string>
+    <string name="task_status_no_columns">There’s no Done column to move this task to, so it can’t be completed here.</string>
+    <string name="task_field_column">Column</string>
+    <string name="task_field_due">Due date</string>
+    <string name="task_field_no_due">No due date</string>
+    <string name="task_field_priority">Priority</string>
+    <string name="task_field_assignee">Assignee</string>
+    <string name="task_field_unassigned">Unassigned</string>
+    <string name="task_field_context">Context</string>
+    <string name="task_field_no_context">No context</string>
+    <string name="task_field_clear">Clear</string>
+    <string name="task_subtasks_title">Subtasks</string>
+    <plurals name="task_subtasks_progress">
+        <item quantity="one">%1$d of %2$d subtask done</item>
+        <item quantity="other">%1$d of %2$d subtasks done</item>
+    </plurals>
+    <string name="task_subtask_of">Subtask of %1$s</string>
+    <string name="task_date_pick">Pick</string>
+    <string name="task_date_cancel">Cancel</string>
+</resources>

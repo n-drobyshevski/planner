@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_tagline">Тёплый общий календарь для двоих.</string>
+    <string name="sign_in">Войти</string>
+    <string name="sign_in_not_configured">В этой сборке нет настроек Supabase. Задай PLANR_SUPABASE_URL, PLANR_SUPABASE_ANON_KEY и PLANR_OAUTH_CLIENT_ID.</string>
+    <string name="sign_in_completing">Вход…</string>
+    <string name="sign_in_session_expired">Сеанс завершён. Войди снова, чтобы календарь продолжал синхронизироваться.</string>
+    <string name="sign_in_error_denied">Доступ не разрешён. Войди снова и выбери «Разрешить доступ».</string>
+    <string name="sign_in_error_expired">Вход занял слишком много времени или уже был использован. Попробуй ещё раз.</string>
+    <string name="sign_in_error_state">Эта ссылка для входа открыта не с этого устройства, поэтому она проигнорирована. Попробуй ещё раз.</string>
+    <string name="sign_in_error_no_member">Этот аккаунт ещё не участник планировщика. Сначала войди в веб-версии по имени.</string>
+    <string name="sign_in_error_network">Не удалось связаться с планировщиком. Проверь подключение и попробуй ещё раз.</string>
+    <string name="sign_in_error_rejected">Не удалось войти. Попробуй ещё раз.</string>
+    <string name="sign_in_error_no_browser">Нет браузера для входа. Установи или включи браузер и попробуй снова.</string>
+    <string name="nav_agenda">Календарь</string>
+    <string name="nav_tasks">Задачи</string>
+    <string name="account_menu">Аккаунт</string>
+    <string name="sign_out">Выйти</string>
+    <string name="sign_out_cancel">Отмена</string>
+    <string name="sign_out_confirm_title">Выйти на этом телефоне?</string>
+    <string name="sign_out_confirm_body">Телефон забудет сессию и удалит сохранённую копию календаря и задач. Виджеты останутся пустыми, пока ты снова не войдёшь.</string>
+</resources>

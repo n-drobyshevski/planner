@@ -1,5 +1,5 @@
 # Checks run on every push/PR: typecheck + lint + unit tests (no Supabase
-# needed — unit tests are pure).
+# needed — unit tests are pure), plus the Android Gradle build + unit tests + lint.
 #
 # The e2e job is opt-in (manual dispatch + nightly): it runs the Playwright
 # suite against a dedicated hosted Supabase project supplied via repo secrets
@@ -33,6 +33,39 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+
+  # Native Android app (android/, a Gradle build). Runs on every push/PR next to
+  # `checks`; the recurrence golden fixtures the Kotlin tests read are kept in
+  # sync with lib/recurrence by `pnpm test` above (test/recurrence-fixtures.test.ts).
+  # PLANR_* config is intentionally unset — the build must not need secrets.
+  android:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      # The action's default `packages` includes the legacy "tools" package,
+      # which current cmdline-tools no longer ship; name what the build uses.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - run: ./gradlew assembleDebug testDebugUnitTest lint --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: android-reports
+          path: |
+            android/**/build/reports/
+            android/**/build/test-results/
+          retention-days: 7
 
   e2e:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian copy, ported from messages/ru (calendar, events, recurrence, toasts, common). -->
+<resources>
+    <string name="agenda_empty_title">Ничего не запланировано</string>
+    <string name="agenda_today">Сегодня</string>
+    <string name="agenda_previous">Назад</string>
+    <string name="agenda_next">Вперёд</string>
+    <string name="agenda_view_day">День</string>
+    <string name="agenda_view_week">Неделя</string>
+    <string name="agenda_new_event">Новое событие</string>
+    <string name="agenda_quick_add">Быстро добавить</string>
+    <string name="agenda_all_day_header">Весь день</string>
+    <string name="agenda_untitled">Без названия</string>
+    <string name="agenda_more_count">ещё +%1$d</string>
+    <string name="agenda_go_to">Перейти к %1$s</string>
+    <string name="agenda_refresh_failed">Не удалось обновить. Показано то, что сохранено на устройстве.</string>
+
+    <string name="agenda_block_time_range">с %1$s до %2$s</string>
+    <string name="agenda_block_shared">общее</string>
+    <string name="agenda_block_readonly">чужое, только для чтения</string>
+    <string name="agenda_block_cancelled">отменено</string>
+    <string name="agenda_block_planned">запланировано</string>
+
+    <string name="agenda_detail_you">Вы</string>
+    <string name="agenda_detail_context">Контекст</string>
+    <string name="agenda_detail_edited">Изменено</string>
+    <string name="agenda_detail_inactive">Неактивно</string>
+    <string name="agenda_detail_read_only">Только для чтения · %1$s</string>
+    <string name="agenda_detail_other_calendar">другой календарь</string>
+    <string name="agenda_detail_missing_title">Событие не найдено</string>
+    <string name="agenda_detail_missing_body">Возможно, его удалили на другом устройстве.</string>
+    <string name="agenda_all_day">Весь день</string>
+
+    <string name="agenda_back">Назад</string>
+    <string name="agenda_close">Закрыть</string>
+    <string name="agenda_edit">Изменить</string>
+    <string name="agenda_delete">Удалить</string>
+    <string name="agenda_save">Сохранить</string>
+    <string name="agenda_cancel">Отмена</string>
+    <string name="agenda_saving">Сохранение…</string>
+    <string name="agenda_search">Поиск</string>
+    <string name="agenda_undo">Отменить</string>
+
+    <string name="agenda_editor_new_event">Новое событие</string>
+    <string name="agenda_editor_edit_event">Изменить событие</string>
+    <string name="agenda_editor_title_placeholder">Добавь название</string>
+    <string name="agenda_editor_title_label">Название события</string>
+    <string name="agenda_editor_all_day">Весь день</string>
+    <string name="agenda_editor_start">Начало</string>
+    <string name="agenda_editor_end">Конец</string>
+    <string name="agenda_editor_start_date">Дата начала</string>
+    <string name="agenda_editor_start_time">Время начала</string>
+    <string name="agenda_editor_end_date">Дата окончания</string>
+    <string name="agenda_editor_end_time">Время окончания</string>
+    <string name="agenda_editor_time_zone">Часовой пояс</string>
+    <string name="agenda_editor_context">Контекст</string>
+    <string name="agenda_editor_no_context">Без контекста</string>
+    <string name="agenda_editor_sharing">Доступ</string>
+    <string name="agenda_editor_shared_context_banner">Общий контекст — вы оба участвуете и можете это редактировать.</string>
+    <string name="agenda_visibility_private">Личное</string>
+    <string name="agenda_visibility_visible">Видно</string>
+    <string name="agenda_visibility_shared">Общее</string>
+    <string name="agenda_visibility_hint_private">Видишь это только ты.</string>
+    <string name="agenda_visibility_hint_shared">Показывается в обоих календарях; редактировать можете вы оба.</string>
+    <string name="agenda_visibility_hint_visible">Партнёр видит это в твоём календаре; редактировать можешь только ты.</string>
+    <string name="agenda_editor_location">Место</string>
+    <string name="agenda_editor_location_placeholder">Добавь место</string>
+    <string name="agenda_editor_notes">Заметки</string>
+    <string name="agenda_editor_title_required">Добавь название.</string>
+    <string name="agenda_editor_end_after_start">Конец должен быть позже начала.</string>
+    <string name="agenda_status_planned">Запланировано</string>
+    <string name="agenda_status_cancelled">Отменено</string>
+
+    <string name="agenda_recurrence_repeat">Повторение</string>
+    <string name="agenda_recurrence_does_not_repeat">Не повторяется</string>
+    <string name="agenda_recurrence_daily">Ежедневно</string>
+    <string name="agenda_recurrence_weekly">Еженедельно</string>
+    <string name="agenda_recurrence_monthly">Ежемесячно</string>
+    <string name="agenda_recurrence_every">Каждые</string>
+    <string name="agenda_recurrence_unit_day">дн.</string>
+    <string name="agenda_recurrence_unit_week">нед.</string>
+    <string name="agenda_recurrence_unit_month">мес.</string>
+    <string name="agenda_recurrence_on_days">По дням</string>
+    <string name="agenda_recurrence_ends">Заканчивается</string>
+    <string name="agenda_recurrence_ends_never">Никогда</string>
+    <string name="agenda_recurrence_ends_until">В дату</string>
+    <string name="agenda_recurrence_ends_count">После…</string>
+    <string name="agenda_recurrence_repeat_until_date">Повторять до даты</string>
+    <string name="agenda_recurrence_decrease">Меньше</string>
+    <string name="agenda_recurrence_increase">Больше</string>
+    <string-array name="agenda_weekday_chips">
+        <item>Пн</item>
+        <item>Вт</item>
+        <item>Ср</item>
+        <item>Чт</item>
+        <item>Пт</item>
+        <item>Сб</item>
+        <item>Вс</item>
+    </string-array>
+
+    <string name="agenda_summary_daily">Повторяется ежедневно</string>
+    <string name="agenda_summary_weekly">Повторяется еженедельно</string>
+    <string name="agenda_summary_monthly">Повторяется ежемесячно</string>
+    <plurals name="agenda_summary_every_day">
+        <item quantity="one">Повторяется каждые %d день</item>
+        <item quantity="few">Повторяется каждые %d дня</item>
+        <item quantity="many">Повторяется каждые %d дней</item>
+        <item quantity="other">Повторяется каждые %d дня</item>
+    </plurals>
+    <plurals name="agenda_summary_every_week">
+        <item quantity="one">Повторяется каждые %d неделю</item>
+        <item quantity="few">Повторяется каждые %d недели</item>
+        <item quantity="many">Повторяется каждые %d недель</item>
+        <item quantity="other">Повторяется каждые %d недели</item>
+    </plurals>
+    <plurals name="agenda_summary_every_month">
+        <item quantity="one">Повторяется каждые %d месяц</item>
+        <item quantity="few">Повторяется каждые %d месяца</item>
+        <item quantity="many">Повторяется каждые %d месяцев</item>
+        <item quantity="other">Повторяется каждые %d месяца</item>
+    </plurals>
+    <string name="agenda_summary_on_days">%1$s по %2$s</string>
+    <string name="agenda_summary_until">%1$s, до %2$s</string>
+    <plurals name="agenda_summary_times">
+        <item quantity="one">%1$s, %2$d раз</item>
+        <item quantity="few">%1$s, %2$d раза</item>
+        <item quantity="many">%1$s, %2$d раз</item>
+        <item quantity="other">%1$s, %2$d раза</item>
+    </plurals>
+    <string name="agenda_summary_day_separator">, </string>
+    <string-array name="agenda_weekday_short">
+        <item>Пн</item>
+        <item>Вт</item>
+        <item>Ср</item>
+        <item>Чт</item>
+        <item>Пт</item>
+        <item>Сб</item>
+        <item>Вс</item>
+    </string-array>
+
+    <string name="agenda_scope_title_edit">Изменить повторяющееся событие</string>
+    <string name="agenda_scope_title_delete">Удалить повторяющееся событие</string>
+    <string name="agenda_scope_apply_which">К каким событиям применить?</string>
+    <string name="agenda_scope_this_event">Это событие</string>
+    <string name="agenda_scope_this_and_following">Это и последующие события</string>
+    <string name="agenda_scope_all_events">Все события</string>
+
+    <string name="agenda_toast_event_created">Событие создано</string>
+    <string name="agenda_toast_event_updated">Событие изменено</string>
+    <string name="agenda_toast_event_deleted">Событие удалено</string>
+    <string name="agenda_toast_this_event_updated">Событие изменено</string>
+    <string name="agenda_toast_this_and_future_updated">Это и последующие изменены</string>
+    <string name="agenda_toast_all_events_updated">Все события изменены</string>
+    <string name="agenda_toast_this_and_future_deleted">Это и последующие удалены</string>
+    <string name="agenda_toast_series_deleted">Серия удалена</string>
+    <string name="agenda_toast_undone">Отменено</string>
+    <string name="agenda_toast_couldnt_undo">Не удалось отменить</string>
+    <string name="agenda_something_went_wrong">Что-то пошло не так</string>
+
+    <string name="agenda_stale_event">Это событие изменили в другом месте.</string>
+    <string name="agenda_stale_reload">Обновить</string>
+</resources>

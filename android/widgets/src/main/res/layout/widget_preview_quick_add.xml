@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget-picker preview (API 31+): a static sketch of QuickAddWidget. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_background"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <TextView
+        style="@style/PlanrWidgetPreviewPill"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/widget_preview_pill_accent"
+        android:text="@string/widget_quickadd_task"
+        android:textColor="@color/planr_widget_on_accent" />
+
+    <TextView
+        style="@style/PlanrWidgetPreviewPill"
+        android:background="@drawable/widget_preview_pill_secondary"
+        android:text="@string/widget_quickadd_event"
+        android:textColor="@color/planr_widget_on_secondary" />
+</LinearLayout>

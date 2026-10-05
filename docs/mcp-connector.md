@@ -89,6 +89,9 @@ screen.
 - `MCP_ALLOW_LOOPBACK_REDIRECT=true` — also allow `localhost`/`127.0.0.1`
   redirects. **Claude Code** needs this (RFC 8252 loopback), but so does any
   native client, so it's off by default.
+- The first-party Android app's exact callback
+  (`https://planr.page/app/auth/callback`) is always allowed, independent of the
+  host list — see `docs/android.md`.
 
 The consent screen also shows the client's redirect host, per the MCP auth spec.
 

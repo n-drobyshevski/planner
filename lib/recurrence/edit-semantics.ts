@@ -94,6 +94,27 @@ function stripRrulePrefix(s: string): string {
 }
 
 /**
+ * "Delete this and following": end the series just before `fromOccurrenceMs`
+ * (UNTIL = from − 1 s, COUNT dropped) — the same rewrite `splitThisAndFuture`
+ * applies to the original, so every other rule part (BYMONTH, BYSETPOS,
+ * BYDAY ordinals, YEARLY…) survives and past occurrences don't move.
+ */
+export function capThisAndFuture(
+  event: EventRow,
+  fromOccurrenceMs: number,
+): { rrule: string | null; recurrenceEndsAt: number } {
+  const untilMs = fromOccurrenceMs - 1000;
+  let rrule: string | null = null;
+  if (event.rrule) {
+    const opts: Partial<Options> = RRule.parseString(event.rrule);
+    opts.count = null;
+    opts.until = new Date(untilMs);
+    rrule = stripRrulePrefix(RRule.optionsToString(opts));
+  }
+  return { rrule, recurrenceEndsAt: untilMs };
+}
+
+/**
  * Split a series at a point ("this and all future events"). The original series
  * is ended just before the split (UNTIL = fromOccurrenceMs - 1000ms), and a new
  * series is created starting at the split point carrying the patch.

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <receiver
+            android:name=".TodayAgendaWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_today_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_agenda_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".TasksWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_tasks_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tasks_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".QuickAddWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_quickadd_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_add_widget_info" />
+        </receiver>
+
+        <!-- Re-renders the dated widgets when "today" may have changed. Exported
+             only so the system can deliver these protected broadcasts, which
+             stay exempt from Android 8's implicit-broadcast limits. Midnight
+             itself is an alarm (explicit PendingIntent); DATE_CHANGED and
+             USER_PRESENT are registered at runtime (see DayRollover). -->
+        <receiver
+            android:name=".WidgetTimeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

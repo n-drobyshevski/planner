@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Planner</string>
+    <string name="app_tagline">A warm, shared calendar for two.</string>
+    <string name="sign_in">Sign in</string>
+    <string name="sign_in_not_configured">This build has no Supabase config. Set PLANR_SUPABASE_URL, PLANR_SUPABASE_ANON_KEY and PLANR_OAUTH_CLIENT_ID.</string>
+    <string name="sign_in_completing">Signing in…</string>
+    <string name="sign_in_session_expired">Your session ended. Sign in again to keep your calendar in sync.</string>
+    <string name="sign_in_error_denied">Access wasn\'t allowed. Sign in again and choose Allow access.</string>
+    <string name="sign_in_error_expired">That sign-in took too long or was already used. Please try again.</string>
+    <string name="sign_in_error_state">That sign-in link didn\'t come from this device, so it was ignored. Please try again.</string>
+    <string name="sign_in_error_no_member">This account isn\'t a member of a planner yet. Sign in on the web with your name first.</string>
+    <string name="sign_in_error_network">Couldn\'t reach the planner. Check your connection and try again.</string>
+    <string name="sign_in_error_rejected">Sign-in didn\'t go through. Please try again.</string>
+    <string name="sign_in_error_no_browser">No browser is available to sign in with. Install or enable one, then try again.</string>
+    <string name="nav_agenda">Calendar</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="account_menu">Account</string>
+    <string name="sign_out">Sign out</string>
+    <string name="sign_out_cancel">Cancel</string>
+    <string name="sign_out_confirm_title">Sign out on this phone?</string>
+    <string name="sign_out_confirm_body">This phone forgets your session and clears its copy of your calendar and tasks. The widgets stay empty until you sign in again.</string>
+</resources>

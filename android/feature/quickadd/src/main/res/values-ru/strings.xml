@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ported from messages/ru (tasks.taskDialog, events.dialog, toasts, common). -->
+<resources>
+    <string name="quickadd_new_task">Новая задача</string>
+    <string name="quickadd_new_event">Новое событие</string>
+    <string name="quickadd_kind_label">Тип элемента</string>
+    <string name="quickadd_kind_task">Задача</string>
+    <string name="quickadd_kind_event">Событие</string>
+    <string name="quickadd_title_label">Название</string>
+    <string name="quickadd_title_task_placeholder">Что нужно сделать?</string>
+    <string name="quickadd_title_event_placeholder">Добавь название</string>
+    <string name="quickadd_due">Срок</string>
+    <string name="quickadd_no_due">Без срока</string>
+    <string name="quickadd_date">Дата</string>
+    <string name="quickadd_today">Сегодня</string>
+    <string name="quickadd_tomorrow">Завтра</string>
+    <string name="quickadd_pick_date">Выбрать дату…</string>
+    <string name="quickadd_all_day">Весь день</string>
+    <string name="quickadd_start">Начало</string>
+    <string name="quickadd_end">Конец</string>
+    <string name="quickadd_next_day">след. день</string>
+    <string name="quickadd_add">Добавить</string>
+    <string name="quickadd_adding">Сохранение…</string>
+    <string name="quickadd_cancel">Отмена</string>
+    <string name="quickadd_apply">Применить</string>
+    <string name="quickadd_task_created">Задача создана</string>
+    <string name="quickadd_event_created">Событие создано</string>
+    <string name="quickadd_error_title">Добавь название.</string>
+    <string name="quickadd_error_end">Конец должен быть позже начала.</string>
+    <string name="quickadd_error_signed_out">Сначала войди в Planr.</string>
+    <string name="quickadd_error_failed">Что-то пошло не так</string>
+</resources>

@@ -1,0 +1,153 @@
+package page.planr.android.core.data.sync
+
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.query.filter.FilterOperator
+import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.RealtimeChannel
+import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.postgresChangeFlow
+import io.github.jan.supabase.realtime.realtime
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import page.planr.android.core.data.auth.AuthState
+import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.di.ApplicationScope
+import page.planr.android.core.data.local.CacheGate
+
+/**
+ * Live sync while the app is in the foreground: one Realtime channel per
+ * workspace with `postgres_changes` on the v1 tables, filtered by
+ * `workspace_id` exactly like `subscribeWorkspace` in lib/supabase/realtime.ts.
+ * RLS applies, so the partner's private rows never arrive.
+ *
+ * Deletes can't be filtered (Supabase Postgres Changes → Limitations: the
+ * old record has only the primary key, so `workspace_id=eq.…` never matches
+ * and a filtered binding never sees a delete). Each table therefore gets a
+ * second, unfiltered DELETE binding. RLS isn't applied to deletes, so it
+ * carries other workspaces' deletes too — bare ids, a no-op locally.
+ *
+ * Every change is written to Room (the screens and widgets follow from
+ * there). Each time the channel (re)joins, the visible window, tasks and
+ * reference data are refetched: changes may have been missed while it was
+ * down or the app was in the background.
+ */
+@Singleton
+class RealtimeSync @Inject constructor(
+    private val supabase: SupabaseClient,
+    private val session: SessionManager,
+    private val applier: RealtimeChangeApplier,
+    private val cacheGate: CacheGate,
+    private val syncRunner: SyncRunner,
+    private val widgets: WidgetRefreshDispatcher,
+    @ApplicationScope private val scope: CoroutineScope,
+) {
+    private var started = false
+
+    /** Call once from Application.onCreate. */
+    fun start() {
+        if (started) return
+        started = true
+        scope.launch {
+            combine(isForeground(), workspaceIds()) { foreground, ws -> ws.takeIf { foreground } }
+                .distinctUntilChanged()
+                .collectLatest { ws -> if (ws != null) runChannel(ws) }
+        }
+    }
+
+    private suspend fun runChannel(workspaceId: String) {
+        val channel = supabase.channel("workspace:$workspaceId:android")
+        // Taken before joining: a change still arriving after a sign-out wiped the cache is dropped.
+        val ticket = cacheGate.ticket()
+        try {
+            coroutineScope {
+                // Register every postgres_changes listener before joining.
+                val changes = merge(
+                    *RealtimeChangeApplier.TABLES.flatMap { table ->
+                        listOf(changesOf(channel, table, workspaceId), deletesOf(channel, table))
+                    }.toTypedArray(),
+                )
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    changes.collect { (table, change) ->
+                        val applied = runCatching { applier.apply(table, change, ticket) }.getOrDefault(false)
+                        if (applied) widgets.requestRefresh()
+                    }
+                }
+                launch {
+                    channel.status
+                        .filter { it == RealtimeChannel.Status.SUBSCRIBED }
+                        .collect { refetchQuietly() }
+                }
+                launch {
+                    // A refreshed token must reach the open socket before the old one expires.
+                    session.accessTokens.drop(1).collect { token ->
+                        if (token != null) runCatching { supabase.realtime.setAuth(token) }
+                    }
+                }
+                channel.subscribe()
+                awaitCancellation()
+            }
+        } finally {
+            withContext(NonCancellable) { runCatching { supabase.realtime.removeChannel(channel) } }
+        }
+    }
+
+    /** INSERT / UPDATE of this workspace's rows (RLS applies). */
+    private fun changesOf(channel: RealtimeChannel, table: String, workspaceId: String): Flow<Pair<String, RowChange>> =
+        channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+            this.table = table
+            filter("workspace_id", FilterOperator.EQ, workspaceId)
+        }.mapNotNull { action ->
+            val change = when (action) {
+                is PostgresAction.Insert -> RowChange.Upsert(action.record)
+                is PostgresAction.Update -> RowChange.Upsert(action.record)
+                // Never delivered under a filter; [deletesOf] covers deletes.
+                is PostgresAction.Delete, is PostgresAction.Select -> null
+            }
+            change?.let { table to it }
+        }
+
+    /** Every DELETE on [table], unfiltered (see the class comment). */
+    private fun deletesOf(channel: RealtimeChannel, table: String): Flow<Pair<String, RowChange>> =
+        channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+            this.table = table
+        }.map { table to RowChange.Delete(it.oldRecord) }
+
+    private suspend fun refetchQuietly() {
+        try {
+            syncRunner.syncVisible()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Offline or a server hiccup: the next (re)join or periodic sync catches up.
+        }
+    }
+
+    private fun workspaceIds(): Flow<String?> =
+        session.authState.map { (it as? AuthState.SignedIn)?.session?.workspaceId }
+
+    private fun isForeground(): Flow<Boolean> =
+        ProcessLifecycleOwner.get().lifecycle.currentStateFlow
+            .map { it.isAtLeast(Lifecycle.State.STARTED) }
+            .flowOn(Dispatchers.Main)
+}

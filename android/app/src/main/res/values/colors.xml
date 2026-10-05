@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window + launcher colors (Compose uses core:design tokens). -->
+    <color name="planr_paper">#FFFAF8F5</color>
+    <color name="planr_charcoal">#FF1C1917</color>
+    <color name="planr_warm_stone">#FF57534E</color>
+    <color name="planr_window_background">@color/planr_paper</color>
+</resources>

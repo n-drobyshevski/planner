@@ -52,6 +52,7 @@ import {
   type TaskDependencyInput,
 } from "./mappers";
 import {
+  capThisAndFuture,
   editAll,
   splitThisAndFuture,
   type OccurrencePatch,
@@ -68,7 +69,6 @@ import {
   checkpointPatchSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
-import { buildRRule, parseRRule } from "@/lib/recurrence/rrule-build";
 import type { ItemAttributes } from "@/lib/attributes/schema";
 
 export class StaleWriteError extends Error {
@@ -445,12 +445,8 @@ export async function deleteThisAndFuture(
   event: EventRow,
   fromOccurrenceMs: number,
 ): Promise<void> {
-  const form = parseRRule(event.rrule);
-  const untilMs = fromOccurrenceMs - 1000;
-  const rrule = form
-    ? buildRRule({ ...form, end: { type: "until", dateMs: untilMs } })
-    : null;
-  await updateEvent(sb, event.id, { rrule, recurrenceEndsAt: untilMs });
+  const { rrule, recurrenceEndsAt } = capThisAndFuture(event, fromOccurrenceMs);
+  await updateEvent(sb, event.id, { rrule, recurrenceEndsAt });
 }
 
 // --- Categories ------------------------------------------------------------

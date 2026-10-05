@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- targetCell*, previewLayout and description are API 31+; older launchers
+     use minWidth/minHeight and show the app icon in the picker.
+     Two weighted pills need ~180dp ("+ Событие" at 13sp plus padding), so the
+     widget doesn't resize below 3 cells: at 2 cells the labels clip. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_quickadd_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewLayout="@layout/widget_preview_quick_add"
+    android:minWidth="180dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    tools:ignore="UnusedAttribute" />
