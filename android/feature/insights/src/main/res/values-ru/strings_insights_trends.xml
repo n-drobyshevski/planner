@@ -1,2 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources />
+<!-- Copied from messages/ru, including the web's gender wart in the busiest-week lines
+     («Самый загруженный неделя»): parity first, a joint copy fix later. -->
+<resources>
+    <!-- Lede. -->
+    <string name="insights_trends_lede_none_headline">Пока мало истории, чтобы говорить о тренде.</string>
+    <string name="insights_trends_lede_none_support">Продолжай отслеживать — направление появится здесь.</string>
+    <string name="insights_trends_lede_flat">Учтённое время держится ровно на протяжении периода.</string>
+    <string name="insights_trends_lede_up">Учтённое время растёт%1$s.</string>
+    <string name="insights_trends_lede_down">Учтённое время снижается%1$s.</string>
+    <string name="insights_trends_lede_rate_day">, примерно %1$s%2$s в день</string>
+    <string name="insights_trends_lede_rate_week">, примерно %1$s%2$s в неделю</string>
+    <string name="insights_trends_lede_rate_month">, примерно %1$s%2$s в месяц</string>
+    <string name="insights_trends_lede_support_day">Самый загруженный день: %1$s (%2$s).</string>
+    <string name="insights_trends_lede_support_week">Самая загруженная неделя: %1$s (%2$s).</string>
+    <string name="insights_trends_lede_support_month">Самый загруженный месяц: %1$s (%2$s).</string>
+
+    <!-- Empty period. -->
+    <string name="insights_trends_empty_title">Пока нечего показать во времени</string>
+    <string name="insights_trends_empty_description">События с указанным временем в этом периоде появятся здесь как тренд по дням, неделям или месяцам.</string>
+
+    <!-- Per-bucket chart. -->
+    <string name="insights_trends_series_tracked">Учтено</string>
+    <string name="insights_trends_series_avg">Среднее за 7 дней</string>
+    <string name="insights_trends_per_bucket_title_day">Учтённое время по дням</string>
+    <string name="insights_trends_per_bucket_title_week">Учтённое время по неделям</string>
+    <string name="insights_trends_per_bucket_title_month">Учтённое время по месяцам</string>
+    <string name="insights_trends_per_bucket_headline_day">Самый загруженный день: %1$s (%2$s).%3$s</string>
+    <string name="insights_trends_per_bucket_headline_week">Самый загруженный неделя: %1$s (%2$s).%3$s</string>
+    <string name="insights_trends_per_bucket_headline_month">Самый загруженный месяц: %1$s (%2$s).%3$s</string>
+    <string name="insights_trends_per_bucket_aria_day">Учтённое время по дням, %1$s</string>
+    <string name="insights_trends_per_bucket_aria_week">Учтённое время по неделям, %1$s</string>
+    <string name="insights_trends_per_bucket_aria_month">Учтённое время по месяцам, %1$s</string>
+    <string name="insights_trends_busiest_day">Самый загруженный день</string>
+    <string name="insights_trends_busiest_week">Самый загруженный неделя</string>
+    <string name="insights_trends_busiest_month">Самый загруженный месяц</string>
+    <string name="insights_trends_sr_summary_day">Учтено %1$s по %2$d дням. Самый загруженный: %3$s — %4$s.</string>
+    <string name="insights_trends_sr_summary_week">Учтено %1$s по %2$d неделям. Самый загруженный: %3$s — %4$s.</string>
+    <string name="insights_trends_sr_summary_month">Учтено %1$s по %2$d месяцам. Самый загруженный: %3$s — %4$s.</string>
+    <string name="insights_trends_trend_up">" Растёт на протяжении периода."</string>
+    <string name="insights_trends_trend_down">" Снижается на протяжении периода."</string>
+    <string name="insights_trends_trend_flat">" Держится ровно на протяжении периода."</string>
+    <string name="insights_trends_footnote_avg">Кривая: скользящее среднее за 7 дней · нажми на день для деталей</string>
+    <string name="insights_trends_footnote_unusual">○ необычный день</string>
+    <string name="insights_trends_total_tracked">Всего учтено</string>
+
+    <!-- Momentum. -->
+    <string name="insights_trends_momentum">Динамика</string>
+    <string name="insights_trends_current_streak">Текущая серия</string>
+    <string name="insights_trends_longest_streak">Самая длинная серия</string>
+    <plurals name="insights_trends_days">
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дня</item>
+        <item quantity="many">%d дней</item>
+        <item quantity="other">%d дня</item>
+    </plurals>
+    <string name="insights_trends_consistency">Стабильность</string>
+    <string name="insights_trends_trend_rate">Скорость тренда</string>
+    <string name="insights_trends_level">Ровно</string>
+    <string name="insights_trends_trend_rate_per_day">%1$s%2$s/день</string>
+    <string name="insights_trends_unusually_heavy">Необычно много:</string>
+    <string name="insights_trends_unusually_light">Необычно мало:</string>
+
+    <!-- By context over time. -->
+    <string name="insights_trends_by_context_title">По контекстам во времени</string>
+    <string name="insights_trends_by_context_headline">Лидирует %1$s — %2$s (%3$s учтённого времени).</string>
+    <string name="insights_trends_by_context_aria_day">Учтённое время по контекстам по дням, топ-%1$d контекстов</string>
+    <string name="insights_trends_by_context_aria_week">Учтённое время по контекстам по неделям, топ-%1$d контекстов</string>
+    <string name="insights_trends_by_context_aria_month">Учтённое время по контекстам по месяцам, топ-%1$d контекстов</string>
+    <string name="insights_trends_col_context">Контекст</string>
+    <string name="insights_trends_col_time">Время</string>
+    <string name="insights_trends_col_share">Доля</string>
+</resources>
