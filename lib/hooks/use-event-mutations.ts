@@ -32,6 +32,13 @@ export type DeleteOp =
   | { kind: "delete"; id: string }
   | { kind: "cancel"; event: EventRow; occurrenceDate: number };
 
+/** One event of an .ics import: the row to create + the occurrence starts to cancel on it. */
+export interface ImportItem {
+  input: EventInput;
+  /** EXDATE instants; applied as cancel overrides when the created row is a series. */
+  exdates: number[];
+}
+
 /** A reversible action: a label for the toast + the inverse to run. */
 type UndoSpec = { label: string; undo: () => Promise<boolean> };
 
@@ -227,6 +234,43 @@ export function useEventMutations(workspaceId: string | undefined) {
             ? null
             : inverse(t("undoLabel.create"), () =>
                 Promise.all(rows.map((r) => m.deleteEvent(sb, r.id))),
+              ),
+      ),
+    /**
+     * An .ics import: one bulk insert, then the series' EXDATEs as cancel
+     * overrides on the rows just created. One invalidate + one toast whose
+     * Undo deletes every created row (their overrides cascade). If the
+     * overrides fail, the created rows are removed so nothing half-imports.
+     */
+    importEvents: (items: ImportItem[]) =>
+      run(
+        (async () => {
+          const rows = await m.createEventsBulk(
+            sb,
+            items.map((i) => i.input),
+          );
+          const cancels = rows.flatMap((row, i) =>
+            row.rrule ? items[i].exdates.map((d) => ({ eventId: row.id, occurrenceDate: d })) : [],
+          );
+          if (cancels.length > 0) {
+            try {
+              await m.insertCancelOverrides(sb, workspaceId!, cancels);
+            } catch (e) {
+              await m.deleteEventsBulk(sb, rows.map((r) => r.id)).catch(() => {});
+              throw e;
+            }
+          }
+          return rows;
+        })(),
+        t("eventsImported", { count: items.length }),
+        (rows) =>
+          rows.length === 0
+            ? null
+            : inverse(t("undoLabel.import"), () =>
+                m.deleteEventsBulk(
+                  sb,
+                  rows.map((r) => r.id),
+                ),
               ),
       ),
     updateSingle: (

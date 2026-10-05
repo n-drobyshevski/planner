@@ -38,6 +38,7 @@ import {
   mapCheckpoint,
   mapTaskDependency,
 } from "./mappers";
+import type { ExistingEvent } from "@/lib/ical/review";
 
 export interface WorkspaceBundle {
   workspaceId: string;
@@ -416,4 +417,75 @@ export async function fetchSleepLogs(
     .order("date");
   if (error) throw error;
   return (data ?? []).map(mapSleepLog);
+}
+
+/** Rows per page / per IN list for the import duplicate lookup. */
+const IMPORT_UID_CHUNK = 100;
+/** PostgREST's max_rows: a page never returns more than this. */
+const PAGE_ROWS = 1000;
+
+/**
+ * The member's events an .ics import could duplicate (see lib/ical/review
+ * `isDuplicate`): those carrying one of the file's UIDs in
+ * `attributes.icalUid` (looked up in chunks of 100), plus every event
+ * overlapping the file's span [minStart, maxEnd] for the title + time match
+ * (paged past PostgREST's 1000-row cap). Deduplicated by id.
+ */
+export async function fetchImportDuplicates(
+  sb: SupabaseClient,
+  params: {
+    workspaceId: string;
+    ownerId: string;
+    uids: string[];
+    minStart: number;
+    maxEnd: number;
+  },
+): Promise<ExistingEvent[]> {
+  const { workspaceId, ownerId, minStart, maxEnd } = params;
+  const cols = "id, title, starts_at, ends_at, attributes";
+  const byId = new Map<string, ExistingEvent>();
+  const add = (rows: Record<string, unknown>[] | null) => {
+    for (const r of rows ?? []) {
+      const attrs = r.attributes as Record<string, unknown> | null;
+      byId.set(r.id as string, {
+        icalUid: typeof attrs?.icalUid === "string" ? attrs.icalUid : null,
+        title: (r.title as string | null) ?? "",
+        start: new Date(r.starts_at as string).getTime(),
+        end: new Date(r.ends_at as string).getTime(),
+      });
+    }
+  };
+
+  // postgrest-js quotes IN values holding , ( ) but doesn't escape quotes or
+  // backslashes; such (rare) UIDs still match on title + time below.
+  const uids = [...new Set(params.uids)].filter((u) => u !== "" && !/["\\]/.test(u));
+  for (let i = 0; i < uids.length; i += IMPORT_UID_CHUNK) {
+    const { data, error } = await sb
+      .from("events")
+      .select(cols)
+      .eq("workspace_id", workspaceId)
+      .eq("owner_id", ownerId)
+      .in("attributes->>icalUid", uids.slice(i, i + IMPORT_UID_CHUNK));
+    if (error) throw error;
+    add(data);
+  }
+
+  if (maxEnd >= minStart) {
+    for (let from = 0; ; from += PAGE_ROWS) {
+      const { data, error } = await sb
+        .from("events")
+        .select(cols)
+        .eq("workspace_id", workspaceId)
+        .eq("owner_id", ownerId)
+        .lte("starts_at", new Date(maxEnd).toISOString())
+        .gte("ends_at", new Date(minStart).toISOString())
+        .order("starts_at")
+        .order("id")
+        .range(from, from + PAGE_ROWS - 1);
+      if (error) throw error;
+      add(data);
+      if (!data || data.length < PAGE_ROWS) break;
+    }
+  }
+  return [...byId.values()];
 }

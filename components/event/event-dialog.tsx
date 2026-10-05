@@ -36,7 +36,6 @@ import { DisclosureSection } from "@/components/ui/disclosure-section";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Lock,
-  Eye,
   EyeOff,
   Trash2,
   Users,
@@ -49,6 +48,7 @@ import { PendingIcon } from "@/components/ui/pending-icon";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimeField } from "@/components/ui/time-field";
 import { RecurrenceEditor } from "./recurrence-editor";
+import { VisibilityToggle } from "./visibility-toggle";
 import { RecurrenceScopePrompt, type RecurrenceScope } from "./recurrence-scope-prompt";
 import { ColorSwatchPicker } from "@/components/shared/color-swatch-picker";
 import { toPaletteColor } from "@/lib/theme/appearance";
@@ -73,17 +73,13 @@ import {
   ceilToStep,
 } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
+import {
+  deriveSharing as deriveSharingFor,
+  usableCategories,
+} from "@/lib/events/sharing";
 import type { Category, EventKind, EventRow, EventStatus, Occurrence } from "@/lib/types";
 import type { EventInput } from "@/lib/supabase/mappers";
 
-/**
- * Visibility of an item (outside a Shared context):
- *  - private: only the owner sees it
- *  - visible: the default — the partner can see it on the owner's calendar
- *    (overlay), only the owner edits
- *  - shared: joint — both see it on their own calendars and both can edit it
- */
-type EventVisibility = EventFormValues["visibility"];
 
 /** Sentinel Select value for the inline "Create new context…" action. */
 const CREATE_CONTEXT_VALUE = "__create__";
@@ -147,25 +143,12 @@ export function EventDialog(props: EventDialogProps) {
 
   const isRecurringEdit = mode === "edit" && Boolean(event?.rrule);
 
-  const usableCategories = categories.filter(
-    (c) => c.ownerId === null || c.ownerId === currentMemberId,
-  );
+  const contexts = usableCategories(categories, currentMemberId);
 
-  // An item filed under a SHARED context (owner_id IS NULL) is JOINT via the
-  // context, so the per-event visibility control is hidden and the stored flags
-  // are coerced clean (jointness comes from the context). Otherwise the 3-way
-  // control governs the flags.
+  // A shared context makes the item joint and hides the visibility control
+  // (see lib/events/sharing).
   function deriveSharing(values: EventFormValues) {
-    const selectedCategory =
-      values.categoryId !== "none"
-        ? categories.find((c) => c.id === values.categoryId) ?? null
-        : null;
-    const sharedContext = selectedCategory?.ownerId === null;
-    return {
-      sharedContext,
-      isPrivate: sharedContext ? false : values.visibility === "private",
-      isShared: sharedContext ? false : values.visibility === "shared",
-    };
+    return deriveSharingFor(values.categoryId, values.visibility, categories);
   }
 
   const schema = useMemo(() => createEventFormSchema(timeZone), [timeZone]);
@@ -717,7 +700,7 @@ export function EventDialog(props: EventDialogProps) {
                             <SelectContent>
                               <SelectGroup>
                                 <SelectItem value="none">{t("dialog.noContext")}</SelectItem>
-                                {usableCategories.map((c) => (
+                                {contexts.map((c) => (
                                   <SelectItem key={c.id} value={c.id}>
                                     {c.name}
                                   </SelectItem>
@@ -749,28 +732,10 @@ export function EventDialog(props: EventDialogProps) {
                             {(field) => (
                               <Field>
                                 <FieldLabel>{t("dialog.sharing")}</FieldLabel>
-                                <ToggleGroup
-                                  type="single"
-                                  variant="outline"
+                                <VisibilityToggle
                                   value={field.state.value}
-                                  onValueChange={(v) =>
-                                    v && field.handleChange(v as EventVisibility)
-                                  }
-                                  className="flex-wrap justify-start max-sm:[&_[data-slot=toggle-group-item]]:h-11"
-                                >
-                                  <ToggleGroupItem value="private">
-                                    <Lock data-icon="inline-start" />
-                                    {t("dialog.visibilityPrivate")}
-                                  </ToggleGroupItem>
-                                  <ToggleGroupItem value="visible">
-                                    <Eye data-icon="inline-start" />
-                                    {t("dialog.visibilityVisible")}
-                                  </ToggleGroupItem>
-                                  <ToggleGroupItem value="shared">
-                                    <Users data-icon="inline-start" />
-                                    {t("dialog.visibilityShared")}
-                                  </ToggleGroupItem>
-                                </ToggleGroup>
+                                  onChange={field.handleChange}
+                                />
                                 <FieldDescription>
                                   {field.state.value === "private"
                                     ? t("dialog.visibilityHintPrivate")

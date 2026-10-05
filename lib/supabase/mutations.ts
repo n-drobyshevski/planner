@@ -144,6 +144,75 @@ export async function deleteEvent(sb: SupabaseClient, id: string): Promise<void>
   if (error) throw error;
 }
 
+/** Rows per bulk INSERT / DELETE statement (keeps request bodies and URLs small). */
+const BULK_CHUNK = 200;
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Create many events in a few statements (one INSERT … RETURNING per 200
+ * rows), e.g. an .ics import. Rows come back in input order: Postgres returns
+ * a multi-row INSERT's rows in VALUES order, which PostgREST preserves.
+ */
+export async function createEventsBulk(
+  sb: SupabaseClient,
+  inputs: EventInput[],
+): Promise<EventRow[]> {
+  const out: EventRow[] = [];
+  try {
+    for (const part of chunk(inputs, BULK_CHUNK)) {
+      const { data, error } = await sb.from("events").insert(part.map(eventInputToRow)).select();
+      if (error) throw error;
+      const rows = (data ?? []).map(mapEvent);
+      out.push(...rows);
+      if (rows.length !== part.length) throw new Error("Some events weren't created.");
+    }
+  } catch (e) {
+    // All or nothing: drop the chunks already written, then report the failure.
+    await deleteEventsBulk(
+      sb,
+      out.map((r) => r.id),
+    ).catch(() => {});
+    throw e;
+  }
+  return out;
+}
+
+/** Delete many events by id (their overrides cascade); the undo of a bulk create. */
+export async function deleteEventsBulk(sb: SupabaseClient, ids: string[]): Promise<void> {
+  for (const part of chunk(ids, BULK_CHUNK)) {
+    const { error } = await sb.from("events").delete().in("id", part);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Cancel many occurrences at once (an imported series' EXDATEs): one bulk
+ * INSERT of `type: "cancel"` override rows, shaped like `applyOverride`'s. The
+ * series are new, so there's no prior override to merge onto.
+ */
+export async function insertCancelOverrides(
+  sb: SupabaseClient,
+  workspaceId: string,
+  rows: { eventId: string; occurrenceDate: number }[],
+): Promise<void> {
+  for (const part of chunk(rows, BULK_CHUNK)) {
+    const { error } = await sb.from("event_overrides").insert(
+      part.map((r) => ({
+        workspace_id: workspaceId,
+        event_id: r.eventId,
+        occurrence_date: toIso(r.occurrenceDate),
+        type: "cancel",
+      })),
+    );
+    if (error) throw error;
+  }
+}
+
 /**
  * Raw rows captured before a delete so undo can re-insert them verbatim. We
  * keep the full Postgres rows (not the domain shape) because restore must
