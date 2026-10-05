@@ -1,4 +1,249 @@
 {
   "file": "strings_insights_overview.xml",
-  "entries": []
+  "entries": [
+    {
+      "web": "insights:lede.overviewHeadline",
+      "sha": "e3db818e3d4999f4",
+      "android": {
+        "insights_overview_lede_headline": 2,
+        "insights_overview_lede_up_week": 2,
+        "insights_overview_lede_up_month": 2,
+        "insights_overview_lede_up_period": 2,
+        "insights_overview_lede_down_week": 2,
+        "insights_overview_lede_down_month": 2,
+        "insights_overview_lede_down_period": 2,
+        "insights_overview_lede_level_week": 0,
+        "insights_overview_lede_level_month": 0,
+        "insights_overview_lede_level_period": 0
+      }
+    },
+    {
+      "web": "insights:lede.overviewSupport",
+      "sha": "832bc43a101377f6",
+      "android": {
+        "insights_overview_lede_support": 2
+      }
+    },
+    {
+      "web": "insights:overview.leadTotal",
+      "sha": "9857a7068813ca0a",
+      "android": {
+        "insights_overview_lead_total": 0
+      }
+    },
+    {
+      "web": "insights:overview.leadDailyAvg",
+      "sha": "1df30a1a4fc4645f",
+      "android": {
+        "insights_overview_lead_daily_avg": 0
+      }
+    },
+    {
+      "web": "insights:overview.leadActiveDays",
+      "sha": "bd5015f1eb3ac978",
+      "android": {
+        "insights_overview_lead_active_days": 0
+      }
+    },
+    {
+      "web": "insights:overview.events",
+      "sha": "0444914ff9412348",
+      "android": {
+        "insights_overview_events": 0
+      }
+    },
+    {
+      "web": "insights:overview.eventsHint",
+      "sha": "976e9b4fee8ef095",
+      "android": {
+        "insights_overview_events_hint": 0
+      }
+    },
+    {
+      "web": "insights:overview.avgSession",
+      "sha": "4612fcfeb1b60b38",
+      "android": {
+        "insights_overview_avg_session": 0
+      }
+    },
+    {
+      "web": "insights:overview.avgSessionHint",
+      "sha": "eb35930b59d12727",
+      "android": {
+        "insights_overview_avg_session_hint": 0
+      }
+    },
+    {
+      "web": "insights:overview.busiestDay",
+      "sha": "3e673ce9785fea30",
+      "android": {
+        "insights_overview_busiest_day": 0
+      }
+    },
+    {
+      "web": "insights:overview.tasksDone",
+      "sha": "64fd07ee5184ad32",
+      "android": {
+        "insights_overview_tasks_done": 0
+      }
+    },
+    {
+      "web": "insights:overview.onTime",
+      "sha": "d76fa410528aa682",
+      "android": {
+        "insights_overview_on_time": 0
+      }
+    },
+    {
+      "web": "insights:overview.onTimeDue",
+      "sha": "830f388c8a099530",
+      "android": {
+        "insights_overview_on_time_due": 1
+      }
+    },
+    {
+      "web": "insights:overview.onTimeNothing",
+      "sha": "7d1b74464205fa1f",
+      "android": {
+        "insights_overview_on_time_nothing": 0
+      }
+    },
+    {
+      "web": "insights:overview.overdue",
+      "sha": "1b7d2ad41adb53c2",
+      "android": {
+        "insights_overview_overdue": 0
+      }
+    },
+    {
+      "web": "insights:overview.overdueHint",
+      "sha": "ea9bb5b90013a2d5",
+      "android": {
+        "insights_overview_overdue_hint": 0
+      }
+    },
+    {
+      "web": "insights:overview.perDay",
+      "sha": "607df6d7bdffafcb",
+      "android": {
+        "insights_overview_per_day": 0
+      }
+    },
+    {
+      "web": "insights:overview.perDayHeadline",
+      "sha": "a6a00113d98fc07f",
+      "android": {
+        "insights_overview_per_day_headline_none": 1,
+        "insights_overview_per_day_headline_level": 1,
+        "insights_overview_per_day_headline_up": 2,
+        "insights_overview_per_day_headline_down": 2
+      }
+    },
+    {
+      "web": "insights:overview.perDayFootnoteTypical",
+      "sha": "2e78f0ea7f886f28",
+      "android": {
+        "insights_overview_per_day_footnote_typical": 1
+      }
+    },
+    {
+      "web": "insights:overview.perDayFootnote",
+      "sha": "24e742eca27a95dc",
+      "android": {
+        "insights_overview_per_day_footnote": 0
+      }
+    },
+    {
+      "web": "insights:overview.perDayAria",
+      "sha": "965540328ca19833",
+      "android": {
+        "insights_overview_per_day_aria": 1
+      }
+    },
+    {
+      "web": "insights:overview.seriesTracked",
+      "sha": "99d95b6116ad88ac",
+      "android": {
+        "insights_overview_series_tracked": 0
+      }
+    },
+    {
+      "web": "insights:overview.seriesAvg",
+      "sha": "ee4161278f1cb965",
+      "android": {
+        "insights_overview_series_avg": 0
+      }
+    },
+    {
+      "web": "insights:overview.seriesPrev",
+      "sha": "8a0272b83c87ad75",
+      "android": {
+        "insights_overview_series_prev": 0
+      }
+    },
+    {
+      "web": "insights:overview.byContext",
+      "sha": "538f148e83c77628",
+      "android": {
+        "insights_overview_by_context": 0
+      }
+    },
+    {
+      "web": "insights:overview.other",
+      "sha": "3a70f60c42e40483",
+      "android": {
+        "insights_overview_other": 0
+      }
+    },
+    {
+      "web": "insights:overview.shifts",
+      "sha": "14cddfc3fc166f5f",
+      "android": {
+        "insights_overview_shifts": 0
+      }
+    },
+    {
+      "web": "insights:overview.shareHeadline",
+      "sha": "b059645dcc62fac9",
+      "android": {
+        "insights_overview_share_headline": 2
+      }
+    },
+    {
+      "web": "insights:overview.shiftPoints",
+      "sha": "c586c74bffe6b346",
+      "android": {
+        "insights_overview_shift_points_up": 2,
+        "insights_overview_shift_points_down": 2
+      }
+    },
+    {
+      "web": "insights:overview.shiftPts",
+      "sha": "76b2b74cab99e501",
+      "android": {
+        "insights_overview_shift_pts": 1
+      }
+    },
+    {
+      "web": "insights:overview.srSummary",
+      "sha": "39adf56ee3f0ebc4",
+      "android": {
+        "insights_overview_sr_summary": 2
+      }
+    },
+    {
+      "web": "insights:overview.srBusiest",
+      "sha": "ea08780e7ae3ee76",
+      "android": {
+        "insights_overview_sr_busiest": 2
+      }
+    },
+    {
+      "web": "insights:overview.srTopContext",
+      "sha": "97b6a15dabfff100",
+      "android": {
+        "insights_overview_sr_top_context": 1
+      }
+    }
+  ]
 }

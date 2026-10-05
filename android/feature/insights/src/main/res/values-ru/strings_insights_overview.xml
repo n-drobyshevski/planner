@@ -1,2 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources />
+<!-- Insights overview strings, copied from messages/ru (manifest:
+     src/test/resources/strings-source/overview.json). Names start with insights_overview_. -->
+<resources>
+    <!-- Lede (lede.overviewHeadline): the frame, then one clause per direction × unit (%2$s; "" for none). -->
+    <string name="insights_overview_lede_headline">Учтено %1$s%2$s.</string>
+    <string name="insights_overview_lede_up_week">, рост на %1$d%% (%2$s) к предыдущей неделе</string>
+    <string name="insights_overview_lede_up_month">, рост на %1$d%% (%2$s) к предыдущему месяцу</string>
+    <string name="insights_overview_lede_up_period">, рост на %1$d%% (%2$s) к предыдущему периоду</string>
+    <string name="insights_overview_lede_down_week">, падение на %1$d%% (%2$s) к предыдущей неделе</string>
+    <string name="insights_overview_lede_down_month">, падение на %1$d%% (%2$s) к предыдущему месяцу</string>
+    <string name="insights_overview_lede_down_period">, падение на %1$d%% (%2$s) к предыдущему периоду</string>
+    <string name="insights_overview_lede_level_week">, наравне с предыдущей неделей</string>
+    <string name="insights_overview_lede_level_month">, наравне с предыдущим месяцем</string>
+    <string name="insights_overview_lede_level_period">, наравне с предыдущим периодом</string>
+    <string name="insights_overview_lede_support">Больше всего ушло на %1$s (%2$d%%).</string>
+
+    <!-- Lead figures and stats. -->
+    <string name="insights_overview_lead_total">Всего</string>
+    <string name="insights_overview_lead_daily_avg">Среднее за день</string>
+    <string name="insights_overview_lead_active_days">Активные дни</string>
+    <string name="insights_overview_events">События</string>
+    <string name="insights_overview_events_hint">учтено за период</string>
+    <string name="insights_overview_avg_session">Средний блок</string>
+    <string name="insights_overview_avg_session_hint">на учтённое событие</string>
+    <string name="insights_overview_busiest_day">Самый загруженный день</string>
+    <string name="insights_overview_tasks_done">Задач сделано</string>
+    <string name="insights_overview_on_time">В срок</string>
+    <string name="insights_overview_on_time_due">%1$d к сроку</string>
+    <string name="insights_overview_on_time_nothing">ничего не назначено</string>
+    <string name="insights_overview_overdue">Просрочено</string>
+    <string name="insights_overview_overdue_hint">открыты после срока</string>
+
+    <!-- Per day (overview.perDayHeadline, one string per trend). -->
+    <string name="insights_overview_per_day">По дням</string>
+    <string name="insights_overview_per_day_headline_none">Учтено %1$s за этот период.</string>
+    <string name="insights_overview_per_day_headline_level">Учтено %1$s, наравне с предыдущим периодом.</string>
+    <string name="insights_overview_per_day_headline_up">Учтено %1$s, рост на %2$d%% к предыдущему периоду.</string>
+    <string name="insights_overview_per_day_headline_down">Учтено %1$s, падение на %2$d%% к предыдущему периоду.</string>
+    <string name="insights_overview_per_day_footnote_typical">Пунктир: типичный день (%1$s) · кривая: скользящее среднее за 7 дней · нажми на день для деталей</string>
+    <string name="insights_overview_per_day_footnote">Кривая: скользящее среднее за 7 дней · нажми на день для деталей</string>
+    <string name="insights_overview_per_day_aria">Учтённое время по дням, %1$s</string>
+    <string name="insights_overview_series_tracked">Учтено</string>
+    <string name="insights_overview_series_avg">Среднее за 7 дней</string>
+    <string name="insights_overview_series_prev">Предыдущий период</string>
+
+    <!-- By context and shifts. -->
+    <string name="insights_overview_by_context">По контекстам</string>
+    <string name="insights_overview_other">Прочее</string>
+    <string name="insights_overview_shifts">Сдвиги к предыдущему периоду</string>
+    <string name="insights_overview_share_headline">Больше всего времени ушло на %1$s (%2$s).</string>
+    <string name="insights_overview_shift_points_up">%1$s: доля выросла на %2$d пунктов к предыдущему периоду</string>
+    <string name="insights_overview_shift_points_down">%1$s: доля упала на %2$d пунктов к предыдущему периоду</string>
+    <string name="insights_overview_shift_pts">%1$d п.</string>
+
+    <!-- Screen-reader summary on the per-day chart. -->
+    <string name="insights_overview_sr_summary">Учтено %1$s за %2$s.</string>
+    <string name="insights_overview_sr_busiest">" Самый загруженный день %1$s — %2$s."</string>
+    <string name="insights_overview_sr_top_context">" Больше всего времени ушло на %1$s."</string>
+</resources>
