@@ -1,4 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Insights tasks strings, copied from messages/en (manifest:
      src/test/resources/strings-source/tasks.json). Names start with insights_tasks_. -->
-<resources />
+<resources>
+    <!-- Lede (lede.tasks*). The done headline is a plural frame plus a comparison clause (TasksText.ledeSpec). -->
+    <plurals name="insights_tasks_lede_overdue">
+        <item quantity="one">%d task is overdue and still open.</item>
+        <item quantity="other">%d tasks are overdue and still open.</item>
+    </plurals>
+    <plurals name="insights_tasks_lede_done">
+        <item quantity="one">You finished %1$d task in this period%2$s.</item>
+        <item quantity="other">You finished %1$d tasks in this period%2$s.</item>
+    </plurals>
+    <string name="insights_tasks_lede_more_week">, %1$d more than the previous week</string>
+    <string name="insights_tasks_lede_more_month">, %1$d more than the previous month</string>
+    <string name="insights_tasks_lede_more_period">, %1$d more than the previous period</string>
+    <string name="insights_tasks_lede_fewer_week">, %1$d fewer than the previous week</string>
+    <string name="insights_tasks_lede_fewer_month">, %1$d fewer than the previous month</string>
+    <string name="insights_tasks_lede_fewer_period">, %1$d fewer than the previous period</string>
+    <plurals name="insights_tasks_lede_done_support">
+        <item quantity="one">You finished %d task in this period.</item>
+        <item quantity="other">You finished %d tasks in this period.</item>
+    </plurals>
+    <string name="insights_tasks_lede_adherence">%1$d%% of due tasks landed on time.</string>
+
+    <!-- No top-level tasks. -->
+    <string name="insights_tasks_empty_title">No tasks yet</string>
+    <string name="insights_tasks_empty_description">Create tasks in a collection and their throughput shows up here.</string>
+    <string name="insights_tasks_open_tasks">Open tasks</string>
+
+    <!-- Lead figures and stats. -->
+    <string name="insights_tasks_lead_completed">Completed</string>
+    <string name="insights_tasks_lead_created">Created</string>
+    <string name="insights_tasks_lead_on_time">On time</string>
+    <string name="insights_tasks_on_time_due">of %1$d due</string>
+    <string name="insights_tasks_on_time_nothing">nothing due</string>
+    <string name="insights_tasks_overdue">Overdue</string>
+    <string name="insights_tasks_overdue_hint">open past their due day</string>
+    <string name="insights_tasks_done_of_created">Done of created</string>
+    <string name="insights_tasks_done_of_created_hint">created this period</string>
+    <string name="insights_tasks_lead_time">Lead time</string>
+    <string name="insights_tasks_lead_time_hint">median, created to done</string>
+    <string name="insights_tasks_lead_days">%1$dd</string>
+    <string name="insights_tasks_lead_days_hours">%1$dd %2$dh</string>
+    <string name="insights_tasks_top_level_note">Top-level tasks only; subtasks count toward their parent.</string>
+
+    <!-- Velocity chart (tasks.velocity / velocityAria: one string per granularity). -->
+    <string name="insights_tasks_velocity_day">Velocity per day</string>
+    <string name="insights_tasks_velocity_week">Velocity per week</string>
+    <string name="insights_tasks_velocity_month">Velocity per month</string>
+    <string name="insights_tasks_velocity_aria_day">Tasks created vs completed per day, %1$s</string>
+    <string name="insights_tasks_velocity_aria_week">Tasks created vs completed per week, %1$s</string>
+    <string name="insights_tasks_velocity_aria_month">Tasks created vs completed per month, %1$s</string>
+    <string name="insights_tasks_series_completed">Completed</string>
+    <string name="insights_tasks_series_created">Created</string>
+    <string name="insights_tasks_sr_summary">%1$d tasks completed and %2$d created in %3$s. %4$d open tasks are overdue.</string>
+</resources>
