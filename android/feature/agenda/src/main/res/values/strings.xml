@@ -171,4 +171,60 @@
     <!-- Optimistic-concurrency conflict (StaleWriteError in lib/supabase/mutations.ts) -->
     <string name="agenda_stale_event">This event was changed elsewhere.</string>
     <string name="agenda_stale_reload">Reload</string>
+
+    <!-- .ics import review (calendar.import, toasts.eventsImported) -->
+    <string name="agenda_import_title">Import events</string>
+    <string name="agenda_import_no_file_title">Nothing to import</string>
+    <string name="agenda_import_no_file_body">Open an .ics file from another app, or pick one from the account menu.</string>
+    <string name="agenda_import_no_events">There are no events in this file.</string>
+    <string name="agenda_import_lookup_error">Couldn\'t check which events are already in Planr.</string>
+    <string name="agenda_import_name_filter">Name</string>
+    <string name="agenda_import_name_placeholder">word, wild*card or /regex/</string>
+    <string name="agenda_import_invalid_regex">That regular expression isn\'t valid.</string>
+    <string name="agenda_import_date_range">Dates</string>
+    <string name="agenda_import_from">From</string>
+    <string name="agenda_import_to">To</string>
+    <string name="agenda_import_any_date">Any date</string>
+    <!-- Clears the From / To date ("Clear From"). -->
+    <string name="agenda_import_clear_date">Clear %1$s</string>
+    <string name="agenda_import_select_all">Select all</string>
+    <string name="agenda_import_select_none">Select none</string>
+    <!-- "3 of 12 events": rows the filters keep, of all rows. -->
+    <plurals name="agenda_import_shown">
+        <item quantity="one">%1$d of %2$d event</item>
+        <item quantity="other">%1$d of %2$d events</item>
+    </plurals>
+    <string name="agenda_import_no_matches">No events match these filters.</string>
+    <string name="agenda_import_filing">Import into</string>
+    <!-- Row checkbox, read with the event's title. -->
+    <string name="agenda_import_include">Import %1$s</string>
+    <string name="agenda_import_edit_row">Edit %1$s</string>
+    <string name="agenda_import_repeats">Repeats</string>
+    <string name="agenda_import_repeats_yearly">Repeats yearly</string>
+    <string name="agenda_import_badge_duplicate">Already in Planr</string>
+    <string name="agenda_import_badge_cancelled">Cancelled</string>
+    <string name="agenda_import_badge_rrule_unsupported">Repeats not supported</string>
+    <string name="agenda_import_badge_zone_unknown">Unknown time zone</string>
+    <string name="agenda_import_badge_rdate_ignored">Extra dates ignored</string>
+    <string name="agenda_import_badge_edited">Edited</string>
+    <string name="agenda_import_title_label">Title</string>
+    <string name="agenda_import_reset">Undo edits</string>
+    <!-- A row's times: "Mon, 5 Oct · 09:00 – 09:30". -->
+    <string name="agenda_import_when">%1$s · %2$s</string>
+    <string name="agenda_import_range">%1$s – %2$s</string>
+    <string name="agenda_import_submit_none">Import</string>
+    <plurals name="agenda_import_submit">
+        <item quantity="one">Import %d event</item>
+        <item quantity="other">Import %d events</item>
+    </plurals>
+    <string name="agenda_import_importing">Importing…</string>
+    <plurals name="agenda_import_skipped">
+        <item quantity="one">%d event in the file couldn\'t be read.</item>
+        <item quantity="other">%d events in the file couldn\'t be read.</item>
+    </plurals>
+    <plurals name="agenda_import_done">
+        <item quantity="one">Imported %d event</item>
+        <item quantity="other">Imported %d events</item>
+    </plurals>
+    <string name="agenda_import_failed">Couldn\'t import. Nothing was added.</string>
 </resources>

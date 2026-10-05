@@ -12,7 +12,9 @@
     <string name="widget_week_name">Week</string>
     <string name="widget_week_description">This week, day by day, for both of you</string>
     <string name="widget_month_name">Month</string>
-    <string name="widget_month_description">The month at a glance, with a dot for whose plans</string>
+    <string name="widget_month_description">The month at a glance, with your events day by day</string>
+    <string name="widget_week_grid_name">Week grid</string>
+    <string name="widget_week_grid_description">The week in seven columns, with your events day by day</string>
 
     <!-- Shared states -->
     <string name="widget_sign_in">Sign in</string>
@@ -30,6 +32,8 @@
     <!-- Week -->
     <string name="widget_week_title">This week</string>
     <string name="widget_week_signed_out">Sign in to see your week here.</string>
+    <string name="widget_week_previous">Previous week</string>
+    <string name="widget_week_next">Next week</string>
     <!-- A day with nothing on it, beside its heading (also read out for a month cell). -->
     <string name="widget_week_free">Free</string>
     <plurals name="widget_week_event_count">
@@ -39,6 +43,13 @@
 
     <!-- Month -->
     <string name="widget_month_signed_out">Sign in to see your month here.</string>
+    <string name="widget_month_previous">Previous month</string>
+    <string name="widget_month_next">Next month</string>
+    <string name="widget_month_add_event">Add event</string>
+    <!-- Read out for a week-number cell: "Week 41". -->
+    <string name="widget_month_week">Week %1$d</string>
+    <!-- More events in a day than fit its cell: "+2". -->
+    <string name="widget_month_more">+%1$d</string>
 
     <!-- Tasks -->
     <string name="widget_tasks_signed_out">Sign in to see your tasks here.</string>
@@ -79,4 +90,5 @@
     <string name="widget_preview_weekday_5">F</string>
     <string name="widget_preview_weekday_6">S</string>
     <string name="widget_preview_weekday_7">S</string>
+    <string name="widget_preview_week_number">Week 41</string>
 </resources>

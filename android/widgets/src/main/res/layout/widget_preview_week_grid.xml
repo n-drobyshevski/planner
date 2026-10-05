@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget-picker preview (API 31+): a static sketch of WeekGridWidget.
+     RemoteViews-safe views only. Shown once, in the picker. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_background"
+    android:orientation="vertical"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="12dp"
+    tools:ignore="HardcodedText,ContentDescription,TooManyViews,NestedWeights">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/widget_preview_week_range"
+            android:textColor="@color/planr_widget_ink"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_preview_week_number"
+            android:textColor="@color/planr_widget_muted"
+            android:textSize="12sp" />
+
+        <ImageView style="@style/PlanrWidgetPreviewHeaderIcon" android:src="@drawable/ic_widget_chevron_left" />
+        <ImageView style="@style/PlanrWidgetPreviewHeaderIcon" android:src="@drawable/ic_widget_chevron_right" />
+
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/widget_preview_pill_accent"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="5dp">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_widget_plus"
+                android:tint="@color/planr_widget_on_accent" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/planr_widget_outline"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <LinearLayout style="@style/PlanrWidgetPreviewWeekGridHead">
+                <TextView style="@style/PlanrWidgetPreviewWeekGridWeekday" android:text="@string/widget_preview_weekday_1" />
+                <TextView style="@style/PlanrWidgetPreviewDate" android:background="@drawable/widget_preview_pill_accent" android:fontFamily="sans-serif-black" android:text="5" android:textColor="@color/planr_widget_on_accent" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewWeekGridHead" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewWeekGridWeekday" android:text="@string/widget_preview_weekday_2" />
+                <TextView style="@style/PlanrWidgetPreviewDate" android:text="6" android:textColor="@color/planr_widget_ink" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewWeekGridHead" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewWeekGridWeekday" android:text="@string/widget_preview_weekday_3" />
+                <TextView style="@style/PlanrWidgetPreviewDate" android:text="7" android:textColor="@color/planr_widget_ink" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewWeekGridHead" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewWeekGridWeekday" android:text="@string/widget_preview_weekday_4" />
+                <TextView style="@style/PlanrWidgetPreviewDate" android:text="8" android:textColor="@color/planr_widget_ink" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewWeekGridHead" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewWeekGridWeekday" android:text="@string/widget_preview_weekday_5" />
+                <TextView style="@style/PlanrWidgetPreviewDate" android:text="9" android:textColor="@color/planr_widget_ink" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewWeekGridHead" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewWeekGridWeekday" android:text="@string/widget_preview_weekday_6" />
+                <TextView style="@style/PlanrWidgetPreviewDate" android:text="10" android:textColor="@color/planr_widget_ink" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewWeekGridHead" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewWeekGridWeekday" android:text="@string/widget_preview_weekday_7" />
+                <TextView style="@style/PlanrWidgetPreviewDate" android:text="11" android:textColor="@color/planr_widget_ink" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="1dp"
+            android:orientation="horizontal">
+            <LinearLayout style="@style/PlanrWidgetPreviewDay" android:paddingTop="2dp">
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_member_a" android:text="@string/widget_preview_event_1" />
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_shared" android:text="@string/widget_preview_event_3" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewDay" android:paddingTop="2dp" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_member_b" android:text="@string/widget_preview_event_2" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewDay" android:paddingTop="2dp" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_member_a" android:text="@string/widget_preview_event_1" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewDay" android:paddingTop="2dp" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_shared" android:text="@string/widget_preview_event_3" />
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_member_b" android:text="@string/widget_preview_event_2" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewDay" android:paddingTop="2dp" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_member_a" android:text="@string/widget_preview_event_1" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewDay" android:paddingTop="2dp" android:layout_marginStart="1dp">
+                <TextView style="@style/PlanrWidgetPreviewChip" android:background="@color/planr_widget_shared" android:text="@string/widget_preview_event_3" />
+            </LinearLayout>
+            <LinearLayout style="@style/PlanrWidgetPreviewDay" android:paddingTop="2dp" android:layout_marginStart="1dp">
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -34,6 +34,8 @@ import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.local.CacheGate
+import page.planr.android.core.data.prefs.AppPrefsSync
+import page.planr.android.core.data.remote.SupabaseTables
 
 /**
  * Live sync while the app is in the foreground: one Realtime channel per
@@ -60,6 +62,7 @@ class RealtimeSync @Inject constructor(
     private val cacheGate: CacheGate,
     private val syncRunner: SyncRunner,
     private val widgets: WidgetRefreshDispatcher,
+    private val appPrefs: AppPrefsSync,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private var started = false
@@ -91,6 +94,12 @@ class RealtimeSync @Inject constructor(
                     changes.collect { (table, change) ->
                         val applied = runCatching { applier.apply(table, change, ticket) }.getOrDefault(false)
                         if (applied) widgets.requestRefresh()
+                    }
+                }
+                // The member's view settings, changed on another device (RLS: never the partner's).
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    changesOf(channel, SupabaseTables.MEMBER_APP_PREFS, workspaceId).collect { (_, change) ->
+                        if (change is RowChange.Upsert) runCatching { appPrefs.applyRemote(change.record) }
                     }
                 }
                 launch {

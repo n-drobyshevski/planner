@@ -63,7 +63,11 @@ sealed interface RowFilter {
 
     data class Gte(override val column: String, val value: String) : RowFilter
 
-    data class In(override val column: String, val values: List<String>) : RowFilter
+    /**
+     * `column=in.(…)`. Uuids go bare; with [quoted] every value is
+     * double-quoted, so free text holding `,` `(` `)` stays one value.
+     */
+    data class In(override val column: String, val values: List<String>, val quoted: Boolean = false) : RowFilter
 
     data class Gt(override val column: String, val value: String) : RowFilter
 
@@ -90,6 +94,7 @@ internal fun eq(column: String, value: String) = RowFilter.Eq(column, value)
 internal fun lt(column: String, value: String) = RowFilter.Lt(column, value)
 internal fun gte(column: String, value: String) = RowFilter.Gte(column, value)
 internal fun isIn(column: String, values: List<String>) = RowFilter.In(column, values)
+internal fun isInQuoted(column: String, values: List<String>) = RowFilter.In(column, values, quoted = true)
 internal fun gt(column: String, value: String) = RowFilter.Gt(column, value)
 internal fun isNull(column: String) = RowFilter.IsNull(column)
 internal fun isNotNull(column: String) = RowFilter.IsNull(column, negate = true)

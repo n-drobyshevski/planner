@@ -2,6 +2,8 @@ package page.planr.android.core.data.remote
 
 import javax.inject.Inject
 import kotlin.time.Instant
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -9,6 +11,7 @@ import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.model.EventOverride
+import page.planr.android.core.model.OverrideType
 import page.planr.android.core.model.PlannerEvent
 import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.recurrence.EditSemantics
@@ -30,6 +33,50 @@ class EventMutations @Inject constructor(
         gateway.insert(SupabaseTables.EVENTS, listOf(EventPayloads.insertRow(draft)))
             .single()
             .decodeAs(PlannerEvent.serializer())
+
+    /**
+     * `createEventsBulk`: many events in a few statements, one
+     * `INSERT … RETURNING` per [BULK_INSERT_CHUNK] drafts (an .ics import).
+     * The rows come back in [drafts] order (Postgres returns a multi-row
+     * INSERT's rows in VALUES order, and PostgREST keeps it). All or nothing:
+     * if a chunk fails, the chunks already written are deleted again before
+     * the failure is rethrown.
+     */
+    suspend fun createEvents(drafts: List<PlannerEventDraft>): List<PlannerEvent> {
+        val created = ArrayList<PlannerEvent>(drafts.size)
+        try {
+            for (part in drafts.chunked(BULK_INSERT_CHUNK)) {
+                val rows = gateway.insert(SupabaseTables.EVENTS, part.map(EventPayloads::insertRow))
+                    .decodeAll(PlannerEvent.serializer())
+                created += rows
+                check(rows.size == part.size) { "Inserted ${rows.size} of ${part.size} events" }
+            }
+        } catch (e: Throwable) {
+            withContext(NonCancellable) { runCatching { deleteEvents(created.map { it.id }) } }
+            throw e
+        }
+        return created
+    }
+
+    /** `deleteEventsBulk`: deletes events by id (their overrides cascade), [BULK_DELETE_CHUNK] ids per request. */
+    suspend fun deleteEvents(ids: List<String>) {
+        for (part in ids.distinct().chunked(BULK_DELETE_CHUNK)) {
+            gateway.delete(SupabaseTables.EVENTS, listOf(isIn("id", part)))
+        }
+    }
+
+    /**
+     * `insertCancelOverrides`: cancels many occurrences at once (an imported
+     * series' EXDATEs), one bulk INSERT of [applyOverride]'s row shape per
+     * [BULK_INSERT_CHUNK]. The series are new, so there is no prior override
+     * to merge onto or to keep for an undo. Returns the stored rows.
+     */
+    suspend fun insertCancelOverrides(workspaceId: String, inputs: List<OverrideInput>): List<EventOverride> {
+        require(inputs.all { it.type == OverrideType.Cancel }) { "Only cancel overrides are inserted in bulk" }
+        return inputs.chunked(BULK_INSERT_CHUNK).flatMap { part ->
+            gateway.insert(SupabaseTables.EVENT_OVERRIDES, part.map { EventPayloads.overrideRow(workspaceId, it) })
+        }.decodeAll(EventOverride.serializer())
+    }
 
     /**
      * `updateEvent`. With [expectedUpdatedAt] the write only lands if the row
@@ -173,6 +220,12 @@ class EventMutations @Inject constructor(
     companion object {
         /** The UNIQUE key of `event_overrides`. */
         const val OVERRIDE_CONFLICT = "event_id,occurrence_date"
+
+        /** Rows per bulk INSERT (keeps request bodies small; the web's `BULK_CHUNK`). */
+        const val BULK_INSERT_CHUNK = 200
+
+        /** Ids per bulk DELETE: they travel in the URL, so fewer than the web's 200 (as for override reads). */
+        const val BULK_DELETE_CHUNK = 120
     }
 }
 

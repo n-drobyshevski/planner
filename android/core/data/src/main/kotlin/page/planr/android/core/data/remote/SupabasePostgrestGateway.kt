@@ -138,7 +138,11 @@ private fun PostgrestFilterBuilder.addFilter(filter: RowFilter, quoted: Boolean)
         is RowFilter.Lt -> filter(filter.column, FilterOperator.LT, v(filter.value))
         is RowFilter.Gte -> filter(filter.column, FilterOperator.GTE, v(filter.value))
         is RowFilter.Gt -> filter(filter.column, FilterOperator.GT, v(filter.value))
-        is RowFilter.In -> filter(filter.column, FilterOperator.IN, filter.values.joinToString(",", "(", ")"))
+        is RowFilter.In -> filter(
+            filter.column,
+            FilterOperator.IN,
+            filter.values.joinToString(",", "(", ")") { if (filter.quoted) "\"$it\"" else it },
+        )
         // `null` is a keyword, never quoted.
         is RowFilter.IsNull ->
             if (filter.negate) {

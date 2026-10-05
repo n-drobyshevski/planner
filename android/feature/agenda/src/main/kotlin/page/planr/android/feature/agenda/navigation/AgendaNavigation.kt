@@ -12,6 +12,7 @@ import page.planr.android.feature.agenda.AgendaScreen
 import page.planr.android.feature.agenda.EventDetailScreen
 import page.planr.android.feature.agenda.EventEditScreen
 import page.planr.android.feature.agenda.EventEditTarget
+import page.planr.android.feature.agenda.importics.IcsImportScreen
 
 /**
  * The agenda feature's routes. [AGENDA] and [EVENT] match the app's
@@ -25,6 +26,9 @@ object AgendaRoutes {
     const val EVENT = "event/{$ARG_ID}"
     const val EVENT_EDIT = "event-edit/{$ARG_ID}"
     const val EVENT_NEW = "event-new?$ARG_START={$ARG_START}"
+
+    /** The .ics import review, for the file waiting in `IcsImportRequests`. */
+    const val IMPORT = "ics-import"
 
     fun event(ref: String): String = "event/${Uri.encode(ref)}"
 
@@ -99,8 +103,18 @@ fun NavGraphBuilder.eventEditScreens(onDone: () -> Unit, onClose: () -> Unit = o
 }
 
 /**
+ * The .ics import review. [onDone] runs after an import, [onClose] when it is
+ * left without one.
+ */
+fun NavGraphBuilder.icsImportScreen(onDone: () -> Unit, onClose: () -> Unit = onDone) {
+    composable(AgendaRoutes.IMPORT) {
+        IcsImportScreen(onDone = onDone, onClose = onClose)
+    }
+}
+
+/**
  * The whole agenda feature wired to [navController]: agenda → detail → edit,
- * plus new-event ([onQuickAdd] as in [agendaScreen]). After a save the editor returns to the agenda (a "this and
+ * plus new-event ([onQuickAdd] as in [agendaScreen]) and the .ics import review. After a save the editor returns to the agenda (a "this and
  * following" edit can move the instance into a new series, so the detail it
  * came from may no longer exist).
  */
@@ -120,6 +134,12 @@ fun NavGraphBuilder.agendaGraph(
         onEdit = { ref -> navController.navigate(AgendaRoutes.editEvent(ref)) },
     )
     eventEditScreens(
+        onDone = {
+            if (!navController.popBackStack(AgendaRoutes.AGENDA, inclusive = false)) navController.popBackStack()
+        },
+        onClose = { navController.popBackStack() },
+    )
+    icsImportScreen(
         onDone = {
             if (!navController.popBackStack(AgendaRoutes.AGENDA, inclusive = false)) navController.popBackStack()
         },

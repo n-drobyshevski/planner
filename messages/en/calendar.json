@@ -24,7 +24,9 @@
     "keyboardShortcutsTitle": "Keyboard shortcuts (?)",
     "moreOptions": "More options",
     "tasksPanel": "Tasks panel",
-    "viewLabel": "View"
+    "viewLabel": "View",
+    "importIcs": "Import .ics",
+    "importIcsTitle": "Import events from an .ics file"
   },
   "agenda": {
     "emptyTitle": "Nothing scheduled",
@@ -178,5 +180,41 @@
       "makeSharedDescription": "You’ll both see and edit every event in “{name}”, and they’ll show on both calendars.",
       "makePersonalDescription": "“{name}” returns to your calendar only. Events {otherName} added here stay theirs and leave your shared view."
     }
+  },
+  "import": {
+    "title": "Import events",
+    "reading": "Reading {name}…",
+    "readError": "Couldn't read this file.",
+    "noEvents": "There are no events in this file.",
+    "lookupError": "Couldn't check which events are already in Planr.",
+    "nameFilter": "Name",
+    "namePlaceholder": "word, wild*card or /regex/",
+    "invalidRegex": "That regular expression isn't valid.",
+    "from": "From",
+    "to": "To",
+    "anyDate": "Any date",
+    "dateRange": "Dates",
+    "selectAll": "Select all",
+    "selectNone": "Select none",
+    "shown": "{shown} of {total, plural, one {# event} other {# events}}",
+    "noMatches": "No events match these filters.",
+    "filing": "Import into",
+    "include": "Import {title}",
+    "editRow": "Edit {title}",
+    "repeats": "Repeats",
+    "badge": {
+      "duplicate": "Already in Planr",
+      "cancelled": "Cancelled",
+      "rruleUnsupported": "Repeats not supported",
+      "zoneUnknown": "Unknown time zone",
+      "rdateIgnored": "Extra dates ignored",
+      "edited": "Edited"
+    },
+    "titleLabel": "Title",
+    "endBeforeStart": "End can't be before start.",
+    "invalidTimes": "Enter a valid date and time.",
+    "submit": "{count, plural, =0 {Import} one {Import # event} other {Import # events}}",
+    "skipped": "{count, plural, one {# event in the file couldn't be read.} other {# events in the file couldn't be read.}}",
+    "notIcs": "That isn't an .ics file."
   }
 }

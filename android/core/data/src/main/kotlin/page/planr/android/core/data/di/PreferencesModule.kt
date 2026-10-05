@@ -15,6 +15,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import page.planr.android.core.data.prefs.AppPrefsChanges
+import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.prefs.DataStoreInsightsPreferences
 import page.planr.android.core.data.prefs.DataStoreViewPreferences
 import page.planr.android.core.data.prefs.InsightsPreferences
@@ -22,13 +24,16 @@ import page.planr.android.core.data.prefs.InsightsPreferencesDataStore
 import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.prefs.ViewPreferencesDataStore
 
-/** Device-local display preferences ([ViewPreferences], [InsightsPreferences]). */
+/** Display preferences ([ViewPreferences], [InsightsPreferences]), synced by [AppPrefsSync]. */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class PreferencesModule {
 
     @Binds
     abstract fun bindViewPreferences(impl: DataStoreViewPreferences): ViewPreferences
+
+    @Binds
+    abstract fun bindAppPrefsChanges(impl: AppPrefsSync): AppPrefsChanges
 
     @Binds
     abstract fun bindInsightsPreferences(impl: DataStoreInsightsPreferences): InsightsPreferences

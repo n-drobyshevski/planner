@@ -913,7 +913,8 @@ export function TimeGrid({
     return { dayIndex: g.dayIndex, startMin: start };
   }
   function onDragOver(e: React.DragEvent) {
-    if (!onScheduleTask) return;
+    // A dragged-in file (an .ics import) is the shell's to take, not a task.
+    if (!onScheduleTask || e.dataTransfer.types.includes("Files")) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
     const { dayIndex, startMin } = dropSlot(e.clientX, e.clientY);

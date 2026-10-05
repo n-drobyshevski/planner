@@ -315,7 +315,14 @@ private suspend fun showNotice(
     if (result == SnackbarResult.ActionPerformed) onUndo(notice)
 }
 
-internal fun UiText.resolve(context: Context): String = context.getString(id, *args.toTypedArray())
+internal fun UiText.resolve(context: Context): String {
+    val count = quantity
+    return if (count != null) {
+        context.resources.getQuantityString(id, count, *args.toTypedArray())
+    } else {
+        context.getString(id, *args.toTypedArray())
+    }
+}
 
 /** Pages either side of today's period; far more than anyone swipes. */
 private const val PAGE_COUNT = 20_000

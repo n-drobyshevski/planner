@@ -21,4 +21,7 @@
     <string name="sign_out_cancel">Отмена</string>
     <string name="sign_out_confirm_title">Выйти на этом телефоне?</string>
     <string name="sign_out_confirm_body">Телефон забудет сессию и удалит сохранённую копию календаря и задач. Виджеты останутся пустыми, пока ты снова не войдёшь.</string>
+    <string name="account_import_ics">Импорт файла .ics</string>
+    <string name="import_file_unreadable">Не получилось прочитать файл.</string>
+    <string name="import_file_too_large">Файл слишком большой для импорта (больше 5 МБ).</string>
 </resources>

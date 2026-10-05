@@ -88,6 +88,21 @@ const KeyboardShortcutsDialog = dynamic(
   () => import("./keyboard-shortcuts-dialog").then((m) => m.KeyboardShortcutsDialog),
   { ssr: false, loading: () => null },
 );
+const IcsImportDialog = dynamic(
+  () => import("./ics-import-dialog").then((m) => m.IcsImportDialog),
+  { ssr: false, loading: () => null },
+);
+
+/** An .ics file dropped or picked for import; `seq` restarts the dialog per file. */
+interface PendingImport {
+  file: File;
+  seq: number;
+}
+
+/** Whether a picked / dropped file looks like an iCalendar file. */
+function isIcsFile(file: File): boolean {
+  return /\.ics$/i.test(file.name) || file.type === "text/calendar";
+}
 // The event details panel (single-click an event) and the recurrence scope
 // prompts are split out of the initial /calendar chunk too: deferring them
 // shrinks the JS the grid must hydrate behind, so first paint comes sooner.
@@ -177,6 +192,8 @@ export function CalendarShell({
   const [mounted, setMounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   // Warm the event/schedule dialog chunks during idle so first open is instant.
   useIdlePreload(OVERLAY_PRELOADS);
 
@@ -434,6 +451,15 @@ export function CalendarShell({
     // Occurrence keys are window-specific; drop the selection on navigation.
     clearSelection();
   }
+  /** Open the import review for a picked / dropped file (anything but .ics is refused). */
+  function startImport(file: File) {
+    if (!isIcsFile(file)) {
+      toast.error(t("import.notIcs"));
+      return;
+    }
+    setPendingImport((prev) => ({ file, seq: (prev?.seq ?? 0) + 1 }));
+  }
+
   function goToday() {
     const t = getTime(startOfDay(Date.now(), { in: tz(viewerTimeZone) }));
     setFocusedDate(t);
@@ -858,6 +884,7 @@ export function CalendarShell({
       pendingDelete ||
       scheduling ||
       shortcutsOpen ||
+      pendingImport ||
       appearancePanelOpen
     )
       return;
@@ -1068,6 +1095,7 @@ export function CalendarShell({
         onToggleBacklog={() => setBacklogOpen(!backlogOpen)}
         onOpenFilters={() => setFiltersOpen(true)}
         onOpenShortcuts={() => setShortcutsOpen(true)}
+        onImportIcs={() => importInputRef.current?.click()}
         sidebarOpen={sidebarOpen}
         backlogOpen={backlogOpen}
         workspace={workspace.data ?? null}
@@ -1082,7 +1110,22 @@ export function CalendarShell({
             categories={workspace.data.categories}
           />
         )}
-        <main className="min-h-0 flex-1 overflow-hidden">
+        <main
+          className="min-h-0 flex-1 overflow-hidden"
+          onDragOver={(e) => {
+            // Let an .ics file be dropped anywhere on the calendar.
+            if (workspace.data?.currentMember && e.dataTransfer.types.includes("Files")) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }
+          }}
+          onDrop={(e) => {
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length === 0 || !workspace.data?.currentMember) return;
+            e.preventDefault();
+            startImport(files.find(isIcsFile) ?? files[0]);
+          }}
+        >
           {mounted ? (
             <CalendarPager
               ref={pagerRef}
@@ -1371,6 +1414,32 @@ export function CalendarShell({
       )}
 
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".ics,text/calendar"
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          // Reset so picking the same file again still fires a change.
+          e.target.value = "";
+          if (file) startImport(file);
+        }}
+      />
+      {pendingImport && workspace.data?.currentMember && (
+        <IcsImportDialog
+          key={pendingImport.seq}
+          open
+          onOpenChange={(o) => !o && setPendingImport(null)}
+          file={pendingImport.file}
+          workspaceId={workspace.data.workspaceId}
+          currentMemberId={workspace.data.currentMember.id}
+          categories={workspace.data.categories}
+        />
+      )}
 
       {workspace.data && (
         <TaskBacklogSheet

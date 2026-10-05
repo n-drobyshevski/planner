@@ -92,6 +92,57 @@ class EventRepository @Inject constructor(
         write({ mutations.createEvent(draft) }) { storeLocally(it) }
 
     /**
+     * Creates many events at once (an .ics import): one insert per 200
+     * drafts, all or nothing, then one Room upsert and one widget refresh.
+     * Returns the stored rows in [drafts] order.
+     */
+    suspend fun createEvents(drafts: List<PlannerEventDraft>): List<PlannerEvent> {
+        if (drafts.isEmpty()) return emptyList()
+        return write({ mutations.createEvents(drafts) }) { created ->
+            dao.upsertEvents(created.map { it.toEntity() })
+        }
+    }
+
+    /** Cancels many occurrences of new series at once (an import's EXDATEs). */
+    suspend fun cancelOccurrences(inputs: List<OverrideInput>) {
+        if (inputs.isEmpty()) return
+        val ws = session.requireSession().workspaceId
+        write({ mutations.insertCancelOverrides(ws, inputs) }) { stored ->
+            dao.upsertOverrides(stored.map { it.toEntity() })
+        }
+    }
+
+    /** Deletes many events and their overrides (the undo of [createEvents]); no snapshot is kept. */
+    suspend fun deleteEvents(ids: List<String>) {
+        if (ids.isEmpty()) return
+        write({ mutations.deleteEvents(ids) }) {
+            db.withTransaction {
+                ids.chunked(SQL_CHUNK).forEach { chunk ->
+                    dao.deleteOverridesOf(chunk)
+                    dao.deleteEvents(chunk)
+                }
+            }
+        }
+    }
+
+    /**
+     * The signed-in member's events an .ics import could duplicate: those
+     * carrying one of [uids] as `attributes.icalUid`, plus their events that
+     * may intersect [window] (the file's span; the paged `fetchWindow`, so
+     * series come as their master rows) for the title + time match. Read
+     * from the server, never cached; distinct by id.
+     */
+    suspend fun findImportCandidates(uids: Collection<String>, window: TimeWindow?): List<PlannerEvent> {
+        val s = session.requireSession()
+        val byUid = queries.fetchEventsByIcalUid(s.workspaceId, s.memberId, uids)
+        val inWindow = window
+            ?.let { queries.fetchWindow(s.workspaceId, it, includeOverrides = false).events }
+            .orEmpty()
+            .filter { it.ownerId == s.memberId }
+        return (byUid + inWindow).distinctBy { it.id }
+    }
+
+    /**
      * Updates the master row. Pass the [PlannerEvent.updatedAt] the edit was
      * based on as [expectedUpdatedAt] to fail with [StaleWriteException]
      * (after reloading the row) if someone changed it meanwhile.

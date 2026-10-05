@@ -29,6 +29,7 @@ class InsightsPreferencesTest {
     private fun TestScope.prefs() = DataStoreInsightsPreferences(
         // The factory rejects a file whose name doesn't end in .preferences_pb.
         PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { File(dir, "insights_test.preferences_pb") }),
+        changes = { edit -> edit() },
     )
 
     @Test

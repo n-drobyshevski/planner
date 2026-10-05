@@ -1,5 +1,8 @@
 package page.planr.android.account
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -10,27 +13,49 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import page.planr.android.BuildConfig
 import page.planr.android.R
+import page.planr.android.importics.IcsFileReader
 
 /**
- * The account action on the Calendar and Tasks headers: a quiet icon that
- * opens a menu with "Sign out" (behind a confirmation) and, below it, the
- * app's version, for bug reports. Signing out
- * forgets the session on this device (and ends it on the server), wipes the
- * cached calendar and tasks, and blanks the widgets.
+ * The account action on the Calendar, Tasks and Insights headers: a quiet
+ * icon that opens a menu with "Import .ics file", "Sign out" (behind a
+ * confirmation) and, below them, the app's version, for bug reports. Signing
+ * out forgets the session on this device (and ends it on the server), wipes
+ * the cached calendar and tasks, and blanks the widgets.
+ *
+ * @param onImportIcs opens the import review once a picked file was read.
  */
 @Composable
-fun AccountMenuButton(viewModel: AccountViewModel = hiltViewModel()) {
+fun AccountMenuButton(onImportIcs: () -> Unit = {}, viewModel: AccountViewModel = hiltViewModel()) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     var confirming by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val openImport by rememberUpdatedState(onImportIcs)
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importFile(uri)
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.importResults.collect { result ->
+            when (result) {
+                is IcsFileReader.Result.Text -> openImport()
+                IcsFileReader.Result.TooLarge ->
+                    Toast.makeText(context, R.string.import_file_too_large, Toast.LENGTH_LONG).show()
+                IcsFileReader.Result.Unreadable ->
+                    Toast.makeText(context, R.string.import_file_unreadable, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     IconButton(onClick = { menuOpen = true }) {
         Icon(
@@ -40,6 +65,13 @@ fun AccountMenuButton(viewModel: AccountViewModel = hiltViewModel()) {
         )
     }
     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.account_import_ics)) },
+            onClick = {
+                menuOpen = false
+                pickFile.launch(ICS_MIME_TYPES)
+            },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.sign_out)) },
             onClick = {
@@ -79,3 +111,9 @@ fun AccountMenuButton(viewModel: AccountViewModel = hiltViewModel()) {
         )
     }
 }
+
+/**
+ * What the picker offers: calendars by their MIME types, plus octet-stream,
+ * which many file providers report for .ics.
+ */
+private val ICS_MIME_TYPES = arrayOf("text/calendar", "application/ics", "text/x-vcalendar", "application/octet-stream")

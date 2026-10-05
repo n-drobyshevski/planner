@@ -61,9 +61,17 @@ class LaunchRouteTest {
     }
 
     @Test
+    fun `the import review opens under the agenda and is never parsed from a route`() {
+        assertEquals(TopLevelTab.Agenda, LaunchRoute.Import.tab)
+        assertEquals("ics-import", LaunchRoute.Import.route)
+        assertNull(LaunchRoute.parse("ics-import"))
+    }
+
+    @Test
     fun `editors are recognised so a widget launch doesn't pop their draft`() {
         assertTrue(isEditorRoute("event-edit/{id}"))
         assertTrue(isEditorRoute("event-new?start={start}"))
+        assertTrue(isEditorRoute("ics-import"))
         assertTrue(isEditorRoute(PlanrRoutes.TASK))
         assertFalse(isEditorRoute(PlanrRoutes.AGENDA))
         assertFalse(isEditorRoute(PlanrRoutes.EVENT))

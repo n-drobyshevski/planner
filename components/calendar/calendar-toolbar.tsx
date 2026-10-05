@@ -11,6 +11,7 @@ import {
   MoreVertical,
   Minimize2,
   Keyboard,
+  Upload,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ export function CalendarToolbar({
   onToggleBacklog,
   onOpenFilters,
   onOpenShortcuts,
+  onImportIcs,
   sidebarOpen,
   backlogOpen,
   workspace,
@@ -78,6 +80,8 @@ export function CalendarToolbar({
   onToggleBacklog: () => void;
   onOpenFilters: () => void;
   onOpenShortcuts: () => void;
+  /** Opens the .ics file picker (the import dialog follows once a file is chosen). */
+  onImportIcs: () => void;
   sidebarOpen: boolean;
   backlogOpen: boolean;
   workspace: WorkspaceData | null;
@@ -189,6 +193,16 @@ export function CalendarToolbar({
         <Button
           variant="ghost"
           size="icon"
+          aria-label={t("toolbar.importIcs")}
+          title={t("toolbar.importIcsTitle")}
+          onClick={onImportIcs}
+          className="hidden md:inline-flex"
+        >
+          <Upload />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           aria-label={t("toolbar.keyboardShortcuts")}
           title={t("toolbar.keyboardShortcutsTitle")}
           onClick={onOpenShortcuts}
@@ -203,6 +217,7 @@ export function CalendarToolbar({
           onPrev={onPrev}
           onNext={onNext}
           onToggleBacklog={onToggleBacklog}
+          onImportIcs={onImportIcs}
           backlogOpen={backlogOpen}
           current={current}
         />
@@ -218,6 +233,7 @@ function CalendarMobileMenu({
   onPrev,
   onNext,
   onToggleBacklog,
+  onImportIcs,
   backlogOpen,
   current,
 }: {
@@ -227,6 +243,7 @@ function CalendarMobileMenu({
   onPrev: () => void;
   onNext: () => void;
   onToggleBacklog: () => void;
+  onImportIcs: () => void;
   backlogOpen: boolean;
   current: Member | null;
 }) {
@@ -293,6 +310,10 @@ function CalendarMobileMenu({
             {t("toolbar.resetZoom")}
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem onClick={onImportIcs}>
+          <Upload data-icon="inline-start" />
+          {t("toolbar.importIcs")}
+        </DropdownMenuItem>
 
         <MobileAccountSection
           current={current}

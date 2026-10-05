@@ -86,30 +86,79 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">0dp</item>
         <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginTop">1dp</item>
         <item name="android:orientation">horizontal</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewWeekCell">
+        <item name="android:layout_width">26dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:background">@color/planr_widget_surface</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingTop">4dp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewWeekNumber">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/widget_preview_pill_secondary</item>
+        <item name="android:paddingHorizontal">4dp</item>
+        <item name="android:textColor">@color/planr_widget_muted</item>
+        <item name="android:textSize">11sp</item>
     </style>
 
     <style name="PlanrWidgetPreviewDay">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
+        <item name="android:background">@color/planr_widget_surface</item>
         <item name="android:gravity">center_horizontal</item>
         <item name="android:orientation">vertical</item>
     </style>
 
     <style name="PlanrWidgetPreviewDate">
-        <item name="android:layout_width">22dp</item>
-        <item name="android:layout_height">22dp</item>
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
         <item name="android:gravity">center</item>
         <item name="android:maxLines">1</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">14sp</item>
     </style>
 
-    <style name="PlanrWidgetPreviewDot">
-        <item name="android:layout_width">6dp</item>
-        <item name="android:layout_height">6dp</item>
-        <item name="android:padding">0.5dp</item>
-        <item name="android:importantForAccessibility">no</item>
-        <item name="android:src">@drawable/widget_dot</item>
+    <style name="PlanrWidgetPreviewChip">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">14dp</item>
+        <item name="android:layout_marginHorizontal">2dp</item>
+        <item name="android:layout_marginBottom">1dp</item>
+        <item name="android:paddingHorizontal">3dp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/planr_widget_on_accent</item>
+        <item name="android:textSize">10sp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewHeaderIcon">
+        <item name="android:layout_width">32dp</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:padding">6dp</item>
+        <item name="android:tint">@color/planr_widget_muted</item>
+    </style>
+
+    <!-- Week grid -->
+    <style name="PlanrWidgetPreviewWeekGridHead">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@color/planr_widget_surface</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewWeekGridWeekday">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/planr_widget_muted</item>
+        <item name="android:textSize">11sp</item>
     </style>
 </resources>

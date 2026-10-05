@@ -13,4 +13,5 @@ object SupabaseTables {
     const val TASKS = "tasks"
     const val COLLECTIONS = "collections"
     const val BOARDS = "boards"
+    const val MEMBER_APP_PREFS = "member_app_prefs"
 }

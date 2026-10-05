@@ -49,6 +49,40 @@
                     android:host="${planrAuthCallbackHost}"
                     android:path="/app/auth/callback" />
             </intent-filter>
+
+            <!-- .ics import: a calendar file opened from another app (Files,
+                 Gmail, a download), by its MIME type… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="text/calendar" />
+                <data android:mimeType="application/ics" />
+                <data android:mimeType="text/x-vcalendar" />
+            </intent-filter>
+            <!-- …or by its name, as many apps send .ics as
+                 application/octet-stream. pathPattern only applies with a
+                 host, and its `.*` stops at the first dot, hence one pattern
+                 per number of dots in the name. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.ics" />
+                <data android:pathPattern=".*\\..*\\.ics" />
+                <data android:pathPattern=".*\\..*\\..*\\.ics" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.ics" />
+            </intent-filter>
+            <!-- …or shared to Planr. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/calendar" />
+            </intent-filter>
         </activity>
 
         <!-- WorkManager is configured by PlanrApplication (HiltWorkerFactory),

@@ -21,6 +21,7 @@ import page.planr.android.core.recurrence.DefaultRecurrenceExpander
 import page.planr.android.core.recurrence.OccurrencePatch
 import page.planr.android.core.recurrence.OverrideInput
 import page.planr.android.feature.agenda.data.AgendaDataSource
+import page.planr.android.feature.agenda.model.AgendaMode
 
 /**
  * In-memory [AgendaDataSource]: events live in a flow and are expanded with
@@ -35,6 +36,7 @@ class FakeAgendaDataSource(
     val events = MutableStateFlow<List<PlannerEvent>>(emptyList())
     val overrides = MutableStateFlow<List<EventOverride>>(emptyList())
     val showPartnerEvents = MutableStateFlow(true)
+    val agendaMode = MutableStateFlow(AgendaMode.Day)
 
     val observedWindows = mutableListOf<TimeWindow>()
     val refreshedWindows = mutableListOf<TimeWindow>()
@@ -54,11 +56,24 @@ class FakeAgendaDataSource(
         data class Revert(val eventId: String, val occurrenceDate: Instant, val prior: OverridePrior) : Call
         data class Split(val event: PlannerEvent, val from: Instant, val patch: OccurrencePatch) : Call
         data class CapFuture(val event: PlannerEvent, val from: Instant) : Call
+        data class FindImportCandidates(val uids: Set<String>, val window: TimeWindow?) : Call
+        data class CreateMany(val drafts: List<PlannerEventDraft>) : Call
+        data class CancelMany(val inputs: List<OverrideInput>) : Call
+        data class DeleteMany(val ids: List<String>) : Call
     }
+
+    /** What [findImportCandidates] answers (the member's events on the server). */
+    var importCandidates: List<PlannerEvent> = emptyList()
 
     override fun currentSession(): SessionInfo? = session
 
     override fun observeMembers(): Flow<List<Member>> = members
+
+    override fun observeAgendaMode(): Flow<AgendaMode> = agendaMode
+
+    override suspend fun setAgendaMode(mode: AgendaMode) {
+        agendaMode.value = mode
+    }
 
     override fun observeShowPartnerEvents(): Flow<Boolean> = showPartnerEvents
 
@@ -128,11 +143,38 @@ class FakeAgendaDataSource(
         return event
     }
 
+    override suspend fun findImportCandidates(uids: Collection<String>, window: TimeWindow?): List<PlannerEvent> {
+        record(Call.FindImportCandidates(uids.toSet(), window))
+        return importCandidates
+    }
+
+    override suspend fun createEvents(drafts: List<PlannerEventDraft>): List<PlannerEvent> {
+        record(Call.CreateMany(drafts))
+        return drafts.mapIndexed { i, d ->
+            Fixtures.event(id = "imported-$i", title = d.title).copy(
+                start = d.start,
+                end = d.end,
+                allDay = d.allDay,
+                rrule = d.rrule,
+                timeZone = d.timeZone,
+                attributes = d.attributes,
+            )
+        }
+    }
+
+    override suspend fun cancelOccurrences(inputs: List<OverrideInput>) = record(Call.CancelMany(inputs))
+
+    override suspend fun deleteEvents(ids: List<String>) = record(Call.DeleteMany(ids))
+
+    /** Throws what it returns for a matching write, every time (e.g. only the cancel overrides fail). */
+    var failWhen: (Call) -> Exception? = { null }
+
     private fun record(call: Call) {
         failNext?.let {
             failNext = null
             throw it
         }
+        failWhen(call)?.let { throw it }
         calls += call
     }
 }

@@ -23,4 +23,7 @@
     <string name="sign_out_cancel">Cancel</string>
     <string name="sign_out_confirm_title">Sign out on this phone?</string>
     <string name="sign_out_confirm_body">This phone forgets your session and clears its copy of your calendar and tasks. The widgets stay empty until you sign in again.</string>
+    <string name="account_import_ics">Import .ics file</string>
+    <string name="import_file_unreadable">Couldn\'t read this file.</string>
+    <string name="import_file_too_large">This file is too large to import (over 5 MB).</string>
 </resources>

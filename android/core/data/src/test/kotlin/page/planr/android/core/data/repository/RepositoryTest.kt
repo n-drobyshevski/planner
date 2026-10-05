@@ -11,14 +11,18 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -53,6 +57,7 @@ import page.planr.android.core.model.Board
 import page.planr.android.core.model.PlannerEvent
 import page.planr.android.core.model.TaskNotToggleableException
 import page.planr.android.core.model.TimeWindow
+import page.planr.android.core.recurrence.EditSemantics
 import page.planr.android.core.recurrence.PatchField
 
 /** Repositories over a fake PostgREST and a real (in-memory) Room. */
@@ -248,6 +253,49 @@ class RepositoryTest {
         events(WorkspaceQueries(signingOut)).refreshWindow(june)
 
         assertEquals(emptyList(), cachedEventIds())
+    }
+
+    @Test
+    fun `createEvents stores every created row in Room at once and refreshes the widgets once`() = runTest {
+        val repo = events()
+        val drafts = (0 until 3).map { i ->
+            Fixtures.eventRow(id = "template").decodeAs(PlannerEvent.serializer()).toDraft()
+                .copy(title = "Imported $i", attributes = buildJsonObject { put("icalUid", "uid-$i") })
+        }
+
+        val created = repo.createEvents(drafts)
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        assertEquals(listOf("Imported 0", "Imported 1", "Imported 2"), created.map { it.title })
+        assertEquals(1, gateway.callsOf<FakePostgrestGateway.Call.Insert>().size)
+        assertEquals(created.map { it.id }.sorted(), cachedEventIds())
+        assertEquals(1, widgetRefreshes)
+
+        repo.cancelOccurrences(listOf(EditSemantics.cancelOccurrence(created[0].id, created[0].start)))
+        assertEquals(1, db.eventDao().observeOverridesFor(created[0].id).first().size)
+
+        repo.deleteEvents(created.map { it.id })
+        assertEquals(emptyList(), cachedEventIds())
+        assertEquals(emptyList(), db.eventDao().observeOverridesFor(created[0].id).first())
+        assertEquals(emptyList(), gateway.rows(SupabaseTables.EVENTS))
+    }
+
+    @Test
+    fun `import candidates are the member's events by uid plus those in the file's span`() = runTest {
+        val tagged = JsonObject(
+            Fixtures.eventRow(id = "by-uid", start = "2020-01-01T09:00:00+00:00", end = "2020-01-01T10:00:00+00:00") +
+                ("attributes" to buildJsonObject { put("icalUid", "x@google.com") }),
+        )
+        val partners = JsonObject(Fixtures.eventRow(id = "partner") + ("owner_id" to JsonPrimitive("someone-else")))
+        gateway.seed(SupabaseTables.EVENTS, tagged, partners, Fixtures.eventRow(id = "in-span"), Fixtures.eventRow(id = "later", start = "2026-07-01T09:00:00+00:00", end = "2026-07-01T10:00:00+00:00"))
+
+        val found = events().findImportCandidates(listOf("x@google.com"), june)
+
+        assertEquals(listOf("by-uid", "in-span"), found.map { it.id }.sorted())
+        // A lookup, not a sync: nothing lands in Room, and no overrides are read.
+        assertEquals(emptyList(), cachedEventIds())
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.SelectPage>().none { it.table == SupabaseTables.EVENT_OVERRIDES })
     }
 
     private fun board(id: String, collection: String, position: Double, isDone: Boolean) = JsonObject(

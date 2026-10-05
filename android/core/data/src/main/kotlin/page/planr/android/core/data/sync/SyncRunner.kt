@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.TaskRepository
 import page.planr.android.core.data.repository.WorkspaceRepository
@@ -22,12 +23,13 @@ class SyncRunner @Inject constructor(
     private val tasks: TaskRepository,
     private val visibleWindow: VisibleWindowTracker,
     private val widgets: WidgetRefreshDispatcher,
+    private val appPrefs: AppPrefsSync,
     private val clock: Clock,
 ) {
 
     /**
-     * Members/categories/boards, the widgets' days (plus the visible window), and
-     * all tasks; then re-renders widgets. Returns false when signed out.
+     * Members/categories/boards, the widgets' days (plus the visible window),
+     * all tasks and the member's view settings; then re-renders widgets. Returns false when signed out.
      * Throws on network / server errors (the worker retries).
      */
     suspend fun syncAll(): Boolean {
@@ -38,6 +40,8 @@ class SyncRunner @Inject constructor(
             launch { workspace.refresh() }
             windowsToSync().forEach { launch { events.refreshWindow(it) } }
             launch { tasks.refresh() }
+            // Never fails the sync: a pending settings change retries next time.
+            launch { appPrefs.pullQuietly() }
         }
         widgets.refreshNow()
         return true
@@ -50,6 +54,7 @@ class SyncRunner @Inject constructor(
             windowsToSync().forEach { launch { events.refreshWindow(it) } }
             launch { tasks.refresh() }
             launch { workspace.refresh() }
+            launch { appPrefs.pullQuietly() }
         }
         widgets.requestRefresh()
     }

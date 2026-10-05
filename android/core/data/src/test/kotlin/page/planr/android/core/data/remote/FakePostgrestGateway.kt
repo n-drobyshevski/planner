@@ -134,7 +134,7 @@ class FakePostgrestGateway(
 }
 
 private fun RowFilter.matches(row: JsonObject): Boolean {
-    val actual = (row[column] as? JsonPrimitive)?.contentOrNull
+    val actual = row.columnText(column)
     return when (this) {
         is RowFilter.Eq -> actual != null && compare(actual, value) == 0
         is RowFilter.Lt -> actual != null && compare(actual, value) < 0
@@ -144,6 +144,14 @@ private fun RowFilter.matches(row: JsonObject): Boolean {
         is RowFilter.IsNull -> (actual == null) != negate
         is RowFilter.AnyOf -> filters.any { it.matches(row) }
     }
+}
+
+/** A column's text, following one PostgREST `json->>key` step into a jsonb column. */
+private fun JsonObject.columnText(column: String): String? {
+    val arrow = column.indexOf("->>")
+    if (arrow < 0) return (this[column] as? JsonPrimitive)?.contentOrNull
+    val json = this[column.substring(0, arrow)] as? JsonObject ?: return null
+    return (json[column.substring(arrow + 3)] as? JsonPrimitive)?.contentOrNull
 }
 
 /** ORDER BY: ascending puts nulls last, descending first, as Postgres does. */

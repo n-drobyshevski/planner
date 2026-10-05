@@ -1,6 +1,7 @@
 {
   "eventCreated": "Event created",
   "eventsCreated": "{count, plural, one {# event created} other {# events created}}",
+  "eventsImported": "{count, plural, one {Imported # event} other {Imported # events}}",
   "eventUpdated": "Event updated",
   "eventsUpdated": "{count, plural, one {# event updated} other {# events updated}}",
   "eventDeleted": "Event deleted",
@@ -42,7 +43,8 @@
     "complete": "complete",
     "reopen": "reopen",
     "addDependency": "add dependency",
-    "removeDependency": "remove dependency"
+    "removeDependency": "remove dependency",
+    "import": "import"
   },
   "dependencyAdded": "Dependency added",
   "dependencyRemoved": "Dependency removed"

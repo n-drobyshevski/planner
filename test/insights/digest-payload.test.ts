@@ -3,6 +3,7 @@ import {
   buildDigestPayload,
   digestPayloadHash,
   digestPayloadSchema,
+  withoutPrivateSignals,
   type DigestPayloadInput,
 } from "@/lib/insights/digest-payload";
 
@@ -119,6 +120,45 @@ describe("buildDigestPayload", () => {
       }),
     );
     expect(JSON.stringify(payload).length).toBeLessThan(4096);
+  });
+});
+
+describe("sleep-derived signals", () => {
+  const sleepDebt = {
+    kind: "sleep-debt",
+    text: "Sleep is running short — 3 of your last 7 logged nights were under 7h (average 6h 10m).",
+  };
+  const restWindow = {
+    kind: "rest-window",
+    text: "Room to breathe on Wed — 9h tracked on Wed; the largest open daytime stretch is 1h 30m from 21:00.",
+  };
+  const safe = (i: number) => ({ kind: "anomaly", text: `signal ${i}` });
+
+  it("never enter the payload", () => {
+    const payload = buildDigestPayload(input({ signals: [sleepDebt, safe(0), restWindow] }));
+    expect(payload.signals.map((s) => s.kind)).toEqual(["anomaly"]);
+    const json = JSON.stringify(payload);
+    expect(json).not.toContain("nights");
+    expect(json).not.toContain("21:00");
+  });
+
+  it("are dropped before the cap, so safe signals keep their places", () => {
+    const signals = [sleepDebt, restWindow, ...Array.from({ length: 7 }, (_, i) => safe(i))];
+    const payload = buildDigestPayload(input({ signals }));
+    expect(payload.signals).toEqual(Array.from({ length: 7 }, (_, i) => safe(i)));
+  });
+
+  it("are stripped server-side from an already-built payload", () => {
+    const sent = { ...buildDigestPayload(input()), signals: [safe(0), sleepDebt, restWindow] };
+    expect(digestPayloadSchema.safeParse(sent).success).toBe(true);
+    expect(withoutPrivateSignals(sent).signals).toEqual([safe(0)]);
+  });
+
+  it("leave a payload without them, and its cache hash, untouched", () => {
+    const payload = buildDigestPayload(input({ signals: [safe(0), safe(1)] }));
+    expect(withoutPrivateSignals(payload)).toBe(payload);
+    const stripped = withoutPrivateSignals({ ...payload, signals: [...payload.signals, sleepDebt] });
+    expect(digestPayloadHash(stripped)).toBe(digestPayloadHash(payload));
   });
 });
 
