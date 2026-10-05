@@ -1,5 +1,9 @@
-import page.planr.buildlogic.planrConfigValue
+import page.planr.buildlogic.buildConfigString
 import page.planr.buildlogic.planrAuthCallbackHost
+import page.planr.buildlogic.planrConfigValue
+import page.planr.buildlogic.planrGitSha
+import page.planr.buildlogic.planrVersionCode
+import page.planr.buildlogic.planrVersionName
 
 plugins {
     alias(libs.plugins.planr.android.application)
@@ -7,13 +11,20 @@ plugins {
     alias(libs.plugins.planr.android.hilt)
 }
 
+// Name from version.properties (semver, bumped by hand); code from the commit
+// count, so a later commit's build always installs over an earlier one. See
+// build-logic's PlanrVersion.kt.
+val appVersionName = planrVersionName()
+val appVersionCode = planrVersionCode()
+
 android {
     namespace = "page.planr.android"
 
     defaultConfig {
         applicationId = "page.planr.android"
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
+        buildConfigField("String", "GIT_SHA", buildConfigString(planrGitSha()))
         // App Link host for /app/auth/callback (PLANR_AUTH_CALLBACK_ORIGIN,
         // default auth.planr.page).
         manifestPlaceholders["planrAuthCallbackHost"] = planrAuthCallbackHost()
@@ -44,7 +55,15 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
+        debug {
+            // "0.2.0-debug": a test build is never mistaken for a release.
+            versionNameSuffix = "-debug"
+        }
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
@@ -56,6 +75,11 @@ android {
         // en is the default; ru mirrors messages/ru on the web.
         localeFilters += listOf("en", "ru")
     }
+}
+
+// APKs are named after the version: planr-0.2.0-143-debug.apk.
+base {
+    archivesName = "planr-$appVersionName-$appVersionCode"
 }
 
 dependencies {

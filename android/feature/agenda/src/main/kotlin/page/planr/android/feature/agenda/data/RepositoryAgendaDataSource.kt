@@ -9,6 +9,7 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
+import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.OccurrenceRepository
 import page.planr.android.core.data.repository.WorkspaceRepository
@@ -28,6 +29,7 @@ class RepositoryAgendaDataSource @Inject constructor(
     private val workspace: WorkspaceRepository,
     private val events: EventRepository,
     private val occurrences: OccurrenceRepository,
+    private val viewPreferences: ViewPreferences,
 ) : AgendaDataSource {
 
     override fun currentSession(): SessionInfo? = session.currentSession
@@ -38,6 +40,10 @@ class RepositoryAgendaDataSource @Inject constructor(
 
     override fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>> =
         occurrences.observeOccurrences(window, zone)
+
+    override fun observeShowPartnerEvents(): Flow<Boolean> = viewPreferences.showPartnerEvents
+
+    override suspend fun setShowPartnerEvents(show: Boolean) = viewPreferences.setShowPartnerEvents(show)
 
     override suspend fun refreshWorkspace() = workspace.refresh()
 

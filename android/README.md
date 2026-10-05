@@ -6,7 +6,7 @@ data, Realtime for live changes, RLS for access control. There is no
 app-specific API. The server-side setup (OAuth client, App Link verification,
 recurrence fixtures) is in [`docs/android.md`](../docs/android.md).
 
-v1 covers the agenda (day/week, both members), event detail and editing
+v1 covers the agenda (day/week, with a toggle for the partner's events), event detail and editing
 (including "this / this and following / all events" on a series), tasks
 (list, detail, complete), Quick add, and five widgets: Today, Week, Month,
 Tasks and Quick add. Sleep, insights, boards/collections, sharing and push are not in
@@ -57,6 +57,24 @@ shows a "not configured" sign-in screen.
 | `PLANR_AUTH_CALLBACK_ORIGIN` | Origin of the OAuth App Link callback: the redirect URI and the App Link host in the manifest. Must be a different host from `PLANR_WEB_ORIGIN` | `https://auth.planr.page` |
 
 Never put the service-role key into the app.
+
+## Versioning
+
+- **Version name**: `VERSION_NAME` in `android/version.properties`, semver
+  (`MAJOR.MINOR.PATCH`). Bump it by hand in the commit that starts a release:
+  PATCH for fixes, MINOR for new features, MAJOR for a change that breaks
+  something for users (such as dropping an Android version). Debug builds add
+  `-debug` (`0.2.0-debug`).
+- **Version code**: the commit count up to `HEAD` (`git rev-list --count
+  HEAD`), so a build of a later commit always installs over an earlier one.
+  Merging keeps it growing; a squash merge onto `main` can make it smaller
+  than the branch build you have installed, and Android refuses a downgrade.
+  If that happens, uninstall first or set `PLANR_VERSION_CODE`. A shallow
+  clone undercounts (the build warns), so CI checks out the full history.
+  `PLANR_VERSION_CODE` (Gradle property or environment) overrides it.
+- **Where it shows**: the APK file name (`planr-0.2.0-143-debug.apk`), the
+  CI artifact name, and the account menu (`Planr 0.2.0-debug · build 143 ·
+  5a0fb8f`, the last part being the commit).
 
 ## Release APK
 
@@ -128,7 +146,8 @@ page.
 
 `.github/workflows/android-apk.yml` builds a debug APK on every push or PR
 that touches `android/**`, and on demand (Actions → *Android debug APK* →
-*Run workflow*). Download `planr-debug-<sha>` from the run's Artifacts.
+*Run workflow*). Download `planr-<version>-<code>-<sha>` (for example
+`planr-0.2.0-debug-143-5a0fb8f`) from the run's Artifacts.
 
 One-time repository setup (Settings → Secrets and variables → Actions):
 
@@ -241,6 +260,17 @@ page that revokes the grant.
   A task with no board to move to (outside any collection, or in one without
   a done column) shows no checkbox, as on the web.
 
+### Partner's events
+
+As on the web, your own events and joint ones (a Shared context) always show.
+The partner's personal events show only while the toggle in the agenda header
+is on: their initial in their colour, a filled disc while shown and an
+outlined one while hidden. The rule is `CalendarVisibility` (the web's
+`filterVisible`, without category hiding). The choice is saved on the device
+in `ViewPreferences` (DataStore, default on), never on the server, just as the
+web keeps its sidebar toggles in the browser. Changing it re-renders the
+widgets.
+
 ### Sync
 
 - **Realtime, while the app is in the foreground.** `RealtimeSync` holds one
@@ -295,6 +325,9 @@ page that revokes the grant.
 
 - **Today.** Today's occurrences from Room, in the members' colors. A tap
   opens the occurrence.
+- **Which events.** Today, Week and Month follow the agenda's partner toggle
+  (`ViewPreferences`): your own events and joint ones always, the partner's
+  personal events only while it is on.
 - **Week.** This Monday-to-Sunday week. Past days fold to their heading with
   a count; today and the days ahead list their events as Today does. A day
   heading opens that day in the agenda, an event opens the event.

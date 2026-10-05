@@ -150,6 +150,42 @@ class AgendaViewModelTest {
     }
 
     @Test
+    fun `hiding the partner keeps my events and joint ones`() = runTest {
+        data.events.value = listOf(
+            Fixtures.event(id = "mine", owner = Fixtures.ANNA, start = "2026-10-04T08:00:00Z", end = "2026-10-04T09:00:00Z"),
+            Fixtures.event(id = "theirs", owner = Fixtures.BORIS, start = "2026-10-04T10:00:00Z", end = "2026-10-04T11:00:00Z"),
+            Fixtures.event(
+                id = "joint",
+                owner = Fixtures.BORIS,
+                isShared = true,
+                start = "2026-10-04T12:00:00Z",
+                end = "2026-10-04T13:00:00Z",
+            ),
+        )
+        val vm = viewModel()
+        assertEquals(PartnerToggle(name = "Boris", color = "#0f766e", isMemberA = false, shown = true), vm.state.value.partner)
+
+        vm.setShowPartnerEvents(false)
+        runCurrent()
+        assertEquals(false, data.showPartnerEvents.value)
+        assertEquals(false, vm.state.value.partner?.shown)
+        assertEquals(setOf("mine", "joint"), vm.state.value.schedule(sunday).timed.map { it.block.eventId }.toSet())
+
+        vm.setShowPartnerEvents(true)
+        runCurrent()
+        assertEquals(setOf("mine", "theirs", "joint"), vm.state.value.schedule(sunday).timed.map { it.block.eventId }.toSet())
+        vm.close()
+    }
+
+    @Test
+    fun `no partner toggle without exactly one other member`() = runTest {
+        data.members.value = listOf(Fixtures.anna)
+        val vm = viewModel()
+        assertEquals(null, vm.state.value.partner)
+        vm.close()
+    }
+
+    @Test
     fun `both members' occurrences land on their days in their colors`() = runTest {
         data.events.value = listOf(
             Fixtures.event(id = "mine", owner = Fixtures.ANNA, start = "2026-10-04T08:00:00Z", end = "2026-10-04T09:00:00Z"),

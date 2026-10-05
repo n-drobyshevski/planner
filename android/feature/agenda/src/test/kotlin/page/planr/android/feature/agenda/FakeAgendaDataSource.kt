@@ -34,6 +34,7 @@ class FakeAgendaDataSource(
     val categories = MutableStateFlow(listOf(Fixtures.work, Fixtures.home))
     val events = MutableStateFlow<List<PlannerEvent>>(emptyList())
     val overrides = MutableStateFlow<List<EventOverride>>(emptyList())
+    val showPartnerEvents = MutableStateFlow(true)
 
     val observedWindows = mutableListOf<TimeWindow>()
     val refreshedWindows = mutableListOf<TimeWindow>()
@@ -58,6 +59,12 @@ class FakeAgendaDataSource(
     override fun currentSession(): SessionInfo? = session
 
     override fun observeMembers(): Flow<List<Member>> = members
+
+    override fun observeShowPartnerEvents(): Flow<Boolean> = showPartnerEvents
+
+    override suspend fun setShowPartnerEvents(show: Boolean) {
+        showPartnerEvents.value = show
+    }
 
     override fun observeCategories(): Flow<List<Category>> = categories
 

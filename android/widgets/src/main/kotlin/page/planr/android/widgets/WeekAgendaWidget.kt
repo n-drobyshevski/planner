@@ -11,12 +11,14 @@ import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.currentState
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.todayIn
+import page.planr.android.core.model.CalendarVisibility
 import page.planr.android.core.model.viewerTimeZone
 
 /**
- * This week, Monday to Sunday, for both members, from the Room cache: past
- * days fold to one line, today and the days ahead list their events. Tapping
- * a day opens it in the agenda; tapping an event opens the event.
+ * This week, Monday to Sunday, from the Room cache (the partner's personal
+ * events only while the agenda's partner toggle is on): past days fold to one
+ * line, today and the days ahead list their events. Tapping a day opens it in
+ * the agenda; tapping an event opens the event.
  */
 class WeekAgendaWidget : GlanceAppWidget() {
 
@@ -43,7 +45,11 @@ internal class WeekAgendaLoader(private val entry: WidgetEntryPoint) {
         val members = entry.workspaceRepository().observeMembers().first()
         val zone = viewerTimeZone(members.firstOrNull { it.id == session.memberId })
         val today = entry.clock().todayIn(zone)
-        val occurrences = entry.occurrenceRepository().snapshot(WeekAgendaModel.weekWindow(today, zone), zone)
+        val occurrences = CalendarVisibility.filter(
+            occurrences = entry.occurrenceRepository().snapshot(WeekAgendaModel.weekWindow(today, zone), zone),
+            viewerId = session.memberId,
+            showPartner = entry.viewPreferences().showPartnerEvents.first(),
+        )
         DayRollover.markRendered(today, zone)
         WeekAgendaModel.build(today, zone, occurrences, members)
     }

@@ -7,6 +7,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlin.time.Clock
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.repository.OccurrenceRepository
 import page.planr.android.core.data.repository.TaskRepository
 import page.planr.android.core.data.repository.WorkspaceRepository
@@ -28,6 +29,8 @@ interface WidgetEntryPoint {
     fun taskRepository(): TaskRepository
 
     fun syncScheduler(): SyncScheduler
+
+    fun viewPreferences(): ViewPreferences
 
     fun clock(): Clock
 

@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import page.planr.android.core.model.CalendarVisibility
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
 import page.planr.android.core.model.Occurrence
@@ -81,8 +82,12 @@ class AgendaViewModel @Inject constructor(
         }
     }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
 
-    private val workspace: StateFlow<Workspace> = combine(data.observeMembers(), data.observeCategories()) { m, c ->
-        Workspace(m, c, data.currentSession()?.memberId)
+    private val workspace: StateFlow<Workspace> = combine(
+        data.observeMembers(),
+        data.observeCategories(),
+        data.observeShowPartnerEvents(),
+    ) { m, c, showPartner ->
+        Workspace(m, c, data.currentSession()?.memberId, showPartner)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), Workspace())
 
     private val frame: Flow<Frame> = combine(mode, focus, minutes, workspace) { mode, focus, now, ws ->
@@ -126,6 +131,7 @@ class AgendaViewModel @Inject constructor(
                 isLoaded = schedules != null,
                 isRefreshing = refreshing,
                 canCreate = ws.viewerId != null,
+                partner = ws.partnerToggle(),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialState())
 
@@ -145,6 +151,11 @@ class AgendaViewModel @Inject constructor(
         viewModelScope.launch {
             dayRequests.pending.filterNotNull().collect { date -> if (dayRequests.take(date)) openDay(date) }
         }
+    }
+
+    /** Shows or hides the partner's personal events (here and in the widgets). */
+    fun setShowPartnerEvents(show: Boolean) {
+        viewModelScope.launch { runCatchingNonCancel { data.setShowPartnerEvents(show) } }
     }
 
     fun setMode(mode: AgendaMode) {
@@ -239,7 +250,8 @@ class AgendaViewModel @Inject constructor(
     ): Map<LocalDate, DaySchedule> {
         val members = ws.members.associateBy { it.id }
         val categories = ws.categories.associateBy { it.id }
-        val blocks = occurrences.map { agendaBlockOf(it, ws.viewerId, members, categories) }
+        val blocks = CalendarVisibility.filter(occurrences, ws.viewerId, ws.showPartner)
+            .map { agendaBlockOf(it, ws.viewerId, members, categories) }
         return scheduleDays(blocks, days, zone)
     }
 
@@ -247,8 +259,18 @@ class AgendaViewModel @Inject constructor(
         val members: List<Member> = emptyList(),
         val categories: List<Category> = emptyList(),
         val viewerId: String? = null,
+        val showPartner: Boolean = true,
     ) {
         val viewer: Member? get() = members.firstOrNull { it.id == viewerId }
+
+        fun partnerToggle(): PartnerToggle? = CalendarVisibility.partnerOf(members, viewerId)?.let { partner ->
+            PartnerToggle(
+                name = partner.name,
+                color = partner.color,
+                isMemberA = members.firstOrNull()?.id == partner.id,
+                shown = showPartner,
+            )
+        }
     }
 
     private data class Frame(val mode: AgendaMode, val today: LocalDate, val focus: LocalDate, val zone: TimeZone)
