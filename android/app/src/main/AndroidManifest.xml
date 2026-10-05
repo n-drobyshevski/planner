@@ -29,14 +29,16 @@
             </intent-filter>
 
             <!-- OAuth sign-in returns here: an App Link verified by
-                 https://planr.page/.well-known/assetlinks.json. -->
+                 https://auth.planr.page/.well-known/assetlinks.json. Its own
+                 host on purpose: Chrome keeps a same-host redirect (consent on
+                 planr.page → callback) inside the Custom Tab. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="${planrWebHost}"
+                    android:host="${planrAuthCallbackHost}"
                     android:path="/app/auth/callback" />
             </intent-filter>
         </activity>

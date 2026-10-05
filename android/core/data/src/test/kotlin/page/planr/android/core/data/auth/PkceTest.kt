@@ -45,7 +45,7 @@ class PkceTest {
             mapOf(
                 "response_type" to "code",
                 "client_id" to "client-123",
-                "redirect_uri" to "https://planr.page/app/auth/callback",
+                "redirect_uri" to "https://auth.planr.page/app/auth/callback",
                 "state" to "st/ate+1",
                 "code_challenge" to "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
                 "code_challenge_method" to "S256",

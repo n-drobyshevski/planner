@@ -53,7 +53,8 @@ shows a "not configured" sign-in screen.
 | `PLANR_SUPABASE_URL` | Supabase project URL, `https://<ref>.supabase.co` | empty |
 | `PLANR_SUPABASE_ANON_KEY` | Publishable (anon) key, the same as the web's `NEXT_PUBLIC_SUPABASE_ANON_KEY` | empty |
 | `PLANR_OAUTH_CLIENT_ID` | The public PKCE OAuth client registered for the app (see `docs/android.md` §1.3) | empty |
-| `PLANR_WEB_ORIGIN` | Web origin: the consent page, the redirect URI, and the App Link host in the manifest | `https://planr.page` |
+| `PLANR_WEB_ORIGIN` | Web origin of the planner (the consent page lives there) | `https://planr.page` |
+| `PLANR_AUTH_CALLBACK_ORIGIN` | Origin of the OAuth App Link callback: the redirect URI and the App Link host in the manifest. Must be a different host from `PLANR_WEB_ORIGIN` | `https://auth.planr.page` |
 
 Never put the service-role key into the app.
 
@@ -102,7 +103,7 @@ or Play internal testing.
    `ANDROID_CERT_SHA256` on the web deploy, so that
    `/.well-known/assetlinks.json` verifies the sign-in callback. Without this
    step, sign-in returns to the browser fallback page instead of the app. See
-   `docs/android.md` §2.
+   `docs/android.md` §3.
 
 5. Bump `versionCode` and `versionName` in `app/build.gradle.kts` for every
    release you hand out.
@@ -112,7 +113,7 @@ or Play internal testing.
 ```sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk      # or the release APK
 adb shell pm verify-app-links --re-verify page.planr.android
-adb shell pm get-app-links page.planr.android                 # planr.page: verified
+adb shell pm get-app-links page.planr.android                 # auth.planr.page: verified
 ```
 
 To sideload without adb, copy the APK to the phone and open it. Android asks
@@ -186,8 +187,9 @@ server, in a Custom Tab:
    (encrypted) and returns the authorize URL.
 2. The user signs in on planr.page with a passkey or passphrase, then approves
    on `/oauth/consent`.
-3. The App Link `https://planr.page/app/auth/callback?code=…&state=…` opens
-   `MainActivity` (singleTask). The intent arrives in `onNewIntent`, or in
+3. The App Link `https://auth.planr.page/app/auth/callback?code=…&state=…` opens
+   `MainActivity` (singleTask). It's on its own host because Chrome keeps a
+   same-host redirect (the consent page is on planr.page) inside the Custom Tab. The intent arrives in `onNewIntent`, or in
    `onCreate` after a cold start, and goes to `SessionManager.handleCallback`.
 4. `state` is checked and the code is exchanged at `/auth/v1/oauth/token`. The
    member is then resolved the way `verifyMcpToken` does it:

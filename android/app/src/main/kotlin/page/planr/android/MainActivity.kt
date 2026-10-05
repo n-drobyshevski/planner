@@ -24,7 +24,7 @@ import page.planr.android.widgets.WidgetLaunch
 
 /**
  * The single activity, and the target of the OAuth App Link
- * (`https://planr.page/app/auth/callback`). It is singleTask, so returning
+ * (`https://auth.planr.page/app/auth/callback`). It is singleTask, so returning
  * from the Custom Tab arrives in [onNewIntent]; a cold start (the process was
  * killed while the user was on the web) arrives in [onCreate]. Either way the
  * callback goes to [SessionManager], which validates `state` and exchanges
