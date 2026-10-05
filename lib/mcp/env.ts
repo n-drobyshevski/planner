@@ -78,6 +78,26 @@ export function getAllowedRedirectHosts(): string[] {
 /** Path of the Android app's OAuth callback (an App Link on the planner's own origin). */
 export const ANDROID_APP_CALLBACK_PATH = "/app/auth/callback";
 
+/**
+ * The Android app's private-use-scheme callback (RFC 8252 §7.1). This is what
+ * the app signs in with: Chrome keeps a same-host navigation (consent →
+ * planr.page/app/auth/callback) inside the Custom Tab instead of handing it to
+ * the App Link, but always hands a custom scheme to the app.
+ */
+export const ANDROID_APP_SCHEME_REDIRECT_URI = "page.planr.android:/oauth/callback";
+
+/** The "Planr for Android" OAuth client registered on the production project. */
+const DEFAULT_ANDROID_OAUTH_CLIENT_ID = "c90ca50b-da07-4a54-b3eb-b58a0936748d";
+
+/**
+ * Client id of the first-party Android app (ANDROID_OAUTH_CLIENT_ID, else the
+ * production client). Client ids are public; this pins the custom-scheme
+ * callback to the one client we registered.
+ */
+export function getAndroidOAuthClientId(): string {
+  return process.env.ANDROID_OAUTH_CLIENT_ID?.trim() || DEFAULT_ANDROID_OAUTH_CLIENT_ID;
+}
+
 /** Production origin, used when NEXT_PUBLIC_SITE_URL is unset (local dev, previews). */
 const DEFAULT_PLANNER_ORIGIN = "https://planr.page";
 
@@ -105,16 +125,28 @@ export function getAndroidAppRedirectUri(): string {
 }
 
 /**
- * True iff `redirectUri` is exactly the Android app's App Link callback on the
- * planner's own origin. Matched on the full origin + path (no query, fragment, or
- * userinfo) rather than by host, so allowing it never opens the rest of the
- * planner's host as a redirect target. A code sent there is safe even for a
- * rogue client registered with this URI: the verified App Link delivers it to
- * the Planr app (whose PKCE verifier won't match), and the web fallback page
- * never reads it.
+ * True iff `redirectUri` is one of the Android app's callbacks:
+ *
+ * - the App Link on the planner's own origin, matched on the full origin + path
+ *   (no query, fragment, or userinfo) rather than by host, so allowing it never
+ *   opens the rest of the planner's host as a redirect target. A code sent there
+ *   is safe even for a rogue client registered with this URI: the verified App
+ *   Link only reaches the Planr app (whose PKCE verifier won't match), and the
+ *   web fallback page never reads it.
+ * - the custom-scheme callback, but only for the registered Android client
+ *   ([clientId] must equal getAndroidOAuthClientId()). Any app can claim a
+ *   custom scheme and dynamic registration lets any client name it, so without
+ *   the client pin a look-alike client would be shown as "Planr for Android"
+ *   and its own app would receive the code.
  */
-export function isAndroidAppRedirect(redirectUri: string | undefined): boolean {
+export function isAndroidAppRedirect(
+  redirectUri: string | undefined,
+  clientId?: string,
+): boolean {
   if (!redirectUri) return false;
+  if (redirectUri === ANDROID_APP_SCHEME_REDIRECT_URI) {
+    return clientId !== undefined && clientId === getAndroidOAuthClientId();
+  }
   let url: URL;
   try {
     url = new URL(redirectUri);
@@ -144,12 +176,16 @@ export function mcpAllowLoopbackRedirect(): boolean {
  * True iff a client's redirect URI is permitted to be authorized. Authoritative
  * check lives in /api/oauth/decision; the consent page mirrors it for UX.
  *
- * The Android app's first-party callback is always allowed (independent of the
- * host override below); everything else goes through the Claude-only host guard.
+ * The Android app's first-party callbacks are always allowed (independent of the
+ * host override below; the custom scheme only with the app's client id);
+ * everything else goes through the Claude-only host guard.
  */
-export function isAllowedClientRedirect(redirectUri: string | undefined): boolean {
+export function isAllowedClientRedirect(
+  redirectUri: string | undefined,
+  clientId?: string,
+): boolean {
   if (!redirectUri) return false;
-  if (isAndroidAppRedirect(redirectUri)) return true;
+  if (isAndroidAppRedirect(redirectUri, clientId)) return true;
   let host: string;
   try {
     host = new URL(redirectUri).hostname.toLowerCase();

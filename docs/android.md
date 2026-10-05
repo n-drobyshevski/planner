@@ -7,7 +7,8 @@ backend. The only web-side pieces are sign-in plumbing, which this document
 covers:
 
 - the OAuth consent flow (shared with the Claude connector),
-- the App Link callback and its Digital Asset Links file,
+- the app's custom-scheme OAuth callback, and the Digital Asset Links file
+  that ties the app to planr.page (passkeys),
 - the recurrence golden fixtures that keep the Kotlin port in step with
   `lib/recurrence`.
 
@@ -16,7 +17,7 @@ covers:
 ```
 Planr for Android
    │  Custom Tab → {SUPABASE_URL}/auth/v1/oauth/authorize
-   │      ?response_type=code&client_id=…&redirect_uri=https://planr.page/app/auth/callback
+   │      ?response_type=code&client_id=…&redirect_uri=page.planr.android:/oauth/callback
    │      &code_challenge=…&code_challenge_method=S256&state=…
    ▼
 Supabase OAuth 2.1 server ──► https://planr.page/oauth/consent   (our consent page)
@@ -24,9 +25,9 @@ Supabase OAuth 2.1 server ──► https://planr.page/oauth/consent   (our cons
    │                               • "Planr for Android wants to sign in…" → Allow
    ▼
 /api/oauth/decision  (re-checks the redirect allowlist, approves via Supabase)
-   │  303 → https://planr.page/app/auth/callback?code=…&state=…
+   │  303 → page.planr.android:/oauth/callback?code=…&state=…
    ▼
-Android App Link (verified via /.well-known/assetlinks.json) → the app
+Chrome hands the custom scheme to the app (MainActivity → SessionManager)
    │  POST {SUPABASE_URL}/auth/v1/oauth/token  (code + PKCE verifier)
    ▼
 access + refresh tokens → supabase-kt (same RLS as the browser session)
@@ -39,35 +40,42 @@ The member is resolved from the token the same way the MCP server does it
 
 | Path | Role |
 | --- | --- |
-| `lib/mcp/env.ts` | `isAndroidAppRedirect` / `getAndroidAppRedirectUri`: the app's callback is always allowed by the redirect guard |
+| `lib/mcp/env.ts` | `isAndroidAppRedirect` / `getAndroidOAuthClientId`: the app's callback is allowed by the redirect guard, pinned to its client id |
 | `app/[locale]/oauth/consent/page.tsx` | Consent screen. Reads as "Planr for Android" when the redirect is the app's callback |
 | `app/api/oauth/decision/route.ts` | Authoritative allowlist check plus approve/deny (unchanged) |
 | `app/.well-known/assetlinks.json/route.ts` | Digital Asset Links (`lib/android/asset-links.ts`) |
-| `app/app/auth/callback/page.tsx` | Static fallback shown only if the App Link doesn't open the app |
+| `app/app/auth/callback/page.tsx` | Static fallback for the earlier https callback (old builds, stale links) |
 | `scripts/recurrence-fixtures.ts` | Golden fixtures for `android/core/recurrence` (see below) |
+
+### Why a custom scheme, not an App Link
+
+The callback used to be the App Link `https://planr.page/app/auth/callback`.
+That never reached the app: the consent page is on planr.page too, and Chrome
+keeps a same-host navigation (consent → decision → callback) inside the Custom
+Tab instead of handing it to an App Link. The "already consented" shortcut is a
+redirect with no user gesture, which App Links ignore as well. A private-use
+scheme (RFC 8252 §7.1, reverse-DNS of the package) is always handed to the app.
 
 ### Redirect allowlist
 
 The consent and decision layers only authorize clients whose redirect is
 allowlisted (the "Claude only" guard; see `docs/mcp-connector.md`). The Android
-callback is allowed **by default and exactly**:
+callback is allowed **exactly, and only for the app's own client**:
 
-- **Redirect URI:** `<origin>/app/auth/callback`.
-- **Origin:** the origin of `NEXT_PUBLIC_SITE_URL`, or `https://planr.page` when that variable is unset or malformed.
-- **Matching:** the full origin and path must match. Query strings, fragments, userinfo, other ports and subdomains are all refused. Allowing the callback never opens the rest of the planner's host as a redirect target.
+- **Redirect URI:** `page.planr.android:/oauth/callback`, compared as an exact string (no trailing slash, query or fragment).
+- **Client pin:** the authorization's `client.id` must equal `ANDROID_OAUTH_CLIENT_ID` (default: the production "Planr for Android" client). Any app can claim a custom scheme and dynamic registration lets any client name this URI, so without the pin a look-alike client would be shown as "Planr for Android" and its own app would receive the code.
 - **Overrides:** `MCP_ALLOWED_REDIRECT_HOSTS` doesn't affect it. That variable only governs third-party hosts.
+- **Legacy:** `<origin>/app/auth/callback` (origin of `NEXT_PUBLIC_SITE_URL`, else `https://planr.page`) is still allowed, matched on full origin and path, so a sign-in started by an older build fails gracefully on the fallback page.
 
-The consent page identifies the app by this redirect, not by the client's
-self-declared name. A rogue client that registers the same redirect gains
-nothing: the code is delivered to the Planr app, whose PKCE verifier won't match,
-or to the fallback page, which never reads it.
+The consent page identifies the app by redirect plus client id, never by the
+client's self-declared name. PKCE protects the code in transit: an app that
+intercepts it can't redeem it without the verifier.
 
 ### Callback fallback page
 
-`/app/auth/callback` normally never loads in a browser, because the verified App
-Link hands the URL to the app. If the app is missing, out of date, or not yet
-verified, the browser shows a short bilingual (en/ru) page that asks the user to
-open Planr and sign in again.
+`/app/auth/callback` is only reached by the legacy https redirect (an older
+build, or a stale link). It shows a short bilingual (en/ru) page that asks the
+user to open Planr and sign in again.
 
 - **Static:** the page never reads `searchParams`, so the code isn't exchanged, logged, stored or forwarded.
 - **Own root layout:** it lives in `app/app/layout.tsx` (outside `[locale]`), which has no analytics and sets `referrer: no-referrer`.
@@ -92,7 +100,7 @@ only the Supabase steps marked *Android* are new.
    - **Dashboard:** Dashboard → **Authentication → OAuth Apps** → *Add client*:
      - Name: `Planr for Android`
      - Type: **Public** (token endpoint auth method `none`)
-     - Redirect URI: `https://planr.page/app/auth/callback`
+     - Redirect URI: `page.planr.android:/oauth/callback`
      - Grant types: `authorization_code`, `refresh_token`
    - **Admin API** (service-role key, from a trusted machine only):
 
@@ -103,7 +111,7 @@ only the Supabase steps marked *Android* are new.
        -H "Content-Type: application/json" \
        -d '{
          "client_name": "Planr for Android",
-         "redirect_uris": ["https://planr.page/app/auth/callback"],
+         "redirect_uris": ["page.planr.android:/oauth/callback"],
          "grant_types": ["authorization_code", "refresh_token"],
          "token_endpoint_auth_method": "none"
        }'
@@ -112,15 +120,17 @@ only the Supabase steps marked *Android* are new.
      In code, the same call is `supabase.auth.admin.oauth.createClient(...)`.
 
    Note the returned **`client_id`**. It is public and goes into the app build as
-   `PLANR_OAUTH_CLIENT_ID`.
-4. For a staging project or domain, register a second client whose redirect is
-   `<staging origin>/app/auth/callback`, and set that deploy's
-   `NEXT_PUBLIC_SITE_URL` to the staging origin so the allowlist follows.
+   `PLANR_OAUTH_CLIENT_ID`, and into Vercel as `ANDROID_OAUTH_CLIENT_ID` (the
+   consent guard's client pin; the default is the production client).
+4. For a staging Supabase project, register a second client with the same
+   redirect, and set that deploy's `ANDROID_OAUTH_CLIENT_ID` to its id so the
+   allowlist follows.
 
 ### 2. Digital Asset Links
 
-Set these env vars in Vercel (all environments that serve the App Link domain),
-then redeploy:
+Sign-in no longer depends on these (it uses the custom scheme), but they let
+Credential Manager offer planr.page's passkeys to the app. Set these env vars in
+Vercel (Production), then redeploy:
 
 | Var | Value |
 | --- | --- |
@@ -135,7 +145,7 @@ then redeploy:
 **What gets served:**
 - **Unset or invalid values:** the route serves `[]`, a valid but empty statement list, so no app is verified.
 - **Configured:** the route serves one statement for the package with these relations:
-  - `delegate_permission/common.handle_all_urls` verifies the App Link.
+  - `delegate_permission/common.handle_all_urls` verifies planr.page links for the app (unused by sign-in now).
   - `delegate_permission/common.get_login_creds` lets Credential Manager offer planr.page's passkeys and passwords to the app.
 
 **Caching:** the route reads no request data, so under Cache Components it is
@@ -146,14 +156,7 @@ prerendered at build time. Changing the variables needs a redeploy.
 ```sh
 curl -s https://planr.page/.well-known/assetlinks.json
 curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://planr.page&relation=delegate_permission/common.handle_all_urls"
-# on a device with the app installed:
-adb shell pm verify-app-links --re-verify page.planr.android
-adb shell pm get-app-links page.planr.android     # planr.page: verified
 ```
-
-The app's manifest must declare the matching filter. It needs
-`android:autoVerify="true"`, scheme `https`, host `planr.page`, and path
-`/app/auth/callback`.
 
 ### 3. Android build config
 

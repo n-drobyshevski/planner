@@ -20,6 +20,26 @@ class AuthCallbackParserTest {
     }
 
     @Test
+    fun `matches only the exact custom-scheme callback`() {
+        val scheme = "page.planr.android:/oauth/callback"
+        assertTrue(AuthCallbackParser.matches("$scheme?code=x&state=y", scheme))
+        assertTrue(AuthCallbackParser.matches(scheme, scheme))
+        assertFalse(AuthCallbackParser.matches("page.planr.android:/oauth/other?code=x", scheme))
+        assertFalse(AuthCallbackParser.matches("page.planr.android://oauth/callback?code=x", scheme))
+        assertFalse(AuthCallbackParser.matches("page.planr.evil:/oauth/callback?code=x", scheme))
+        assertFalse(AuthCallbackParser.matches("$callback?code=x", scheme))
+        assertFalse(AuthCallbackParser.matches("$scheme?code=x", callback))
+    }
+
+    @Test
+    fun `parses a custom-scheme callback`() {
+        assertEquals(
+            AuthCallback.Code("abc-123", "st"),
+            AuthCallbackParser.parse("page.planr.android:/oauth/callback?code=abc-123&state=st"),
+        )
+    }
+
+    @Test
     fun `parses code and state`() {
         assertEquals(
             AuthCallback.Code("abc-123", "s t"),

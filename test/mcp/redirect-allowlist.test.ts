@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
+  ANDROID_APP_SCHEME_REDIRECT_URI,
   getAndroidAppRedirectUri,
+  getAndroidOAuthClientId,
   getPlannerOrigin,
   isAllowedClientRedirect,
   isAndroidAppRedirect,
@@ -14,6 +16,7 @@ beforeEach(() => {
   delete process.env.MCP_ALLOWED_REDIRECT_HOSTS;
   delete process.env.MCP_ALLOW_LOOPBACK_REDIRECT;
   delete process.env.NEXT_PUBLIC_SITE_URL;
+  delete process.env.ANDROID_OAUTH_CLIENT_ID;
 });
 
 describe("isAllowedClientRedirect (Claude-only guard)", () => {
@@ -103,5 +106,59 @@ describe("Android app redirect (first-party App Link)", () => {
     ]) {
       expect(isAllowedClientRedirect(uri), uri).toBe(false);
     }
+  });
+});
+
+describe("Android app redirect (custom scheme, pinned to the app's client)", () => {
+  const appClient = "c90ca50b-da07-4a54-b3eb-b58a0936748d";
+
+  it("allows the scheme callback only for the registered Android client", () => {
+    expect(ANDROID_APP_SCHEME_REDIRECT_URI).toBe("page.planr.android:/oauth/callback");
+    expect(getAndroidOAuthClientId()).toBe(appClient);
+    expect(isAndroidAppRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(true);
+    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(true);
+  });
+
+  it("refuses a look-alike client using the same scheme callback", () => {
+    // Dynamic registration lets any client name this URI, and any app can claim
+    // the scheme — without the client pin it would be shown as Planr for Android.
+    expect(isAndroidAppRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, "rogue-client")).toBe(false);
+    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, "rogue-client")).toBe(
+      false,
+    );
+    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI)).toBe(false);
+  });
+
+  it("follows ANDROID_OAUTH_CLIENT_ID", () => {
+    process.env.ANDROID_OAUTH_CLIENT_ID = "staging-client";
+    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, "staging-client")).toBe(
+      true,
+    );
+    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(false);
+  });
+
+  it("stays allowed when the Claude host list is overridden", () => {
+    process.env.MCP_ALLOWED_REDIRECT_HOSTS = "claude.com";
+    expect(isAllowedClientRedirect(ANDROID_APP_SCHEME_REDIRECT_URI, appClient)).toBe(true);
+  });
+
+  it("matches the exact URI only", () => {
+    for (const uri of [
+      "page.planr.android:/oauth/callback/",
+      "page.planr.android:/oauth/callback?x=1",
+      "page.planr.android:/oauth/callback#frag",
+      "page.planr.android:/oauth/other",
+      "page.planr.android://oauth/callback",
+      "PAGE.PLANR.ANDROID:/oauth/callback",
+      "page.planr.evil:/oauth/callback",
+    ]) {
+      expect(isAllowedClientRedirect(uri, appClient), uri).toBe(false);
+    }
+  });
+
+  it("keeps the App Link form working for any client (older builds)", () => {
+    expect(isAllowedClientRedirect("https://planr.page/app/auth/callback", "other")).toBe(
+      true,
+    );
   });
 });

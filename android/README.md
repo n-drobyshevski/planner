@@ -3,7 +3,7 @@
 A native Jetpack Compose client for planr.page, with Glance home-screen
 widgets. Like the web app, it talks **directly to Supabase**: PostgREST for
 data, Realtime for live changes, RLS for access control. There is no
-app-specific API. The server-side setup (OAuth client, App Link verification,
+app-specific API. The server-side setup (OAuth client, asset links,
 recurrence fixtures) is in [`docs/android.md`](../docs/android.md).
 
 v1 covers the agenda (day/week, both members), event detail and editing
@@ -53,7 +53,7 @@ shows a "not configured" sign-in screen.
 | `PLANR_SUPABASE_URL` | Supabase project URL, `https://<ref>.supabase.co` | empty |
 | `PLANR_SUPABASE_ANON_KEY` | Publishable (anon) key, the same as the web's `NEXT_PUBLIC_SUPABASE_ANON_KEY` | empty |
 | `PLANR_OAUTH_CLIENT_ID` | The public PKCE OAuth client registered for the app (see `docs/android.md` §1.3) | empty |
-| `PLANR_WEB_ORIGIN` | Web origin: the consent page, the redirect URI, and the App Link host in the manifest | `https://planr.page` |
+| `PLANR_WEB_ORIGIN` | Web origin of the planner (the consent page lives there) | `https://planr.page` |
 
 Never put the service-role key into the app.
 
@@ -97,12 +97,12 @@ or Play internal testing.
    Release builds are minified with R8. The keep rules are in
    `app/proguard-rules.pro`.
 
-4. **Register the certificate for App Links.** Take the key's SHA-256 from
+4. **Register the certificate in asset links.** Take the key's SHA-256 from
    `keytool -list -v -keystore … -alias planr` and add it to
    `ANDROID_CERT_SHA256` on the web deploy, so that
-   `/.well-known/assetlinks.json` verifies the sign-in callback. Without this
-   step, sign-in returns to the browser fallback page instead of the app. See
-   `docs/android.md` §2.
+   `/.well-known/assetlinks.json` ties the app to planr.page (Credential
+   Manager can then offer the site's passkeys). Sign-in itself doesn't need
+   it. See `docs/android.md` §2.
 
 5. Bump `versionCode` and `versionName` in `app/build.gradle.kts` for every
    release you hand out.
@@ -111,17 +111,13 @@ or Play internal testing.
 
 ```sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk      # or the release APK
-adb shell pm verify-app-links --re-verify page.planr.android
-adb shell pm get-app-links page.planr.android                 # planr.page: verified
 ```
 
 To sideload without adb, copy the APK to the phone and open it. Android asks
 once to allow installs from that source.
 
-Debug builds are signed with the local debug key. For the App Link to verify
-with one, that key's fingerprint (`./gradlew :app:signingReport`) must be in
-`ANDROID_CERT_SHA256`. Otherwise sign-in comes back to the browser fallback
-page.
+Debug builds are signed with the local debug key
+(`./gradlew :app:signingReport` shows its fingerprint).
 
 ### Test APKs from CI
 
@@ -186,8 +182,10 @@ server, in a Custom Tab:
    (encrypted) and returns the authorize URL.
 2. The user signs in on planr.page with a passkey or passphrase, then approves
    on `/oauth/consent`.
-3. The App Link `https://planr.page/app/auth/callback?code=…&state=…` opens
-   `MainActivity` (singleTask). The intent arrives in `onNewIntent`, or in
+3. The consent approval redirects to `page.planr.android:/oauth/callback?code=…&state=…`,
+   which Chrome hands to `MainActivity` (singleTask). It's a custom scheme
+   rather than an https App Link because Chrome keeps a same-host planr.page
+   redirect inside the Custom Tab. The intent arrives in `onNewIntent`, or in
    `onCreate` after a cold start, and goes to `SessionManager.handleCallback`.
 4. `state` is checked and the code is exchanged at `/auth/v1/oauth/token`. The
    member is then resolved the way `verifyMcpToken` does it:

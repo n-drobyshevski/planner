@@ -13,8 +13,8 @@
 #   secrets.ANDROID_DEBUG_KEYSTORE_BASE64 (+ optional
 #   secrets.ANDROID_DEBUG_KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD)
 #     A shared debug keystore, base64-encoded. Without it every run signs with
-#     a fresh throwaway key: installs over a previous build fail and the App
-#     Link sign-in callback won't verify. See android/README.md.
+#     a fresh throwaway key, so installs over a previous build fail. See
+#     android/README.md.
 name: Android debug APK
 
 on:
@@ -60,7 +60,7 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/debug.keystore"
             echo "PLANR_DEBUG_STORE_FILE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
           else
-            echo "::warning::ANDROID_DEBUG_KEYSTORE_BASE64 is not set; the APK is signed with a throwaway key (no in-place updates, App Link sign-in won't verify)."
+            echo "::warning::ANDROID_DEBUG_KEYSTORE_BASE64 is not set; the APK is signed with a throwaway key (no in-place updates over earlier builds)."
           fi
 
       - name: Assemble debug APK
