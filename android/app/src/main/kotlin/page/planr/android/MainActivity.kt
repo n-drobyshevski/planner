@@ -18,6 +18,7 @@ import javax.inject.Inject
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.design.theme.PlanrTheme
+import page.planr.android.feature.agenda.model.AgendaDayRequests
 import page.planr.android.navigation.LaunchRoute
 import page.planr.android.navigation.PlanrNavHost
 import page.planr.android.widgets.WidgetLaunch
@@ -38,6 +39,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var sessionManager: SessionManager
+
+    @Inject
+    lateinit var agendaDayRequests: AgendaDayRequests
 
     /** A widget's requested destination, until the nav host has opened it. */
     private var launchRoute by mutableStateOf<LaunchRoute?>(null)
@@ -61,6 +65,7 @@ class MainActivity : ComponentActivity() {
                             signedIn = authState is AuthState.SignedIn,
                             launchRoute = launchRoute,
                             onLaunchRouteHandled = { launchRoute = null },
+                            onOpenDay = agendaDayRequests::request,
                         )
                     }
                 }

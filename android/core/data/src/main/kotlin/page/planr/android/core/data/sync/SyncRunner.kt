@@ -26,7 +26,7 @@ class SyncRunner @Inject constructor(
 ) {
 
     /**
-     * Members/categories/boards, today ±7 days (plus the visible window), and
+     * Members/categories/boards, the widgets' days (plus the visible window), and
      * all tasks; then re-renders widgets. Returns false when signed out.
      * Throws on network / server errors (the worker retries).
      */
@@ -54,7 +54,7 @@ class SyncRunner @Inject constructor(
         widgets.requestRefresh()
     }
 
-    /** Today ±7 days (what the widgets show) and the agenda's window when it lies elsewhere. */
+    /** The widgets' days ([SyncWindows.aroundToday]) and the agenda's window when it lies elsewhere. */
     private fun windowsToSync(): List<TimeWindow> {
         val today = SyncWindows.aroundToday(clock)
         val visible = visibleWindow.window.value

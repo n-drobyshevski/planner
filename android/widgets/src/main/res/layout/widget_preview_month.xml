@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget-picker preview (API 31+): a static sketch of MonthWidget.
+     RemoteViews-safe views only. Shown once, in the picker, so its view
+     count doesn't matter. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_background"
+    android:orientation="vertical"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="12dp"
+    tools:ignore="HardcodedText,ContentDescription,TooManyViews">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/widget_preview_month"
+            android:textColor="@color/planr_widget_ink"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_preview_year"
+            android:textColor="@color/planr_widget_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:orientation="horizontal">
+        <TextView style="@style/PlanrWidgetPreviewWeekday" android:text="@string/widget_preview_weekday_1" />
+        <TextView style="@style/PlanrWidgetPreviewWeekday" android:text="@string/widget_preview_weekday_2" />
+        <TextView style="@style/PlanrWidgetPreviewWeekday" android:text="@string/widget_preview_weekday_3" />
+        <TextView style="@style/PlanrWidgetPreviewWeekday" android:text="@string/widget_preview_weekday_4" />
+        <TextView style="@style/PlanrWidgetPreviewWeekday" android:text="@string/widget_preview_weekday_5" />
+        <TextView style="@style/PlanrWidgetPreviewWeekday" android:text="@string/widget_preview_weekday_6" />
+        <TextView style="@style/PlanrWidgetPreviewWeekday" android:text="@string/widget_preview_weekday_7" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewWeek">
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="28"
+                android:textColor="@color/planr_widget_outline" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="29"
+                android:textColor="@color/planr_widget_outline" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="30"
+                android:textColor="@color/planr_widget_outline" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="1"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="2"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_a" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="3"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="4"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewWeek">
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:background="@drawable/widget_preview_pill_accent"
+                android:fontFamily="sans-serif-black"
+                android:text="5"
+                android:textColor="@color/planr_widget_on_accent" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_a" />
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_b" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="6"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="7"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_shared" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="8"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="9"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_b" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="10"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="11"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewWeek">
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="12"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_a" />
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_shared" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="13"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="14"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_b" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="15"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="16"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_a" />
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_b" />
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_shared" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="17"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="18"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewWeek">
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="19"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="20"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_a" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="21"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="22"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="23"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_b" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="24"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="25"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewWeek">
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="26"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_shared" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="27"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="28"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="29"
+                android:textColor="@color/planr_widget_ink" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:orientation="horizontal">
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_a" />
+                <ImageView style="@style/PlanrWidgetPreviewDot" android:tint="@color/planr_widget_member_b" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="30"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="31"
+                android:textColor="@color/planr_widget_ink" />
+        </LinearLayout>
+        <LinearLayout style="@style/PlanrWidgetPreviewDay">
+            <TextView
+                style="@style/PlanrWidgetPreviewDate"
+                android:text="1"
+                android:textColor="@color/planr_widget_outline" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

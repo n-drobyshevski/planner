@@ -20,7 +20,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * Keeps the dated widgets (Today, Tasks' due labels) on the right day.
+ * Keeps the dated widgets (Today, Week, Month, Tasks' due labels) on the right day.
  *
  * Since Android 8 a manifest receiver no longer gets `DATE_CHANGED` or
  * `USER_PRESENT`, so midnight is an alarm instead: a non-wakeup, allow-while-
@@ -79,10 +79,17 @@ internal object DayRollover {
 
     private fun hasDatedWidgets(context: Context): Boolean {
         val manager = AppWidgetManager.getInstance(context) ?: return false
-        return listOf(TodayAgendaWidgetReceiver::class.java, TasksWidgetReceiver::class.java).any { receiver ->
+        return DATED_RECEIVERS.any { receiver ->
             manager.getAppWidgetIds(ComponentName(context, receiver)).isNotEmpty()
         }
     }
+
+    private val DATED_RECEIVERS = listOf(
+        TodayAgendaWidgetReceiver::class.java,
+        WeekAgendaWidgetReceiver::class.java,
+        MonthWidgetReceiver::class.java,
+        TasksWidgetReceiver::class.java,
+    )
 
     private fun rolloverIntent(context: Context): PendingIntent =
         PendingIntent.getBroadcast(

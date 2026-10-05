@@ -17,6 +17,7 @@ import kotlinx.datetime.LocalDate
 import org.junit.Rule
 import org.junit.Test
 import page.planr.android.core.model.TimeWindow
+import page.planr.android.feature.agenda.model.AgendaDayRequests
 import page.planr.android.feature.agenda.model.AgendaMode
 import page.planr.android.feature.agenda.model.AgendaNotice
 import page.planr.android.feature.agenda.model.AgendaNotices
@@ -30,13 +31,14 @@ class AgendaViewModelTest {
 
     private val data = FakeAgendaDataSource()
     private val notices = AgendaNotices()
+    private val dayRequests = AgendaDayRequests()
 
     // Sunday 4 Oct 2026, 09:30 in Berlin.
     private val clock = Fixtures.clockAt("2026-10-04T07:30:00Z")
     private val sunday = LocalDate(2026, 10, 4)
 
     private fun TestScope.viewModel(saved: SavedStateHandle = SavedStateHandle()): AgendaViewModel {
-        val vm = AgendaViewModel(data, clock, notices, saved)
+        val vm = AgendaViewModel(data, clock, notices, saved, dayRequests)
         backgroundScope.launch { vm.state.collect {} }
         runCurrent()
         return vm
@@ -96,6 +98,40 @@ class AgendaViewModelTest {
         vm.openDay(LocalDate(2026, 10, 7))
         assertEquals(AgendaMode.Day, vm.state.value.mode)
         assertEquals(listOf(LocalDate(2026, 10, 7)), vm.state.value.days)
+        vm.close()
+    }
+
+    @Test
+    fun `opening another day of today's week lands on that day, not today`() = runTest {
+        val vm = viewModel()
+        vm.setMode(AgendaMode.Week)
+        runCurrent()
+
+        vm.openDay(LocalDate(2026, 10, 1))
+        assertEquals(AgendaMode.Day, vm.state.value.mode)
+        assertEquals(listOf(LocalDate(2026, 10, 1)), vm.state.value.days)
+        vm.close()
+    }
+
+    @Test
+    fun `a widget's day request opens that day, once, live or on creation`() = runTest {
+        // Posted before the agenda exists (a cold start from the widget).
+        dayRequests.request(LocalDate(2026, 10, 9))
+        val vm = viewModel()
+        assertEquals(AgendaMode.Day, vm.state.value.mode)
+        assertEquals(listOf(LocalDate(2026, 10, 9)), vm.state.value.days)
+
+        // Taken: a second agenda doesn't replay it.
+        val other = viewModel()
+        assertEquals(listOf(sunday), other.state.value.days)
+        other.close()
+
+        // Posted while the agenda is open.
+        vm.setMode(AgendaMode.Week)
+        dayRequests.request(LocalDate(2026, 10, 20))
+        runCurrent()
+        assertEquals(AgendaMode.Day, vm.state.value.mode)
+        assertEquals(listOf(LocalDate(2026, 10, 20)), vm.state.value.days)
         vm.close()
     }
 

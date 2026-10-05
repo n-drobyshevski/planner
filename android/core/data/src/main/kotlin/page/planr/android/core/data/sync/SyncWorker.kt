@@ -10,9 +10,10 @@ import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Periodic background refresh (every 30 min on a network): today ±7 days,
- * tasks and reference data into Room, then the widgets. Built by the app's
- * HiltWorkerFactory (see PlanrApplication's WorkManager configuration).
+ * Periodic background refresh (every 30 min on a network): the widgets' days
+ * ([SyncWindows.aroundToday]), tasks and reference data into Room, then the
+ * widgets. Built by the app's HiltWorkerFactory (see PlanrApplication's
+ * WorkManager configuration).
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(

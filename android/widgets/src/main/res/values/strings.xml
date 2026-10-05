@@ -9,6 +9,10 @@
     <string name="widget_tasks_description">Open tasks, with a checkbox to complete them</string>
     <string name="widget_quickadd_name">Quick add</string>
     <string name="widget_quickadd_description">Add a task or an event in one tap</string>
+    <string name="widget_week_name">Week</string>
+    <string name="widget_week_description">This week, day by day, for both of you</string>
+    <string name="widget_month_name">Month</string>
+    <string name="widget_month_description">The month at a glance, with a dot for whose plans</string>
 
     <!-- Shared states -->
     <string name="widget_sign_in">Sign in</string>
@@ -22,6 +26,19 @@
     <string name="widget_all_day">All day</string>
     <!-- A timed event that began on an earlier day: "to 10:00". -->
     <string name="widget_until">to %1$s</string>
+
+    <!-- Week -->
+    <string name="widget_week_title">This week</string>
+    <string name="widget_week_signed_out">Sign in to see your week here.</string>
+    <!-- A day with nothing on it, beside its heading (also read out for a month cell). -->
+    <string name="widget_week_free">Free</string>
+    <plurals name="widget_week_event_count">
+        <item quantity="one">%d event</item>
+        <item quantity="other">%d events</item>
+    </plurals>
+
+    <!-- Month -->
+    <string name="widget_month_signed_out">Sign in to see your month here.</string>
 
     <!-- Tasks -->
     <string name="widget_tasks_signed_out">Sign in to see your tasks here.</string>
@@ -49,4 +66,17 @@
     <string name="widget_preview_task_2">Book train tickets</string>
     <string name="widget_preview_task_3">Call the landlord</string>
     <string name="widget_preview_open_count">3 open</string>
+    <string name="widget_preview_week_range">5–11 Oct</string>
+    <string name="widget_preview_week_day_1">Mon 5</string>
+    <string name="widget_preview_week_day_2">Tue 6</string>
+    <string name="widget_preview_week_day_3">Wed 7</string>
+    <string name="widget_preview_month">October</string>
+    <string name="widget_preview_year" translatable="false">2026</string>
+    <string name="widget_preview_weekday_1">M</string>
+    <string name="widget_preview_weekday_2">T</string>
+    <string name="widget_preview_weekday_3">W</string>
+    <string name="widget_preview_weekday_4">T</string>
+    <string name="widget_preview_weekday_5">F</string>
+    <string name="widget_preview_weekday_6">S</string>
+    <string name="widget_preview_weekday_7">S</string>
 </resources>

@@ -8,8 +8,8 @@ recurrence fixtures) is in [`docs/android.md`](../docs/android.md).
 
 v1 covers the agenda (day/week, both members), event detail and editing
 (including "this / this and following / all events" on a series), tasks
-(list, detail, complete), Quick add, and three widgets: Today, Tasks and
-Quick add. Sleep, insights, boards/collections, sharing and push are not in
+(list, detail, complete), Quick add, and five widgets: Today, Week, Month,
+Tasks and Quick add. Sleep, insights, boards/collections, sharing and push are not in
 v1.
 
 ## Build
@@ -171,7 +171,7 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 | `:feature:agenda` | `…feature.agenda` | Day/week agenda, event detail, event editor, recurring-edit scopes |
 | `:feature:tasks` | `…feature.tasks` | Task list with filters, task detail/edit, complete |
 | `:feature:quickadd` | `…feature.quickadd` | Quick add bottom sheet, plus the translucent `QuickAddActivity` the widget opens |
-| `:widgets` | `…widgets` | Glance widgets: Today, Tasks, Quick add |
+| `:widgets` | `…widgets` | Glance widgets: Today, Week, Month, Tasks, Quick add |
 
 Shared build setup is in `build-logic/`, as the convention plugins
 `planr.android.application`, `planr.android.library`, `planr.android.compose`,
@@ -252,8 +252,9 @@ page that revokes the grant.
   case something was missed while disconnected.
 - **Periodic, while signed in.** `SyncScheduler` keeps a 30-minute periodic
   `SyncWorker` (network required), plus one immediate run after a fresh
-  sign-in. It cancels both on sign-out. The worker syncs today ±7 days, tasks
-  and reference data.
+  sign-in. It cancels both on sign-out. The worker syncs the days the widgets
+  can show (today ±7 days and this month's whole weeks, `SyncWindows`),
+  tasks and reference data.
 - **Start-up.** `PlanrApplication.onCreate` starts both through
   `DataInitializer`.
 - **Workers.** WorkManager is configured by `PlanrApplication` with
@@ -285,20 +286,29 @@ page that revokes the grant.
 - **Widget taps.** A widget tap sends `MainActivity` an intent with
   `WidgetLaunch.ACTION_OPEN` and a route. `MainActivity` is exported, so that
   route is untrusted. `LaunchRoute.parse` accepts only `agenda`, `tasks`,
-  `event/{ref}` and `task/{id}`. Once signed in, the app opens the route's
-  tab and pushes the detail on top, so Back returns to the tab.
+  `event/{ref}`, `task/{id}` and `day/{yyyy-mm-dd}`. Once signed in, the app
+  opens the route's tab and pushes the detail on top, so Back returns to the
+  tab. A `day/…` route posts the date to `AgendaDayRequests`, which the
+  agenda takes (open or created next) and shows in the day view.
 
 ### Widgets (Glance)
 
 - **Today.** Today's occurrences from Room, in the members' colors. A tap
   opens the occurrence.
+- **Week.** This Monday-to-Sunday week. Past days fold to their heading with
+  a count; today and the days ahead list their events as Today does. A day
+  heading opens that day in the agenda, an event opens the event.
+- **Month.** This month as a Monday-first grid, with one dot per member who
+  has plans that day (shared amber when joint) and today circled. A day opens
+  it in the agenda. It shows the current month only (no paging).
 - **Tasks.** Open tasks the viewer is responsible for, or that are in a shared
   context. The checkbox completes the task through `TaskRepository.setDone`
   (owner only, as RLS requires).
 - **Quick add.** "+ Task" and "+ Event" open `QuickAddActivity`.
 
 Widgets refresh after any write, on Realtime changes and on each periodic
-sync. They also refresh at local midnight (a non-waking alarm) and on time,
+sync. They read Room only, so Week and Month show what sync has fetched.
+They also refresh at local midnight (a non-waking alarm) and on time,
 time-zone or locale changes.
 
 ## Tests

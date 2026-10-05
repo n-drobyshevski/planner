@@ -14,14 +14,14 @@ import kotlinx.datetime.todayIn
 import page.planr.android.core.model.viewerTimeZone
 
 /**
- * Today's occurrences for both members, from the Room cache: a colour bar
- * for whose, the time, the title. Tapping a row opens the event; tapping the
- * header opens the agenda.
+ * This week, Monday to Sunday, for both members, from the Room cache: past
+ * days fold to one line, today and the days ahead list their events. Tapping
+ * a day opens it in the agenda; tapping an event opens the event.
  */
-class TodayAgendaWidget : GlanceAppWidget() {
+class WeekAgendaWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val loader = TodayAgendaLoader(WidgetEntryPoint.from(context))
+        val loader = WeekAgendaLoader(WidgetEntryPoint.from(context))
         val initialTick = WidgetState.tick(getAppWidgetState<Preferences>(context, id))
         val initial = loader.load()
         DayRollover.sync(context)
@@ -29,39 +29,36 @@ class TodayAgendaWidget : GlanceAppWidget() {
         provideContent {
             val tick = WidgetState.tick(currentState<Preferences>())
             val content = rememberLoaded(initialTick, initial, tick) { loader.load() }
-            TodayAgendaContent(content)
+            WeekAgendaContent(content)
         }
     }
 }
 
 /**
- * Reads today from Room in the viewer's zone (their `members.timezone`, else
- * the device's — the same day and times as the app's agenda); never touches
- * the network.
+ * Reads this week from Room in the viewer's zone (as [TodayAgendaLoader]);
+ * never touches the network.
  */
-internal class TodayAgendaLoader(private val entry: WidgetEntryPoint) {
-    suspend fun load(): WidgetContent<TodayAgenda> = loadForSession(entry.sessionManager()) { session ->
+internal class WeekAgendaLoader(private val entry: WidgetEntryPoint) {
+    suspend fun load(): WidgetContent<WeekAgenda> = loadForSession(entry.sessionManager()) { session ->
         val members = entry.workspaceRepository().observeMembers().first()
         val zone = viewerTimeZone(members.firstOrNull { it.id == session.memberId })
         val today = entry.clock().todayIn(zone)
-        val occurrences = entry.occurrenceRepository().snapshot(TodayAgendaModel.dayWindow(today, zone), zone)
+        val occurrences = entry.occurrenceRepository().snapshot(WeekAgendaModel.weekWindow(today, zone), zone)
         DayRollover.markRendered(today, zone)
-        TodayAgendaModel.build(today, zone, occurrences, members)
+        WeekAgendaModel.build(today, zone, occurrences, members)
     }
 }
 
-class TodayAgendaWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = TodayAgendaWidget()
+class WeekAgendaWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = WeekAgendaWidget()
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        // The first widget on a home screen: pull the widgets' days so it fills.
         WidgetEntryPoint.from(context).syncScheduler().syncNow()
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        // Also runs after a reboot, which clears alarms.
         DayRollover.sync(context)
     }
 
