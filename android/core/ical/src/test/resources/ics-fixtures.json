@@ -1,0 +1,4534 @@
+{
+  "parse": [
+    {
+      "name": "google.ics@Europe/Berlin",
+      "file": "google.ics",
+      "viewerZone": "Europe/Berlin",
+      "text": "BEGIN:VCALENDAR\r\nPRODID:-//Google Inc//Google Calendar 70.9054//EN\r\nVERSION:2.0\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Home\r\nX-WR-TIMEZONE:Europe/Berlin\r\nBEGIN:VTIMEZONE\r\nTZID:Europe/Berlin\r\nBEGIN:DAYLIGHT\r\nTZOFFSETFROM:+0100\r\nTZOFFSETTO:+0200\r\nTZNAME:CEST\r\nDTSTART:19700329T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU\r\nEND:DAYLIGHT\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Berlin:20261005T090000\r\nDTEND;TZID=Europe/Berlin:20261005T093000\r\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261130T225959Z\r\nEXDATE;TZID=Europe/Berlin:20261012T090000,20261014T090000\r\nDTSTAMP:20261001T080000Z\r\nUID:standup-123@google.com\r\nSUMMARY:Standup\r\nDESCRIPTION:Daily sync\\, notes in the doc.\\nBring coffee\\; or tea.\\\\nOK\r\nLOCATION:Office\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:This is an event reminder\r\nTRIGGER:-P0DT0H10M0S\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Berlin:20261021T110000\r\nDTEND;TZID=Europe/Berlin:20261021T113000\r\nRECURRENCE-ID;TZID=Europe/Berlin:20261021T090000\r\nUID:standup-123@google.com\r\nSUMMARY:Standup (moved)\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261102\r\nUID:trip-456@google.com\r\nSUMMARY:Weekend trip to the sea with a very long title that is folded acro\r\n ss two lines\r\nTRANSP:TRANSPARENT\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20261007T170000Z\r\nDTEND:20261007T183000Z\r\nUID:dentist-789@google.com\r\nSUMMARY:Dentist\r\nSTATUS:CONFIRMED\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20250315\r\nDTEND;VALUE=DATE:20250316\r\nRRULE:FREQ=YEARLY\r\nUID:birthday-1@google.com\r\nSUMMARY:Anna's birthday\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "result": {
+        "events": [
+          {
+            "key": "birthday-1@google.com",
+            "uid": "birthday-1@google.com",
+            "title": "Anna's birthday",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1741996800000,
+            "end": 1742083200000,
+            "timeZone": "Europe/Berlin",
+            "rrule": "FREQ=YEARLY",
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "standup-123@google.com",
+            "uid": "standup-123@google.com",
+            "title": "Standup",
+            "description": "Daily sync, notes in the doc.\nBring coffee; or tea.\\nOK",
+            "location": "Office",
+            "allDay": false,
+            "start": 1791183600000,
+            "end": 1791185400000,
+            "timeZone": "Europe/Berlin",
+            "rrule": "FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261130T225959Z",
+            "recurrenceEndsAt": 1796079599000,
+            "exdates": [
+              1791788400000,
+              1791961200000,
+              1792566000000
+            ],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "dentist-789@google.com",
+            "uid": "dentist-789@google.com",
+            "title": "Dentist",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791392400000,
+            "end": 1791397800000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "standup-123@google.com#20261021T070000Z",
+            "uid": "standup-123@google.com#20261021T070000Z",
+            "title": "Standup (moved)",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792573200000,
+            "end": 1792575000000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "trip-456@google.com",
+            "uid": "trip-456@google.com",
+            "title": "Weekend trip to the sea with a very long title that is folded across two lines",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1793404800000,
+            "end": 1793577600000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          }
+        ],
+        "skipped": 0
+      }
+    },
+    {
+      "name": "google.ics@Asia/Kolkata",
+      "file": "google.ics",
+      "viewerZone": "Asia/Kolkata",
+      "text": "BEGIN:VCALENDAR\r\nPRODID:-//Google Inc//Google Calendar 70.9054//EN\r\nVERSION:2.0\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Home\r\nX-WR-TIMEZONE:Europe/Berlin\r\nBEGIN:VTIMEZONE\r\nTZID:Europe/Berlin\r\nBEGIN:DAYLIGHT\r\nTZOFFSETFROM:+0100\r\nTZOFFSETTO:+0200\r\nTZNAME:CEST\r\nDTSTART:19700329T020000\r\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU\r\nEND:DAYLIGHT\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Berlin:20261005T090000\r\nDTEND;TZID=Europe/Berlin:20261005T093000\r\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261130T225959Z\r\nEXDATE;TZID=Europe/Berlin:20261012T090000,20261014T090000\r\nDTSTAMP:20261001T080000Z\r\nUID:standup-123@google.com\r\nSUMMARY:Standup\r\nDESCRIPTION:Daily sync\\, notes in the doc.\\nBring coffee\\; or tea.\\\\nOK\r\nLOCATION:Office\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:This is an event reminder\r\nTRIGGER:-P0DT0H10M0S\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Berlin:20261021T110000\r\nDTEND;TZID=Europe/Berlin:20261021T113000\r\nRECURRENCE-ID;TZID=Europe/Berlin:20261021T090000\r\nUID:standup-123@google.com\r\nSUMMARY:Standup (moved)\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261102\r\nUID:trip-456@google.com\r\nSUMMARY:Weekend trip to the sea with a very long title that is folded acro\r\n ss two lines\r\nTRANSP:TRANSPARENT\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20261007T170000Z\r\nDTEND:20261007T183000Z\r\nUID:dentist-789@google.com\r\nSUMMARY:Dentist\r\nSTATUS:CONFIRMED\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20250315\r\nDTEND;VALUE=DATE:20250316\r\nRRULE:FREQ=YEARLY\r\nUID:birthday-1@google.com\r\nSUMMARY:Anna's birthday\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "result": {
+        "events": [
+          {
+            "key": "birthday-1@google.com",
+            "uid": "birthday-1@google.com",
+            "title": "Anna's birthday",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1741996800000,
+            "end": 1742083200000,
+            "timeZone": "Asia/Kolkata",
+            "rrule": "FREQ=YEARLY",
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "standup-123@google.com",
+            "uid": "standup-123@google.com",
+            "title": "Standup",
+            "description": "Daily sync, notes in the doc.\nBring coffee; or tea.\\nOK",
+            "location": "Office",
+            "allDay": false,
+            "start": 1791183600000,
+            "end": 1791185400000,
+            "timeZone": "Europe/Berlin",
+            "rrule": "FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261130T225959Z",
+            "recurrenceEndsAt": 1796079599000,
+            "exdates": [
+              1791788400000,
+              1791961200000,
+              1792566000000
+            ],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "dentist-789@google.com",
+            "uid": "dentist-789@google.com",
+            "title": "Dentist",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791392400000,
+            "end": 1791397800000,
+            "timeZone": "Asia/Kolkata",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "standup-123@google.com#20261021T070000Z",
+            "uid": "standup-123@google.com#20261021T070000Z",
+            "title": "Standup (moved)",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792573200000,
+            "end": 1792575000000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "trip-456@google.com",
+            "uid": "trip-456@google.com",
+            "title": "Weekend trip to the sea with a very long title that is folded across two lines",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1793404800000,
+            "end": 1793577600000,
+            "timeZone": "Asia/Kolkata",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          }
+        ],
+        "skipped": 0
+      }
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin",
+      "file": "outlook.ics",
+      "viewerZone": "Europe/Berlin",
+      "text": "BEGIN:VCALENDAR\r\nPRODID:-//Microsoft Corporation//Outlook 16.0 MIMEDIR//EN\r\nVERSION:2.0\r\nMETHOD:PUBLISH\r\nBEGIN:VTIMEZONE\r\nTZID:W. Europe Standard Time\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nCLASS:PUBLIC\r\nDTSTART;TZID=\"W. Europe Standard Time\":20261013T140000\r\nDTEND;TZID=\"W. Europe Standard Time\":20261013T150000\r\nRRULE:FREQ=MONTHLY;BYDAY=2TU;UNTIL=20270301T000000\r\nSUMMARY;LANGUAGE=en-us:Team review\r\nUID:040000008200E00074C5B7101A82E00800000000\r\nSTATUS:TENTATIVE\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;TZID=\"Russian Standard Time\":20261009T190000\r\nDURATION:PT2H30M\r\nSUMMARY:Ужин с друзьями\r\nUID:outlook-dinner-1\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;TZID=\"W. Europe Standard Time\":20261016T100000\r\nDTEND;TZID=\"W. Europe Standard Time\":20261016T110000\r\nSUMMARY:Cancelled: Budget meeting\r\nUID:outlook-budget-2\r\nSTATUS:CANCELLED\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;TZID=\"Pacific Standard Time\":20261020T080000\r\nDTEND;TZID=\"Pacific Standard Time\":20261020T083000\r\nSUMMARY:Call with Sam (SF)\r\nUID:outlook-call-3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "result": {
+        "events": [
+          {
+            "key": "outlook-dinner-1",
+            "uid": "outlook-dinner-1",
+            "title": "Ужин с друзьями",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791561600000,
+            "end": 1791570600000,
+            "timeZone": "Europe/Moscow",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "040000008200E00074C5B7101A82E00800000000",
+            "uid": "040000008200E00074C5B7101A82E00800000000",
+            "title": "Team review",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791892800000,
+            "end": 1791896400000,
+            "timeZone": "Europe/Berlin",
+            "rrule": "FREQ=MONTHLY;BYDAY=2TU;UNTIL=20270228T230000Z",
+            "recurrenceEndsAt": 1803855600000,
+            "exdates": [],
+            "status": "planned",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "outlook-budget-2",
+            "uid": "outlook-budget-2",
+            "title": "Cancelled: Budget meeting",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792137600000,
+            "end": 1792141200000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": true,
+            "warnings": []
+          },
+          {
+            "key": "outlook-call-3",
+            "uid": "outlook-call-3",
+            "title": "Call with Sam (SF)",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792508400000,
+            "end": 1792510200000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          }
+        ],
+        "skipped": 0
+      }
+    },
+    {
+      "name": "apple.ics@Europe/Berlin",
+      "file": "apple.ics",
+      "viewerZone": "Europe/Berlin",
+      "text": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Apple Inc.//macOS 15.0//EN\r\nBEGIN:VTIMEZONE\r\nTZID:Europe/Moscow\r\nBEGIN:STANDARD\r\nDTSTART:20110327T030000\r\nTZOFFSETFROM:+0300\r\nTZOFFSETTO:+0300\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Moscow:20261008T183000\r\nDTEND;TZID=Europe/Moscow:20261008T200000\r\nSUMMARY:Йога\r\nUID:A1B2C3D4-apple-yoga\r\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=6\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20261011T100000\r\nSUMMARY:Floating brunch (no end)\r\nUID:apple-brunch\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261024\r\nSUMMARY:Day off\r\nUID:apple-dayoff\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261201\r\nDTEND;VALUE=DATE:20261202\r\nRRULE:FREQ=DAILY;UNTIL=20261205\r\nEXDATE;VALUE=DATE:20261203\r\nSUMMARY:Conference\r\nUID:apple-conf\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "result": {
+        "events": [
+          {
+            "key": "A1B2C3D4-apple-yoga",
+            "uid": "A1B2C3D4-apple-yoga",
+            "title": "Йога",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791473400000,
+            "end": 1791478800000,
+            "timeZone": "Europe/Moscow",
+            "rrule": "FREQ=WEEKLY;INTERVAL=2;COUNT=6",
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "apple-brunch",
+            "uid": "apple-brunch",
+            "title": "Floating brunch (no end)",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791705600000,
+            "end": 1791709200000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "apple-dayoff",
+            "uid": "apple-dayoff",
+            "title": "Day off",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1792800000000,
+            "end": 1792886400000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "apple-conf",
+            "uid": "apple-conf",
+            "title": "Conference",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1796083200000,
+            "end": 1796169600000,
+            "timeZone": "Europe/Berlin",
+            "rrule": "FREQ=DAILY;UNTIL=20261205",
+            "recurrenceEndsAt": 1796428800000,
+            "exdates": [
+              1796256000000
+            ],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          }
+        ],
+        "skipped": 0
+      }
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles",
+      "file": "apple.ics",
+      "viewerZone": "America/Los_Angeles",
+      "text": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Apple Inc.//macOS 15.0//EN\r\nBEGIN:VTIMEZONE\r\nTZID:Europe/Moscow\r\nBEGIN:STANDARD\r\nDTSTART:20110327T030000\r\nTZOFFSETFROM:+0300\r\nTZOFFSETTO:+0300\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Moscow:20261008T183000\r\nDTEND;TZID=Europe/Moscow:20261008T200000\r\nSUMMARY:Йога\r\nUID:A1B2C3D4-apple-yoga\r\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=6\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20261011T100000\r\nSUMMARY:Floating brunch (no end)\r\nUID:apple-brunch\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261024\r\nSUMMARY:Day off\r\nUID:apple-dayoff\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261201\r\nDTEND;VALUE=DATE:20261202\r\nRRULE:FREQ=DAILY;UNTIL=20261205\r\nEXDATE;VALUE=DATE:20261203\r\nSUMMARY:Conference\r\nUID:apple-conf\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "result": {
+        "events": [
+          {
+            "key": "A1B2C3D4-apple-yoga",
+            "uid": "A1B2C3D4-apple-yoga",
+            "title": "Йога",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791473400000,
+            "end": 1791478800000,
+            "timeZone": "Europe/Moscow",
+            "rrule": "FREQ=WEEKLY;INTERVAL=2;COUNT=6",
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "apple-brunch",
+            "uid": "apple-brunch",
+            "title": "Floating brunch (no end)",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791738000000,
+            "end": 1791741600000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "apple-dayoff",
+            "uid": "apple-dayoff",
+            "title": "Day off",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1792800000000,
+            "end": 1792886400000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "apple-conf",
+            "uid": "apple-conf",
+            "title": "Conference",
+            "description": null,
+            "location": null,
+            "allDay": true,
+            "start": 1796083200000,
+            "end": 1796169600000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": "FREQ=DAILY;UNTIL=20261205",
+            "recurrenceEndsAt": 1796428800000,
+            "exdates": [
+              1796256000000
+            ],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          }
+        ],
+        "skipped": 0
+      }
+    },
+    {
+      "name": "edge.ics@Europe/Berlin",
+      "file": "edge.ics",
+      "viewerZone": "Europe/Berlin",
+      "text": "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VTODO\nDTSTART:20261010T090000Z\nSUMMARY:A task, not an event\nUID:todo-1\nEND:VTODO\nBEGIN:VEVENT\nDTSTART:20261012T090000Z\nRRULE:FREQ=BOGUS\nSUMMARY:Broken rule\nUID:edge-broken-rule\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261012T090000Z\nDTEND:20261012T091500Z\nRRULE:FREQ=HOURLY;COUNT=4\nSUMMARY:Hourly ping\nUID:edge-hourly\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=Mars/Olympus:20261013T120000\nDTEND;TZID=Mars/Olympus:20261013T130000\nSUMMARY:Unknown zone lunch\nUID:edge-mars\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=/mozilla.org/20050126_1/Europe/Paris:20261014T080000\nDTEND;TZID=/mozilla.org/20050126_1/Europe/Paris:20261014T090000\nRDATE;TZID=/mozilla.org/20050126_1/Europe/Paris:20261021T080000\nRRULE:FREQ=DAILY;INTERVAL=3;UNTIL=20261031\nSUMMARY:Thunderbird run\nUID:edge-thunderbird\nEND:VEVENT\nBEGIN:VEVENT\nSUMMARY:No start at all\nUID:edge-nostart\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=Europe/Berlin:20260329T023000\nDTEND;TZID=Europe/Berlin:20260329T033000\nSUMMARY:In the spring gap\nUID:edge-gap\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=Europe/Berlin:20261025T023000\nDTEND;TZID=Europe/Berlin:20261025T031500\nSUMMARY:In the repeated hour\nUID:edge-overlap\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261015T120000Z\nDTEND:20261015T110000Z\nSUMMARY:Ends before it starts\nUID:edge-dup\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261016T120000Z\nDTEND:20261016T130000Z\nSUMMARY:\nUID:edge-dup\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261017T120000Z\nDTEND:20261017T130000Z\nSUMMARY:No UID here\nEND:VEVENT\nEND:VCALENDAR\n",
+      "result": {
+        "events": [
+          {
+            "key": "edge-gap",
+            "uid": "edge-gap",
+            "title": "In the spring gap",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1774747800000,
+            "end": 1774747800000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "edge-broken-rule",
+            "uid": "edge-broken-rule",
+            "title": "Broken rule",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791795600000,
+            "end": 1791799200000,
+            "timeZone": "UTC",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "rrule-unsupported"
+            ]
+          },
+          {
+            "key": "edge-hourly",
+            "uid": "edge-hourly",
+            "title": "Hourly ping",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791795600000,
+            "end": 1791796500000,
+            "timeZone": "UTC",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "rrule-unsupported"
+            ]
+          },
+          {
+            "key": "edge-mars",
+            "uid": "edge-mars",
+            "title": "Unknown zone lunch",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791885600000,
+            "end": 1791889200000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "zone-unknown"
+            ]
+          },
+          {
+            "key": "edge-thunderbird",
+            "uid": "edge-thunderbird",
+            "title": "Thunderbird run",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791957600000,
+            "end": 1791961200000,
+            "timeZone": "Europe/Paris",
+            "rrule": "FREQ=DAILY;INTERVAL=3;UNTIL=20261031T225959Z",
+            "recurrenceEndsAt": 1793487599000,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "rdate-ignored"
+            ]
+          },
+          {
+            "key": "edge-dup",
+            "uid": "edge-dup",
+            "title": "Ends before it starts",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792065600000,
+            "end": 1792065600000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "edge-dup~2",
+            "uid": "edge-dup",
+            "title": "",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792152000000,
+            "end": 1792155600000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "#9",
+            "uid": null,
+            "title": "No UID here",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792238400000,
+            "end": 1792242000000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "edge-overlap",
+            "uid": "edge-overlap",
+            "title": "In the repeated hour",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792888200000,
+            "end": 1792894500000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          }
+        ],
+        "skipped": 1
+      }
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles",
+      "file": "edge.ics",
+      "viewerZone": "America/Los_Angeles",
+      "text": "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VTODO\nDTSTART:20261010T090000Z\nSUMMARY:A task, not an event\nUID:todo-1\nEND:VTODO\nBEGIN:VEVENT\nDTSTART:20261012T090000Z\nRRULE:FREQ=BOGUS\nSUMMARY:Broken rule\nUID:edge-broken-rule\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261012T090000Z\nDTEND:20261012T091500Z\nRRULE:FREQ=HOURLY;COUNT=4\nSUMMARY:Hourly ping\nUID:edge-hourly\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=Mars/Olympus:20261013T120000\nDTEND;TZID=Mars/Olympus:20261013T130000\nSUMMARY:Unknown zone lunch\nUID:edge-mars\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=/mozilla.org/20050126_1/Europe/Paris:20261014T080000\nDTEND;TZID=/mozilla.org/20050126_1/Europe/Paris:20261014T090000\nRDATE;TZID=/mozilla.org/20050126_1/Europe/Paris:20261021T080000\nRRULE:FREQ=DAILY;INTERVAL=3;UNTIL=20261031\nSUMMARY:Thunderbird run\nUID:edge-thunderbird\nEND:VEVENT\nBEGIN:VEVENT\nSUMMARY:No start at all\nUID:edge-nostart\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=Europe/Berlin:20260329T023000\nDTEND;TZID=Europe/Berlin:20260329T033000\nSUMMARY:In the spring gap\nUID:edge-gap\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;TZID=Europe/Berlin:20261025T023000\nDTEND;TZID=Europe/Berlin:20261025T031500\nSUMMARY:In the repeated hour\nUID:edge-overlap\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261015T120000Z\nDTEND:20261015T110000Z\nSUMMARY:Ends before it starts\nUID:edge-dup\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261016T120000Z\nDTEND:20261016T130000Z\nSUMMARY:\nUID:edge-dup\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261017T120000Z\nDTEND:20261017T130000Z\nSUMMARY:No UID here\nEND:VEVENT\nEND:VCALENDAR\n",
+      "result": {
+        "events": [
+          {
+            "key": "edge-gap",
+            "uid": "edge-gap",
+            "title": "In the spring gap",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1774747800000,
+            "end": 1774747800000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "edge-broken-rule",
+            "uid": "edge-broken-rule",
+            "title": "Broken rule",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791795600000,
+            "end": 1791799200000,
+            "timeZone": "UTC",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "rrule-unsupported"
+            ]
+          },
+          {
+            "key": "edge-hourly",
+            "uid": "edge-hourly",
+            "title": "Hourly ping",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791795600000,
+            "end": 1791796500000,
+            "timeZone": "UTC",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "rrule-unsupported"
+            ]
+          },
+          {
+            "key": "edge-mars",
+            "uid": "edge-mars",
+            "title": "Unknown zone lunch",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791918000000,
+            "end": 1791921600000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "zone-unknown"
+            ]
+          },
+          {
+            "key": "edge-thunderbird",
+            "uid": "edge-thunderbird",
+            "title": "Thunderbird run",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1791957600000,
+            "end": 1791961200000,
+            "timeZone": "Europe/Paris",
+            "rrule": "FREQ=DAILY;INTERVAL=3;UNTIL=20261031T225959Z",
+            "recurrenceEndsAt": 1793487599000,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": [
+              "rdate-ignored"
+            ]
+          },
+          {
+            "key": "edge-dup",
+            "uid": "edge-dup",
+            "title": "Ends before it starts",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792065600000,
+            "end": 1792065600000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "edge-dup~2",
+            "uid": "edge-dup",
+            "title": "",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792152000000,
+            "end": 1792155600000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "#9",
+            "uid": null,
+            "title": "No UID here",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792238400000,
+            "end": 1792242000000,
+            "timeZone": "America/Los_Angeles",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          },
+          {
+            "key": "edge-overlap",
+            "uid": "edge-overlap",
+            "title": "In the repeated hour",
+            "description": null,
+            "location": null,
+            "allDay": false,
+            "start": 1792888200000,
+            "end": 1792894500000,
+            "timeZone": "Europe/Berlin",
+            "rrule": null,
+            "recurrenceEndsAt": null,
+            "exdates": [],
+            "status": "confirmed",
+            "cancelled": false,
+            "warnings": []
+          }
+        ],
+        "skipped": 1
+      }
+    }
+  ],
+  "names": [
+    {
+      "name": "\"\" ~ \"Standup\"",
+      "pattern": "",
+      "title": "Standup",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"\" ~ \"Standup (moved)\"",
+      "pattern": "",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"\" ~ \"Team review\"",
+      "pattern": "",
+      "title": "Team review",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"\" ~ \"Call with Sam (SF)\"",
+      "pattern": "",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"\" ~ \"Йога\"",
+      "pattern": "",
+      "title": "Йога",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"\" ~ \"a.b test\"",
+      "pattern": "",
+      "title": "a.b test",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"\" ~ \"axb test\"",
+      "pattern": "",
+      "title": "axb test",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"\" ~ \"\"",
+      "pattern": "",
+      "title": "",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"stand\" ~ \"Standup\"",
+      "pattern": "stand",
+      "title": "Standup",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"stand\" ~ \"Standup (moved)\"",
+      "pattern": "stand",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"stand\" ~ \"Team review\"",
+      "pattern": "stand",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand\" ~ \"Call with Sam (SF)\"",
+      "pattern": "stand",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand\" ~ \"Йога\"",
+      "pattern": "stand",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand\" ~ \"a.b test\"",
+      "pattern": "stand",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand\" ~ \"axb test\"",
+      "pattern": "stand",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand\" ~ \"\"",
+      "pattern": "stand",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"STAND\" ~ \"Standup\"",
+      "pattern": "STAND",
+      "title": "Standup",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"STAND\" ~ \"Standup (moved)\"",
+      "pattern": "STAND",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"STAND\" ~ \"Team review\"",
+      "pattern": "STAND",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"STAND\" ~ \"Call with Sam (SF)\"",
+      "pattern": "STAND",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"STAND\" ~ \"Йога\"",
+      "pattern": "STAND",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"STAND\" ~ \"a.b test\"",
+      "pattern": "STAND",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"STAND\" ~ \"axb test\"",
+      "pattern": "STAND",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"STAND\" ~ \"\"",
+      "pattern": "STAND",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"*up\" ~ \"Standup\"",
+      "pattern": "*up",
+      "title": "Standup",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*up\" ~ \"Standup (moved)\"",
+      "pattern": "*up",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*up\" ~ \"Team review\"",
+      "pattern": "*up",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"*up\" ~ \"Call with Sam (SF)\"",
+      "pattern": "*up",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"*up\" ~ \"Йога\"",
+      "pattern": "*up",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"*up\" ~ \"a.b test\"",
+      "pattern": "*up",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"*up\" ~ \"axb test\"",
+      "pattern": "*up",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"*up\" ~ \"\"",
+      "pattern": "*up",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand?p\" ~ \"Standup\"",
+      "pattern": "stand?p",
+      "title": "Standup",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"stand?p\" ~ \"Standup (moved)\"",
+      "pattern": "stand?p",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"stand?p\" ~ \"Team review\"",
+      "pattern": "stand?p",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand?p\" ~ \"Call with Sam (SF)\"",
+      "pattern": "stand?p",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand?p\" ~ \"Йога\"",
+      "pattern": "stand?p",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand?p\" ~ \"a.b test\"",
+      "pattern": "stand?p",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand?p\" ~ \"axb test\"",
+      "pattern": "stand?p",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"stand?p\" ~ \"\"",
+      "pattern": "stand?p",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"team*review\" ~ \"Standup\"",
+      "pattern": "team*review",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"team*review\" ~ \"Standup (moved)\"",
+      "pattern": "team*review",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"team*review\" ~ \"Team review\"",
+      "pattern": "team*review",
+      "title": "Team review",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"team*review\" ~ \"Call with Sam (SF)\"",
+      "pattern": "team*review",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"team*review\" ~ \"Йога\"",
+      "pattern": "team*review",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"team*review\" ~ \"a.b test\"",
+      "pattern": "team*review",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"team*review\" ~ \"axb test\"",
+      "pattern": "team*review",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"team*review\" ~ \"\"",
+      "pattern": "team*review",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/^call/\" ~ \"Standup\"",
+      "pattern": "/^call/",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/^call/\" ~ \"Standup (moved)\"",
+      "pattern": "/^call/",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/^call/\" ~ \"Team review\"",
+      "pattern": "/^call/",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/^call/\" ~ \"Call with Sam (SF)\"",
+      "pattern": "/^call/",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"/^call/\" ~ \"Йога\"",
+      "pattern": "/^call/",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/^call/\" ~ \"a.b test\"",
+      "pattern": "/^call/",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/^call/\" ~ \"axb test\"",
+      "pattern": "/^call/",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/^call/\" ~ \"\"",
+      "pattern": "/^call/",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"Standup\"",
+      "pattern": "/[unclosed/",
+      "title": "Standup",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"Standup (moved)\"",
+      "pattern": "/[unclosed/",
+      "title": "Standup (moved)",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"Team review\"",
+      "pattern": "/[unclosed/",
+      "title": "Team review",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"Call with Sam (SF)\"",
+      "pattern": "/[unclosed/",
+      "title": "Call with Sam (SF)",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"Йога\"",
+      "pattern": "/[unclosed/",
+      "title": "Йога",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"a.b test\"",
+      "pattern": "/[unclosed/",
+      "title": "a.b test",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"axb test\"",
+      "pattern": "/[unclosed/",
+      "title": "axb test",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"/[unclosed/\" ~ \"\"",
+      "pattern": "/[unclosed/",
+      "title": "",
+      "ok": false,
+      "match": false
+    },
+    {
+      "name": "\"йог\" ~ \"Standup\"",
+      "pattern": "йог",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"йог\" ~ \"Standup (moved)\"",
+      "pattern": "йог",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"йог\" ~ \"Team review\"",
+      "pattern": "йог",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"йог\" ~ \"Call with Sam (SF)\"",
+      "pattern": "йог",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"йог\" ~ \"Йога\"",
+      "pattern": "йог",
+      "title": "Йога",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"йог\" ~ \"a.b test\"",
+      "pattern": "йог",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"йог\" ~ \"axb test\"",
+      "pattern": "йог",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"йог\" ~ \"\"",
+      "pattern": "йог",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"Standup\"",
+      "pattern": "ЙОГА",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"Standup (moved)\"",
+      "pattern": "ЙОГА",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"Team review\"",
+      "pattern": "ЙОГА",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"Call with Sam (SF)\"",
+      "pattern": "ЙОГА",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"Йога\"",
+      "pattern": "ЙОГА",
+      "title": "Йога",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"a.b test\"",
+      "pattern": "ЙОГА",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"axb test\"",
+      "pattern": "ЙОГА",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"ЙОГА\" ~ \"\"",
+      "pattern": "ЙОГА",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"Standup\"",
+      "pattern": "/йо.а/",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"Standup (moved)\"",
+      "pattern": "/йо.а/",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"Team review\"",
+      "pattern": "/йо.а/",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"Call with Sam (SF)\"",
+      "pattern": "/йо.а/",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"Йога\"",
+      "pattern": "/йо.а/",
+      "title": "Йога",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"a.b test\"",
+      "pattern": "/йо.а/",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"axb test\"",
+      "pattern": "/йо.а/",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/йо.а/\" ~ \"\"",
+      "pattern": "/йо.а/",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"Й*А\" ~ \"Standup\"",
+      "pattern": "Й*А",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"Й*А\" ~ \"Standup (moved)\"",
+      "pattern": "Й*А",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"Й*А\" ~ \"Team review\"",
+      "pattern": "Й*А",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"Й*А\" ~ \"Call with Sam (SF)\"",
+      "pattern": "Й*А",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"Й*А\" ~ \"Йога\"",
+      "pattern": "Й*А",
+      "title": "Йога",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"Й*А\" ~ \"a.b test\"",
+      "pattern": "Й*А",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"Й*А\" ~ \"axb test\"",
+      "pattern": "Й*А",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"Й*А\" ~ \"\"",
+      "pattern": "Й*А",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"a.b\" ~ \"Standup\"",
+      "pattern": "a.b",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"a.b\" ~ \"Standup (moved)\"",
+      "pattern": "a.b",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"a.b\" ~ \"Team review\"",
+      "pattern": "a.b",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"a.b\" ~ \"Call with Sam (SF)\"",
+      "pattern": "a.b",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"a.b\" ~ \"Йога\"",
+      "pattern": "a.b",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"a.b\" ~ \"a.b test\"",
+      "pattern": "a.b",
+      "title": "a.b test",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"a.b\" ~ \"axb test\"",
+      "pattern": "a.b",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"a.b\" ~ \"\"",
+      "pattern": "a.b",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"*\" ~ \"Standup\"",
+      "pattern": "*",
+      "title": "Standup",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*\" ~ \"Standup (moved)\"",
+      "pattern": "*",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*\" ~ \"Team review\"",
+      "pattern": "*",
+      "title": "Team review",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*\" ~ \"Call with Sam (SF)\"",
+      "pattern": "*",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*\" ~ \"Йога\"",
+      "pattern": "*",
+      "title": "Йога",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*\" ~ \"a.b test\"",
+      "pattern": "*",
+      "title": "a.b test",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*\" ~ \"axb test\"",
+      "pattern": "*",
+      "title": "axb test",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"*\" ~ \"\"",
+      "pattern": "*",
+      "title": "",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"Standup\"",
+      "pattern": "?",
+      "title": "Standup",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"Standup (moved)\"",
+      "pattern": "?",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"Team review\"",
+      "pattern": "?",
+      "title": "Team review",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"Call with Sam (SF)\"",
+      "pattern": "?",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"Йога\"",
+      "pattern": "?",
+      "title": "Йога",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"a.b test\"",
+      "pattern": "?",
+      "title": "a.b test",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"axb test\"",
+      "pattern": "?",
+      "title": "axb test",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"?\" ~ \"\"",
+      "pattern": "?",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"(sf)\" ~ \"Standup\"",
+      "pattern": "(sf)",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"(sf)\" ~ \"Standup (moved)\"",
+      "pattern": "(sf)",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"(sf)\" ~ \"Team review\"",
+      "pattern": "(sf)",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"(sf)\" ~ \"Call with Sam (SF)\"",
+      "pattern": "(sf)",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"(sf)\" ~ \"Йога\"",
+      "pattern": "(sf)",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"(sf)\" ~ \"a.b test\"",
+      "pattern": "(sf)",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"(sf)\" ~ \"axb test\"",
+      "pattern": "(sf)",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"(sf)\" ~ \"\"",
+      "pattern": "(sf)",
+      "title": "",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"Standup\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "Standup",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"Standup (moved)\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "Standup (moved)",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"Team review\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "Team review",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"Call with Sam (SF)\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "Call with Sam (SF)",
+      "ok": true,
+      "match": true
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"Йога\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "Йога",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"a.b test\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "a.b test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"axb test\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "axb test",
+      "ok": true,
+      "match": false
+    },
+    {
+      "name": "\"/\\\\(SF\\\\)$/\" ~ \"\"",
+      "pattern": "/\\(SF\\)$/",
+      "title": "",
+      "ok": true,
+      "match": false
+    }
+  ],
+  "ranges": [
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com […, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com [2026-10-08, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com […, 2026-10-06]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com […, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com [2026-10-08, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com […, 2026-10-06]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com […, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com [2026-10-08, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com […, 2026-10-06]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z […, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z [2026-10-08, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z […, 2026-10-06]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com […, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com [2026-10-08, …]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com […, 2026-10-06]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com […, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com [2026-10-08, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com […, 2026-10-06]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com […, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com [2026-10-08, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com […, 2026-10-06]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com […, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com [2026-10-08, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com […, 2026-10-06]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z […, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z [2026-10-08, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z […, 2026-10-06]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com […, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com [2026-10-08, …]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com […, 2026-10-06]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com [2026-10-20, 2026-10-25]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com [2026-11-01, 2026-11-01]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com [2026-12-03, 2026-12-03]",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 […, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 [2026-10-08, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 […, 2026-10-06]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 [2026-10-20, 2026-10-25]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 [2026-11-01, 2026-11-01]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 [2026-12-03, 2026-12-03]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 […, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 [2026-10-08, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 […, 2026-10-06]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 [2026-10-20, 2026-10-25]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 [2026-11-01, 2026-11-01]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 [2026-12-03, 2026-12-03]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 […, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 [2026-10-08, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 […, 2026-10-06]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 [2026-10-20, 2026-10-25]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 [2026-11-01, 2026-11-01]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 [2026-12-03, 2026-12-03]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 […, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 [2026-10-08, …]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 […, 2026-10-06]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 [2026-10-20, 2026-10-25]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 [2026-11-01, 2026-11-01]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 [2026-12-03, 2026-12-03]",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga […, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga [2026-10-08, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga […, 2026-10-06]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch […, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch [2026-10-08, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch […, 2026-10-06]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff […, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff [2026-10-08, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff […, 2026-10-06]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf […, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf [2026-10-08, …]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf […, 2026-10-06]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga […, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga [2026-10-08, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga […, 2026-10-06]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch […, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch [2026-10-08, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch […, 2026-10-06]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff […, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff [2026-10-08, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff […, 2026-10-06]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf […, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf [2026-10-08, …]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf […, 2026-10-06]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf [2026-10-20, 2026-10-25]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf [2026-11-01, 2026-11-01]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf [2026-12-03, 2026-12-03]",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap […, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap [2026-10-08, …]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap […, 2026-10-06]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap […, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "from": null,
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap [2026-10-08, …]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "from": "2026-10-08",
+      "to": null,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap […, 2026-10-06]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "from": null,
+      "to": "2026-10-06",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap [2026-10-20, 2026-10-25]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "from": "2026-10-20",
+      "to": "2026-10-25",
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap [2026-11-01, 2026-11-01]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "from": "2026-11-01",
+      "to": "2026-11-01",
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap [2026-12-03, 2026-12-03]",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "from": "2026-12-03",
+      "to": "2026-12-03",
+      "expected": false
+    }
+  ],
+  "duplicates": [
+    {
+      "name": "same uid, other time",
+      "event": {
+        "key": "dentist-789@google.com",
+        "uid": "dentist-789@google.com",
+        "title": "Dentist",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1791392400000,
+        "end": 1791397800000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [
+        {
+          "icalUid": "dentist-789@google.com",
+          "title": "Other",
+          "start": 0,
+          "end": 1
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "same title and time, no uid",
+      "event": {
+        "key": "dentist-789@google.com",
+        "uid": "dentist-789@google.com",
+        "title": "Dentist",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1791392400000,
+        "end": 1791397800000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [
+        {
+          "icalUid": null,
+          "title": "  dentist ",
+          "start": 1791392400000,
+          "end": 1791397800000
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "same title, other end",
+      "event": {
+        "key": "dentist-789@google.com",
+        "uid": "dentist-789@google.com",
+        "title": "Dentist",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1791392400000,
+        "end": 1791397800000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [
+        {
+          "icalUid": null,
+          "title": "Dentist",
+          "start": 1791392400000,
+          "end": 1791397800001
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "other title, same time",
+      "event": {
+        "key": "dentist-789@google.com",
+        "uid": "dentist-789@google.com",
+        "title": "Dentist",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1791392400000,
+        "end": 1791397800000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [
+        {
+          "icalUid": null,
+          "title": "Dentists",
+          "start": 1791392400000,
+          "end": 1791397800000
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "nothing existing",
+      "event": {
+        "key": "dentist-789@google.com",
+        "uid": "dentist-789@google.com",
+        "title": "Dentist",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1791392400000,
+        "end": 1791397800000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [],
+      "expected": false
+    },
+    {
+      "name": "no uid in file, other uid existing",
+      "event": {
+        "key": "#9",
+        "uid": null,
+        "title": "No UID here",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1792238400000,
+        "end": 1792242000000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [
+        {
+          "icalUid": "x",
+          "title": "No UID here",
+          "start": 1792238400000,
+          "end": 1792242000000
+        }
+      ],
+      "expected": true
+    },
+    {
+      "name": "no uid never matches a null uid",
+      "event": {
+        "key": "#9",
+        "uid": null,
+        "title": "No UID here",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1792238400000,
+        "end": 1792242000000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [
+        {
+          "icalUid": null,
+          "title": "Something",
+          "start": 1,
+          "end": 2
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "whitespace collapses",
+      "event": {
+        "key": "dentist-789@google.com",
+        "uid": "dentist-789@google.com",
+        "title": "Dentist",
+        "description": null,
+        "location": null,
+        "allDay": false,
+        "start": 1791392400000,
+        "end": 1791397800000,
+        "timeZone": "Europe/Berlin",
+        "rrule": null,
+        "recurrenceEndsAt": null,
+        "exdates": [],
+        "status": "confirmed",
+        "cancelled": false,
+        "warnings": []
+      },
+      "existing": [
+        {
+          "icalUid": null,
+          "title": "DENTIST",
+          "start": 1791392400000,
+          "end": 1791397800000
+        }
+      ],
+      "expected": true
+    }
+  ],
+  "defaults": [
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com dup=false",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin birthday-1@google.com dup=true",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "birthday-1@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com dup=false",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com dup=true",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com dup=false",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin dentist-789@google.com dup=true",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "dentist-789@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z dup=false",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin standup-123@google.com#20261021T070000Z dup=true",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com dup=false",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Europe/Berlin trip-456@google.com dup=true",
+      "parse": "google.ics@Europe/Berlin",
+      "key": "trip-456@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com dup=false",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata birthday-1@google.com dup=true",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "birthday-1@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com dup=false",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com dup=true",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com dup=false",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata dentist-789@google.com dup=true",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "dentist-789@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z dup=false",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata standup-123@google.com#20261021T070000Z dup=true",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "standup-123@google.com#20261021T070000Z",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com dup=false",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "google.ics@Asia/Kolkata trip-456@google.com dup=true",
+      "parse": "google.ics@Asia/Kolkata",
+      "key": "trip-456@google.com",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 dup=false",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-dinner-1 dup=true",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-dinner-1",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 dup=false",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin 040000008200E00074C5B7101A82E00800000000 dup=true",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "040000008200E00074C5B7101A82E00800000000",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 dup=false",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-budget-2 dup=true",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-budget-2",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 dup=false",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "outlook.ics@Europe/Berlin outlook-call-3 dup=true",
+      "parse": "outlook.ics@Europe/Berlin",
+      "key": "outlook-call-3",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga dup=false",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin A1B2C3D4-apple-yoga dup=true",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "A1B2C3D4-apple-yoga",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch dup=false",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-brunch dup=true",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-brunch",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff dup=false",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-dayoff dup=true",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-dayoff",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf dup=false",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@Europe/Berlin apple-conf dup=true",
+      "parse": "apple.ics@Europe/Berlin",
+      "key": "apple-conf",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga dup=false",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles A1B2C3D4-apple-yoga dup=true",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "A1B2C3D4-apple-yoga",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch dup=false",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-brunch dup=true",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-brunch",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff dup=false",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-dayoff dup=true",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-dayoff",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf dup=false",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "apple.ics@America/Los_Angeles apple-conf dup=true",
+      "parse": "apple.ics@America/Los_Angeles",
+      "key": "apple-conf",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-gap dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-gap",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-broken-rule dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-broken-rule",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-hourly dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-hourly",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-mars dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-mars",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-thunderbird dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-thunderbird",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-dup~2 dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-dup~2",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin #9 dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "#9",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap dup=false",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@Europe/Berlin edge-overlap dup=true",
+      "parse": "edge.ics@Europe/Berlin",
+      "key": "edge-overlap",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-gap dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-gap",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-broken-rule dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-broken-rule",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-hourly dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-hourly",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-mars dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-mars",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-thunderbird dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-thunderbird",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-dup~2 dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-dup~2",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles #9 dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "#9",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap dup=false",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "duplicate": false,
+      "now": 1791201600000,
+      "expected": true
+    },
+    {
+      "name": "edge.ics@America/Los_Angeles edge-overlap dup=true",
+      "parse": "edge.ics@America/Los_Angeles",
+      "key": "edge-overlap",
+      "duplicate": true,
+      "now": 1791201600000,
+      "expected": false
+    }
+  ]
+}
