@@ -9,7 +9,8 @@ recurrence fixtures) is in [`docs/android.md`](../docs/android.md).
 v1 covers the agenda (day/week, with a toggle for the partner's events), event detail and editing
 (including "this / this and following / all events" on a series), tasks
 (list, detail, complete), Quick add, read-only Insights (Overview, Trends,
-Patterns, Tasks), and five widgets: Today, Week, Month, Tasks and Quick add.
+Patterns, Tasks), and six widgets: Today, Week, Week grid, Month, Tasks and
+Quick add.
 Sleep, boards/collections, sharing and push are not in v1.
 
 ## Build
@@ -195,7 +196,7 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 | `:feature:tasks` | `…feature.tasks` | Task list with filters, task detail/edit, complete |
 | `:feature:quickadd` | `…feature.quickadd` | Quick add bottom sheet, plus the translucent `QuickAddActivity` the widget opens |
 | `:feature:insights` | `…feature.insights` | Insights: period bar, filters, the Overview / Trends / Patterns / Tasks tabs with hand-drawn Canvas charts, the day sheet |
-| `:widgets` | `…widgets` | Glance widgets: Today, Week, Month, Tasks, Quick add |
+| `:widgets` | `…widgets` | Glance widgets: Today, Week, Week grid, Month, Tasks, Quick add |
 
 Shared build setup is in `build-logic/`, as the convention plugins
 `planr.android.application`, `planr.android.library`, `planr.android.compose`,
@@ -386,6 +387,11 @@ members and tasks.
   months per widget (another month is fetched on demand, since sync keeps only
   the current one), + opens Quick add for an event, and a day opens it in the
   agenda.
+- **Week grid.** The Month widget's look for one week: seven day columns
+  (weekday and date over a stack of event chips, "+N" when they don't fit),
+  the range and ISO week in the header, ‹ › paging weeks per widget (fetched
+  on demand outside the synced days) and + for a new event. It sits beside the
+  list-style Week widget, which keeps start times.
 - **Tasks.** Open tasks the viewer is responsible for, or that are in a shared
   context. The checkbox completes the task through `TaskRepository.setDone`
   (owner only, as RLS requires).

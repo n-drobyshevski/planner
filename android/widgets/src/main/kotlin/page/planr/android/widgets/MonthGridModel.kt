@@ -42,6 +42,37 @@ internal data class MonthChip(
     val tone: MemberTone,
 )
 
+/**
+ * A day's events as chips, for the Month and Week grid widgets: bucketed and
+ * ordered as the Today widget does, cancelled ones left out (inactive ones
+ * stay, as the Today widget lists them), coloured as the agenda paints them.
+ */
+internal class CalendarDays(
+    private val zone: TimeZone,
+    private val occurrences: List<Occurrence>,
+    private val members: List<Member>,
+    categories: List<Category>,
+) {
+    private val byKey = occurrences.associateBy { it.key }
+    private val memberColors = members.associate { it.id to it.color }
+    private val categoryColors = categories.associate { it.id to it.color }
+
+    fun chipsFor(day: LocalDate): List<MonthChip> =
+        TodayAgendaModel.build(day, zone, occurrences, members).rows
+            .filterNot { it.cancelled }
+            .map { row ->
+                val occurrence = byKey[row.key]
+                MonthChip(
+                    key = row.key,
+                    title = row.title,
+                    colorHex = occurrence?.let {
+                        it.color ?: it.categoryId?.let(categoryColors::get) ?: memberColors[it.ownerId]
+                    },
+                    tone = row.tone,
+                )
+            }
+}
+
 /** Builds [MonthGrid] from expanded occurrences. Pure, so it is unit-tested directly. */
 internal object MonthGridModel {
 
@@ -52,9 +83,7 @@ internal object MonthGridModel {
     }
 
     /**
-     * Every day of [month]'s grid with its events, bucketed as the Today
-     * widget does. Cancelled occurrences are left out; inactive ones stay
-     * (the Today widget lists them, muted).
+     * Every day of [month]'s grid with its events ([CalendarDays]).
      *
      * @param month any day of the month to show.
      * @param occurrences expanded over (at least) [gridWindow].
@@ -69,27 +98,14 @@ internal object MonthGridModel {
         categories: List<Category> = emptyList(),
     ): MonthGrid {
         val first = CalendarWeeks.monthStart(month)
-        val byKey = occurrences.associateBy { it.key }
-        val memberColors = members.associate { it.id to it.color }
-        val categoryColors = categories.associate { it.id to it.color }
+        val days = CalendarDays(zone, occurrences, members, categories)
         val grid = CalendarWeeks.monthGrid(month)
         val weeks = grid.map { week ->
             week.map { day ->
-                val rows = TodayAgendaModel.build(day, zone, occurrences, members).rows.filterNot { it.cancelled }
                 MonthDay(
                     date = day,
                     inMonth = day.month == first.month && day.year == first.year,
-                    chips = rows.map { row ->
-                        val occurrence = byKey[row.key]
-                        MonthChip(
-                            key = row.key,
-                            title = row.title,
-                            colorHex = occurrence?.let {
-                                it.color ?: it.categoryId?.let(categoryColors::get) ?: memberColors[it.ownerId]
-                            },
-                            tone = row.tone,
-                        )
-                    },
+                    chips = days.chipsFor(day),
                 )
             }
         }

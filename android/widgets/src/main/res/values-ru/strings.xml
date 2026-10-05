@@ -11,6 +11,8 @@
     <string name="widget_week_description">Неделя по дням — твои события и партнёра</string>
     <string name="widget_month_name">Месяц</string>
     <string name="widget_month_description">Весь месяц: события по дням</string>
+    <string name="widget_week_grid_name">Неделя сеткой</string>
+    <string name="widget_week_grid_description">Неделя в семи колонках — события по дням</string>
 
     <!-- Shared states -->
     <string name="widget_sign_in">Войти</string>
@@ -27,6 +29,8 @@
     <!-- Week -->
     <string name="widget_week_title">Эта неделя</string>
     <string name="widget_week_signed_out">Войди, чтобы видеть здесь свою неделю.</string>
+    <string name="widget_week_previous">Предыдущая неделя</string>
+    <string name="widget_week_next">Следующая неделя</string>
     <string name="widget_week_free">Свободно</string>
     <plurals name="widget_week_event_count">
         <item quantity="one">%d событие</item>
@@ -83,4 +87,5 @@
     <string name="widget_preview_weekday_5">П</string>
     <string name="widget_preview_weekday_6">С</string>
     <string name="widget_preview_weekday_7">В</string>
+    <string name="widget_preview_week_number">Неделя 41</string>
 </resources>

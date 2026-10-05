@@ -1,4 +1,4 @@
-// Home-screen widgets (Jetpack Glance): Today agenda, Week, Month, Tasks, Quick add.
+// Home-screen widgets (Jetpack Glance): Today agenda, Week, Week grid, Month, Tasks, Quick add.
 // They render from the Room cache in :core:data (never the network) and
 // re-render when :core:data's WidgetRefreshDispatcher fans out a refresh.
 plugins {

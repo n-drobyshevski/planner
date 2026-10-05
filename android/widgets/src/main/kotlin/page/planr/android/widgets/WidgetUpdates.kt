@@ -26,12 +26,17 @@ internal object WidgetState {
     /** The Month widget's paging: months from the current one (0 = this month). */
     val MonthOffset = intPreferencesKey("planr.month_offset")
 
+    /** The Week grid widget's paging: weeks from the current one (0 = this week). */
+    val WeekOffset = intPreferencesKey("planr.week_offset")
+
     /** Longer than any write may take (CompleteTaskAction's budget plus slack). */
     const val PENDING_TTL_MS = 30_000L
 
     fun tick(prefs: Preferences): Long = prefs[RefreshTick] ?: 0L
 
     fun monthOffset(prefs: Preferences): Int = prefs[MonthOffset] ?: 0
+
+    fun weekOffset(prefs: Preferences): Int = prefs[WeekOffset] ?: 0
 
     /** Ids ticked less than [PENDING_TTL_MS] before [nowMs]. */
     fun pendingDone(prefs: Preferences, nowMs: Long = System.currentTimeMillis()): Set<String> =
@@ -64,6 +69,7 @@ internal object WidgetUpdates {
         refresh(context, TodayAgendaWidget())
         refresh(context, WeekAgendaWidget())
         refresh(context, MonthWidget())
+        refresh(context, WeekGridWidget())
         refresh(context, TasksWidget())
         // Static; re-rendered only so a language change reaches its labels.
         QuickAddWidget().updateAll(context)
