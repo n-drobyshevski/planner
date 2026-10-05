@@ -33,13 +33,15 @@ import page.planr.android.core.design.glance.PlanrGlanceColors
 /**
  * Shared widget frame: Planr colours (day/night), the warm-paper surface with
  * soft corners, and a quiet header — [title] on the left, [detail] on the
- * right; tapping it runs [onHeaderClick].
+ * right; tapping it runs [onHeaderClick]. [actions] (buttons) sit at the
+ * header's end; with them, only the title is the header's tap target.
  */
 @Composable
 internal fun WidgetScaffold(
     title: String,
     detail: String? = null,
     onHeaderClick: Action? = null,
+    actions: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit = {},
 ) {
     GlanceTheme(colors = PlanrGlanceColors.scheme) {
@@ -50,7 +52,7 @@ internal fun WidgetScaffold(
                 .widgetSurface()
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
-            WidgetHeader(title, detail, onHeaderClick)
+            WidgetHeader(title, detail, onHeaderClick, actions)
             Spacer(GlanceModifier.height(6.dp))
             content()
         }
@@ -64,17 +66,20 @@ internal fun GlanceModifier.widgetSurface(): GlanceModifier =
         .cornerRadius(16.dp)
 
 @Composable
-private fun WidgetHeader(title: String, detail: String?, onClick: Action?) {
+private fun WidgetHeader(title: String, detail: String?, onClick: Action?, actions: (@Composable () -> Unit)?) {
     val modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp)
+    val rowClick = onClick.takeIf { actions == null }
+    val titleClick = onClick.takeIf { actions != null }
     Row(
-        modifier = if (onClick != null) modifier.clickable(onClick) else modifier,
+        modifier = if (rowClick != null) modifier.clickable(rowClick) else modifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val titleModifier = GlanceModifier.defaultWeight()
         Text(
             text = title,
             maxLines = 1,
             style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium),
-            modifier = GlanceModifier.defaultWeight(),
+            modifier = if (titleClick != null) titleModifier.clickable(titleClick) else titleModifier,
         )
         if (detail != null) {
             Text(
@@ -83,6 +88,7 @@ private fun WidgetHeader(title: String, detail: String?, onClick: Action?) {
                 style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
             )
         }
+        actions?.invoke()
     }
 }
 

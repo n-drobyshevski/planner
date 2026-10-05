@@ -2,6 +2,7 @@ package page.planr.android.widgets
 
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.glance.GlanceId
@@ -22,10 +23,15 @@ internal object WidgetState {
      */
     val PendingDone = stringSetPreferencesKey("planr.pending_done")
 
+    /** The Month widget's paging: months from the current one (0 = this month). */
+    val MonthOffset = intPreferencesKey("planr.month_offset")
+
     /** Longer than any write may take (CompleteTaskAction's budget plus slack). */
     const val PENDING_TTL_MS = 30_000L
 
     fun tick(prefs: Preferences): Long = prefs[RefreshTick] ?: 0L
+
+    fun monthOffset(prefs: Preferences): Int = prefs[MonthOffset] ?: 0
 
     /** Ids ticked less than [PENDING_TTL_MS] before [nowMs]. */
     fun pendingDone(prefs: Preferences, nowMs: Long = System.currentTimeMillis()): Set<String> =

@@ -12,7 +12,7 @@
     <string name="widget_week_name">Week</string>
     <string name="widget_week_description">This week, day by day, for both of you</string>
     <string name="widget_month_name">Month</string>
-    <string name="widget_month_description">The month at a glance, with a dot for whose plans</string>
+    <string name="widget_month_description">The month at a glance, with your events day by day</string>
 
     <!-- Shared states -->
     <string name="widget_sign_in">Sign in</string>
@@ -39,6 +39,13 @@
 
     <!-- Month -->
     <string name="widget_month_signed_out">Sign in to see your month here.</string>
+    <string name="widget_month_previous">Previous month</string>
+    <string name="widget_month_next">Next month</string>
+    <string name="widget_month_add_event">Add event</string>
+    <!-- Read out for a week-number cell: "Week 41". -->
+    <string name="widget_month_week">Week %1$d</string>
+    <!-- More events in a day than fit its cell: "+2". -->
+    <string name="widget_month_more">+%1$d</string>
 
     <!-- Tasks -->
     <string name="widget_tasks_signed_out">Sign in to see your tasks here.</string>

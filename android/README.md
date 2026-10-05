@@ -380,9 +380,12 @@ members and tasks.
 - **Week.** This Monday-to-Sunday week. Past days fold to their heading with
   a count; today and the days ahead list their events as Today does. A day
   heading opens that day in the agenda, an event opens the event.
-- **Month.** This month as a Monday-first grid, with one dot per member who
-  has plans that day (shared amber when joint) and today circled. A day opens
-  it in the agenda. It shows the current month only (no paging).
+- **Month.** A wall-calendar month: ISO week numbers down the side, hairline
+  grid lines, and each day's events as titled chips in their agenda colours
+  (as many as the widget's height fits, then "+N"). Today is circled. ‹ › page
+  months per widget (another month is fetched on demand, since sync keeps only
+  the current one), + opens Quick add for an event, and a day opens it in the
+  agenda.
 - **Tasks.** Open tasks the viewer is responsible for, or that are in a shared
   context. The checkbox completes the task through `TaskRepository.setDone`
   (owner only, as RLS requires).
