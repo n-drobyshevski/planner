@@ -1,5 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Ported from messages/en (tasks.taskDialog, events.dialog, toasts, common). -->
 <resources>
     <string name="quickadd_new_task">New task</string>
     <string name="quickadd_new_event">New event</string>
+    <string name="quickadd_kind_label">Item type</string>
+    <string name="quickadd_kind_task">Task</string>
+    <string name="quickadd_kind_event">Event</string>
+    <string name="quickadd_title_label">Title</string>
+    <string name="quickadd_title_task_placeholder">What needs doing?</string>
+    <string name="quickadd_title_event_placeholder">Add title</string>
+    <string name="quickadd_due">Due date</string>
+    <string name="quickadd_no_due">No due date</string>
+    <string name="quickadd_date">Date</string>
+    <string name="quickadd_today">Today</string>
+    <string name="quickadd_tomorrow">Tomorrow</string>
+    <string name="quickadd_pick_date">Pick date…</string>
+    <string name="quickadd_all_day">All day</string>
+    <string name="quickadd_start">Start</string>
+    <string name="quickadd_end">End</string>
+    <string name="quickadd_next_day">next day</string>
+    <string name="quickadd_add">Add</string>
+    <string name="quickadd_adding">Saving…</string>
+    <string name="quickadd_cancel">Cancel</string>
+    <string name="quickadd_apply">Apply</string>
+    <string name="quickadd_task_created">Task created</string>
+    <string name="quickadd_event_created">Event created</string>
+    <string name="quickadd_error_title">Add a title.</string>
+    <string name="quickadd_error_end">End must be after start.</string>
+    <string name="quickadd_error_signed_out">Sign in to Planr first.</string>
+    <string name="quickadd_error_failed">Something went wrong</string>
 </resources>

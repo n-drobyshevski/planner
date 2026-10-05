@@ -30,7 +30,7 @@
  *   overrideInputs: OverrideInputCase[]; // cancelOccurrence / modifyOccurrence
  *   editAll: EditAllCase[];             // editAll(event, patch)
  *   splitThisAndFuture: SplitCase[];    // splitThisAndFuture(event, from, patch)
- *   capThisAndFuture: CapCase[];        // deleteThisAndFuture's pure part (mutations.ts)
+ *   capThisAndFuture: CapCase[];        // capThisAndFuture(event, from) (deleteThisAndFuture's pure part)
  *   buildRRule: BuildRRuleCase[];       // buildRRule(form)
  *   parseRRule: ParseRRuleCase[];       // parseRRule(rrule)
  * };
@@ -125,6 +125,7 @@ import { TZDate } from "@date-fns/tz";
 import { expandEvents } from "@/lib/recurrence/expand";
 import {
   cancelOccurrence,
+  capThisAndFuture,
   editAll,
   modifyOccurrence,
   splitThisAndFuture,
@@ -1553,14 +1554,6 @@ function splitCases(): JsonObject[] {
   });
 }
 
-/** Mirrors the pure part of mutations.deleteThisAndFuture. */
-function capThisAndFuture(event: EventRow, fromOccurrenceMs: number) {
-  const form = parseRRule(event.rrule);
-  const untilMs = fromOccurrenceMs - 1000;
-  const rrule = form ? buildRRule({ ...form, end: { type: "until", dateMs: untilMs } }) : null;
-  return { rrule, recurrenceEndsAt: untilMs };
-}
-
 function capCases(): JsonObject[] {
   const specs: { name: string; description: string; row: JsonObject; from: number }[] = [
     {
@@ -1583,9 +1576,8 @@ function capCases(): JsonObject[] {
       from: wall(MOSCOW, 2026, 2, 9, 21),
     },
     {
-      name: "unsupported-freq-normalized",
-      description:
-        "A YEARLY rule round-trips through the form, which only knows DAILY/WEEKLY/MONTHLY (falls back to WEEKLY) — current web behavior.",
+      name: "yearly-kept",
+      description: "A YEARLY rule keeps its frequency: only UNTIL is added.",
       row: eventRow({
         id: eventId(905),
         title: "Checkup",
@@ -1595,6 +1587,45 @@ function capCases(): JsonObject[] {
         rrule: "FREQ=YEARLY",
       }),
       from: wall(BERLIN, 2027, 1, 20, 9),
+    },
+    {
+      name: "yearly-bymonth-ordinal-kept",
+      description: "Last Sunday in March: BYMONTH and the -1SU ordinal survive the cap.",
+      row: eventRow({
+        id: eventId(907),
+        title: "Clocks change",
+        start: wall(BERLIN, 2026, 3, 29, 9),
+        end: wall(BERLIN, 2026, 3, 29, 10),
+        timeZone: BERLIN,
+        rrule: "FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+      }),
+      from: wall(BERLIN, 2028, 3, 26, 9),
+    },
+    {
+      name: "monthly-nth-weekday-kept",
+      description: "Second Tuesday monthly: the 2TU ordinal survives (no jump to the start's day-of-month).",
+      row: eventRow({
+        id: eventId(908),
+        title: "Book club",
+        start: wall(MOSCOW, 2026, 1, 13, 19),
+        end: wall(MOSCOW, 2026, 1, 13, 21),
+        timeZone: MOSCOW,
+        rrule: "FREQ=MONTHLY;BYDAY=2TU;COUNT=12",
+      }),
+      from: wall(MOSCOW, 2026, 6, 9, 19),
+    },
+    {
+      name: "monthly-bysetpos-kept",
+      description: "Last weekday of the month: BYSETPOS survives.",
+      row: eventRow({
+        id: eventId(909),
+        title: "Invoices",
+        start: wall(BERLIN, 2026, 1, 30, 16),
+        end: wall(BERLIN, 2026, 1, 30, 17),
+        timeZone: BERLIN,
+        rrule: "FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1",
+      }),
+      from: wall(BERLIN, 2026, 7, 31, 16),
     },
     {
       name: "non-recurring",

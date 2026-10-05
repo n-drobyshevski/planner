@@ -5,6 +5,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
+import page.planr.android.core.recurrence.PatchField
 
 /**
  * Domain -> snake_case row payloads for `tasks`: `taskInputToRow` /
@@ -69,7 +70,7 @@ internal object TaskPayloads {
     }
 }
 
-private typealias ValueOf<T> = page.planr.android.core.recurrence.PatchField.Value<T>
+private typealias ValueOf<T> = PatchField.Value<T>
 
 /** The field rules of `taskInputBase` in lib/tasks/schemas.ts. */
 internal object TaskRules {

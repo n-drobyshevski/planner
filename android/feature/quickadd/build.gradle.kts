@@ -1,4 +1,5 @@
-// The Quick add sheet (task or event), also hosted by the Quick add widget.
+// The Quick add sheet (task or event), also hosted by the Quick add widget
+// through the translucent QuickAddActivity.
 plugins {
     alias(libs.plugins.planr.android.library)
     alias(libs.plugins.planr.android.compose)
@@ -12,7 +13,10 @@ android {
 dependencies {
     implementation(projects.core.design)
     implementation(projects.core.data)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    testImplementation(libs.kotlinx.coroutines.test)
 }

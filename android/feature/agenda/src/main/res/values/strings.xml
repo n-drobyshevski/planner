@@ -1,6 +1,172 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<!--
+  Agenda, event detail and event editor copy, ported from the web's next-intl
+  messages (messages/en: calendar, events, recurrence, toasts, common). Every
+  name is prefixed `agenda_` so it can't collide with other modules once
+  resources merge into the app.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Agenda (calendar.toolbar / calendar.agenda / calendar.labels) -->
     <string name="agenda_empty_title">Nothing scheduled</string>
-    <string name="agenda_empty_body">Add an event with the New button, or jump to another date.</string>
-    <string name="event_detail_title">Event</string>
+    <string name="agenda_today">Today</string>
+    <string name="agenda_previous">Previous</string>
+    <string name="agenda_next">Next</string>
+    <string name="agenda_view_day">Day</string>
+    <string name="agenda_view_week">Week</string>
+    <string name="agenda_new_event">New event</string>
+    <string name="agenda_quick_add">Quick add</string>
+    <string name="agenda_all_day_header">All-day</string>
+    <string name="agenda_untitled">Untitled event</string>
+    <!-- A count badge, "+3 more"; the web keeps it a plain string too. -->
+    <string name="agenda_more_count" tools:ignore="PluralsCandidate">+%1$d more</string>
+    <string name="agenda_go_to">Go to %1$s</string>
+    <string name="agenda_refresh_failed">Couldn\'t refresh. Showing what\'s saved on this device.</string>
+
+    <!-- Event block accessibility (calendar.block) -->
+    <string name="agenda_block_time_range">%1$s to %2$s</string>
+    <string name="agenda_block_shared">shared</string>
+    <string name="agenda_block_readonly">another member\'s, read-only</string>
+    <string name="agenda_block_cancelled">cancelled</string>
+    <string name="agenda_block_planned">planned</string>
+
+    <!-- Event detail (events.details) -->
+    <string name="agenda_detail_you">You</string>
+    <string name="agenda_detail_context">Context</string>
+    <string name="agenda_detail_edited">Edited</string>
+    <string name="agenda_detail_inactive">Inactive</string>
+    <string name="agenda_detail_read_only">Read-only · %1$s</string>
+    <string name="agenda_detail_other_calendar">another calendar</string>
+    <string name="agenda_detail_missing_title">Event not found</string>
+    <string name="agenda_detail_missing_body">It may have been deleted on another device.</string>
+    <string name="agenda_all_day">All day</string>
+
+    <!-- Common actions (common) -->
+    <string name="agenda_back">Back</string>
+    <string name="agenda_close">Close</string>
+    <string name="agenda_edit">Edit</string>
+    <string name="agenda_delete">Delete</string>
+    <string name="agenda_save">Save</string>
+    <string name="agenda_cancel">Cancel</string>
+    <string name="agenda_saving">Saving…</string>
+    <string name="agenda_search">Search</string>
+    <string name="agenda_undo">Undo</string>
+
+    <!-- Event editor (events.dialog) -->
+    <string name="agenda_editor_new_event">New event</string>
+    <string name="agenda_editor_edit_event">Edit event</string>
+    <string name="agenda_editor_title_placeholder">Add title</string>
+    <string name="agenda_editor_title_label">Event title</string>
+    <string name="agenda_editor_all_day">All day</string>
+    <string name="agenda_editor_start">Start</string>
+    <string name="agenda_editor_end">End</string>
+    <string name="agenda_editor_start_date">Start date</string>
+    <string name="agenda_editor_start_time">Start time</string>
+    <string name="agenda_editor_end_date">End date</string>
+    <string name="agenda_editor_end_time">End time</string>
+    <string name="agenda_editor_time_zone">Time zone</string>
+    <string name="agenda_editor_context">Context</string>
+    <string name="agenda_editor_no_context">No context</string>
+    <string name="agenda_editor_sharing">Sharing</string>
+    <string name="agenda_editor_shared_context_banner">Shared context — you both attend and can edit this.</string>
+    <string name="agenda_visibility_private">Private</string>
+    <string name="agenda_visibility_visible">Visible</string>
+    <string name="agenda_visibility_shared">Shared</string>
+    <string name="agenda_visibility_hint_private">Only you can see this.</string>
+    <string name="agenda_visibility_hint_shared">Shows on both calendars; you both can edit it.</string>
+    <string name="agenda_visibility_hint_visible">Your partner can see it on your calendar; only you can edit it.</string>
+    <string name="agenda_editor_location">Location</string>
+    <string name="agenda_editor_location_placeholder">Add a location</string>
+    <string name="agenda_editor_notes">Notes</string>
+    <string name="agenda_editor_title_required">Please add a title.</string>
+    <string name="agenda_editor_end_after_start">End must be after start.</string>
+    <string name="agenda_status_planned">Planned</string>
+    <string name="agenda_status_cancelled">Cancelled</string>
+
+    <!-- Recurrence editor (events.recurrence) -->
+    <string name="agenda_recurrence_repeat">Repeat</string>
+    <string name="agenda_recurrence_does_not_repeat">Does not repeat</string>
+    <string name="agenda_recurrence_daily">Daily</string>
+    <string name="agenda_recurrence_weekly">Weekly</string>
+    <string name="agenda_recurrence_monthly">Monthly</string>
+    <string name="agenda_recurrence_every">Every</string>
+    <string name="agenda_recurrence_unit_day">day(s)</string>
+    <string name="agenda_recurrence_unit_week">week(s)</string>
+    <string name="agenda_recurrence_unit_month">month(s)</string>
+    <string name="agenda_recurrence_on_days">On days</string>
+    <string name="agenda_recurrence_ends">Ends</string>
+    <string name="agenda_recurrence_ends_never">Never</string>
+    <string name="agenda_recurrence_ends_until">On date</string>
+    <string name="agenda_recurrence_ends_count">After…</string>
+    <string name="agenda_recurrence_repeat_until_date">Repeat until date</string>
+    <string name="agenda_recurrence_decrease">Fewer</string>
+    <string name="agenda_recurrence_increase">More</string>
+    <!-- Mon..Sun chip labels (events.recurrence.weekday) -->
+    <string-array name="agenda_weekday_chips">
+        <item>Mo</item>
+        <item>Tu</item>
+        <item>We</item>
+        <item>Th</item>
+        <item>Fr</item>
+        <item>Sa</item>
+        <item>Su</item>
+    </string-array>
+
+    <!-- Recurrence summary (recurrence.*) -->
+    <string name="agenda_summary_daily">Repeats daily</string>
+    <string name="agenda_summary_weekly">Repeats weekly</string>
+    <string name="agenda_summary_monthly">Repeats monthly</string>
+    <plurals name="agenda_summary_every_day">
+        <item quantity="one">Repeats every %d day</item>
+        <item quantity="other">Repeats every %d days</item>
+    </plurals>
+    <plurals name="agenda_summary_every_week">
+        <item quantity="one">Repeats every %d week</item>
+        <item quantity="other">Repeats every %d weeks</item>
+    </plurals>
+    <plurals name="agenda_summary_every_month">
+        <item quantity="one">Repeats every %d month</item>
+        <item quantity="other">Repeats every %d months</item>
+    </plurals>
+    <string name="agenda_summary_on_days">%1$s on %2$s</string>
+    <string name="agenda_summary_until">%1$s, until %2$s</string>
+    <plurals name="agenda_summary_times">
+        <item quantity="one">%1$s, %2$d time</item>
+        <item quantity="other">%1$s, %2$d times</item>
+    </plurals>
+    <string name="agenda_summary_day_separator">, </string>
+    <!-- Mon..Sun (recurrence.weekday) -->
+    <string-array name="agenda_weekday_short">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+
+    <!-- Recurring edit / delete scope (events.scope) -->
+    <string name="agenda_scope_title_edit">Edit recurring event</string>
+    <string name="agenda_scope_title_delete">Delete recurring event</string>
+    <string name="agenda_scope_apply_which">Apply to which events?</string>
+    <string name="agenda_scope_this_event">This event</string>
+    <string name="agenda_scope_this_and_following">This and following events</string>
+    <string name="agenda_scope_all_events">All events</string>
+
+    <!-- Results (toasts) -->
+    <string name="agenda_toast_event_created">Event created</string>
+    <string name="agenda_toast_event_updated">Event updated</string>
+    <string name="agenda_toast_event_deleted">Event deleted</string>
+    <string name="agenda_toast_this_event_updated">This event updated</string>
+    <string name="agenda_toast_this_and_future_updated">This and future updated</string>
+    <string name="agenda_toast_all_events_updated">All events updated</string>
+    <string name="agenda_toast_this_and_future_deleted">This and future deleted</string>
+    <string name="agenda_toast_series_deleted">Series deleted</string>
+    <string name="agenda_toast_undone">Undone</string>
+    <string name="agenda_toast_couldnt_undo">Couldn\'t undo</string>
+    <string name="agenda_something_went_wrong">Something went wrong</string>
+
+    <!-- Optimistic-concurrency conflict (StaleWriteError in lib/supabase/mutations.ts) -->
+    <string name="agenda_stale_event">This event was changed elsewhere.</string>
+    <string name="agenda_stale_reload">Reload</string>
 </resources>

@@ -13,6 +13,10 @@ dependencies {
     implementation(projects.core.design)
     implementation(projects.core.data)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.kotlinx.datetime)
+
+    testImplementation(libs.kotlinx.coroutines.test)
 }

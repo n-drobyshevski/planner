@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="planr_widget_surface">#1C1917</color>
+    <color name="planr_widget_ink">#FAF8F5</color>
+    <color name="planr_widget_muted">#BCB3AA</color>
+    <color name="planr_widget_accent">#A8A29E</color>
+    <color name="planr_widget_on_accent">#292524</color>
+    <color name="planr_widget_secondary">#3A3531</color>
+    <color name="planr_widget_on_secondary">#FAF8F5</color>
+    <color name="planr_widget_outline">#5C554F</color>
+</resources>

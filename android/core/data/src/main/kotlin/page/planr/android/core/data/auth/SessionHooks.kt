@@ -16,4 +16,10 @@ fun interface LocalDataCleaner {
 fun interface AccessTokenSource {
     /** A currently valid access token (refreshed if needed), or null when signed out. */
     suspend fun accessToken(): String?
+
+    /**
+     * The server answered 401 to [rejected]: refresh now, whatever the local
+     * expiry says, and return the token to retry with (null: don't retry).
+     */
+    suspend fun refreshRejected(rejected: String?): String? = null
 }

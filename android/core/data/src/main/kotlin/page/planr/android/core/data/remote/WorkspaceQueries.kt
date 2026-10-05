@@ -81,6 +81,18 @@ class WorkspaceQueries @Inject constructor(
         order = listOf(RowOrder("position"), RowOrder("created_at")),
     ).decodeAll(Task.serializer())
 
+    /** One event row, e.g. to reload it after a stale write; null when gone or hidden. */
+    suspend fun fetchEvent(workspaceId: String, id: String): PlannerEvent? = gateway.select(
+        SupabaseTables.EVENTS,
+        filters = listOf(eq("workspace_id", workspaceId), eq("id", id)),
+    ).firstOrNull()?.decodeAs(PlannerEvent.serializer())
+
+    /** One task row; null when gone or hidden. */
+    suspend fun fetchTask(workspaceId: String, id: String): Task? = gateway.select(
+        SupabaseTables.TASKS,
+        filters = listOf(eq("workspace_id", workspaceId), eq("id", id)),
+    ).firstOrNull()?.decodeAs(Task.serializer())
+
     /**
      * The member a token belongs to, like `verifyMcpToken` in lib/mcp/auth.ts:
      * the `members` row where `auth_user_id = sub`. Null when there is none.

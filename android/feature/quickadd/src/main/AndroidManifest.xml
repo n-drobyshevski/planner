@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Hosts the Quick add sheet over the home screen. Launched only by
+             our own widget (explicit intent), so it isn't exported; its own
+             empty task affinity keeps it out of the main app's back stack. -->
+        <activity
+            android:name=".QuickAddActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Planr.QuickAdd"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>

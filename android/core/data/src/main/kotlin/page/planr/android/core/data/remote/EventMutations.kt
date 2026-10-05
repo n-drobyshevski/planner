@@ -10,13 +10,11 @@ import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.PlannerEvent
+import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.recurrence.EditSemantics
 import page.planr.android.core.recurrence.OccurrencePatch
 import page.planr.android.core.recurrence.OverrideInput
 import page.planr.android.core.recurrence.PatchField
-import page.planr.android.core.recurrence.RRuleBuild
-import page.planr.android.core.recurrence.RecurrenceEnd
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Event writes — the v1 subset of lib/supabase/mutations.ts with identical
@@ -28,7 +26,7 @@ class EventMutations @Inject constructor(
 ) {
 
     /** `createEvent`: insert and return the stored row. */
-    suspend fun createEvent(draft: page.planr.android.core.model.PlannerEventDraft): PlannerEvent =
+    suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent =
         gateway.insert(SupabaseTables.EVENTS, listOf(EventPayloads.insertRow(draft)))
             .single()
             .decodeAs(PlannerEvent.serializer())
@@ -160,15 +158,15 @@ class EventMutations @Inject constructor(
         )
     }
 
-    /** `deleteThisAndFuture`: cap the series with UNTIL one second before [fromOccurrence]. */
+    /**
+     * `deleteThisAndFuture`: cap the series with UNTIL one second before
+     * [fromOccurrence], keeping the rest of the rule ([EditSemantics.capThisAndFuture]).
+     */
     suspend fun deleteThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): PlannerEvent {
-        val until = fromOccurrence - 1.seconds
-        val rrule = RRuleBuild.parseRRule(event.rrule)?.let { form ->
-            RRuleBuild.buildRRule(form.copy(end = RecurrenceEnd.Until(until)))
-        }
+        val cap = EditSemantics.capThisAndFuture(event, fromOccurrence)
         return updateEvent(
             event.id,
-            EventPatch(rrule = PatchField.Value(rrule), recurrenceEndsAt = PatchField.Value(until)),
+            EventPatch(rrule = PatchField.Value(cap.rrule), recurrenceEndsAt = PatchField.Value(cap.recurrenceEndsAt)),
         )
     }
 

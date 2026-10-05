@@ -111,16 +111,14 @@ object EditSemantics {
 
     /**
      * "Delete this and following": cap the series just before [fromOccurrence]
-     * (UNTIL = from − 1 s). The pure half of `deleteThisAndFuture` in
-     * lib/supabase/mutations.ts, which round-trips the rule through the
-     * recurrence form — so, like the web, a rule the form can't express
-     * (e.g. YEARLY) is normalized by [RRuleBuild.parseRRule].
+     * (UNTIL = from − 1 s, COUNT dropped) — `capThisAndFuture` in
+     * lib/recurrence/edit-semantics.ts. The same rewrite as the split's
+     * original, so every other rule part (BYMONTH, BYSETPOS, BYDAY ordinals,
+     * YEARLY…) survives and past occurrences stay where they were.
      */
     fun capThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): SeriesEnd {
         val until = fromOccurrence - 1.seconds
-        val rrule = RRuleBuild.parseRRule(event.rrule)?.let { form ->
-            RRuleBuild.buildRRule(form.copy(end = RecurrenceEnd.Until(until)))
-        }
+        val rrule = event.rrule?.takeIf { it.isNotEmpty() }?.let { rewriteRule(it, until = until.toEpochMilliseconds()) }
         return SeriesEnd(id = event.id, rrule = rrule, recurrenceEndsAt = until)
     }
 

@@ -40,6 +40,10 @@ import page.planr.android.core.data.di.ApplicationScope
  *   expiry; a [Mutex] makes concurrent callers share one refresh (refresh
  *   tokens rotate, so a second parallel refresh would fail). A rejected
  *   refresh signs the user out with [SignOutReason.SessionExpired].
+ * - [refreshRejected] forces a refresh when the server answered 401 anyway
+ *   (a revoked token, or a device clock far off the server's).
+ * - [signOut] is the user's "Sign out": local wipe plus a best-effort
+ *   server-side logout.
  */
 @Singleton
 class SessionManager @Inject constructor(
@@ -134,13 +138,37 @@ class SessionManager @Inject constructor(
         }
     }
 
-    /** Signs out: forgets the tokens and wipes the local cache. */
-    suspend fun signOut(reason: SignOutReason = SignOutReason.UserRequested) = stateMutex.withLock {
-        clearSession()
-        _authState.value = AuthState.SignedOut(reason)
+    override suspend fun refreshRejected(rejected: String?): String? = refreshMutex.withLock {
+        val latest = session.value ?: return@withLock null
+        // Someone else already replaced the rejected token: retry with theirs.
+        if (latest.accessToken != rejected) latest.accessToken else refresh(latest)
     }
 
-    private suspend fun restore() {
+    /**
+     * Signs out: forgets the tokens, wipes the local cache and, best effort,
+     * ends the session on the server so a copied refresh token is useless.
+     *
+     * Holds [refreshMutex] too (always after [stateMutex], the order
+     * [completeSignIn] takes them in), so an in-flight refresh can't store its
+     * rotated tokens after the sign-out cleared them.
+     */
+    suspend fun signOut(reason: SignOutReason = SignOutReason.UserRequested) = stateMutex.withLock {
+        refreshMutex.withLock {
+            val accessToken = session.value?.accessToken
+            clearSession(reason)
+            if (accessToken != null) {
+                // Not awaited: signing out must work offline and never hang on the network.
+                scope.launch { runCatching { tokenClient.revokeSession(accessToken) } }
+            }
+        }
+    }
+
+    /**
+     * Under [stateMutex]: a cold start from the App Link launches
+     * [completeSignIn] right behind this, and the restore must not overwrite
+     * the fresh sign-in with "signed out".
+     */
+    private suspend fun restore() = stateMutex.withLock {
         val stored = store.readSession()
         val info = stored?.info()
         if (stored != null && info != null) {
@@ -207,7 +235,8 @@ class SessionManager @Inject constructor(
             // Offline or a 5xx: keep the session, hand out the old token while it lasts.
             return current.accessToken.takeUnless { current.expiresWithin(Duration.ZERO, clock.now()) }
         }
-        // A sign-out may have raced the request; never resurrect the session.
+        // Sign-out holds refreshMutex, so it can't interleave from here on; this
+        // only guards a sign-in that replaced the session meanwhile.
         if (session.value?.refreshToken != current.refreshToken) return session.value?.accessToken
         val updated = current.refreshedWith(tokens, clock.now())
         store.writeSession(updated)
@@ -220,14 +249,19 @@ class SessionManager @Inject constructor(
      * member lookup asks for a token), which already holds it.
      */
     private suspend fun expire() {
-        clearSession()
-        _authState.value = AuthState.SignedOut(SignOutReason.SessionExpired)
+        clearSession(SignOutReason.SessionExpired)
     }
 
-    private suspend fun clearSession() {
+    /**
+     * The auth state flips before the cache is wiped: widgets re-rendered by
+     * [LocalDataCleaner.clearAll] must already see "signed out" (a sign-in
+     * prompt), not a signed-in member with empty tables ("nothing today").
+     */
+    private suspend fun clearSession(reason: SignOutReason) {
         session.value = null
         store.writeSession(null)
         store.writePending(null)
+        _authState.value = AuthState.SignedOut(reason)
         localData.clearAll()
     }
 

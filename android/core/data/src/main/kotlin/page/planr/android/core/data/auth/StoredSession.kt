@@ -51,10 +51,17 @@ data class StoredSession(
             )
         }
 
-        /** The JWT's own `exp` wins; `expires_in` is the fallback. */
+        /**
+         * Expiry on the device's clock: [now] + `expires_in`. The JWT's `exp`
+         * is on the server's clock, and refresh decisions compare against
+         * `clock.now()` — so a skewed device clock would refresh too late
+         * (401s) or on every request. `exp` is only the fallback when the
+         * response has no `expires_in`.
+         */
         private fun expiryOf(tokens: OAuthTokens, now: Instant): Long =
-            JwtClaims.parse(tokens.accessToken)?.expiresAtEpochSec
-                ?: (now.epochSeconds + (tokens.expiresIn ?: DEFAULT_LIFETIME_SEC))
+            tokens.expiresIn?.let { now.epochSeconds + it }
+                ?: JwtClaims.parse(tokens.accessToken)?.expiresAtEpochSec
+                ?: (now.epochSeconds + DEFAULT_LIFETIME_SEC)
 
         private const val DEFAULT_LIFETIME_SEC = 3600L
     }

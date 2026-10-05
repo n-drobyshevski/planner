@@ -1,6 +1,92 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Ported from messages/ru (tasks, events, toasts, common). -->
 <resources>
+    <!-- List -->
+    <string name="tasks_title">Задачи</string>
+    <string name="tasks_new_task">Новая задача</string>
     <string name="tasks_empty_title">Пока нет задач</string>
     <string name="tasks_empty_body">Создай первую задачу, чтобы начать.</string>
+    <string name="tasks_filtered_empty_title">Нет подходящих задач</string>
+    <string name="tasks_filtered_empty_body">Под текущие фильтры не подходит ни одна задача.</string>
+    <string name="tasks_filtered_clear">Сбросить фильтры</string>
+    <string name="tasks_loading">Загрузка…</string>
+
+    <!-- Filters -->
+    <string name="tasks_filter_scope">Чьи задачи</string>
+    <string name="tasks_filter_state">Состояние</string>
+    <string name="tasks_filter_all">Все</string>
+    <string name="tasks_filter_mine">Мои</string>
+    <string name="tasks_filter_partner">Партнёра</string>
+    <string name="tasks_filter_shared">Общие</string>
+    <string name="tasks_filter_open">Открытые</string>
+    <string name="tasks_filter_done">Готовые</string>
+
+    <!-- Sections -->
+    <string name="tasks_group_overdue">Просрочено</string>
+    <string name="tasks_group_this_week">На этой неделе</string>
+    <string name="tasks_group_later">Позже</string>
+    <string name="tasks_group_no_date">Без даты</string>
+    <string name="tasks_group_done">Готово</string>
+
+    <!-- Card -->
+    <string name="task_card_mark_done">Отметить выполненной</string>
+    <string name="task_card_mark_not_done">Отметить невыполненной</string>
+    <string name="task_card_private">Личное</string>
+    <string name="task_card_overdue">Просрочено</string>
+    <string name="task_card_due">Срок %1$s</string>
+    <string name="task_card_progress">%1$d/%2$d</string>
+    <string name="task_card_assignee">Исполнитель: %1$s</string>
+
+    <!-- Priority -->
+    <string name="task_priority_none">Без приоритета</string>
+    <string name="task_priority_low">Низкий</string>
+    <string name="task_priority_medium">Средний</string>
+    <string name="task_priority_high">Высокий</string>
+
+    <!-- Notices -->
+    <string name="task_completed">Задача выполнена</string>
+    <string name="task_reopened">Задача снова открыта</string>
+    <string name="task_updated">Задача изменена</string>
+    <string name="task_stale">Задачу изменили в другом месте. Показана последняя версия.</string>
+    <string name="task_failed">Что-то пошло не так</string>
+    <string name="task_undo">Отменить</string>
+
+    <!-- Detail -->
     <string name="task_detail_title">Задача</string>
+    <string name="task_detail_edit_title">Изменить задачу</string>
+    <string name="task_detail_back">Назад</string>
+    <string name="task_detail_save">Сохранить</string>
+    <string name="task_detail_saving">Сохранение…</string>
+    <string name="task_detail_not_found_title">Задача не найдена</string>
+    <string name="task_detail_not_found_body">Возможно, её удалили или сделали личной.</string>
+    <string name="task_detail_read_only">Только для чтения · %1$s</string>
+    <string name="task_detail_untitled">Задача без названия</string>
+    <string name="task_field_title">Название</string>
+    <string name="task_field_title_placeholder">Что нужно сделать?</string>
+    <string name="task_field_title_required">Добавь название.</string>
+    <string name="task_field_notes">Заметки</string>
+    <string name="task_field_notes_placeholder">Добавь детали</string>
+    <string name="task_field_status">Статус</string>
+    <string name="task_status_open">Открыто</string>
+    <string name="task_status_done">Готово</string>
+    <string name="task_status_no_columns">Эту задачу некуда перенести в «Готово», поэтому здесь её не завершить.</string>
+    <string name="task_field_column">Колонка</string>
+    <string name="task_field_due">Срок</string>
+    <string name="task_field_no_due">Без срока</string>
+    <string name="task_field_priority">Приоритет</string>
+    <string name="task_field_assignee">Исполнитель</string>
+    <string name="task_field_unassigned">Без исполнителя</string>
+    <string name="task_field_context">Контекст</string>
+    <string name="task_field_no_context">Без контекста</string>
+    <string name="task_field_clear">Очистить</string>
+    <string name="task_subtasks_title">Подзадачи</string>
+    <plurals name="task_subtasks_progress">
+        <item quantity="one">%1$d из %2$d подзадачи выполнено</item>
+        <item quantity="few">%1$d из %2$d подзадач выполнено</item>
+        <item quantity="many">%1$d из %2$d подзадач выполнено</item>
+        <item quantity="other">%1$d из %2$d подзадачи выполнено</item>
+    </plurals>
+    <string name="task_subtask_of">Подзадача «%1$s»</string>
+    <string name="task_date_pick">Выбрать</string>
+    <string name="task_date_cancel">Отмена</string>
 </resources>

@@ -55,4 +55,8 @@ private fun KotlinCommonCompilerOptions.applyPlanrDefaults() {
     // kotlin.time.Instant (used by kotlinx-datetime 0.7 / supabase-kt 3.2) is
     // still @ExperimentalTime on Kotlin 2.2; opt in once, project-wide.
     optIn.add("kotlin.time.ExperimentalTime")
+    // Hilt qualifiers on constructor properties (`@ApplicationContext private
+    // val context`) must reach the parameter; adopt Kotlin's upcoming default
+    // (param + property) now instead of a warning per injected property.
+    freeCompilerArgs.add("-Xannotation-default-target=param-property")
 }

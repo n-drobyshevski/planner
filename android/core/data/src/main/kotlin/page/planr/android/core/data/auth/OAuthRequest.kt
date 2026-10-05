@@ -13,6 +13,9 @@ object OAuthEndpoints {
     fun authorize(supabaseUrl: String): String = "${supabaseUrl.trimEnd('/')}/auth/v1/oauth/authorize"
 
     fun token(supabaseUrl: String): String = "${supabaseUrl.trimEnd('/')}/auth/v1/oauth/token"
+
+    /** GoTrue's logout; `scope=local` ends only this device's session. */
+    fun logout(supabaseUrl: String): String = "${supabaseUrl.trimEnd('/')}/auth/v1/logout?scope=local"
 }
 
 /**

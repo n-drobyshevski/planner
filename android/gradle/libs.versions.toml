@@ -35,7 +35,6 @@ glance = "1.1.1"
 browser = "1.8.0"
 datastore = "1.1.7"
 
-lib-recur = "0.17.1"
 robolectric = "4.16"
 androidx-test-core = "1.7.0"
 junit5 = "5.14.0"
@@ -94,7 +93,6 @@ androidx-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androi
 androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidx-hilt" }
 
 # Recurrence (RFC 5545)
-lib-recur = { module = "org.dmfs:lib-recur", version.ref = "lib-recur" }
 
 # Testing
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }

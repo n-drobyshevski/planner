@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared pieces of the picker-preview layouts. -->
+<resources>
+    <style name="PlanrWidgetPreviewRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingVertical">5dp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewBar">
+        <item name="android:layout_width">3dp</item>
+        <item name="android:layout_height">20dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewTime">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/planr_widget_muted</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewTitle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/planr_widget_ink</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewDue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">8dp</item>
+        <item name="android:textColor">@color/planr_widget_muted</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewCheck">
+        <item name="android:layout_width">16dp</item>
+        <item name="android:layout_height">16dp</item>
+        <item name="android:layout_marginStart">10dp</item>
+        <item name="android:layout_marginEnd">14dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:src">@drawable/widget_preview_checkbox</item>
+    </style>
+
+    <style name="PlanrWidgetPreviewPill">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:paddingVertical">8dp</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+</resources>
