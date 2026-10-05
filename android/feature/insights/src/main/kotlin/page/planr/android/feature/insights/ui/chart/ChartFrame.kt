@@ -1,6 +1,7 @@
 package page.planr.android.feature.insights.ui.chart
 
 import android.content.res.Configuration
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -24,13 +25,12 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import page.planr.android.core.design.theme.PlanrTheme
 import page.planr.android.feature.insights.ui.components.rememberReducedMotion
@@ -161,7 +162,8 @@ internal fun rememberValueTween(target: List<DoubleArray>, animationKey: Any): V
 /**
  * The band chart's selection: a tap opens the band (when the chart opens
  * bands) or toggles its tooltip; a long press then drag scrubs; a tap outside
- * the bands clears it. Plot geometry is pushed in from layout.
+ * the bands, or any touch outside the tooltip, clears it. Plot geometry is
+ * pushed in from layout. Times are uptime ms (the touch's own, or the clock's).
  */
 @Stable
 internal class ChartSelection {
@@ -170,26 +172,64 @@ internal class ChartSelection {
     var plotWidth by mutableFloatStateOf(0f)
     var bandCount by mutableIntStateOf(0)
     var onOpen: ((Int) -> Unit)? = null
+    private val closed = ClosedTooltip<Int>()
 
     fun bandAt(x: Float): Int? = ChartGeometry.bandOf(x, plotLeft, plotWidth, bandCount)
 
     fun center(index: Int): Float = ChartGeometry.bandCenter(index, plotLeft, plotWidth, bandCount)
 
-    fun tap(x: Float) {
+    fun tap(x: Float, atMillis: Long) {
         val band = bandAt(x)
         val open = onOpen
+        val closedByThisTouch = closed.take(band, atMillis)
         when {
             band == null -> selected = null
             open != null -> {
                 selected = null
                 open(band)
             }
+            closedByThisTouch -> selected = null
             else -> selected = if (selected == band) null else band
         }
     }
 
     fun scrub(x: Float) {
+        closed.take(null, 0L)
         bandAt(x)?.let { selected = it }
+    }
+
+    /** A touch outside the tooltip (or on it): close it. */
+    fun dismiss(atMillis: Long) {
+        closed.record(selected, atMillis)
+        selected = null
+    }
+}
+
+/**
+ * Which tooltip a touch just closed. The touch that closes a popup still
+ * reaches what is under it, so when it lands on the very item whose tooltip
+ * it closed, [take] says so and the tap toggles the tooltip off instead of
+ * reopening it.
+ */
+internal class ClosedTooltip<T : Any> {
+    private var item: T? = null
+    private var atMillis = 0L
+
+    fun record(item: T?, atMillis: Long) {
+        this.item = item
+        this.atMillis = atMillis
+    }
+
+    /** Whether a tap on [item] at [atMillis] is the touch that closed its tooltip; forgets it either way. */
+    fun take(item: T?, atMillis: Long): Boolean {
+        val same = item != null && item == this.item && abs(atMillis - this.atMillis) <= SAME_TOUCH_MS
+        this.item = null
+        return same
+    }
+
+    private companion object {
+        /** A tap's down-to-up span is under the long-press timeout (≤ 500 ms), plus slack. */
+        const val SAME_TOUCH_MS = 600L
     }
 }
 
@@ -206,7 +246,7 @@ internal fun Modifier.bandGestures(selection: ChartSelection): Modifier = pointe
             // A null `up` is a cancelled gesture (the list scrolled): not a tap.
             up?.let {
                 it.consume()
-                selection.tap(it.position.x)
+                selection.tap(it.position.x, it.uptimeMillis)
             }
             return@awaitEachGesture
         }
@@ -278,7 +318,11 @@ internal fun BoxScope.BandSemantics(nodes: List<ChartA11y.BandNode>) {
 
 // --- Tooltip -----------------------------------------------------------------------
 
-/** The selected band's tooltip, floating above the chart at the band's center. */
+/**
+ * The selected band's tooltip, floating above the chart at the band's center.
+ * Any touch closes it, outside it (a scroll, another control, the chart
+ * itself) or on it, so it never lingers over the list or blocks what it covers.
+ */
 @Composable
 internal fun BandTooltip(selection: ChartSelection, bands: List<BandInfo>) {
     val index = selection.selected ?: return
@@ -286,8 +330,30 @@ internal fun BandTooltip(selection: ChartSelection, bands: List<BandInfo>) {
     val centerX = selection.center(index).roundToInt()
     val gap = with(LocalDensity.current) { TOOLTIP_GAP.roundToPx() }
     val position = remember(centerX, gap) { TooltipPosition(centerX, gap) }
-    Popup(popupPositionProvider = position, properties = PopupProperties(focusable = false)) {
+    TooltipPopup(position, onClose = { selection.dismiss(SystemClock.uptimeMillis()) }) {
         ChartTooltip(band.title, band.rows)
+    }
+}
+
+/** A non-focusable tooltip popup that calls [onClose] on any touch, outside it or on it. */
+@Composable
+internal fun TooltipPopup(position: PopupPositionProvider, onClose: () -> Unit, content: @Composable () -> Unit) {
+    val close by rememberUpdatedState(onClose)
+    Popup(
+        popupPositionProvider = position,
+        onDismissRequest = { close() },
+        properties = PopupProperties(focusable = false, dismissOnClickOutside = true),
+    ) {
+        Box(
+            Modifier.pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    close()
+                }
+            },
+        ) {
+            content()
+        }
     }
 }
 
@@ -319,50 +385,64 @@ internal class TooltipPosition(private val anchorX: Int?, private val gap: Int) 
 
 // --- Drawing -----------------------------------------------------------------------
 
+// Called from draw lambdas, which rerun on every frame of the grow-in, the
+// value tween and a scrub: nothing here allocates per call. Paths, strokes,
+// dash effects and scratch arrays are built once in `drawWithCache`.
+
 /** Three gridlines at 0, 50% and 100% of the plot, or only the baseline when nothing is drawn. */
 internal fun DrawScope.drawGrid(plot: Rect, color: Color, hasData: Boolean) {
     val stroke = 1.dp.toPx()
-    val ys = if (hasData) listOf(plot.bottom, plot.center.y, plot.top) else listOf(plot.bottom)
-    for (y in ys) drawLine(color, Offset(plot.left, y), Offset(plot.right, y), stroke)
+    drawLine(color, Offset(plot.left, plot.bottom), Offset(plot.right, plot.bottom), stroke)
+    if (!hasData) return
+    val middle = plot.center.y
+    drawLine(color, Offset(plot.left, middle), Offset(plot.right, middle), stroke)
+    drawLine(color, Offset(plot.left, plot.top), Offset(plot.right, plot.top), stroke)
 }
 
-/** A bar with its top corners rounded (radius clamped to the bar), reusing [path]. */
-internal fun DrawScope.drawTopRoundedBar(path: Path, rect: Rect, radius: Float, color: Color) {
-    if (rect.width <= 0f || rect.height <= 0f) return
-    val r = minOf(radius, rect.width / 2f, rect.height)
+/** A bar from [left] to [right] and [top] to [bottom] with its top corners rounded (radius clamped to the bar), reusing [path]. */
+internal fun DrawScope.drawTopRoundedBar(path: Path, left: Float, top: Float, right: Float, bottom: Float, radius: Float, color: Color) {
+    val width = right - left
+    val height = bottom - top
+    if (width <= 0f || height <= 0f) return
+    val r = minOf(radius, width / 2f, height)
+    val k = r * (1f - ARC_KAPPA) // a quarter circle as one cubic
     path.reset()
-    path.addRoundRect(
-        RoundRect(
-            rect = rect,
-            topLeft = CornerRadius(r),
-            topRight = CornerRadius(r),
-            bottomRight = CornerRadius.Zero,
-            bottomLeft = CornerRadius.Zero,
-        ),
-    )
+    path.moveTo(left, bottom)
+    path.lineTo(left, top + r)
+    path.cubicTo(left, top + k, left + k, top, left + r, top)
+    path.lineTo(right - r, top)
+    path.cubicTo(right - k, top, right, top + k, right, top + r)
+    path.lineTo(right, bottom)
+    path.close()
     drawPath(path, color)
 }
 
-/** A monotone curve through [points] (d3 curveMonotoneX), reusing [path]. */
-internal fun DrawScope.drawMonotone(path: Path, points: List<Offset>, color: Color, width: Float, dashed: Boolean = false) {
-    if (points.isEmpty()) return
-    path.reset()
-    path.moveTo(points[0].x, points[0].y)
-    val controls = ChartGeometry.monotonePath(points)
-    var i = 0
-    while (i + 2 < controls.size) {
-        val c1 = controls[i]
-        val c2 = controls[i + 1]
-        val end = controls[i + 2]
-        path.cubicTo(c1.x, c1.y, c2.x, c2.y, end.x, end.y)
-        i += 3
-    }
-    val effect = if (dashed) dashEffect() else null
-    drawPath(path, color, style = Stroke(width = width, pathEffect = effect))
+/** The cubic Bézier constant for a quarter circle. */
+private const val ARC_KAPPA = 0.5522848f
+
+/** Scratch arrays for a monotone curve of up to [capacity] points: fill [ys], then [drawMonotone]. */
+internal class CurveBuffers(capacity: Int) {
+    val ys = FloatArray(capacity)
+    val tangents = FloatArray(capacity)
+    val controls = FloatArray(6 * maxOf(0, capacity - 1))
 }
 
-/** The `[4, 4]` dash of the reference and dashed lines. */
-internal fun DrawScope.dashEffect(): PathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
+/** A monotone curve (d3 curveMonotoneX) through the first [n] of [xs] and [curve]'s ys, reusing [path]. */
+internal fun DrawScope.drawMonotone(path: Path, xs: FloatArray, curve: CurveBuffers, n: Int, color: Color, stroke: Stroke) {
+    if (n <= 0) return
+    path.reset()
+    path.moveTo(xs[0], curve.ys[0])
+    val c = curve.controls
+    val segments = ChartGeometry.monotoneInto(xs, curve.ys, n, curve.tangents, c)
+    for (k in 0 until segments) {
+        val o = 6 * k
+        path.cubicTo(c[o], c[o + 1], c[o + 2], c[o + 3], c[o + 4], c[o + 5])
+    }
+    drawPath(path, color, style = stroke)
+}
+
+/** The `[4, 4]` dash of the reference and dashed lines (build it once, in `drawWithCache`). */
+internal fun Density.dashEffect(): PathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
 
 /** The vertical cursor of the selected band. */
 internal fun DrawScope.drawCursor(plot: Rect, x: Float, color: Color) {

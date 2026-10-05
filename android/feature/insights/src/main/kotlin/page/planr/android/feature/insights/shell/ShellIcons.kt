@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
  */
 internal object ShellIcons {
     val ChevronDown by lazy { lucide("ChevronDown", "m6 9 6 6 6-6") }
+    val Check by lazy { lucide("Check", "M20 6 9 17l-5-5") }
     val Info by lazy { lucide("Info", "M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0", "M12 16v-4", "M12 8h.01") }
 
     private fun lucide(name: String, vararg paths: String): ImageVector =

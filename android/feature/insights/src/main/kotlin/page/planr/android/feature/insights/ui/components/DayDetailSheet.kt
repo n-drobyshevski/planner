@@ -66,7 +66,8 @@ fun DayDetailSheet(
     onOpenInCalendar: (LocalDate) -> Unit,
 ) {
     val locale = rememberLabelLocale()
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // Card White, like the filters sheet and Quick add (DESIGN.md: raised surfaces).
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = PlanrTheme.colors.card) {
         Column(
             Modifier
                 .fillMaxWidth()

@@ -9,9 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -69,20 +69,26 @@ fun LineChart(
                     val plot = plotRect(size.width, height.toPx())
                     val centers = List(bandCount) { ChartGeometry.bandCenter(it, plot.left, plot.width, bandCount) }
                     val tickIdx = tickIndices(centers, tickLabels)
+                    val xs = centers.toFloatArray()
                     val path = Path()
-                    val stroke = 2.dp.toPx()
+                    val curve = CurveBuffers(bandCount)
+                    val stroke = Stroke(width = 2.dp.toPx())
+                    // Index loops only: this reruns on every animation frame.
                     onDrawBehind {
                         val now = values.current()
                         val g = growth.value
                         // yMax over the visible series only.
-                        val yMax = now.maxOfOrNull { arr -> arr.maxOrNull() ?: 0.0 }?.coerceAtLeast(0.0) ?: 0.0
+                        var yMax = 0.0
+                        for (k in now.indices) {
+                            val arr = now[k]
+                            for (j in arr.indices) if (arr[j] > yMax) yMax = arr[j]
+                        }
                         drawGrid(plot, chart.grid, yMax > 0.0)
-                        now.forEachIndexed { s, line ->
-                            if (s >= visible.size) return@forEachIndexed
-                            val points = List(minOf(bandCount, line.size)) { i ->
-                                Offset(centers[i], ChartGeometry.yOf(line[i] * g, yMax, plot))
-                            }
-                            drawMonotone(path, points, visible[s].color, stroke)
+                        for (s in 0 until minOf(now.size, visible.size)) {
+                            val line = now[s]
+                            val n = minOf(bandCount, line.size)
+                            for (i in 0 until n) curve.ys[i] = ChartGeometry.yOf(line[i] * g, yMax, plot)
+                            drawMonotone(path, xs, curve, n, visible[s].color, stroke)
                         }
                         selection.selected?.let { if (it < bandCount) drawCursor(plot, centers[it], chart.grid) }
                         drawTicks(plot, centers, tickLabels, tickIdx, tickColor)

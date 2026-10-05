@@ -60,14 +60,22 @@ object ChartGeometry {
         gapPx: Float,
         bandCount: Int,
     ): Rect {
+        val left = barLeft(index, seriesIndex, seriesCount, plot, gapPx, bandCount)
+        return Rect(left, yOf(value, yMax, plot), left + barWidth(seriesCount, plot, gapPx, bandCount), plot.bottom)
+    }
+
+    /** The left edge of [barRect], without allocating it (for the draw loop). */
+    fun barLeft(index: Int, seriesIndex: Int, seriesCount: Int, plot: Rect, gapPx: Float, bandCount: Int): Float {
         val bw = plot.width / maxOf(1, bandCount)
-        val group = bw * GROUP_FRACTION
-        val groupLeft = plot.left + index * bw + (bw - group) / 2f
+        val groupLeft = plot.left + index * bw + (bw - bw * GROUP_FRACTION) / 2f
+        return groupLeft + seriesIndex * (barWidth(seriesCount, plot, gapPx, bandCount) + gapPx)
+    }
+
+    /** The width of every bar of [barRect]. */
+    fun barWidth(seriesCount: Int, plot: Rect, gapPx: Float, bandCount: Int): Float {
+        val group = plot.width / maxOf(1, bandCount) * GROUP_FRACTION
         val count = maxOf(1, seriesCount)
-        val barWidth = maxOf(0f, (group - gapPx * (count - 1)) / count)
-        val left = groupLeft + seriesIndex * (barWidth + gapPx)
-        val top = yOf(value, yMax, plot)
-        return Rect(left, top, left + barWidth, plot.bottom)
+        return maxOf(0f, (group - gapPx * (count - 1)) / count)
     }
 
     /** The plot y of [value] on `[0, yMax]` (the bottom when `yMax <= 0`). */
@@ -110,43 +118,65 @@ object ChartGeometry {
     fun monotonePath(points: List<Offset>): List<Offset> {
         val n = points.size
         if (n < 2) return emptyList()
-        if (n == 2) {
-            val (a, b) = points
-            return listOf(a + (b - a) / 3f, a + (b - a) * 2f / 3f, b)
-        }
-        val tangents = FloatArray(n)
-        for (i in 1 until n - 1) tangents[i] = slope3(points[i - 1], points[i], points[i + 1])
-        tangents[0] = slope2(points[0], points[1], tangents[1])
-        tangents[n - 1] = slope2(points[n - 2], points[n - 1], tangents[n - 2])
+        val xs = FloatArray(n) { points[it].x }
+        val ys = FloatArray(n) { points[it].y }
+        val out = FloatArray(6 * (n - 1))
+        val segments = monotoneInto(xs, ys, n, FloatArray(n), out)
+        return List(3 * segments) { Offset(out[2 * it], out[2 * it + 1]) }
+    }
 
-        val out = ArrayList<Offset>(3 * (n - 1))
-        for (i in 0 until n - 1) {
-            val p0 = points[i]
-            val p1 = points[i + 1]
-            val dx = (p1.x - p0.x) / 3f
-            out += Offset(p0.x + dx, p0.y + dx * tangents[i])
-            out += Offset(p1.x - dx, p1.y - dx * tangents[i + 1])
-            out += p1
+    /**
+     * [monotonePath] without allocating, for the draw loop: the curve through
+     * the first [n] points of [xs] / [ys], written to [out] as 6 floats per
+     * segment (`c1x c1y c2x c2y endX endY`), with [tangents] (≥ n) as scratch.
+     * Returns the number of segments.
+     */
+    fun monotoneInto(xs: FloatArray, ys: FloatArray, n: Int, tangents: FloatArray, out: FloatArray): Int {
+        if (n < 2) return 0
+        if (n == 2) {
+            val dx = xs[1] - xs[0]
+            val dy = ys[1] - ys[0]
+            out[0] = xs[0] + dx / 3f
+            out[1] = ys[0] + dy / 3f
+            out[2] = xs[0] + dx * 2f / 3f
+            out[3] = ys[0] + dy * 2f / 3f
+            out[4] = xs[1]
+            out[5] = ys[1]
+            return 1
         }
-        return out
+        for (i in 1 until n - 1) tangents[i] = slope3(xs[i - 1], ys[i - 1], xs[i], ys[i], xs[i + 1], ys[i + 1])
+        tangents[0] = slope2(xs[0], ys[0], xs[1], ys[1], tangents[1])
+        tangents[n - 1] = slope2(xs[n - 2], ys[n - 2], xs[n - 1], ys[n - 1], tangents[n - 2])
+
+        for (i in 0 until n - 1) {
+            val dx = (xs[i + 1] - xs[i]) / 3f
+            val o = 6 * i
+            out[o] = xs[i] + dx
+            out[o + 1] = ys[i] + dx * tangents[i]
+            out[o + 2] = xs[i + 1] - dx
+            out[o + 3] = ys[i + 1] - dx * tangents[i + 1]
+            out[o + 4] = xs[i + 1]
+            out[o + 5] = ys[i + 1]
+        }
+        return n - 1
     }
 
     /** d3's interior tangent: 0 at a local extremum, else the limited harmonic slope. */
-    private fun slope3(p0: Offset, p1: Offset, p2: Offset): Float {
-        val h0 = p1.x - p0.x
-        val h1 = p2.x - p1.x
+    private fun slope3(x0: Float, y0: Float, x1: Float, y1: Float, x2: Float, y2: Float): Float {
+        val h0 = x1 - x0
+        val h1 = x2 - x1
         if (h0 == 0f || h1 == 0f) return 0f
-        val s0 = (p1.y - p0.y) / h0
-        val s1 = (p2.y - p1.y) / h1
+        val s0 = (y1 - y0) / h0
+        val s1 = (y2 - y1) / h1
         val p = (s0 * h1 + s1 * h0) / (h0 + h1)
         val t = (sign(s0) + sign(s1)) * minOf(abs(s0), abs(s1), 0.5f * abs(p))
         return if (t.isNaN()) 0f else t
     }
 
     /** d3's end tangent from the neighbouring one. */
-    private fun slope2(p0: Offset, p1: Offset, t: Float): Float {
-        val h = p1.x - p0.x
-        return if (h != 0f) (3f * (p1.y - p0.y) / h - t) / 2f else t
+    private fun slope2(x0: Float, y0: Float, x1: Float, y1: Float, t: Float): Float {
+        val h = x1 - x0
+        return if (h != 0f) (3f * (y1 - y0) / h - t) / 2f else t
     }
 
     /**

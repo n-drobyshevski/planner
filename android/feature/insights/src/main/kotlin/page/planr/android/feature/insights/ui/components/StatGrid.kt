@@ -72,12 +72,11 @@ fun StatFigure(
 ) {
     val prefix = stringResource(R.string.insights_common_needs_attention).trimEnd()
     Column(modifier.semantics(mergeDescendants = true) {}) {
+        // The label wraps (stat-card.tsx truncates only the hint): it names the figure.
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (warning) {

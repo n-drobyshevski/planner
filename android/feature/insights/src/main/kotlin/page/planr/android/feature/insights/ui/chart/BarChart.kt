@@ -78,46 +78,58 @@ fun BarChart(
                 .drawWithCache {
                     val plot = plotRect(size.width, height.toPx())
                     val centers = List(bandCount) { ChartGeometry.bandCenter(it, plot.left, plot.width, bandCount) }
+                    val xs = centers.toFloatArray()
                     val ticks = tickIndices(centers, tickLabels)
                     val path = Path()
+                    val curve = CurveBuffers(bandCount)
                     val gap = ChartInsets.BarGap.toPx()
                     val radius = ChartInsets.BarRadius.toPx()
                     val reference = chart.comparison.copy(alpha = chart.comparison.alpha * REFERENCE_OPACITY)
+                    val dash = dashEffect()
+                    val lineStrokes = data.lines.map { style ->
+                        val width = if (style.color == chart.line) 1.5.dp.toPx() else 2.dp.toPx()
+                        Stroke(width = width, pathEffect = if (style.dashed) dash else null)
+                    }
                     val markerRadius = 4.dp.toPx()
                     val markerStroke = Stroke(width = 2.dp.toPx())
+                    // Index loops only: this reruns on every animation frame.
                     onDrawBehind {
                         val now = values.current()
                         val g = growth.value
-                        val bars = now.take(data.series.size)
-                        val lines = now.drop(data.series.size)
-                        val yMax = (bars + lines).maxOfOrNull { arr -> arr.maxOrNull() ?: 0.0 }?.coerceAtLeast(0.0) ?: 0.0
+                        val barCount = minOf(data.series.size, now.size)
+                        var yMax = 0.0
+                        for (k in now.indices) {
+                            val arr = now[k]
+                            for (j in arr.indices) if (arr[j] > yMax) yMax = arr[j]
+                        }
                         drawGrid(plot, chart.grid, yMax > 0.0)
                         if (bandCount == 0) return@onDrawBehind
 
-                        bars.forEachIndexed { s, series ->
+                        val barWidth = ChartGeometry.barWidth(barCount, plot, gap, bandCount)
+                        for (s in 0 until barCount) {
+                            val series = now[s]
                             val style = data.series[s]
                             val fill = style.color.copy(alpha = style.color.alpha * style.alpha)
                             for (i in 0 until minOf(bandCount, series.size)) {
                                 val v = series[i] * g
                                 if (v <= 0.0) continue
-                                val rect = ChartGeometry.barRect(i, s, bars.size, v, yMax, plot, gap, bandCount)
-                                drawTopRoundedBar(path, rect, radius, fill)
+                                val left = ChartGeometry.barLeft(i, s, barCount, plot, gap, bandCount)
+                                val top = ChartGeometry.yOf(v, yMax, plot)
+                                drawTopRoundedBar(path, left, top, left + barWidth, plot.bottom, radius, fill)
                             }
                         }
                         val ref = data.referenceY
                         if (ref != null && ref > 0.0 && ref <= yMax) {
                             val y = ChartGeometry.yOf(ref, yMax, plot)
-                            drawLine(reference, Offset(plot.left, y), Offset(plot.right, y), 1.dp.toPx(), pathEffect = dashEffect())
+                            drawLine(reference, Offset(plot.left, y), Offset(plot.right, y), 1.dp.toPx(), pathEffect = dash)
                         }
-                        lines.forEachIndexed { l, line ->
-                            val style = data.lines[l]
-                            val points = List(minOf(bandCount, line.size)) { i ->
-                                Offset(centers[i], ChartGeometry.yOf(line[i] * g, yMax, plot))
-                            }
-                            val width = if (style.color == chart.line) 1.5.dp.toPx() else 2.dp.toPx()
-                            drawMonotone(path, points, style.color, width, style.dashed)
+                        for (l in data.lines.indices) {
+                            val line = now.getOrNull(data.series.size + l) ?: break
+                            val n = minOf(bandCount, line.size)
+                            for (i in 0 until n) curve.ys[i] = ChartGeometry.yOf(line[i] * g, yMax, plot)
+                            drawMonotone(path, xs, curve, n, data.lines[l].color, lineStrokes[l])
                         }
-                        val primary = bars.getOrNull(data.primary)
+                        val primary = if (data.primary in 0 until barCount) now[data.primary] else null
                         if (primary != null) {
                             val ink = data.series[data.primary].color
                             for (i in data.markers) {

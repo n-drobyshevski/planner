@@ -226,6 +226,21 @@ class RepositoryTest {
     }
 
     @Test
+    fun `a window refresh under steady Realtime edits backs off, then applies its last snapshot`() = runTest {
+        gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow(id = "server"))
+        // Every fetch collides with another Realtime change.
+        val busy = hooked { _ ->
+            RealtimeChangeApplier(db, gate)
+                .apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(id = "server")), gate.ticket())
+        }
+
+        events(WorkspaceQueries(busy)).refreshWindow(june)
+
+        assertEquals(CacheGate.MAX_ATTEMPTS, busy.eventSelects)
+        assertEquals(listOf("server"), cachedEventIds(), "the refresh still completes")
+    }
+
+    @Test
     fun `nothing is written back after the cache was wiped mid-request`() = runTest {
         gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow(id = "private"))
         val signingOut = hooked { gate.wipe { db.clearAllTables() } }

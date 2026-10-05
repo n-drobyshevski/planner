@@ -10,7 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.onSizeChanged
@@ -72,40 +72,55 @@ fun StackedBarChart(
                     val path = Path()
                     val radius = ChartInsets.BarRadius.toPx()
                     val separator = 1.dp.toPx()
+                    // Index loops over the (already tweened) values, no boxing: this reruns on every animation frame.
                     onDrawBehind {
                         val now = values.current()
                         val g = growth.value.toDouble()
-                        // Stack the (already tweened) values; Long ms keep the stacking exact.
-                        val columns = ChartGeometry.stacked(now.map { arr -> arr.map { it.toLong() } })
-                        val yMax = columns.maxOfOrNull { col -> col.lastOrNull()?.second ?: 0L }?.toDouble() ?: 0.0
+                        val layers = minOf(now.size, series.size)
+                        // Stack Long ms, like ChartGeometry.stacked, so the stacking stays exact.
+                        var yMaxMs = 0L
+                        for (i in 0 until bandCount) {
+                            var total = 0L
+                            for (s in 0 until layers) total += msAt(now[s], i)
+                            if (total > yMaxMs) yMaxMs = total
+                        }
+                        val yMax = yMaxMs.toDouble()
                         drawGrid(plot, chart.grid, yMax > 0.0)
-                        for (i in 0 until minOf(bandCount, columns.size)) {
-                            val column = columns[i]
-                            val top = column.indexOfLast { (bottom, top) -> top > bottom }
-                            if (top < 0) continue
-                            val frame = ChartGeometry.barRect(i, 0, 1, 0.0, yMax, plot, 0f, bandCount)
-                            column.forEachIndexed { s, (bottom, upper) ->
-                                if (upper <= bottom) return@forEachIndexed
-                                val rect = Rect(
-                                    frame.left,
-                                    ChartGeometry.yOf(upper * g, yMax, plot),
-                                    frame.right,
-                                    ChartGeometry.yOf(bottom * g, yMax, plot),
-                                )
-                                val style = series[s]
-                                val fill = style.color.copy(alpha = style.color.alpha * style.alpha)
-                                if (s == top) {
-                                    drawTopRoundedBar(path, rect, radius, fill)
-                                } else {
-                                    drawRect(fill, rect.topLeft, rect.size)
+                        val width = ChartGeometry.barWidth(1, plot, 0f, bandCount)
+                        for (i in 0 until bandCount) {
+                            var topLayer = -1
+                            for (s in 0 until layers) if (msAt(now[s], i) > 0L) topLayer = s
+                            if (topLayer < 0) continue
+                            val left = ChartGeometry.barLeft(i, 0, 1, plot, 0f, bandCount)
+                            var bottom = 0L
+                            for (s in 0..topLayer) {
+                                val upper = bottom + msAt(now[s], i)
+                                if (upper > bottom) {
+                                    val style = series[s]
+                                    val fill = style.color.copy(alpha = style.color.alpha * style.alpha)
+                                    val yTop = ChartGeometry.yOf(upper * g, yMax, plot)
+                                    val yBottom = ChartGeometry.yOf(bottom * g, yMax, plot)
+                                    if (s == topLayer) {
+                                        drawTopRoundedBar(path, left, yTop, left + width, yBottom, radius, fill)
+                                    } else {
+                                        drawRect(fill, Offset(left, yTop), Size(width, yBottom - yTop))
+                                    }
                                 }
+                                bottom = upper
                             }
-                            // Separators between adjacent segments: the non-color cue between categories.
-                            column.forEachIndexed { s, (bottom, upper) ->
-                                if (upper <= bottom || bottom <= 0L) return@forEachIndexed
-                                if (column.subList(0, s).none { (b, t) -> t > b }) return@forEachIndexed
-                                val y = ChartGeometry.yOf(bottom * g, yMax, plot)
-                                drawLine(card, Offset(frame.left, y), Offset(frame.right, y), separator)
+                            // Separators between adjacent segments, over them: the non-color cue between categories.
+                            bottom = 0L
+                            var below = false // a non-empty segment under this one
+                            for (s in 0..topLayer) {
+                                val upper = bottom + msAt(now[s], i)
+                                if (upper > bottom) {
+                                    if (below && bottom > 0L) {
+                                        val y = ChartGeometry.yOf(bottom * g, yMax, plot)
+                                        drawLine(card, Offset(left, y), Offset(left + width, y), separator)
+                                    }
+                                    below = true
+                                }
+                                bottom = upper
                             }
                         }
                         selection.selected?.let { if (it < bandCount) drawCursor(plot, centers[it], chart.grid) }
@@ -134,3 +149,6 @@ private fun StackedBarChartPreview() = PreviewSurface {
         animationKey = Unit,
     )
 }
+
+/** Column [i] of a tweened series as whole ms (0 past its end). */
+private fun msAt(values: DoubleArray, i: Int): Long = if (i < values.size) values[i].toLong() else 0L

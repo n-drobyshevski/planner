@@ -34,7 +34,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.shareIn
@@ -78,7 +77,10 @@ import page.planr.android.feature.insights.model.InsightsModelFactory
  * (`WhileSubscribed`), because the Insights back stack outlives the tab: off
  * screen, Realtime edits cost nothing. Refresh bookkeeping lives in fields, so
  * it survives resubscription: a period's union window `[prev.start, cur.end)`
- * is fetched once per ViewModel, and resume refreshes only the current window.
+ * is fetched once per viewer, and resume refreshes only the current window.
+ * The last viewer and model are kept too, so coming back shows them at once
+ * (no skeleton, no lost scroll position) while the upstream restarts. All of
+ * it is forgotten when the signed-in member changes: sign-out wipes Room.
  * Tab and period survive process death through [SavedStateHandle]; the
  * comparison ghost and the Trends legend are session state.
  */
@@ -112,7 +114,7 @@ class InsightsViewModel @Inject constructor(
     /** Signed-in viewer and zone; null until their member row (and zone) is known. */
     private val viewer: Flow<Viewer?> = data.currentMemberId.distinctUntilChanged().flatMapLatest { id ->
         if (id == null) flowOf(null) else viewerOf(id)
-    }.distinctUntilChanged()
+    }.distinctUntilChanged().onEach { if (it != null) lastViewer = it }
 
     /** The resolved period for the viewer; shared by every branch below. */
     private val frame: Flow<Frame?> = combine(viewer, periodState, now) { v, s, n ->
@@ -160,14 +162,22 @@ class InsightsViewModel @Inject constructor(
 
     /** Only the active tab is computed. */
     private val computed: Flow<Computed> = combine(snapshots, tab) { s, t -> s to t }
-        .mapLatest { (s, t) -> Computed(s.inputs.period, t, withContext(compute) { contentOf(s.inputs, t) }, s.currentCached) }
+        .mapLatest { (s, t) ->
+            val content = withContext(compute) { contentOf(s.inputs, t) }
+            Computed(s.inputs.viewerId, s.inputs.period, t, content, s.currentCached)
+        }
+        .onEach { lastComputed = it }
 
-    /** Fetches each new union window once, 300 ms after the period settles. */
-    private val unionRefresh: Flow<UnionKey> = frame
-        .mapNotNull { f -> f?.period?.let { UnionKey(Periods.unionWindow(it), it.window) } }
+    /**
+     * Fetches each new union window once, 300 ms after the period settles.
+     * Signed out the key is null, so signing back in to the same period
+     * counts as a new key (the bookkeeping was reset meanwhile).
+     */
+    private val unionRefresh: Flow<UnionKey?> = frame
+        .map { f -> f?.period?.let { UnionKey(Periods.unionWindow(it), it.window) } }
         .distinctUntilChanged()
         .debounce(UNION_DEBOUNCE_MS)
-        .onEach { key -> if (key.union != lastUnionOk) refreshUnion(key.union, key.current) }
+        .onEach { key -> if (key != null && key.union != lastUnionOk) refreshUnion(key.union, key.current) }
 
     private val unionFetch = MutableStateFlow<Map<MsWindow, Fetch>>(emptyMap())
     private val refreshing = MutableStateFlow(false)
@@ -181,6 +191,16 @@ class InsightsViewModel @Inject constructor(
     private var lastCurrentOk: Pair<MsWindow, Long>? = null
     private val inFlight = HashMap<MsWindow, Deferred<Boolean>>()
 
+    /** Bumped by [forgetViewer]; a refresh started under an older generation records nothing. */
+    private var generation = 0
+
+    // What the screen showed last, replayed when it resubscribes (see the class comment).
+    @Volatile
+    private var lastViewer: Viewer? = null
+
+    @Volatile
+    private var lastComputed: Computed? = null
+
     @Volatile
     private var latestFrame: Frame? = null
 
@@ -190,7 +210,7 @@ class InsightsViewModel @Inject constructor(
     private var dayJob: Job? = null
     private val filterWrites = Mutex()
 
-    private val shell: Flow<Shell> = combine(frame, tab, computed.onStart<Computed?> { emit(null) }, unionFetch) { f, t, c, fetches ->
+    private val shell: Flow<Shell> = combine(frame, tab, computed.onStart<Computed?> { emit(lastComputed) }, unionFetch) { f, t, c, fetches ->
         Shell(f, t, contentFor(f, t, c, fetches))
     }
 
@@ -216,6 +236,20 @@ class InsightsViewModel @Inject constructor(
         launch { unionRefresh.collect {} }
         combine(shell, reference, session) { s, r, x -> uiStateOf(s, r, x) }.collect { send(it) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), InsightsUiState(tab = savedTab()))
+
+    init {
+        // Watched even off screen (it is not Room): a sign-out while this back
+        // stack is saved must still invalidate what it believes is cached.
+        viewModelScope.launch {
+            var bound: String? = null
+            data.currentMemberId.distinctUntilChanged().collect { id ->
+                if (id != bound) {
+                    if (bound != null) forgetViewer()
+                    bound = id
+                }
+            }
+        }
+    }
 
     fun selectTab(tab: InsightsTab) {
         savedState[KEY_TAB] = tab.name
@@ -300,6 +334,7 @@ class InsightsViewModel @Inject constructor(
         if (refreshing.value) return
         val period = currentPeriod() ?: return
         val union = Periods.unionWindow(period)
+        val started = generation
         viewModelScope.launch {
             refreshing.value = true
             try {
@@ -308,6 +343,7 @@ class InsightsViewModel @Inject constructor(
                     val reference = async { runCatchingNonCancel { data.refreshReference() } }
                     window.await() to reference.await()
                 }
+                if (started != generation) return@launch
                 if (windowOk) onUnionRefreshed(union, period.window)
                 refreshFailed.value = !(windowOk && referenceOk)
             } finally {
@@ -335,8 +371,10 @@ class InsightsViewModel @Inject constructor(
         val wall = clock.now().toEpochMilliseconds()
         val last = lastCurrentOk
         if (last != null && last.first == period.window && wall - last.second < RESUME_REFRESH_MS) return
+        val started = generation
         viewModelScope.launch {
-            if (fetch(period.window).await()) lastCurrentOk = period.window to clock.now().toEpochMilliseconds()
+            val ok = fetch(period.window).await()
+            if (ok && started == generation) lastCurrentOk = period.window to clock.now().toEpochMilliseconds()
         }
     }
 
@@ -359,8 +397,11 @@ class InsightsViewModel @Inject constructor(
 
     private fun refreshUnion(union: MsWindow, current: MsWindow) {
         unionFetch.update { if (it[union] == Fetch.Ok) it else it + (union to Fetch.InFlight) }
+        val started = generation
         viewModelScope.launch {
-            if (fetch(union).await()) {
+            val ok = fetch(union).await()
+            if (started != generation) return@launch
+            if (ok) {
                 onUnionRefreshed(union, current)
             } else {
                 unionFetch.update { if (it[union] == Fetch.Ok) it else it + (union to Fetch.Failed) }
@@ -376,6 +417,25 @@ class InsightsViewModel @Inject constructor(
     }
 
     /**
+     * The signed-in member changed (signed out, or another member): Room was
+     * wiped or holds someone else's rows, so nothing fetched or computed for
+     * the previous viewer counts any more. The next subscription starts from
+     * Loading and fetches the union again.
+     */
+    private fun forgetViewer() {
+        generation++
+        lastUnionOk = null
+        lastCurrentOk = null
+        inFlight.clear()
+        unionFetch.value = emptyMap()
+        refreshFailed.value = false
+        lastViewer = null
+        lastComputed = null
+        latestInputs = null
+        closeDay()
+    }
+
+    /**
      * Refreshes [window] into Room, joining a refresh of the same window that
      * is already running. Runs in viewModelScope, so leaving the screen does
      * not cancel a nearly finished write. Never throws: false on failure.
@@ -387,12 +447,18 @@ class InsightsViewModel @Inject constructor(
     }
 
     private fun viewerOf(id: String): Flow<Viewer?> = flow {
-        emit(null)
         val rows = data.observeMembers().map { members -> members.firstOrNull { it.id == id } }
-        // Wait for the member row so the first period resolves in the member's
-        // zone, not the device's; offline with an empty cache, fall back.
-        if (withTimeoutOrNull(MEMBER_WAIT_MS) { rows.filterNotNull().first() } == null) {
-            emit(Viewer(id, viewerTimeZone(null)))
+        val known = lastViewer?.takeIf { it.id == id }
+        if (known != null) {
+            // Back on screen: resolve in the zone already known; the row follows.
+            emit(known)
+        } else {
+            emit(null)
+            // Wait for the member row so the first period resolves in the member's
+            // zone, not the device's; offline with an empty cache, fall back.
+            if (withTimeoutOrNull(MEMBER_WAIT_MS) { rows.filterNotNull().first() } == null) {
+                emit(Viewer(id, viewerTimeZone(null)))
+            }
         }
         emitAll(rows.filterNotNull().map { Viewer(id, viewerTimeZone(it)) })
     }
@@ -433,7 +499,7 @@ class InsightsViewModel @Inject constructor(
      * refresh over an empty cache is [TabContent.Failed].
      */
     private fun contentFor(f: Frame?, tab: InsightsTab, c: Computed?, fetches: Map<MsWindow, Fetch>): TabContent {
-        if (f == null || c == null || c.period != f.period || c.tab != tab) return TabContent.Loading
+        if (f == null || c == null || c.viewerId != f.viewerId || c.period != f.period || c.tab != tab) return TabContent.Loading
         val fetch = fetches[Periods.unionWindow(f.period)]
         return when {
             fetch == Fetch.Failed && !c.currentCached -> TabContent.Failed()
@@ -511,7 +577,13 @@ class InsightsViewModel @Inject constructor(
 
     private data class Snapshot(val inputs: InsightsInputs, val currentCached: Boolean)
 
-    private data class Computed(val period: ResolvedPeriod, val tab: InsightsTab, val content: TabContent, val currentCached: Boolean)
+    private data class Computed(
+        val viewerId: String,
+        val period: ResolvedPeriod,
+        val tab: InsightsTab,
+        val content: TabContent,
+        val currentCached: Boolean,
+    )
 
     private data class UnionKey(val union: MsWindow, val current: MsWindow)
 

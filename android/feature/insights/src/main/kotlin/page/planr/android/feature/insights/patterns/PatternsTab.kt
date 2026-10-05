@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -34,6 +35,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collectionInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -385,6 +387,19 @@ private fun ShareShiftsSection(shares: List<CategoryShare>, categories: Map<Stri
     val caption = stringResource(R.string.insights_patterns_share_shifts_caption)
     val headerStyle = MaterialTheme.typography.labelSmall
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    // The Time column fits its widest duration on one line ("12 ч 30 мин" is wider than "12h 30m").
+    val timeHeader = stringResource(R.string.insights_patterns_col_time)
+    val numbers = PlanrTheme.type.timeMedium
+    val locale = rememberLabelLocale()
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val timeColumn = remember(shares, locale, numbers, headerStyle, timeHeader, measurer, density) {
+        val widest = maxOf(
+            measurer.measure(timeHeader, headerStyle).size.width,
+            shares.maxOfOrNull { measurer.measure(DurationFormat.format(it.ms.toDouble(), locale), numbers).size.width } ?: 0,
+        )
+        maxOf(TIME_COLUMN, with(density) { widest.toDp() })
+    }
     Column(verticalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
         SectionLabel(stringResource(R.string.insights_patterns_share_shifts))
         Column(
@@ -395,13 +410,13 @@ private fun ShareShiftsSection(shares: List<CategoryShare>, categories: Map<Stri
         ) {
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp).clearAndSetSemantics {}) {
                 Text(stringResource(R.string.insights_patterns_col_context), Modifier.weight(1f), style = headerStyle, color = muted)
-                HeaderCell(stringResource(R.string.insights_patterns_col_time), TIME_COLUMN)
+                HeaderCell(timeHeader, timeColumn)
                 HeaderCell(stringResource(R.string.insights_patterns_col_share), SHARE_COLUMN)
                 HeaderCell(stringResource(R.string.insights_patterns_col_delta), DELTA_COLUMN)
             }
             for (share in shares) {
                 HorizontalDivider(color = PlanrTheme.colors.hairline)
-                ShareShiftRow(share, categories)
+                ShareShiftRow(share, categories, timeColumn)
             }
         }
     }
@@ -419,7 +434,7 @@ private fun HeaderCell(text: String, width: Dp) {
 }
 
 @Composable
-private fun ShareShiftRow(share: CategoryShare, categories: Map<String, Category>) {
+private fun ShareShiftRow(share: CategoryShare, categories: Map<String, Category>, timeColumn: Dp) {
     val key = SeriesKeys.of(share.categoryId)
     val pts = JsMath.roundToInt(share.deltaShare * 100)
     val spoken = when {
@@ -450,7 +465,13 @@ private fun ShareShiftRow(share: CategoryShare, categories: Map<String, Category
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(durationText(share.ms.toDouble()), Modifier.width(TIME_COLUMN), style = numbers, textAlign = TextAlign.End)
+        Text(
+            durationText(share.ms.toDouble()),
+            Modifier.width(timeColumn),
+            style = numbers,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
         Text("${JsMath.roundToInt(share.share * 100)}%", Modifier.width(SHARE_COLUMN), style = numbers, textAlign = TextAlign.End)
         Text(
             rememberGlyphText(deltaText),
@@ -530,6 +551,7 @@ private fun Swatch(color: Color) {
 
 private const val DASH = "—"
 private const val BANDS = 6
+/** The Time column's minimum; it widens to its widest duration. */
 private val TIME_COLUMN = 64.dp
 private val SHARE_COLUMN = 44.dp
 private val DELTA_COLUMN = 64.dp

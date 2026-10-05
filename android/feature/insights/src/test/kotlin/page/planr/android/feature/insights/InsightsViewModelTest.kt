@@ -46,8 +46,13 @@ class InsightsViewModelTest {
 
     private fun test(block: suspend TestScope.() -> Unit) = runTest(main.dispatcher.scheduler) { block() }
 
-    /** Subscribes like the screen does; cancel the job to leave it. */
-    private fun TestScope.open(vm: InsightsViewModel): Job = backgroundScope.launch { vm.state.collect {} }
+    /**
+     * Subscribes like the screen does; cancel the job to leave it. Started at
+     * once: `advanceUntilIdle` alone never runs background-scope work when no
+     * foreground task is pending, so a resubscription would otherwise not happen.
+     */
+    private fun TestScope.open(vm: InsightsViewModel, onState: (InsightsUiState) -> Unit = {}): Job =
+        backgroundScope.launch { vm.state.collect { onState(it) } }.also { runCurrent() }
 
     private fun resolve(state: PeriodState = PeriodState(), zone: ZoneId = BERLIN, now: Long = NOW_MS): ResolvedPeriod =
         Periods.resolve(state, zone, now)
@@ -408,9 +413,13 @@ class InsightsViewModelTest {
         screen.cancel()
         advanceTimeBy(6_000)
         clock.instant = NOW + 70.seconds
-        open(vm)
+        // Coming back shows the last model at once: no skeleton, no header gap (§E.5 scroll state, §H.31).
+        val seen = mutableListOf<InsightsUiState>()
+        open(vm) { seen += it }
         advanceUntilIdle()
         assertEquals(listOf(unionOf(p)), data.refreshedWindows, "no union refetch on resubscription")
+        assertTrue(seen.none { it.content == TabContent.Loading }, "never Loading: ${seen.map { it.content }}")
+        assertTrue(seen.all { it.period != null }, "the period header never disappears")
 
         vm.onResume()
         advanceUntilIdle()
@@ -419,6 +428,52 @@ class InsightsViewModelTest {
         vm.onResume()
         advanceUntilIdle()
         assertEquals(2, data.refreshedWindows.size, "throttled for 30 s")
+    }
+
+    @Test
+    fun `signing out and back in while off screen forgets the union and loads again`() = test {
+        val data = FakeInsightsDataSource()
+        val vm = viewModel(data)
+        val screen = open(vm)
+        advanceUntilIdle()
+        assertEquals(listOf(unionOf(resolve())), data.refreshedWindows)
+        assertIs<TabContent.Overview>(vm.state.value.content)
+
+        // Off screen (the Insights back stack is saved): sign-out wipes Room, then the same member signs in.
+        screen.cancel()
+        advanceTimeBy(6_000)
+        data.memberId.value = null
+        advanceUntilIdle()
+        data.memberId.value = ANNA
+        advanceUntilIdle()
+
+        val gate = CompletableDeferred<Unit>()
+        data.refreshGate = gate
+        open(vm)
+        advanceUntilIdle()
+        assertEquals(listOf(unionOf(resolve()), unionOf(resolve())), data.refreshedWindows, "the union is fetched again")
+        assertEquals(TabContent.Loading, vm.state.value.content, "the wiped cache is not shown as data")
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertIs<TabContent.Overview>(vm.state.value.content)
+    }
+
+    @Test
+    fun `signing out and back in on screen fetches the union again`() = test {
+        val data = FakeInsightsDataSource()
+        val vm = viewModel(data)
+        open(vm)
+        advanceUntilIdle()
+
+        data.memberId.value = null
+        advanceUntilIdle()
+        assertNull(vm.state.value.period)
+        data.memberId.value = ANNA
+        advanceUntilIdle()
+
+        assertEquals(listOf(unionOf(resolve()), unionOf(resolve())), data.refreshedWindows)
+        assertIs<TabContent.Overview>(vm.state.value.content)
     }
 
     @Test

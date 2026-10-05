@@ -1,5 +1,6 @@
 package page.planr.android.feature.insights.ui.chart
 
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -34,8 +35,6 @@ import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import page.planr.android.core.design.theme.PlanrTheme
 import page.planr.android.core.design.theme.TABULAR_NUMS
 
@@ -56,6 +55,7 @@ fun Heatmap(
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val tap by rememberUpdatedState(onCellTap)
     var selected by remember(data) { mutableStateOf<Pair<Int, Int>?>(null) }
+    val closed = remember { ClosedTooltip<Pair<Int, Int>>() }
     val gap = with(LocalDensity.current) { TOOLTIP_GAP.roundToPx() }
     val cellShape = RoundedCornerShape(2.dp)
 
@@ -103,16 +103,21 @@ fun Heatmap(
                             .then(if (step >= 3) Modifier.border(1.dp, strongEdge, cellShape) else Modifier)
                             .pointerInput(row, col) {
                                 detectTapGestures {
-                                    selected = if (selected == row to col) null else row to col
+                                    val cell = row to col
+                                    val closedByThisTouch = closed.take(cell, SystemClock.uptimeMillis())
+                                    selected = if (closedByThisTouch || selected == cell) null else cell
                                     tap?.invoke(row, col)
                                 }
                             },
                     ) {
                         if (selected == row to col) {
                             val text = data.cellDescriptions.getOrNull(row)?.getOrNull(col).orEmpty()
-                            Popup(
-                                popupPositionProvider = remember(gap) { TooltipPosition(null, gap) },
-                                properties = PopupProperties(focusable = false),
+                            TooltipPopup(
+                                position = remember(gap) { TooltipPosition(null, gap) },
+                                onClose = {
+                                    closed.record(row to col, SystemClock.uptimeMillis())
+                                    selected = null
+                                },
                             ) {
                                 ChartTooltip(text, emptyList())
                             }

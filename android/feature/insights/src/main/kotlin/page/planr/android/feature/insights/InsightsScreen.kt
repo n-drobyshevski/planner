@@ -100,6 +100,8 @@ fun InsightsScreen(
 
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     var rangeOpen by rememberSaveable { mutableStateOf(false) }
+    // Here, not in the period bar: the bar's list item is replaced when content lands.
+    var presetMenuOpen by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
@@ -124,6 +126,8 @@ fun InsightsScreen(
                     onOpenAgenda = onOpenAgenda,
                     onOpenTasks = onOpenTasks,
                     onEditCustom = { rangeOpen = true },
+                    presetMenuOpen = presetMenuOpen,
+                    onPresetMenuOpenChange = { presetMenuOpen = it },
                 )
             }
         }
@@ -221,6 +225,8 @@ private fun InsightsContent(
     onOpenAgenda: () -> Unit,
     onOpenTasks: () -> Unit,
     onEditCustom: () -> Unit,
+    presetMenuOpen: Boolean,
+    onPresetMenuOpenChange: (Boolean) -> Unit,
 ) {
     val period = state.period
     val zone = state.zone
@@ -230,6 +236,8 @@ private fun InsightsContent(
                 PeriodBar(
                     period = period,
                     zone = zone,
+                    menuOpen = presetMenuOpen,
+                    onMenuOpenChange = onPresetMenuOpenChange,
                     onPreset = { preset ->
                         viewModel.selectPreset(preset)
                         if (preset == PeriodPreset.Custom) onEditCustom()

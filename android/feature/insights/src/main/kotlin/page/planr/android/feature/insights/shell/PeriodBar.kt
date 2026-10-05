@@ -24,15 +24,12 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +47,9 @@ import page.planr.android.feature.insights.R
  * a compact preset trigger with the range beside it, then the Day / Week /
  * Month buckets, the ones the window does not offer disabled.
  *
+ * @param menuOpen whether the preset menu is open: hoisted, because the bar
+ *   moves between lists (the shell's while loading, then the tab's) and must
+ *   not close the menu when it does.
  * @param onEditCustom reopens the custom-range dialog (the range is tappable while Custom).
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -57,6 +57,8 @@ import page.planr.android.feature.insights.R
 internal fun PeriodBar(
     period: PeriodUi,
     zone: ZoneId,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
     onPreset: (PeriodPreset) -> Unit,
     onGranularity: (Granularity) -> Unit,
     onEditCustom: () -> Unit,
@@ -68,22 +70,26 @@ internal fun PeriodBar(
             verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xs),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
-            PresetTrigger(period.preset, onPreset)
+            PresetTrigger(period.preset, menuOpen, onMenuOpenChange, onPreset)
             RangeText(period, zone, onEditCustom)
         }
         GranularityRow(period, onGranularity)
     }
 }
 
-/** A FilterChip-sized button (32 dp, 48 dp touch target) opening the preset menu. */
+/** A FilterChip-sized button (32 dp, 48 dp touch target) opening the preset menu; the current preset is checked. */
 @Composable
-private fun PresetTrigger(preset: PeriodPreset, onPreset: (PeriodPreset) -> Unit) {
-    var open by rememberSaveable { mutableStateOf(false) }
+private fun PresetTrigger(
+    preset: PeriodPreset,
+    open: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    onPreset: (PeriodPreset) -> Unit,
+) {
     val label = stringResource(ShellText.preset(preset))
     val description = stringResource(R.string.insights_period_label) + ", " + label
     Box {
         TextButton(
-            onClick = { open = true },
+            onClick = { onOpenChange(true) },
             shape = RoundedCornerShape(PlanrRadii.sm),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
@@ -101,18 +107,26 @@ private fun PresetTrigger(preset: PeriodPreset, onPreset: (PeriodPreset) -> Unit
                     .size(16.dp),
             )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(expanded = open, onDismissRequest = { onOpenChange(false) }) {
             PeriodPreset.entries.forEach { option ->
+                val current = option == preset
                 DropdownMenuItem(
                     text = {
                         Text(
                             stringResource(ShellText.preset(option)),
-                            fontWeight = if (option == preset) FontWeight.SemiBold else FontWeight.Normal,
+                            fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     },
                     onClick = {
-                        open = false
+                        onOpenChange(false)
                         onPreset(option)
+                    },
+                    // Spoken as selected; the check is the sighted cue (not weight alone).
+                    modifier = Modifier.semantics { selected = current },
+                    trailingIcon = if (current) {
+                        { Icon(ShellIcons.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else {
+                        null
                     },
                 )
             }
