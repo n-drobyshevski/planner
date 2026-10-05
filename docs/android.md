@@ -58,6 +58,11 @@ the link targets the app that opened the Custom Tab, Chrome also waives its
 user-gesture requirement, so the "already consented" auto-redirect reaches the
 app too.
 
+This relies on the browser handing links to apps. The app opens the sign-in
+tab in Chrome when it's installed; Firefox by default keeps every link in the
+browser ("Open links in apps" is off), so with Firefox as the tab the user
+lands on the fallback page.
+
 A private-use scheme (`page.planr.android:/…`) would also leave the tab, but any
 app can claim a scheme. A malicious app could start a sign-in with the public
 client id and its own PKCE challenge, and receive the code. A verified App Link
