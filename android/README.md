@@ -8,9 +8,9 @@ recurrence fixtures) is in [`docs/android.md`](../docs/android.md).
 
 v1 covers the agenda (day/week, with a toggle for the partner's events), event detail and editing
 (including "this / this and following / all events" on a series), tasks
-(list, detail, complete), Quick add, and five widgets: Today, Week, Month,
-Tasks and Quick add. Sleep, insights, boards/collections, sharing and push are not in
-v1.
+(list, detail, complete), Quick add, read-only Insights (Overview, Trends,
+Patterns, Tasks), and five widgets: Today, Week, Month, Tasks and Quick add.
+Sleep, boards/collections, sharing and push are not in v1.
 
 ## Build
 
@@ -35,7 +35,8 @@ export ANDROID_HOME=/path/to/android-sdk
 ```
 
 `testDebugUnitTest` also runs the pure-JVM modules (`:core:model`,
-`:core:recurrence`), whose JUnit 5 `test` task is aliased under that name.
+`:core:recurrence`, `:core:insights`), whose JUnit 5 `test` task is aliased
+under that name.
 CI runs the same commands (the `android` job in `.github/workflows/ci.yml`)
 with no config set.
 
@@ -173,11 +174,13 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 ## Architecture
 
 ```
-:app ──► :feature:agenda ─┐
-     ├─► :feature:tasks ──┤
-     ├─► :feature:quickadd┼─► :core:data ─► :core:recurrence ─► :core:model
-     ├─► :widgets ────────┘        │
-     └─► :core:design ◄────────────┘ (features and widgets use it too)
+:app ──► :feature:agenda ───┐
+     ├─► :feature:tasks ────┤
+     ├─► :feature:quickadd ─┼─► :core:data ─► :core:recurrence ─► :core:model
+     ├─► :feature:insights ─┤        │                               ▲
+     │          └───────────┼────────┼─► :core:insights ─────────────┘
+     ├─► :widgets ──────────┘        │
+     └─► :core:design ◄──────────────┘ (features and widgets use it too)
 ```
 
 | Module | Package | Role |
@@ -185,11 +188,13 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 | `:app` | `page.planr.android` | `PlanrApplication` (Hilt, WorkManager config, data start-up), `MainActivity`, navigation, sign-in |
 | `:core:model` | `…core.model` | Pure JVM. Supabase row shapes (snake_case `@SerialName`), enums, `Occurrence`, `PlanrJson` |
 | `:core:recurrence` | `…core.recurrence` | Pure JVM. A port of `lib/recurrence/*` (an internal rrule.js port, the expander, edit semantics, RRULE build/parse), checked against TypeScript golden fixtures |
+| `:core:insights` | `…core.insights` | Pure JVM. A port of the web's Insights logic (`lib/analytics/*`, `lib/insights/*`: periods, filters, analytics, ledes, labels, the tabs' view selectors), checked against TypeScript golden fixtures |
 | `:core:design` | `…core.design` | `PlanrTheme` (warm paper, warm-stone accent, member colors, light and dark), tokens from `DESIGN.md`, Glance colors, bundled fonts |
 | `:core:data` | `…core.data` | Auth, Supabase client, Room cache, repositories, sync, Hilt bindings, `BuildConfig` |
 | `:feature:agenda` | `…feature.agenda` | Day/week agenda, event detail, event editor, recurring-edit scopes |
 | `:feature:tasks` | `…feature.tasks` | Task list with filters, task detail/edit, complete |
 | `:feature:quickadd` | `…feature.quickadd` | Quick add bottom sheet, plus the translucent `QuickAddActivity` the widget opens |
+| `:feature:insights` | `…feature.insights` | Insights: period bar, filters, the Overview / Trends / Patterns / Tasks tabs with hand-drawn Canvas charts, the day sheet |
 | `:widgets` | `…widgets` | Glance widgets: Today, Week, Month, Tasks, Quick add |
 
 Shared build setup is in `build-logic/`, as the convention plugins
@@ -231,7 +236,7 @@ If the server rejects a refresh (`invalid_grant` and similar; a 429 or 5xx
 only retries later), the app signs out (`SignOutReason.SessionExpired`) and
 clears Room.
 
-**Sign out** is in the account menu on the Calendar and Tasks headers. It
+**Sign out** is in the account menu on the Calendar, Tasks and Insights headers. It
 forgets the tokens, wipes Room and blanks the widgets, then (best effort, not
 awaited) ends the session on the server with `POST /auth/v1/logout?scope=local`.
 A lost phone can't yet be cut off from the web: there is no "connected apps"
@@ -301,17 +306,18 @@ widgets.
 
 - **Signed out:** only `signin`. Losing the session from anywhere clears the
   back stack back to it.
-- **Signed in:** a bottom bar with **Calendar** (`agenda`) and **Tasks**
-  (`tasks`), shown only on those two roots. The agenda is always the root of
-  the back stack, and each tab keeps its own stack when you switch.
+- **Signed in:** a bottom bar with **Calendar** (`agenda`), **Tasks**
+  (`tasks`) and **Insights** (`insights`), shown only on those roots. The
+  agenda is always the root of the back stack, and each tab keeps its own
+  stack when you switch.
 - **Detail routes:**
   - `event/{ref}`: `ref` is an event id or an occurrence key
     `eventId:epochMs`.
   - `event-edit/{ref}`
   - `event-new?start=…`
   - `task/{id}`
-- **Quick add.** The floating button on each tab opens the Quick add sheet:
-  an event on Calendar, a task on Tasks. The agenda's top-bar "+" opens the
+- **Quick add.** The floating button opens the Quick add sheet: an event on
+  Calendar, a task on Tasks. Insights has no floating button. The agenda's top-bar "+" opens the
   full event editor instead.
 - **Widget taps.** A widget tap sends `MainActivity` an intent with
   `WidgetLaunch.ACTION_OPEN` and a route. `MainActivity` is exported, so that
@@ -320,6 +326,49 @@ widgets.
   opens the route's tab and pushes the detail on top, so Back returns to the
   tab. A `day/…` route posts the date to `AgendaDayRequests`, which the
   agenda takes (open or created next) and shows in the day view.
+
+### Insights
+
+The web's Insights surface for the phone layout: Overview, Trends, Patterns
+and Tasks (no Sleep, suggestions, goals, forecast or saved views). Every
+number comes from what the app already caches: events, overrides, categories,
+members and tasks.
+
+- **Logic.** `:core:insights` ports the TypeScript functions one to one:
+  epoch-ms `Long`s and half-open windows, days and DST through `java.time` in
+  the viewer's zone (`viewerTimeZone(member)`, never the device zone), JS
+  `Math.round` / `toFixed` semantics, `Locale.ROOT` decimals and the
+  date-fns name tables rather than CLDR's. `:feature:insights` only builds
+  the active tab's model, debounced, on `Dispatchers.Default`.
+- **Data windows.** A period resolves to a current and a previous window.
+  `InsightsViewModel` fetches their union (`[prev.start, cur.end)`, up to 732
+  days) once per period change, and reads each window from Room separately
+  with `OccurrenceRepository.observeUntracked`, so Insights never moves the
+  agenda's `VisibleWindowTracker`. On resume it refreshes only the current
+  window (at most every 30 s); pull-to-refresh fetches the union and the
+  reference data. `fetchWindow` and `fetchTasks` page past the server's
+  `max_rows` (keyset paging terminated by an exact count), so large
+  workspaces are complete. The web still truncates there, so for more than
+  1000 events or tasks its numbers can differ.
+- **Scope and filters.** Like the web: the viewer's own and joint items, the
+  tasks they own or are assigned. The agenda's partner toggle does not apply.
+  Hidden categories and "include inactive" are kept per viewer on the device
+  (`InsightsPreferences`, DataStore). The period, granularity and tab live in
+  the ViewModel's saved state, so "Open in calendar" and back keeps them.
+- **Fixtures.** `pnpm fixtures:insights` runs the real TypeScript functions
+  and writes one JSON file per area into
+  `core/insights/src/test/resources/fixtures/`; the Kotlin tests replay every
+  case. The exporter pins `TZ=UTC` before loading anything and checks that
+  the output is the same under Pacific/Chatham and America/Santiago;
+  `test/insights-fixtures.test.ts` checks for drift in `pnpm test`. The
+  strings in `feature/insights/src/main/res/values{,-ru}/strings_insights_*.xml`
+  are tied to `messages/*.json` by the manifests in
+  `feature/insights/src/test/resources/strings-source/` (hashes checked by
+  vitest, format args and plurals by `StringsManifestTest`).
+- **Hostile test defaults.** The unit tests of `:core:insights` and
+  `:feature:insights` run with the JVM default zone Pacific/Chatham and the
+  locale ru-RU, so any read of the device zone or locale (`ZoneId.systemDefault()`,
+  `String.format("%.1f")`) fails a test instead of passing in a UTC/en CI.
 
 ### Widgets (Glance)
 
@@ -349,11 +398,16 @@ time-zone or locale changes.
 - **`:core:recurrence`**: golden fixtures produced by the real TypeScript
   functions (`pnpm fixtures:recurrence`, drift-checked by `pnpm test`), plus
   focused tests.
+- **`:core:insights`**: golden fixtures produced by the real TypeScript
+  functions (`pnpm fixtures:insights`, drift-checked by `pnpm test`), plus
+  focused tests, under a hostile default zone and locale (see Insights).
 - **`:core:data`**: payload and query shapes against a fake `PostgrestGateway`,
-  session and refresh logic, and Room DAOs (Robolectric).
+  paging, session and refresh logic, and Room DAOs (Robolectric).
 - **Features and widgets**: ViewModels against in-memory fakes of each
-  feature's data-source interface, and the widgets' models.
-- **`:app`**: widget launch-route parsing.
+  feature's data-source interface, and the widgets' models. Insights also
+  tests its tab-model builders, lede-to-string mapping, chart geometry and a
+  loose compute budget (a year of data in under 3 s).
+- **`:app`**: widget launch-route parsing and the bottom-bar tabs.
 
 There are no instrumented (device) tests yet. Check UI, widgets and sign-in on
 a device or emulator.

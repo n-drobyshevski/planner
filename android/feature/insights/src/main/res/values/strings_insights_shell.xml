@@ -3,7 +3,6 @@
      messages/en (manifest: src/test/resources/strings-source/shell.json). -->
 <resources>
     <string name="insights_shell_title">Insights</string>
-    <string name="insights_shell_placeholder">Insights are on their way.</string>
 
     <string name="insights_tab_overview">Overview</string>
     <string name="insights_tab_trends">Trends</string>

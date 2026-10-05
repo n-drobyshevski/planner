@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.ZoneId
@@ -49,7 +50,10 @@ import page.planr.android.core.insights.model.SeriesKeys
 import page.planr.android.core.insights.model.Span
 import page.planr.android.core.insights.selectors.DayDetail
 import page.planr.android.core.model.Category
+import page.planr.android.core.model.EventKind
 import page.planr.android.feature.insights.R
+import page.planr.android.feature.insights.ui.chart.InsightsPreviews
+import page.planr.android.feature.insights.ui.chart.PreviewSurface
 
 /** A day's items, as counted by the chart that opened it (day-detail-sheet.tsx). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -231,3 +235,41 @@ private val FOCUS = mapOf(
     Focus.Deep to R.string.insights_common_attr_focus_deep,
     Focus.Shallow to R.string.insights_common_attr_focus_shallow,
 )
+
+// --- Preview -----------------------------------------------------------------------
+
+/** The sheet's item rows (a modal sheet does not render in a static preview). */
+@InsightsPreviews
+@Preview(name = "Light ru", showBackground = true, backgroundColor = 0xFFFAF8F5, widthDp = 360, locale = "ru")
+@Composable
+private fun DayItemRowsPreview() = PreviewSurface {
+    val zone = ZoneId.of("Europe/Berlin")
+    val date = LocalDate.of(2026, 10, 1)
+    val dayStart = date.atStartOfDay(zone).toInstant().toEpochMilli()
+    val hour = 3_600_000L
+    val work = Category(id = "work", workspaceId = "ws", ownerId = "a", name = "Work", color = "#2a77b8")
+    fun item(key: String, title: String, from: Long, to: Long, shared: Boolean = false, inactive: Boolean = false, attributes: Attributes = Attributes.None) =
+        Span(
+            key = key,
+            eventId = key,
+            title = title,
+            start = dayStart + from,
+            end = dayStart + to,
+            kind = EventKind.Event,
+            allDay = false,
+            inactive = inactive,
+            ownerId = "a",
+            isShared = shared,
+            categoryId = if (shared) null else work.id,
+            attributes = attributes,
+        )
+    val items = listOf(
+        item("1", "Design review", 9 * hour, 10 * hour + hour / 2, attributes = Attributes(energy = 3, focus = Focus.Deep)),
+        item("2", "Groceries", 17 * hour, 18 * hour, shared = true),
+        item("3", "Gym", 19 * hour, 20 * hour, inactive = true),
+    )
+    val model = DayDetailModel(dayStart, dayStart + 24 * hour, date, items, 5 * hour / 2)
+    Column(verticalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
+        items.forEach { DayItemRow(it, model, mapOf(work.id to work), zone) }
+    }
+}

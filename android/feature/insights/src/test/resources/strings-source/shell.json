@@ -9,14 +9,6 @@
       }
     },
     {
-      "web": null,
-      "source": "NEW (pre-launch placeholder; removed when INSIGHTS_LIVE goes)",
-      "sha": null,
-      "android": {
-        "insights_shell_placeholder": 0
-      }
-    },
-    {
       "web": "insights:tabs.overview",
       "sha": "21b838a1f4d98afd",
       "android": {

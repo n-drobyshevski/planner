@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="insights_shell_title">Аналитика</string>
-    <string name="insights_shell_placeholder">Аналитика скоро появится.</string>
 
     <string name="insights_tab_overview">Обзор</string>
     <string name="insights_tab_trends">Тренды</string>
