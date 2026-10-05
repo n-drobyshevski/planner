@@ -4,10 +4,12 @@ import io.github.jan.supabase.postgrest.PropertyConversionMethod
 import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * supabase-kt keeps only the first filter per column; the gateway must turn
- * the `updated_at` guard into one logical `and=(...)` group.
+ * the `updated_at` guard into one logical `and=(...)` group. The `or` group
+ * `fetchWindow` sends is pinned here exactly as PostgREST documents it.
  */
 class SupabaseFilterTest {
 
@@ -29,5 +31,47 @@ class SupabaseFilterTest {
         val builder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
         builder.apply(listOf(isIn("event_id", listOf("a", "b"))))
         assertEquals(mapOf("event_id" to listOf("in.(a,b)")), builder.params)
+    }
+
+    @Test
+    fun `anyOf renders one or group with quoted values and a bare null`() {
+        val builder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
+        builder.apply(listOf(anyOf(isNotNull("rrule"), gte("ends_at", "2026-06-01T00:00:00.000Z"))))
+        assertEquals(
+            mapOf("or" to listOf("(rrule.not.is.null,ends_at.gte.\"2026-06-01T00:00:00.000Z\")")),
+            builder.params,
+        )
+    }
+
+    @Test
+    fun `anyOf children are always quoted`() {
+        val builder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
+        builder.apply(listOf(eq("workspace_id", "w1"), anyOf(eq("title", "a,b"), gt("id", "e1"), isNull("rrule"))))
+        assertEquals(
+            mapOf(
+                "workspace_id" to listOf("eq.w1"),
+                "or" to listOf("(title.eq.\"a,b\",id.gt.\"e1\",rrule.is.null)"),
+            ),
+            builder.params,
+        )
+    }
+
+    @Test
+    fun `gt and isNull render bare at the top level`() {
+        val gtBuilder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
+        gtBuilder.apply(listOf(gt("id", "e1")))
+        assertEquals(mapOf("id" to listOf("gt.e1")), gtBuilder.params)
+
+        val nullBuilder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
+        nullBuilder.apply(listOf(isNull("rrule")))
+        assertEquals(mapOf("rrule" to listOf("is.null")), nullBuilder.params)
+    }
+
+    @Test
+    fun `two anyOf groups throw instead of repeating or`() {
+        val builder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
+        assertFailsWith<IllegalArgumentException> {
+            builder.apply(listOf(anyOf(isNull("rrule")), anyOf(gt("id", "e1"))))
+        }
     }
 }

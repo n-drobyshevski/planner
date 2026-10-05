@@ -10,9 +10,13 @@ import kotlinx.serialization.json.contentOrNull
  * Postgres would (timestamps compared as instants), and an `updated_at`
  * "trigger" that stamps every UPDATE with a fresh microsecond time. Records
  * every call so tests can assert the exact payloads and filters.
+ *
+ * Reads apply `order` (a stable sort, same comparison as the filters) and
+ * then `limit`; [maxRows] caps every read like the server's `max_rows`.
  */
 class FakePostgrestGateway(
     private var nowMicros: Long = 1_780_000_000_000_000L,
+    private val maxRows: Int? = null,
 ) : PostgrestGateway {
 
     val tables = mutableMapOf<String, MutableList<JsonObject>>()
@@ -22,6 +26,7 @@ class FakePostgrestGateway(
         val table: String
 
         data class Select(override val table: String, val columns: String, val filters: List<RowFilter>, val order: List<RowOrder>, val limit: Long?) : Call
+        data class SelectPage(override val table: String, val columns: String, val filters: List<RowFilter>, val order: List<RowOrder>, val limit: Long) : Call
         data class Insert(override val table: String, val rows: List<JsonObject>) : Call
         data class Update(override val table: String, val patch: JsonObject, val filters: List<RowFilter>) : Call
         data class Upsert(override val table: String, val rows: List<JsonObject>, val onConflict: String) : Call
@@ -44,8 +49,27 @@ class FakePostgrestGateway(
         limit: Long?,
     ): List<JsonObject> {
         calls += Call.Select(table, columns, filters, order, limit)
-        val matched = rows(table).filter { row -> filters.all { it.matches(row) } }
-        return if (limit != null) matched.take(limit.toInt()) else matched
+        return capped(matching(table, filters, order), limit)
+    }
+
+    override suspend fun selectPage(
+        table: String,
+        columns: String,
+        filters: List<RowFilter>,
+        order: List<RowOrder>,
+        limit: Long,
+    ): SelectPage {
+        calls += Call.SelectPage(table, columns, filters, order, limit)
+        val matched = matching(table, filters, order)
+        return SelectPage(capped(matched, limit), total = matched.size.toLong())
+    }
+
+    private fun matching(table: String, filters: List<RowFilter>, order: List<RowOrder>): List<JsonObject> =
+        rows(table).filter { row -> filters.all { it.matches(row) } }.sortedWith(order.comparator())
+
+    private fun capped(rows: List<JsonObject>, limit: Long?): List<JsonObject> {
+        val cap = listOfNotNull(limit, maxRows?.toLong()).minOrNull() ?: return rows
+        return rows.take(cap.toInt())
     }
 
     override suspend fun insert(table: String, rows: List<JsonObject>): List<JsonObject> {
@@ -116,7 +140,26 @@ private fun RowFilter.matches(row: JsonObject): Boolean {
         is RowFilter.Lt -> actual != null && compare(actual, value) < 0
         is RowFilter.Gte -> actual != null && compare(actual, value) >= 0
         is RowFilter.In -> actual != null && values.any { compare(actual, it) == 0 }
+        is RowFilter.Gt -> actual != null && compare(actual, value) > 0
+        is RowFilter.IsNull -> (actual == null) != negate
+        is RowFilter.AnyOf -> filters.any { it.matches(row) }
     }
+}
+
+/** ORDER BY: ascending puts nulls last, descending first, as Postgres does. */
+private fun List<RowOrder>.comparator(): Comparator<JsonObject> = Comparator { a, b ->
+    for (term in this) {
+        val x = (a[term.column] as? JsonPrimitive)?.contentOrNull
+        val y = (b[term.column] as? JsonPrimitive)?.contentOrNull
+        val c = when {
+            x == null && y == null -> 0
+            x == null -> 1
+            y == null -> -1
+            else -> compare(x, y)
+        }
+        if (c != 0) return@Comparator if (term.ascending) c else -c
+    }
+    0
 }
 
 private fun sameValue(a: Any?, b: Any?): Boolean {
