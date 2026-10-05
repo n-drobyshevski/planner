@@ -160,4 +160,63 @@
 
     <string name="agenda_stale_event">Это событие изменили в другом месте.</string>
     <string name="agenda_stale_reload">Обновить</string>
+
+    <string name="agenda_import_title">Импорт событий</string>
+    <string name="agenda_import_no_file_title">Нечего импортировать</string>
+    <string name="agenda_import_no_file_body">Открой файл .ics из другого приложения или выбери его в меню аккаунта.</string>
+    <string name="agenda_import_no_events">В этом файле нет событий.</string>
+    <string name="agenda_import_lookup_error">Не получилось проверить, какие события уже есть в Planr.</string>
+    <string name="agenda_import_name_filter">Название</string>
+    <string name="agenda_import_name_placeholder">слово, шаб*лон или /regex/</string>
+    <string name="agenda_import_invalid_regex">В регулярном выражении ошибка.</string>
+    <string name="agenda_import_date_range">Даты</string>
+    <string name="agenda_import_from">С</string>
+    <string name="agenda_import_to">По</string>
+    <string name="agenda_import_any_date">Любая дата</string>
+    <string name="agenda_import_clear_date">Очистить «%1$s»</string>
+    <string name="agenda_import_select_all">Выбрать все</string>
+    <string name="agenda_import_select_none">Снять выбор</string>
+    <plurals name="agenda_import_shown">
+        <item quantity="one">%1$d из %2$d события</item>
+        <item quantity="few">%1$d из %2$d событий</item>
+        <item quantity="many">%1$d из %2$d событий</item>
+        <item quantity="other">%1$d из %2$d события</item>
+    </plurals>
+    <string name="agenda_import_no_matches">Под эти фильтры ничего не подходит.</string>
+    <string name="agenda_import_filing">Куда импортировать</string>
+    <string name="agenda_import_include">Импортировать «%1$s»</string>
+    <string name="agenda_import_edit_row">Изменить «%1$s»</string>
+    <string name="agenda_import_repeats">Повторяется</string>
+    <string name="agenda_import_repeats_yearly">Повторяется каждый год</string>
+    <string name="agenda_import_badge_duplicate">Уже в Planr</string>
+    <string name="agenda_import_badge_cancelled">Отменено</string>
+    <string name="agenda_import_badge_rrule_unsupported">Повтор не поддерживается</string>
+    <string name="agenda_import_badge_zone_unknown">Неизвестный часовой пояс</string>
+    <string name="agenda_import_badge_rdate_ignored">Доп. даты пропущены</string>
+    <string name="agenda_import_badge_edited">Изменено</string>
+    <string name="agenda_import_title_label">Название</string>
+    <string name="agenda_import_reset">Сбросить изменения</string>
+    <string name="agenda_import_when">%1$s · %2$s</string>
+    <string name="agenda_import_range">%1$s – %2$s</string>
+    <string name="agenda_import_submit_none">Импортировать</string>
+    <plurals name="agenda_import_submit">
+        <item quantity="one">Импортировать %d событие</item>
+        <item quantity="few">Импортировать %d события</item>
+        <item quantity="many">Импортировать %d событий</item>
+        <item quantity="other">Импортировать %d события</item>
+    </plurals>
+    <string name="agenda_import_importing">Импортирую…</string>
+    <plurals name="agenda_import_skipped">
+        <item quantity="one">%d событие из файла не удалось прочитать.</item>
+        <item quantity="few">%d события из файла не удалось прочитать.</item>
+        <item quantity="many">%d событий из файла не удалось прочитать.</item>
+        <item quantity="other">%d события из файла не удалось прочитать.</item>
+    </plurals>
+    <plurals name="agenda_import_done">
+        <item quantity="one">Импортировано %d событие</item>
+        <item quantity="few">Импортировано %d события</item>
+        <item quantity="many">Импортировано %d событий</item>
+        <item quantity="other">Импортировано %d события</item>
+    </plurals>
+    <string name="agenda_import_failed">Не получилось импортировать. Ничего не добавлено.</string>
 </resources>

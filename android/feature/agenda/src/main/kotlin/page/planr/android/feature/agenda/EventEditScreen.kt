@@ -205,7 +205,7 @@ private fun EditorFields(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        WhenSection(state, form, formats, onChange)
+        WhenSection(form, state.error, formats, onChange)
 
         Section(stringResource(R.string.agenda_recurrence_repeat)) {
             RecurrencePicker(
@@ -250,10 +250,15 @@ private fun EditorFields(
     }
 }
 
+/**
+ * All-day, start / end and (for a timed event) the time zone: the editor's
+ * "when" block, also used inline by the .ics import review. [error] shows the
+ * end-before-start message.
+ */
 @Composable
-private fun WhenSection(
-    state: EventEditUiState,
+internal fun WhenSection(
     form: EventForm,
+    error: EventFormError?,
     formats: AgendaFormats,
     onChange: ((EventForm) -> EventForm) -> Unit,
 ) {
@@ -289,7 +294,7 @@ private fun WhenSection(
             onDate = { date -> onChange { it.copy(endDate = date) } },
             onTime = { time -> onChange { it.copy(endTime = time) } },
         )
-        if (state.error == EventFormError.EndBeforeStart) {
+        if (error == EventFormError.EndBeforeStart) {
             Text(
                 stringResource(R.string.agenda_editor_end_after_start),
                 style = MaterialTheme.typography.bodySmall,
@@ -347,7 +352,7 @@ private fun DateTimeRow(
 }
 
 @Composable
-private fun CategorySelect(selectedId: String?, categories: List<Category>, onSelect: (String?) -> Unit) {
+internal fun CategorySelect(selectedId: String?, categories: List<Category>, onSelect: (String?) -> Unit) {
     val none = SelectOption<String?>(null, stringResource(R.string.agenda_editor_no_context))
     val options = listOf(none) + categories.sortedBy { it.sortOrder }.map { category ->
         SelectOption<String?>(category.id, category.name, leading = { Swatch(category.color) })
@@ -362,7 +367,7 @@ private fun CategorySelect(selectedId: String?, categories: List<Category>, onSe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VisibilitySelect(value: VisibilityChoice, onSelect: (VisibilityChoice) -> Unit) {
+internal fun VisibilitySelect(value: VisibilityChoice, onSelect: (VisibilityChoice) -> Unit) {
     val choices = VisibilityChoice.entries
     Column(verticalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -400,7 +405,7 @@ private fun VisibilitySelect(value: VisibilityChoice, onSelect: (VisibilityChoic
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
         Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         content()
@@ -408,7 +413,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

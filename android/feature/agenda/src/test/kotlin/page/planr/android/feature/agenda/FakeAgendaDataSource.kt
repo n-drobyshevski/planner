@@ -54,7 +54,14 @@ class FakeAgendaDataSource(
         data class Revert(val eventId: String, val occurrenceDate: Instant, val prior: OverridePrior) : Call
         data class Split(val event: PlannerEvent, val from: Instant, val patch: OccurrencePatch) : Call
         data class CapFuture(val event: PlannerEvent, val from: Instant) : Call
+        data class FindImportCandidates(val uids: Set<String>, val window: TimeWindow?) : Call
+        data class CreateMany(val drafts: List<PlannerEventDraft>) : Call
+        data class CancelMany(val inputs: List<OverrideInput>) : Call
+        data class DeleteMany(val ids: List<String>) : Call
     }
+
+    /** What [findImportCandidates] answers (the member's events on the server). */
+    var importCandidates: List<PlannerEvent> = emptyList()
 
     override fun currentSession(): SessionInfo? = session
 
@@ -128,11 +135,38 @@ class FakeAgendaDataSource(
         return event
     }
 
+    override suspend fun findImportCandidates(uids: Collection<String>, window: TimeWindow?): List<PlannerEvent> {
+        record(Call.FindImportCandidates(uids.toSet(), window))
+        return importCandidates
+    }
+
+    override suspend fun createEvents(drafts: List<PlannerEventDraft>): List<PlannerEvent> {
+        record(Call.CreateMany(drafts))
+        return drafts.mapIndexed { i, d ->
+            Fixtures.event(id = "imported-$i", title = d.title).copy(
+                start = d.start,
+                end = d.end,
+                allDay = d.allDay,
+                rrule = d.rrule,
+                timeZone = d.timeZone,
+                attributes = d.attributes,
+            )
+        }
+    }
+
+    override suspend fun cancelOccurrences(inputs: List<OverrideInput>) = record(Call.CancelMany(inputs))
+
+    override suspend fun deleteEvents(ids: List<String>) = record(Call.DeleteMany(ids))
+
+    /** Throws what it returns for a matching write, every time (e.g. only the cancel overrides fail). */
+    var failWhen: (Call) -> Exception? = { null }
+
     private fun record(call: Call) {
         failNext?.let {
             failNext = null
             throw it
         }
+        failWhen(call)?.let { throw it }
         calls += call
     }
 }

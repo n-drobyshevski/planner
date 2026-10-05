@@ -40,7 +40,8 @@ import page.planr.android.feature.quickadd.R as QuickAddR
  * against it. Losing the session (the account menu's "Sign out", or a
  * refresh token the server rejected) clears the back stack back to sign-in.
  *
- * @param launchRoute a widget's requested destination; opened once signed in,
+ * @param launchRoute a widget's requested destination, or the import review
+ *   for a file opened in or shared to the app; opened once signed in,
  *   then reported through [onLaunchRouteHandled] (also when it was dropped
  *   because nobody is signed in).
  * @param onOpenDay asks the agenda to show a day (a widget's [LaunchRoute.Day]).
@@ -59,6 +60,8 @@ fun PlanrNavHost(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentTab = TopLevelTab.ofRoute(backStackEntry?.destination?.route)
     var quickAdd by rememberSaveable { mutableStateOf<QuickAddKind?>(null) }
+    // The account menu read a picked .ics file into IcsImportRequests: review it.
+    val openImport: () -> Unit = remember(navController) { { navController.open(LaunchRoute.Import) } }
 
     LaunchedEffect(signedIn) {
         if (!signedIn) {
@@ -112,12 +115,12 @@ fun PlanrNavHost(
             agendaGraph(
                 navController,
                 onQuickAdd = { quickAdd = TopLevelTab.Agenda.quickAddKind },
-                accountAction = { AccountMenuButton() },
+                accountAction = { AccountMenuButton(onImportIcs = openImport) },
             )
             tasksScreen(
                 onOpenTask = { id -> navController.navigateToTask(id) },
                 onNewTask = { quickAdd = TopLevelTab.Tasks.quickAddKind },
-                accountAction = { AccountMenuButton() },
+                accountAction = { AccountMenuButton(onImportIcs = openImport) },
             )
             taskDetailScreen(onBack = { navController.popBackStack() })
             insightsScreen(
@@ -129,7 +132,7 @@ fun PlanrNavHost(
                 },
                 onOpenAgenda = { navController.selectTab(TopLevelTab.Agenda) },
                 onOpenTasks = { navController.selectTab(TopLevelTab.Tasks) },
-                accountAction = { AccountMenuButton() },
+                accountAction = { AccountMenuButton(onImportIcs = openImport) },
             )
         }
     }
@@ -166,6 +169,7 @@ private fun NavController.open(target: LaunchRoute) {
         is LaunchRoute.Tab, is LaunchRoute.Day -> null
         is LaunchRoute.Event -> target.route
         is LaunchRoute.Task -> target.route
+        is LaunchRoute.Import -> target.route
     }
     if (isEditorRoute(currentDestination?.route)) {
         if (detail != null) runCatching { navigate(detail) }

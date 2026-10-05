@@ -68,9 +68,14 @@ class WorkspaceQueries @Inject constructor(
      * `recurrence_ends_at` client-side) and the one-offs that end at or after
      * the window start; together with the post-filter that is exactly the
      * set the unbounded query returned, minus the transfer. Overrides are
-     * fetched in id chunks, a few chunks at a time.
+     * fetched in id chunks, a few chunks at a time; [includeOverrides] false
+     * skips them (a lookup that only needs the rows).
      */
-    suspend fun fetchWindow(workspaceId: String, window: TimeWindow): WindowData = coroutineScope {
+    suspend fun fetchWindow(
+        workspaceId: String,
+        window: TimeWindow,
+        includeOverrides: Boolean = true,
+    ): WindowData = coroutineScope {
         val events = selectAllPages(
             SupabaseTables.EVENTS,
             filters = listOf(
@@ -79,7 +84,7 @@ class WorkspaceQueries @Inject constructor(
                 anyOf(isNotNull("rrule"), gte("ends_at", PostgresTime.toIso(window.start))),
             ),
         ).decodeAll(PlannerEvent.serializer()).filter { it.mayIntersect(window) }
-        if (events.isEmpty()) return@coroutineScope WindowData(events, emptyList())
+        if (events.isEmpty() || !includeOverrides) return@coroutineScope WindowData(events, emptyList())
 
         val limiter = Semaphore(OVERRIDE_CONCURRENCY)
         val overrides = events.map { it.id }.chunked(OVERRIDE_ID_CHUNK)
@@ -103,6 +108,29 @@ class WorkspaceQueries @Inject constructor(
         selectAllPages(SupabaseTables.TASKS, filters = listOf(eq("workspace_id", workspaceId)))
             .decodeAll(Task.serializer())
             .sortedWith(compareBy<Task>({ it.position }, { it.createdAt })) // the web's ORDER BY
+
+    /**
+     * [ownerId]'s events carrying one of [uids] as `attributes.icalUid` (an
+     * .ics import's duplicate lookup, `fetchImportDuplicates` on the web), in
+     * IN lists of [ICAL_UID_CHUNK], every page. UIDs holding `"` or `\`
+     * are skipped, as on the web; those still match on title and time.
+     */
+    suspend fun fetchEventsByIcalUid(workspaceId: String, ownerId: String, uids: Collection<String>): List<PlannerEvent> =
+        uids.distinct()
+            .filter { it.isNotEmpty() && '"' !in it && '\\' !in it }
+            .chunked(ICAL_UID_CHUNK)
+            .flatMap { chunk ->
+                selectAllPages(
+                    SupabaseTables.EVENTS,
+                    filters = listOf(
+                        eq("workspace_id", workspaceId),
+                        eq("owner_id", ownerId),
+                        isInQuoted(ICAL_UID_COLUMN, chunk),
+                    ),
+                )
+            }
+            .decodeAll(PlannerEvent.serializer())
+            .distinctBy { it.id }
 
     /** One event row, e.g. to reload it after a stale write; null when gone or hidden. */
     suspend fun fetchEvent(workspaceId: String, id: String): PlannerEvent? = gateway.select(
@@ -174,6 +202,12 @@ class WorkspaceQueries @Inject constructor(
 
         /** 120 uuids (36 chars + ',') ≈ 4.5 KB of query string; well under proxy/URL limits. */
         const val OVERRIDE_ID_CHUNK = 120
+
+        /** UIDs per IN list of [fetchEventsByIcalUid] (they can be long: Outlook's are 40+ characters). */
+        const val ICAL_UID_CHUNK = 100
+
+        /** Where an imported event keeps its iCalendar UID (`attributes->>icalUid`). */
+        const val ICAL_UID_COLUMN = "attributes->>icalUid"
 
         /** Override chunks in flight at once. All inside the `CacheGate` fetch, so atomicity is unchanged. */
         const val OVERRIDE_CONCURRENCY = 4

@@ -34,6 +34,13 @@ class SupabaseFilterTest {
     }
 
     @Test
+    fun `a quoted in filter keeps free text values whole`() {
+        val builder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
+        builder.apply(listOf(isInQuoted("attributes->>icalUid", listOf("a,b@x", "(c)"))))
+        assertEquals(mapOf("attributes->>icalUid" to listOf("in.(\"a,b@x\",\"(c)\")")), builder.params)
+    }
+
+    @Test
     fun `anyOf renders one or group with quoted values and a bare null`() {
         val builder = PostgrestFilterBuilder(PropertyConversionMethod.NONE)
         builder.apply(listOf(anyOf(isNotNull("rrule"), gte("ends_at", "2026-06-01T00:00:00.000Z"))))

@@ -74,4 +74,13 @@ class RepositoryAgendaDataSource @Inject constructor(
 
     override suspend fun deleteThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): PlannerEvent =
         events.deleteThisAndFuture(event, fromOccurrence)
+
+    override suspend fun findImportCandidates(uids: Collection<String>, window: TimeWindow?): List<PlannerEvent> =
+        events.findImportCandidates(uids, window)
+
+    override suspend fun createEvents(drafts: List<PlannerEventDraft>): List<PlannerEvent> = events.createEvents(drafts)
+
+    override suspend fun cancelOccurrences(inputs: List<OverrideInput>) = events.cancelOccurrences(inputs)
+
+    override suspend fun deleteEvents(ids: List<String>) = events.deleteEvents(ids)
 }

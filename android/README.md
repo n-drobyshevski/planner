@@ -9,8 +9,8 @@ recurrence fixtures) is in [`docs/android.md`](../docs/android.md).
 v1 covers the agenda (day/week, with a toggle for the partner's events), event detail and editing
 (including "this / this and following / all events" on a series), tasks
 (list, detail, complete), Quick add, read-only Insights (Overview, Trends,
-Patterns, Tasks), and six widgets: Today, Week, Week grid, Month, Tasks and
-Quick add.
+Patterns, Tasks), .ics import with a review step, and six widgets: Today,
+Week, Week grid, Month, Tasks and Quick add.
 Sleep, boards/collections, sharing and push are not in v1.
 
 ## Build
@@ -36,7 +36,7 @@ export ANDROID_HOME=/path/to/android-sdk
 ```
 
 `testDebugUnitTest` also runs the pure-JVM modules (`:core:model`,
-`:core:recurrence`, `:core:insights`), whose JUnit 5 `test` task is aliased
+`:core:recurrence`, `:core:ical`, `:core:insights`), whose JUnit 5 `test` task is aliased
 under that name.
 CI runs the same commands (the `android` job in `.github/workflows/ci.yml`)
 with no config set.
@@ -182,6 +182,8 @@ One-time repository setup (Settings → Secrets and variables → Actions):
      │          └───────────┼────────┼─► :core:insights ─────────────┘
      ├─► :widgets ──────────┘        │
      └─► :core:design ◄──────────────┘ (features and widgets use it too)
+
+:feature:agenda ─► :core:ical ─► :core:recurrence, :core:model (the .ics import)
 ```
 
 | Module | Package | Role |
@@ -189,10 +191,11 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 | `:app` | `page.planr.android` | `PlanrApplication` (Hilt, WorkManager config, data start-up), `MainActivity`, navigation, sign-in |
 | `:core:model` | `…core.model` | Pure JVM. Supabase row shapes (snake_case `@SerialName`), enums, `Occurrence`, `PlanrJson` |
 | `:core:recurrence` | `…core.recurrence` | Pure JVM. A port of `lib/recurrence/*` (an internal rrule.js port, the expander, edit semantics, RRULE build/parse), checked against TypeScript golden fixtures |
+| `:core:ical` | `…core.ical` | Pure JVM. A port of `lib/ical/*` for the .ics import: `IcsParser` (RFC 5545 → event drafts), `IcsZones` (TZID resolution, java.time wall times), `IcsReview` (name / date filters, duplicates, default selection), checked against TypeScript golden fixtures |
 | `:core:insights` | `…core.insights` | Pure JVM. A port of the web's Insights logic (`lib/analytics/*`, `lib/insights/*`: periods, filters, analytics, ledes, labels, the tabs' view selectors), checked against TypeScript golden fixtures |
 | `:core:design` | `…core.design` | `PlanrTheme` (warm paper, warm-stone accent, member colors, light and dark), tokens from `DESIGN.md`, Glance colors, bundled fonts |
 | `:core:data` | `…core.data` | Auth, Supabase client, Room cache, repositories, sync, Hilt bindings, `BuildConfig` |
-| `:feature:agenda` | `…feature.agenda` | Day/week agenda, event detail, event editor, recurring-edit scopes |
+| `:feature:agenda` | `…feature.agenda` | Day/week agenda, event detail, event editor, recurring-edit scopes, the .ics import review |
 | `:feature:tasks` | `…feature.tasks` | Task list with filters, task detail/edit, complete |
 | `:feature:quickadd` | `…feature.quickadd` | Quick add bottom sheet, plus the translucent `QuickAddActivity` the widget opens |
 | `:feature:insights` | `…feature.insights` | Insights: period bar, filters, the Overview / Trends / Patterns / Tasks tabs with hand-drawn Canvas charts, the day sheet |
@@ -316,6 +319,7 @@ widgets.
     `eventId:epochMs`.
   - `event-edit/{ref}`
   - `event-new?start=…`
+  - `ics-import` (the .ics import review)
   - `task/{id}`
 - **Quick add.** The floating button opens the Quick add sheet: an event on
   Calendar, a task on Tasks. Insights has no floating button. The agenda's top-bar "+" opens the
@@ -327,6 +331,55 @@ widgets.
   opens the route's tab and pushes the detail on top, so Back returns to the
   tab. A `day/…` route posts the date to `AgendaDayRequests`, which the
   agenda takes (open or created next) and shows in the day view.
+- **Files.** An .ics file opened in or shared to the app ends in
+  `LaunchRoute.Import` (see below), which pushes `ics-import` over the
+  agenda once signed in. Like the editors, it is never popped by a later
+  launch (`isEditorRoute`).
+
+### .ics import
+
+Events from an .ics file (a Google, Outlook or Apple Calendar export, an
+invitation) are reviewed before anything is written.
+
+- **Opening a file.** `MainActivity` takes a VIEW of a `content:` / `file:`
+  URI (by MIME type `text/calendar`, `application/ics`,
+  `text/x-vcalendar`, or by a `.ics` name, since many apps send
+  `application/octet-stream`) and a SEND of `text/calendar` (a stream, or
+  the calendar as text). An `https` VIEW stays the sign-in callback
+  (`IncomingIntent.classify`). The account menu's **Import .ics file** opens
+  the system picker (`OpenDocument`). Either way the file is read at once on
+  IO (`IcsFileReader`, UTF-8, at most 5 MB) into the in-memory
+  `IcsImportRequests`, which the review claims once.
+- **Parsing.** `:core:ical` ports `lib/ical/*` one to one: line unfolding and
+  TEXT escapes, all-day dates as UTC midnights with an exclusive end, TZIDs
+  resolved to IANA zones (Windows names and path-style TZIDs too; unknown ones
+  read in the viewer's zone, with a warning), wall times resolved like
+  `ZonedDateTime.ofLocal` (earlier offset in an overlap, forward through a
+  gap), DURATION and missing ends, bare RRULEs with UNTIL in UTC (sub-daily or
+  invalid rules, checked with `RRules.isValid`, import once with a warning),
+  EXDATEs and RECURRENCE-ID replacements as occurrences to cancel.
+- **Review** (`IcsImportScreen` / `IcsImportViewModel`). A name filter
+  (substring, `*` / `?` glob, or `/regex/`, all case-insensitive), a From / To
+  day range (From defaults to today), select all / none over the rows the
+  filters keep, and one context and sharing choice for every event (a shared
+  context makes them joint, as in the editor). Each row shows its title,
+  times in the viewer's zone, the repeat summary and badges (Already in
+  Planr, Cancelled, Repeats not supported, Unknown time zone, Extra dates
+  ignored, Edited); tapping it opens an inline editor (title, all-day,
+  start / end, zone) built from the editor's own `WhenSection`. Duplicates,
+  cancelled and past events start unticked.
+- **Duplicates.** Before the review, `EventRepository.findImportCandidates`
+  asks the server for the member's events whose `attributes.icalUid` is one
+  of the file's UIDs (quoted IN lists of 100) and for their events in the
+  file's span (the paged `fetchWindow`, without overrides). An event is
+  already in Planr with the same UID, or the same title, start and end.
+- **Import.** `EventRepository.createEvents` inserts the drafts 200 per
+  statement (all or nothing: earlier chunks are deleted if one fails), then
+  one Room upsert and one widget refresh; the UID is kept as
+  `attributes.icalUid`. EXDATEs follow as one bulk insert of cancel
+  overrides (`cancelOccurrences`); if that fails, the created events are
+  deleted again. The agenda then shows "Imported N events" with an Undo that
+  deletes them all (`deleteEvents`).
 
 ### Insights
 
@@ -407,6 +460,11 @@ time-zone or locale changes.
 - **`:core:recurrence`**: golden fixtures produced by the real TypeScript
   functions (`pnpm fixtures:recurrence`, drift-checked by `pnpm test`), plus
   focused tests.
+- **`:core:ical`**: golden fixtures produced by the real TypeScript
+  functions (`pnpm fixtures:ics`, drift-checked by `pnpm test`): every sample
+  file in `test/fixtures/ics` parsed under its viewer zones, plus the name,
+  range, duplicate and default-selection cases; focused tests for DST, zones
+  and rules, under a hostile default zone and locale.
 - **`:core:insights`**: golden fixtures produced by the real TypeScript
   functions (`pnpm fixtures:insights`, drift-checked by `pnpm test`), plus
   focused tests, under a hostile default zone and locale (see Insights).
@@ -416,7 +474,8 @@ time-zone or locale changes.
   feature's data-source interface, and the widgets' models. Insights also
   tests its tab-model builders, lede-to-string mapping, chart geometry and a
   loose compute budget (a year of data in under 3 s).
-- **`:app`**: widget launch-route parsing and the bottom-bar tabs.
+- **`:app`**: widget launch-route parsing, intent routing (sign-in callback,
+  .ics files and shares), the .ics byte reader, and the bottom-bar tabs.
 
 There are no instrumented (device) tests yet. Check UI, widgets and sign-in on
 a device or emulator.

@@ -70,4 +70,20 @@ interface AgendaDataSource {
 
     /** "Delete this and following": caps the series before [fromOccurrence]. */
     suspend fun deleteThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): PlannerEvent
+
+    /**
+     * The signed-in member's events an .ics import could duplicate: those with
+     * one of [uids] as `attributes.icalUid`, plus theirs that may intersect
+     * [window] (series as master rows). Read from the server.
+     */
+    suspend fun findImportCandidates(uids: Collection<String>, window: TimeWindow?): List<PlannerEvent>
+
+    /** Creates many events at once, all or nothing; the stored rows in [drafts] order. */
+    suspend fun createEvents(drafts: List<PlannerEventDraft>): List<PlannerEvent>
+
+    /** Inserts cancel overrides on new series (an import's EXDATEs). */
+    suspend fun cancelOccurrences(inputs: List<OverrideInput>)
+
+    /** Deletes many events and their overrides (the undo of [createEvents]). */
+    suspend fun deleteEvents(ids: List<String>)
 }

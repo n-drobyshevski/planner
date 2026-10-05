@@ -4,9 +4,11 @@ import kotlinx.datetime.LocalDate
 import page.planr.android.feature.agenda.navigation.AgendaRoutes
 
 /**
- * Where an external launch (a widget tap) asked the app to open. MainActivity
- * is exported, so the requested route is untrusted input: only the shapes the
- * widgets produce are accepted, anything else opens the app as is.
+ * Where an external launch (a widget tap, an .ics file opened in or shared to
+ * the app) asked the app to open. MainActivity is exported, so a widget's
+ * route is untrusted input: only the shapes the widgets produce are accepted
+ * ([parse]), anything else opens the app as is. [Import] is never parsed from
+ * a route: the activity sets it once it has read a file.
  */
 sealed interface LaunchRoute {
     /** The tab the target lives under; the detail (if any) is pushed on top of it. */
@@ -24,6 +26,12 @@ sealed interface LaunchRoute {
     /** One day in the agenda's day view. */
     data class Day(val date: LocalDate) : LaunchRoute {
         override val tab get() = TopLevelTab.Agenda
+    }
+
+    /** The .ics import review, for the file just handed to `IcsImportRequests`. */
+    data object Import : LaunchRoute {
+        override val tab get() = TopLevelTab.Agenda
+        val route get() = AgendaRoutes.IMPORT
     }
 
     /** A task; [encodedId] stays URI-encoded. */
@@ -63,8 +71,12 @@ sealed interface LaunchRoute {
 }
 
 /**
- * Routes that hold an unsaved draft: the event editor (existing or new) and
- * the task detail, which edits in place. A widget launch must not pop them.
+ * Routes that hold an unsaved draft: the event editor (existing or new), the
+ * task detail, which edits in place, and the .ics import review. A launch
+ * from outside must not pop them.
  */
 internal fun isEditorRoute(route: String?): Boolean =
-    route == AgendaRoutes.EVENT_EDIT || route == AgendaRoutes.EVENT_NEW || route == PlanrRoutes.TASK
+    route == AgendaRoutes.EVENT_EDIT ||
+        route == AgendaRoutes.EVENT_NEW ||
+        route == AgendaRoutes.IMPORT ||
+        route == PlanrRoutes.TASK
