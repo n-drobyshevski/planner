@@ -1,4 +1,269 @@
 {
   "file": "strings_insights_trends.xml",
-  "entries": []
+  "entries": [
+    {
+      "web": "insights:lede.trendsNoneHeadline",
+      "sha": "ef9a58e200b9b2e0",
+      "android": {
+        "insights_trends_lede_none_headline": 0
+      }
+    },
+    {
+      "web": "insights:lede.trendsNoneSupport",
+      "sha": "0aff740ac3d5e921",
+      "android": {
+        "insights_trends_lede_none_support": 0
+      }
+    },
+    {
+      "web": "insights:lede.trendsHeadline",
+      "sha": "de31b224bd512afc",
+      "android": {
+        "insights_trends_lede_flat": 0,
+        "insights_trends_lede_up": 1,
+        "insights_trends_lede_down": 1,
+        "insights_trends_lede_rate_day": 2,
+        "insights_trends_lede_rate_week": 2,
+        "insights_trends_lede_rate_month": 2
+      }
+    },
+    {
+      "web": "insights:lede.trendsSupport",
+      "sha": "0b914eab588917a4",
+      "android": {
+        "insights_trends_lede_support_day": 2,
+        "insights_trends_lede_support_week": 2,
+        "insights_trends_lede_support_month": 2
+      }
+    },
+    {
+      "web": "insights:trends.emptyTitle",
+      "sha": "3d245bc5bf53dbae",
+      "android": {
+        "insights_trends_empty_title": 0
+      }
+    },
+    {
+      "web": "insights:trends.emptyDescription",
+      "sha": "d9830811463bcc87",
+      "android": {
+        "insights_trends_empty_description": 0
+      }
+    },
+    {
+      "web": "insights:trends.seriesTracked",
+      "sha": "99d95b6116ad88ac",
+      "android": {
+        "insights_trends_series_tracked": 0
+      }
+    },
+    {
+      "web": "insights:trends.seriesAvg",
+      "sha": "ee4161278f1cb965",
+      "android": {
+        "insights_trends_series_avg": 0
+      }
+    },
+    {
+      "web": "insights:trends.perBucketTitle",
+      "sha": "fd2624a41563be21",
+      "android": {
+        "insights_trends_per_bucket_title_day": 0,
+        "insights_trends_per_bucket_title_week": 0,
+        "insights_trends_per_bucket_title_month": 0
+      }
+    },
+    {
+      "web": "insights:trends.perBucketHeadline",
+      "sha": "50d5977da46f742d",
+      "android": {
+        "insights_trends_per_bucket_headline_day": 3,
+        "insights_trends_per_bucket_headline_week": 3,
+        "insights_trends_per_bucket_headline_month": 3
+      }
+    },
+    {
+      "web": "insights:trends.perBucketAria",
+      "sha": "e4ba94e5ae5cd7b3",
+      "android": {
+        "insights_trends_per_bucket_aria_day": 1,
+        "insights_trends_per_bucket_aria_week": 1,
+        "insights_trends_per_bucket_aria_month": 1
+      }
+    },
+    {
+      "web": "insights:trends.busiestGranularity",
+      "sha": "db529fb0cb5c019a",
+      "android": {
+        "insights_trends_busiest_day": 0,
+        "insights_trends_busiest_week": 0,
+        "insights_trends_busiest_month": 0
+      }
+    },
+    {
+      "web": "insights:trends.srSummary",
+      "sha": "dca89d03181e1456",
+      "android": {
+        "insights_trends_sr_summary_day": 4,
+        "insights_trends_sr_summary_week": 4,
+        "insights_trends_sr_summary_month": 4
+      }
+    },
+    {
+      "web": "insights:trends.trendUp",
+      "sha": "293d31b9d230e2da",
+      "android": {
+        "insights_trends_trend_up": 0
+      }
+    },
+    {
+      "web": "insights:trends.trendDown",
+      "sha": "90d4038ac08b2bef",
+      "android": {
+        "insights_trends_trend_down": 0
+      }
+    },
+    {
+      "web": "insights:trends.trendFlat",
+      "sha": "1274569e8d347e58",
+      "android": {
+        "insights_trends_trend_flat": 0
+      }
+    },
+    {
+      "web": "insights:trends.footnoteAvg",
+      "sha": "24e742eca27a95dc",
+      "android": {
+        "insights_trends_footnote_avg": 0
+      }
+    },
+    {
+      "web": "insights:trends.footnoteUnusual",
+      "sha": "40ae88e940e8cf79",
+      "android": {
+        "insights_trends_footnote_unusual": 0
+      }
+    },
+    {
+      "web": "insights:trends.totalTracked",
+      "sha": "e9d745e23d87cbe4",
+      "android": {
+        "insights_trends_total_tracked": 0
+      }
+    },
+    {
+      "web": "insights:trends.momentum",
+      "sha": "9f44d9f514b1ce03",
+      "android": {
+        "insights_trends_momentum": 0
+      }
+    },
+    {
+      "web": "insights:trends.currentStreak",
+      "sha": "afc1ffb244c90d6b",
+      "android": {
+        "insights_trends_current_streak": 0
+      }
+    },
+    {
+      "web": "insights:trends.longestStreak",
+      "sha": "b4731ce6f65b0f9e",
+      "android": {
+        "insights_trends_longest_streak": 0
+      }
+    },
+    {
+      "web": "insights:trends.days",
+      "sha": "4b8026d1b9e8ae55",
+      "android": {
+        "insights_trends_days": 1
+      }
+    },
+    {
+      "web": "insights:trends.consistency",
+      "sha": "2d99b65f879da8a2",
+      "android": {
+        "insights_trends_consistency": 0
+      }
+    },
+    {
+      "web": "insights:trends.trendRate",
+      "sha": "99efc16289502e23",
+      "android": {
+        "insights_trends_trend_rate": 0
+      }
+    },
+    {
+      "web": "insights:trends.level",
+      "sha": "a262223edb1315d6",
+      "android": {
+        "insights_trends_level": 0
+      }
+    },
+    {
+      "web": "insights:trends.trendRatePerDay",
+      "sha": "2cc8a401d9b70075",
+      "android": {
+        "insights_trends_trend_rate_per_day": 2
+      }
+    },
+    {
+      "web": "insights:trends.unusuallyHeavy",
+      "sha": "fbcf5a48197e92ee",
+      "android": {
+        "insights_trends_unusually_heavy": 0
+      }
+    },
+    {
+      "web": "insights:trends.unusuallyLight",
+      "sha": "a6e8a0b2adda0fc1",
+      "android": {
+        "insights_trends_unusually_light": 0
+      }
+    },
+    {
+      "web": "insights:trends.byContextTitle",
+      "sha": "49beba29110a4634",
+      "android": {
+        "insights_trends_by_context_title": 0
+      }
+    },
+    {
+      "web": "insights:trends.byContextHeadline",
+      "sha": "d50b55696c13c4a7",
+      "android": {
+        "insights_trends_by_context_headline": 3
+      }
+    },
+    {
+      "web": "insights:trends.byContextAria",
+      "sha": "bb7939fafd24fb5e",
+      "android": {
+        "insights_trends_by_context_aria_day": 1,
+        "insights_trends_by_context_aria_week": 1,
+        "insights_trends_by_context_aria_month": 1
+      }
+    },
+    {
+      "web": "insights:trends.colContext",
+      "sha": "eaec6409cd6ceae4",
+      "android": {
+        "insights_trends_col_context": 0
+      }
+    },
+    {
+      "web": "insights:trends.colTime",
+      "sha": "ff08ed0e79696326",
+      "android": {
+        "insights_trends_col_time": 0
+      }
+    },
+    {
+      "web": "insights:trends.colShare",
+      "sha": "01579c1a8694dda4",
+      "android": {
+        "insights_trends_col_share": 0
+      }
+    }
+  ]
 }
