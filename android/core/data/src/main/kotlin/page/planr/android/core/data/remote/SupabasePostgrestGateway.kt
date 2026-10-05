@@ -4,6 +4,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Count
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
@@ -38,6 +39,22 @@ class SupabasePostgrestGateway @Inject constructor(
             order.forEach { order(it.column, if (it.ascending) Order.ASCENDING else Order.DESCENDING) }
             limit?.let { limit(it) }
         }.decodeList<JsonObject>()
+    }
+
+    override suspend fun selectPage(
+        table: String,
+        columns: String,
+        filters: List<RowFilter>,
+        order: List<RowOrder>,
+        limit: Long,
+    ): SelectPage = retryingUnauthorized {
+        val result = supabase.from(table).select(Columns.raw(columns)) {
+            count(Count.EXACT)
+            filter { apply(filters) }
+            order.forEach { order(it.column, if (it.ascending) Order.ASCENDING else Order.DESCENDING) }
+            limit(limit)
+        }
+        SelectPage(result.decodeList<JsonObject>(), result.countOrNull())
     }
 
     override suspend fun insert(table: String, rows: List<JsonObject>): List<JsonObject> = retryingUnauthorized {
@@ -97,13 +114,19 @@ class SupabasePostgrestGateway @Inject constructor(
  * `and=(col.gte."…",col.lt."…")` group instead — the same predicate. Values
  * are double-quoted there because ISO timestamps contain `.` and `:`, which
  * are reserved inside logical expressions.
+ *
+ * An [RowFilter.AnyOf] becomes one `or=(…)` group, its children quoted the
+ * same way. Only one is allowed: rather than rely on how PostgREST combines
+ * repeated `or=` params, a second one throws.
  */
 internal fun PostgrestFilterBuilder.apply(filters: List<RowFilter>) {
+    require(filters.count { it is RowFilter.AnyOf } <= 1) { "At most one AnyOf filter per query" }
     filters.groupBy { it.column }.forEach { (_, group) ->
-        if (group.size == 1) {
-            addFilter(group.single(), quoted = false)
-        } else {
-            and { group.forEach { addFilter(it, quoted = true) } }
+        val single = group.singleOrNull()
+        when {
+            single is RowFilter.AnyOf -> or { single.filters.forEach { addFilter(it, quoted = true) } }
+            single != null -> addFilter(single, quoted = false)
+            else -> and { group.forEach { addFilter(it, quoted = true) } }
         }
     }
 }
@@ -114,6 +137,15 @@ private fun PostgrestFilterBuilder.addFilter(filter: RowFilter, quoted: Boolean)
         is RowFilter.Eq -> filter(filter.column, FilterOperator.EQ, v(filter.value))
         is RowFilter.Lt -> filter(filter.column, FilterOperator.LT, v(filter.value))
         is RowFilter.Gte -> filter(filter.column, FilterOperator.GTE, v(filter.value))
+        is RowFilter.Gt -> filter(filter.column, FilterOperator.GT, v(filter.value))
         is RowFilter.In -> filter(filter.column, FilterOperator.IN, filter.values.joinToString(",", "(", ")"))
+        // `null` is a keyword, never quoted.
+        is RowFilter.IsNull ->
+            if (filter.negate) {
+                filterNot(filter.column, FilterOperator.IS, "null")
+            } else {
+                filter(filter.column, FilterOperator.IS, "null")
+            }
+        is RowFilter.AnyOf -> or { filter.filters.forEach { addFilter(it, quoted = true) } }
     }
 }

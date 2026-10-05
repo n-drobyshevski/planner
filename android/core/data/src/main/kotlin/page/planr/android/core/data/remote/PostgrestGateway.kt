@@ -22,6 +22,20 @@ interface PostgrestGateway {
         limit: Long? = null,
     ): List<JsonObject>
 
+    /**
+     * One page of a `select`, plus the exact number of rows matching
+     * [filters] (`Prefer: count=exact`). Paginated reads use this: the count,
+     * not a short page, tells them when they're done, since a server whose
+     * `max_rows` is below [limit] returns short pages too.
+     */
+    suspend fun selectPage(
+        table: String,
+        columns: String = "*",
+        filters: List<RowFilter>,
+        order: List<RowOrder>,
+        limit: Long,
+    ): SelectPage
+
     /** Inserts [rows] and returns them as stored (`.insert(...).select()`). */
     suspend fun insert(table: String, rows: List<JsonObject>): List<JsonObject>
 
@@ -50,7 +64,23 @@ sealed interface RowFilter {
     data class Gte(override val column: String, val value: String) : RowFilter
 
     data class In(override val column: String, val values: List<String>) : RowFilter
+
+    data class Gt(override val column: String, val value: String) : RowFilter
+
+    /** `column.is.null`, or `column.not.is.null` when [negate]. */
+    data class IsNull(override val column: String, val negate: Boolean = false) : RowFilter
+
+    /**
+     * PostgREST logical `or=(…)` over [filters]; their values are rendered
+     * quoted. At most one per query.
+     */
+    data class AnyOf(val filters: List<RowFilter>) : RowFilter {
+        override val column: String get() = "or"
+    }
 }
+
+/** One page of rows and the exact number of rows matching the filters; null if the server sent none. */
+data class SelectPage(val rows: List<JsonObject>, val total: Long?)
 
 /** An ORDER BY term. */
 data class RowOrder(val column: String, val ascending: Boolean = true)
@@ -60,3 +90,7 @@ internal fun eq(column: String, value: String) = RowFilter.Eq(column, value)
 internal fun lt(column: String, value: String) = RowFilter.Lt(column, value)
 internal fun gte(column: String, value: String) = RowFilter.Gte(column, value)
 internal fun isIn(column: String, values: List<String>) = RowFilter.In(column, values)
+internal fun gt(column: String, value: String) = RowFilter.Gt(column, value)
+internal fun isNull(column: String) = RowFilter.IsNull(column)
+internal fun isNotNull(column: String) = RowFilter.IsNull(column, negate = true)
+internal fun anyOf(vararg filters: RowFilter) = RowFilter.AnyOf(filters.toList())
