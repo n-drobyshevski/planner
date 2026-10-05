@@ -4,6 +4,7 @@ import java.time.ZoneId
 import page.planr.android.core.insights.model.DayDetailModel
 import page.planr.android.core.insights.model.ResolvedPeriod
 import page.planr.android.core.insights.model.Span
+import page.planr.android.core.insights.period.Periods
 
 /** The day sheet's slice (lib/insights/view-selectors.ts `buildDayDetail`). */
 object DayDetail {
@@ -21,8 +22,24 @@ object DayDetail {
         spans: List<Span>,
         zone: ZoneId,
         titleOrder: Comparator<in String>,
-    ): DayDetailModel = TODO("U1")
+    ): DayDetailModel {
+        val date = Periods.localDate(dayMs, zone)
+        val idx = period.days.indexOf(dayMs)
+        val dayEnd = if (idx >= 0) {
+            period.days.getOrNull(idx + 1) ?: period.window.end
+        } else {
+            date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        }
+        // JS `a.start - b.start || compareTitles(a.title, b.title)` on a stable sort.
+        val order = Comparator<Span> { a, b ->
+            val byStart = a.start.compareTo(b.start)
+            if (byStart != 0) byStart else titleOrder.compare(a.title, b.title)
+        }
+        val items = spans.filter { it.start < dayEnd && it.end > dayMs }.sortedWith(order)
+        val totalMs = items.filter { !it.inactive }.sumOf { clippedMs(it, dayMs, dayEnd) }
+        return DayDetailModel(dayStart = dayMs, dayEnd = dayEnd, date = date, items = items, totalMs = totalMs)
+    }
 
     /** `clippedMs`: the span's ms inside `[start, end)`. */
-    fun clippedMs(s: Span, start: Long, end: Long): Long = TODO("U1")
+    fun clippedMs(s: Span, start: Long, end: Long): Long = maxOf(0L, minOf(s.end, end) - maxOf(s.start, start))
 }

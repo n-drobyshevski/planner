@@ -1,4 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Insights common strings, copied from messages/en (manifest:
      src/test/resources/strings-source/common.json). Names start with insights_common_. -->
-<resources />
+<resources>
+    <string name="insights_common_needs_attention">"Needs attention: "</string>
+
+    <!-- Deltas (stat-card.tsx). -->
+    <string name="insights_common_delta_new">new</string>
+    <string name="insights_common_delta_new_sr">new — nothing in the previous period</string>
+    <string name="insights_common_delta_up">up %1$d%% vs previous period</string>
+    <string name="insights_common_delta_down">down %1$d%% vs previous period</string>
+    <string name="insights_common_delta_no_change">no change vs previous period</string>
+
+    <!-- Series names and legend states (series.ts, chart-card.tsx). -->
+    <string name="insights_common_series_other">Other</string>
+    <string name="insights_common_series_no_context">No context</string>
+    <string name="insights_common_series_unknown">Unknown</string>
+    <string name="insights_common_series_hidden">(hidden)</string>
+    <string name="insights_common_series_shown">(shown)</string>
+    <string name="insights_common_compare_previous">Compare with previous period</string>
+    <string name="insights_common_view_as_table">View as table</string>
+    <string name="insights_common_open_day_action">Open day</string>
+
+    <!-- Empty period. -->
+    <string name="insights_common_empty_title">No tracked time in this period</string>
+    <string name="insights_common_empty_description">Insights count timed events from your calendar. Schedule something in this range — or pick a different period — to see where your time goes.</string>
+    <string name="insights_common_empty_open_calendar">Open the calendar</string>
+
+    <!-- Day sheet (day-detail-sheet.tsx). -->
+    <string name="insights_common_day_nothing">Nothing scheduled in the current insights filter.</string>
+    <plurals name="insights_common_day_summary">
+        <item quantity="one">%1$s tracked across %2$d item (current filter).</item>
+        <item quantity="other">%1$s tracked across %2$d items (current filter).</item>
+    </plurals>
+    <string name="insights_common_day_inactive">inactive</string>
+    <string name="insights_common_day_all_day">All day</string>
+    <string name="insights_common_day_open_in_calendar">Open in calendar</string>
+    <string name="insights_common_day_shared">Shared</string>
+    <string name="insights_common_attr_chip">%1$s: %2$s</string>
+
+    <!-- Event attributes (common.json attributes.*). -->
+    <string name="insights_common_attr_energy_label">Energy</string>
+    <string name="insights_common_attr_energy_1">1 Low</string>
+    <string name="insights_common_attr_energy_2">2 Steady</string>
+    <string name="insights_common_attr_energy_3">3 High</string>
+    <string name="insights_common_attr_energy_4">4 Peak</string>
+    <string name="insights_common_attr_flexibility_label">Flexibility</string>
+    <string name="insights_common_attr_flexibility_fixed">Fixed</string>
+    <string name="insights_common_attr_flexibility_movable">Movable</string>
+    <string name="insights_common_attr_flexibility_flexible">Flexible</string>
+    <string name="insights_common_attr_focus_label">Focus</string>
+    <string name="insights_common_attr_focus_deep">Deep</string>
+    <string name="insights_common_attr_focus_shallow">Shallow</string>
+    <string name="insights_common_attr_satisfaction_label">Satisfaction</string>
+    <string name="insights_common_attr_satisfaction_1">1 Poor</string>
+    <string name="insights_common_attr_satisfaction_2">2 Okay</string>
+    <string name="insights_common_attr_satisfaction_3">3 Good</string>
+    <string name="insights_common_attr_satisfaction_4">4 Great</string>
+</resources>
