@@ -2,19 +2,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Smartphone } from "lucide-react";
 
+import { DEFAULT_ANDROID_PACKAGE_NAME } from "@/lib/android/asset-links";
 import enMessages from "@/messages/en";
 import ruMessages from "@/messages/ru";
+
+import { OpenAppButton } from "./open-app-button";
 
 /**
  * Fallback for the Android app's OAuth redirect, `/app/auth/callback`. Normally
  * the verified App Link hands this URL straight to Planr for Android and the
- * browser never loads it; it only renders when the app isn't installed, is out
- * of date, or link verification failed.
+ * browser never loads it; it renders when the browser keeps links to itself
+ * (Firefox, unless "Open links in apps" is on), link verification hasn't run
+ * yet, or the app isn't installed. Its "Open Planr" button re-delivers the
+ * callback to the app explicitly (see lib/android/callback-intent.ts).
  *
- * SECURITY: the URL carries a one-time authorization `code` (and `state`). This
- * page never reads `searchParams` — nothing is exchanged, logged, stored, or
- * forwarded — so it's a fully static page with no request-time work at all. The
- * code is useless without the app's PKCE verifier and expires within minutes.
+ * SECURITY: the URL carries a one-time authorization `code` (and `state`). The
+ * server never reads `searchParams` — nothing is exchanged, logged or stored —
+ * so it's a fully static page with no request-time work at all. Only the button,
+ * in the browser, reads the query, and it hands it to the app's package alone.
+ * The code is useless without the app's PKCE verifier and expires within minutes.
  *
  * Bilingual rather than negotiated: reading the locale cookie/Accept-Language
  * would make the page dynamic for a screen almost nobody sees, so it shows both
@@ -23,6 +29,9 @@ import ruMessages from "@/messages/ru";
 export const metadata: Metadata = {
   title: enMessages.consent.appCallback.metaTitle,
 };
+
+/** Read at build time (the page is prerendered); see docs/android.md. */
+const PACKAGE_NAME = process.env.ANDROID_PACKAGE_NAME?.trim() || DEFAULT_ANDROID_PACKAGE_NAME;
 
 const BLOCKS = [
   { lang: "en", copy: enMessages.consent.appCallback },
@@ -52,6 +61,7 @@ export default function AppAuthCallbackPage() {
               <h2 className="text-base font-semibold text-foreground">{copy.title}</h2>
             )}
             <p className="text-sm text-pretty text-muted-foreground">{copy.body}</p>
+            <OpenAppButton label={copy.openApp} packageName={PACKAGE_NAME} />
             <p className="text-xs text-muted-foreground">{copy.note}</p>
             {/* `/` lives under another root layout, so this is a full navigation;
                 the target carries no query, so the code is left behind. */}

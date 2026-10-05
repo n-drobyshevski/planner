@@ -184,7 +184,10 @@ Sign-in uses OAuth 2.1 authorization code + PKCE against Supabase's OAuth
 server, in a Custom Tab:
 
 1. `SessionManager.beginSignIn()` stores the PKCE verifier and `state`
-   (encrypted) and returns the authorize URL.
+   (encrypted) and returns the authorize URL. The sign-in screen opens it in a
+   Custom Tab in Chrome when Chrome is installed, whatever the default browser:
+   Firefox by default never hands a link to an app ("Open links in apps" is
+   off), which would strand the user on the callback's fallback page.
 2. The user signs in on planr.page with a passkey or passphrase, then approves
    on `/oauth/consent`.
 3. The App Link `https://auth.planr.page/app/auth/callback?code=…&state=…` opens

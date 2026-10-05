@@ -58,6 +58,11 @@ the link targets the app that opened the Custom Tab, Chrome also waives its
 user-gesture requirement, so the "already consented" auto-redirect reaches the
 app too.
 
+This relies on the browser handing links to apps. The app opens the sign-in
+tab in Chrome when it's installed; Firefox by default keeps every link in the
+browser ("Open links in apps" is off), so with Firefox as the tab the user
+lands on the fallback page.
+
 A private-use scheme (`page.planr.android:/…`) would also leave the tab, but any
 app can claim a scheme. A malicious app could start a sign-in with the public
 client id and its own PKCE challenge, and receive the code. A verified App Link
@@ -82,11 +87,15 @@ or to the fallback page, which never reads it.
 ### Callback fallback page
 
 `/app/auth/callback` normally never loads in a browser, because the verified App
-Link hands the URL to the app. If the app is missing, out of date, or not yet
-verified, the browser shows a short bilingual (en/ru) page that asks the user to
-open Planr and sign in again.
+Link hands the URL to the app. When it does load (the browser keeps links to
+itself, as Firefox does unless "Open links in apps" is on; the link isn't
+verified yet; or the app is missing), a short bilingual (en/ru) page offers an
+**Open Planr** button. Its `intent://` URL (`lib/android/callback-intent.ts`)
+re-delivers `code`, `state` and any `error` to the `page.planr.android` package
+explicitly, which browsers honour on a tap. If that fails too, the page asks the
+user to sign in again from the app.
 
-- **Static:** the page never reads `searchParams`, so the code isn't exchanged, logged, stored or forwarded.
+- **Static:** the server never reads `searchParams`, so the code isn't exchanged, logged or stored. Only the button, in the browser, reads the query, and it hands it to the app's package alone (unknown parameters are dropped; values are encoded so they can't alter the intent).
 - **Own root layout:** it lives in `app/app/layout.tsx` (outside `[locale]`), which has no analytics and sets `referrer: no-referrer`.
 - **Not proxied:** it's excluded from the `proxy.ts` matcher, so it is never locale-rewritten or bounced to `/login`.
 

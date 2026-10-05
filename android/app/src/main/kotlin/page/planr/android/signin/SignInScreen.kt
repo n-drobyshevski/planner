@@ -2,6 +2,7 @@ package page.planr.android.signin
 
 import android.content.ActivityNotFoundException
 import android.content.Context
+import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -122,12 +123,33 @@ private fun errorText(error: SignInError): String = stringResource(
     },
 )
 
-/** Opens [url] in a Custom Tab; false when no browser can handle it. */
+/**
+ * Chrome builds, in order of preference, for the sign-in tab. The return to the
+ * app is an App Link on auth.planr.page, and browsers differ in whether they
+ * hand one to the app: Chrome does (and, for the app that opened the tab,
+ * without a fresh tap), while Firefox by default keeps every link in the
+ * browser ("Open links in apps" is off), stranding the user on the fallback
+ * page.
+ */
+private val SIGN_IN_BROWSERS = listOf(
+    "com.android.chrome",
+    "com.chrome.beta",
+    "com.chrome.dev",
+    "com.chrome.canary",
+)
+
+/**
+ * Opens [url] in a Custom Tab, in Chrome when it's installed (whatever the
+ * default browser), else in the default browser. False when no browser can
+ * handle it.
+ */
 private fun Context.openCustomTab(url: String): Boolean = try {
-    CustomTabsIntent.Builder()
+    val tab = CustomTabsIntent.Builder()
         .setShowTitle(true)
         .build()
-        .launchUrl(this, url.toUri())
+    CustomTabsClient.getPackageName(this, SIGN_IN_BROWSERS, true)
+        ?.let { tab.intent.setPackage(it) }
+    tab.launchUrl(this, url.toUri())
     true
 } catch (_: ActivityNotFoundException) {
     false
