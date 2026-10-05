@@ -30,7 +30,8 @@
   "appCallback": {
     "metaTitle": "Open Planr",
     "title": "Finish signing in in the app",
-    "body": "This link is meant for Planr for Android. If the app didn't open, make sure it's installed and up to date, then start signing in again from the app.",
+    "body": "This link is meant for Planr for Android. If the app didn't open on its own, tap Open Planr. If that doesn't work, make sure the app is installed and up to date, then start signing in again from the app.",
+    "openApp": "Open Planr",
     "note": "Nothing was sent from this page. You can close it.",
     "goToCalendar": "Open Planr on the web"
   }
