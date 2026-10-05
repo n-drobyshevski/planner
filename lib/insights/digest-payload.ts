@@ -2,11 +2,13 @@
 // period — what the API route sends to the model. Pure + isomorphic (built
 // client-side from already-computed analytics, re-validated server-side).
 //
-// Privacy boundary, by construction: NO event titles, NO occurrence rows, NO
-// sleep data ever enter the payload. Context (category) names and goal names
-// do — they're the coarse labels a useful narrative needs — plus suggestion
-// headlines/evidence, which are app-derived text (the unscheduled-task kind
-// can carry a task title; that is the one user-authored string class here).
+// Privacy boundary: NO event titles, NO occurrence rows, NO sleep data ever
+// enter the payload. Context (category) names and goal names do — they're the
+// coarse labels a useful narrative needs — plus suggestion headlines/evidence,
+// which are app-derived text (the unscheduled-task kind can carry a task
+// title; that is the one user-authored string class here). Suggestions derived
+// from sleep (DIGEST_EXCLUDED_SIGNAL_KINDS) are dropped here and again by the
+// API route, since their evidence text quotes sleep logs or sleep prefs.
 // Durations are rounded to MINUTES so the payload (and its cache hash) is
 // stable against sub-minute jitter.
 
@@ -18,6 +20,20 @@ const MAX_ANOMALIES = 3;
 const MAX_SIGNALS = 8;
 
 const str = (max: number) => z.string().min(1).max(max);
+
+/**
+ * Suggestion kinds that never reach the model. Sleep is member-private and
+ * stays in the app: `sleep-debt` quotes the sleep logs ("3 of your last 7
+ * logged nights were under 7h"), and `rest-window` is computed inside the
+ * waking window from the sleep prefs, so its "open stretch from 21:00" gives
+ * away bed and wake times.
+ */
+export const DIGEST_EXCLUDED_SIGNAL_KINDS: ReadonlySet<string> = new Set([
+  "sleep-debt",
+  "rest-window",
+]);
+
+const isSharedSignal = (s: { kind: string }) => !DIGEST_EXCLUDED_SIGNAL_KINDS.has(s.kind);
 
 export const digestPayloadSchema = z.object({
   period: z.object({
@@ -181,11 +197,21 @@ export function buildDigestPayload(input: DigestPayloadInput): DigestPayload {
       direction: a.direction,
     })),
     streak: input.streak,
-    signals: input.signals.slice(0, MAX_SIGNALS).map((s) => ({
+    signals: input.signals.filter(isSharedSignal).slice(0, MAX_SIGNALS).map((s) => ({
       kind: s.kind.slice(0, 40),
       text: s.text.slice(0, 200),
     })),
   };
+}
+
+/**
+ * [payload] without signals of an excluded kind: the server applies it to
+ * whatever a client sent, so an older bundle (or any other caller) can't
+ * forward sleep-derived text to the model.
+ */
+export function withoutPrivateSignals(payload: DigestPayload): DigestPayload {
+  if (payload.signals.every(isSharedSignal)) return payload;
+  return { ...payload, signals: payload.signals.filter(isSharedSignal) };
 }
 
 /**

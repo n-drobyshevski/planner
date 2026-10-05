@@ -1,7 +1,8 @@
 // POST /api/insights/digest — the one server-side AI surface in the app.
 //
 // The client sends the compact aggregate payload (lib/insights/digest-payload
-// — no event titles, no occurrence rows, no sleep data); this route
+// — no event titles, no occurrence rows, no sleep data); this route strips any
+// sleep-derived signal the client may still send (withoutPrivateSignals),
 // authenticates the member, re-derives the cache hash server-side, and either
 // returns the member's cached digest, declares the feature unavailable
 // (no ANTHROPIC_API_KEY ⇒ the card hides itself), enforces the daily
@@ -16,6 +17,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { createClient } from "@/lib/supabase/server";
 import {
   digestPayloadSchema,
+  withoutPrivateSignals,
   type DigestPayload,
 } from "@/lib/insights/digest-payload";
 import { digestSchema, type Digest } from "@/lib/insights/digest-schema";
@@ -60,7 +62,10 @@ export async function POST(request: Request) {
   if (!parsedPayload.success) {
     return Response.json({ error: "Unrecognized payload." }, { status: 400 });
   }
-  const payload = parsedPayload.data;
+  // Defence in depth: buildDigestPayload already drops these, but a stale
+  // bundle or another caller might not. Stripped (not rejected) so it keeps
+  // working; the hash below is taken over the stripped payload.
+  const payload = withoutPrivateSignals(parsedPayload.data);
 
   const sb = await createClient();
   const { data: claims } = await sb.auth.getClaims();
