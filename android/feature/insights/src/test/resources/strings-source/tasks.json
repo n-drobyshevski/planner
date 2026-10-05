@@ -1,4 +1,197 @@
 {
   "file": "strings_insights_tasks.xml",
-  "entries": []
+  "entries": [
+    {
+      "web": "insights:lede.tasksOverdueHeadline",
+      "sha": "fff8af006be21247",
+      "android": {
+        "insights_tasks_lede_overdue": 1
+      }
+    },
+    {
+      "web": "insights:lede.tasksDoneHeadline",
+      "sha": "9026135bbd498553",
+      "android": {
+        "insights_tasks_lede_done": 2,
+        "insights_tasks_lede_more_week": 1,
+        "insights_tasks_lede_more_month": 1,
+        "insights_tasks_lede_more_period": 1,
+        "insights_tasks_lede_fewer_week": 1,
+        "insights_tasks_lede_fewer_month": 1,
+        "insights_tasks_lede_fewer_period": 1
+      }
+    },
+    {
+      "web": "insights:lede.tasksDoneSupport",
+      "sha": "368363b3d73c3479",
+      "android": {
+        "insights_tasks_lede_done_support": 1
+      }
+    },
+    {
+      "web": "insights:lede.tasksAdherenceSupport",
+      "sha": "80fa80ac177afb91",
+      "android": {
+        "insights_tasks_lede_adherence": 1
+      }
+    },
+    {
+      "web": "insights:tasks.emptyTitle",
+      "sha": "6deefc6827a307e3",
+      "android": {
+        "insights_tasks_empty_title": 0
+      }
+    },
+    {
+      "web": "insights:tasks.emptyDescription",
+      "sha": "0fd7657fa0ea2bb2",
+      "android": {
+        "insights_tasks_empty_description": 0
+      }
+    },
+    {
+      "web": "insights:tasks.openTasks",
+      "sha": "3ec90b353c52638c",
+      "android": {
+        "insights_tasks_open_tasks": 0
+      }
+    },
+    {
+      "web": "insights:tasks.leadCompleted",
+      "sha": "ac95f01d86e4f265",
+      "android": {
+        "insights_tasks_lead_completed": 0
+      }
+    },
+    {
+      "web": "insights:tasks.leadCreated",
+      "sha": "e8ab9c21e3cd53e5",
+      "android": {
+        "insights_tasks_lead_created": 0
+      }
+    },
+    {
+      "web": "insights:tasks.leadOnTime",
+      "sha": "d76fa410528aa682",
+      "android": {
+        "insights_tasks_lead_on_time": 0
+      }
+    },
+    {
+      "web": "insights:tasks.onTimeDue",
+      "sha": "635f58f98b092832",
+      "android": {
+        "insights_tasks_on_time_due": 1
+      }
+    },
+    {
+      "web": "insights:tasks.onTimeNothing",
+      "sha": "7d1b74464205fa1f",
+      "android": {
+        "insights_tasks_on_time_nothing": 0
+      }
+    },
+    {
+      "web": "insights:tasks.overdue",
+      "sha": "1b7d2ad41adb53c2",
+      "android": {
+        "insights_tasks_overdue": 0
+      }
+    },
+    {
+      "web": "insights:tasks.overdueHint",
+      "sha": "ea9bb5b90013a2d5",
+      "android": {
+        "insights_tasks_overdue_hint": 0
+      }
+    },
+    {
+      "web": "insights:tasks.doneOfCreated",
+      "sha": "42e6db66dabe812d",
+      "android": {
+        "insights_tasks_done_of_created": 0
+      }
+    },
+    {
+      "web": "insights:tasks.doneOfCreatedHint",
+      "sha": "a4f1b8cf042f005b",
+      "android": {
+        "insights_tasks_done_of_created_hint": 0
+      }
+    },
+    {
+      "web": "insights:tasks.leadTime",
+      "sha": "820517e8048d4cc2",
+      "android": {
+        "insights_tasks_lead_time": 0
+      }
+    },
+    {
+      "web": "insights:tasks.leadTimeHint",
+      "sha": "0a343e425c3a225c",
+      "android": {
+        "insights_tasks_lead_time_hint": 0
+      }
+    },
+    {
+      "web": "insights:tasks.topLevelNote",
+      "sha": "3522e28254748c6e",
+      "android": {
+        "insights_tasks_top_level_note": 0
+      }
+    },
+    {
+      "web": "insights:tasks.velocity",
+      "sha": "8c71e75d8fb66f97",
+      "android": {
+        "insights_tasks_velocity_day": 0,
+        "insights_tasks_velocity_week": 0,
+        "insights_tasks_velocity_month": 0
+      }
+    },
+    {
+      "web": "insights:tasks.velocityAria",
+      "sha": "626ba10a111b68d6",
+      "android": {
+        "insights_tasks_velocity_aria_day": 1,
+        "insights_tasks_velocity_aria_week": 1,
+        "insights_tasks_velocity_aria_month": 1
+      }
+    },
+    {
+      "web": "insights:tasks.seriesCompleted",
+      "sha": "ac95f01d86e4f265",
+      "android": {
+        "insights_tasks_series_completed": 0
+      }
+    },
+    {
+      "web": "insights:tasks.seriesCreated",
+      "sha": "e8ab9c21e3cd53e5",
+      "android": {
+        "insights_tasks_series_created": 0
+      }
+    },
+    {
+      "web": "insights:tasks.srSummary",
+      "sha": "135efdf83399b6b0",
+      "android": {
+        "insights_tasks_sr_summary": 4
+      }
+    },
+    {
+      "web": "insights:tasks.leadDays",
+      "sha": "6f3dc58f0b8e6a6a",
+      "android": {
+        "insights_tasks_lead_days": 1
+      }
+    },
+    {
+      "web": "insights:tasks.leadDaysHours",
+      "sha": "f9d6c96ba9adac04",
+      "android": {
+        "insights_tasks_lead_days_hours": 2
+      }
+    }
+  ]
 }
