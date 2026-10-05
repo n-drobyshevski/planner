@@ -39,6 +39,7 @@ import page.planr.android.core.data.remote.Fixtures
 import page.planr.android.core.data.remote.PostgrestGateway
 import page.planr.android.core.data.remote.RowFilter
 import page.planr.android.core.data.remote.RowOrder
+import page.planr.android.core.data.remote.SelectPage
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.remote.TaskMutations
@@ -183,18 +184,27 @@ class RepositoryTest {
         assertEquals(emptyList(), gateway.callsOf<FakePostgrestGateway.Call.Update>())
     }
 
-    /** [gateway], running [afterEventSelect] right after each `events` select returns. */
+    /** [gateway], running [afterEventSelect] right after each `events` page returns. */
     private fun hooked(afterEventSelect: suspend (call: Int) -> Unit) = object : PostgrestGateway by gateway {
         var eventSelects = 0
-        override suspend fun select(
+        override suspend fun selectPage(
             table: String,
             columns: String,
             filters: List<RowFilter>,
             order: List<RowOrder>,
-            limit: Long?,
-        ): List<JsonObject> = gateway.select(table, columns, filters, order, limit).also {
+            limit: Long,
+        ): SelectPage = gateway.selectPage(table, columns, filters, order, limit).also {
             if (table == SupabaseTables.EVENTS) afterEventSelect(eventSelects++)
         }
+    }
+
+    @Test
+    fun `a task refresh past max_rows keeps every task`() = runTest {
+        gateway.seed(SupabaseTables.TASKS, *Array(1_203) { Fixtures.taskRow(id = "task-%05d".format(it)) })
+
+        tasks().refresh()
+
+        assertEquals(1_203, db.taskDao().observeAll(Fixtures.WS).first().size)
     }
 
     @Test
@@ -213,6 +223,21 @@ class RepositoryTest {
 
         assertEquals(2, racing.eventSelects) // refetched instead of applying the stale snapshot
         assertEquals(listOf("new"), cachedEventIds())
+    }
+
+    @Test
+    fun `a window refresh under steady Realtime edits backs off, then applies its last snapshot`() = runTest {
+        gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow(id = "server"))
+        // Every fetch collides with another Realtime change.
+        val busy = hooked { _ ->
+            RealtimeChangeApplier(db, gate)
+                .apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(id = "server")), gate.ticket())
+        }
+
+        events(WorkspaceQueries(busy)).refreshWindow(june)
+
+        assertEquals(CacheGate.MAX_ATTEMPTS, busy.eventSelects)
+        assertEquals(listOf("server"), cachedEventIds(), "the refresh still completes")
     }
 
     @Test

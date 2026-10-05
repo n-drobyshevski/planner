@@ -20,8 +20,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.datetime.LocalDate
 import page.planr.android.account.AccountMenuButton
 import page.planr.android.feature.agenda.navigation.agendaGraph
+import page.planr.android.feature.insights.insightsScreen
 import page.planr.android.feature.quickadd.QuickAddKind
 import page.planr.android.feature.quickadd.QuickAddSheet
 import page.planr.android.feature.tasks.navigateToTask
@@ -31,9 +33,9 @@ import page.planr.android.signin.SignInScreen
 import page.planr.android.feature.quickadd.R as QuickAddR
 
 /**
- * App navigation. Signed out, only sign-in; signed in, the Agenda and Tasks
- * tabs (bottom bar on their roots, hidden on detail screens) with Quick add
- * behind each tab's floating button. The agenda is always the root of the
+ * App navigation. Signed out, only sign-in; signed in, the Agenda, Tasks and
+ * Insights tabs (bottom bar on their roots, hidden on detail screens) with
+ * Quick add behind the floating button of the tabs that have one. The agenda is always the root of the
  * signed-in back stack, so switching tabs saves and restores each tab's stack
  * against it. Losing the session (the account menu's "Sign out", or a
  * refresh token the server rejected) clears the back stack back to sign-in.
@@ -41,6 +43,7 @@ import page.planr.android.feature.quickadd.R as QuickAddR
  * @param launchRoute a widget's requested destination; opened once signed in,
  *   then reported through [onLaunchRouteHandled] (also when it was dropped
  *   because nobody is signed in).
+ * @param onOpenDay asks the agenda to show a day (a widget's [LaunchRoute.Day]).
  */
 @Composable
 fun PlanrNavHost(
@@ -48,6 +51,7 @@ fun PlanrNavHost(
     modifier: Modifier = Modifier,
     launchRoute: LaunchRoute? = null,
     onLaunchRouteHandled: () -> Unit = {},
+    onOpenDay: (LocalDate) -> Unit = {},
 ) {
     val navController = rememberNavController()
     // Fixed for the graph's lifetime; later auth changes navigate instead.
@@ -69,7 +73,10 @@ fun PlanrNavHost(
     }
     LaunchedEffect(launchRoute, signedIn) {
         val target = launchRoute ?: return@LaunchedEffect
-        if (signedIn) navController.open(target)
+        if (signedIn) {
+            navController.open(target)
+            if (target is LaunchRoute.Day) onOpenDay(target.date)
+        }
         onLaunchRouteHandled()
     }
 
@@ -113,6 +120,17 @@ fun PlanrNavHost(
                 accountAction = { AccountMenuButton() },
             )
             taskDetailScreen(onBack = { navController.popBackStack() })
+            insightsScreen(
+                onOpenDay = { date ->
+                    // selectTab saves the Insights stack (its ViewModel and saved state),
+                    // unlike open(), so coming back keeps the period and tab.
+                    navController.selectTab(TopLevelTab.Agenda)
+                    onOpenDay(date)
+                },
+                onOpenAgenda = { navController.selectTab(TopLevelTab.Agenda) },
+                onOpenTasks = { navController.selectTab(TopLevelTab.Tasks) },
+                accountAction = { AccountMenuButton() },
+            )
         }
     }
 
@@ -145,7 +163,7 @@ private fun NavController.selectTab(tab: TopLevelTab) {
  */
 private fun NavController.open(target: LaunchRoute) {
     val detail = when (target) {
-        is LaunchRoute.Tab -> null
+        is LaunchRoute.Tab, is LaunchRoute.Day -> null
         is LaunchRoute.Event -> target.route
         is LaunchRoute.Task -> target.route
     }

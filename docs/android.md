@@ -8,8 +8,8 @@ covers:
 
 - the OAuth consent flow (shared with the Claude connector),
 - the App Link callback and its Digital Asset Links file,
-- the recurrence golden fixtures that keep the Kotlin port in step with
-  `lib/recurrence`.
+- the recurrence and Insights golden fixtures that keep the Kotlin ports in
+  step with `lib/recurrence`, `lib/analytics` and `lib/insights`.
 
 ## Sign-in flow
 
@@ -45,6 +45,8 @@ The member is resolved from the token the same way the MCP server does it
 | `app/.well-known/assetlinks.json/route.ts` | Digital Asset Links (`lib/android/asset-links.ts`) |
 | `app/app/auth/callback/page.tsx` | Static fallback shown only if the App Link doesn't open the app |
 | `scripts/recurrence-fixtures.ts` | Golden fixtures for `android/core/recurrence` (see below) |
+| `scripts/export-insights-fixtures.ts`, `scripts/insights-fixtures.ts`, `scripts/insights-fixtures/*` | Golden fixtures for `android/core/insights` (see below) |
+| `lib/insights/view-selectors.ts` | The Insights tabs' view logic, extracted from the components so the fixtures cover it too |
 
 ### Why the callback has its own host
 
@@ -238,6 +240,42 @@ you re-export and commit the JSON. The Kotlin tests then show what to port.
 **Not covered:** a wall time that occurs twice on a fall-back day. The web's
 answer there depends on the host machine's time zone, so there is nothing
 deterministic to pin.
+
+## Insights golden fixtures
+
+The Kotlin port of the Insights logic (`lib/analytics/*`, `lib/insights/*` and
+`lib/insights/view-selectors.ts`) lives in `android/core/insights`. Like the
+recurrence port, it is tested against JSON produced by the real TypeScript
+functions:
+
+```sh
+pnpm fixtures:insights
+# → android/core/insights/src/test/resources/fixtures/<area>.json
+#   and the sha fields of android/feature/insights/src/test/resources/strings-source/*.json
+```
+
+The registry and the common schema are in `scripts/insights-fixtures.ts`; each
+area (period, usage, patterns, ledes, labels, `selectors-*`, …) has its builder
+in `scripts/insights-fixtures/`. In short:
+
+- Instants are epoch ms; windows are half-open. Cases run over a zone matrix
+  that includes DST in both directions, Asia/Kolkata (+5:30) and
+  America/Santiago, whose DST gap falls at midnight.
+- The exporter sets `TZ=UTC` before it loads any module, then rebuilds the
+  fixtures in child processes under UTC, Pacific/Chatham and America/Santiago
+  and refuses to write if any digest differs: a builder must never read the
+  process zone.
+- Each file stays under 1.5 MB.
+- Ledes are compared as `{tone, key, args}`. The Android strings are tied to
+  `messages/{en,ru}/*.json` by per-file manifests whose `sha` fields the
+  exporter refreshes, so a web copy change shows up as a diff.
+
+**Drift check:** `test/insights-fixtures.test.ts` rebuilds every area in
+memory during `pnpm test`, compares the bytes with the committed files,
+repeats the digest under Pacific/Chatham, and recomputes the strings-manifest
+hashes. A web-side change to the Insights logic or copy therefore fails CI
+until you re-export, commit the JSON, and port the change; the Kotlin tests
+(run with a Pacific/Chatham, ru-RU JVM default) show what to port.
 
 ## CI
 

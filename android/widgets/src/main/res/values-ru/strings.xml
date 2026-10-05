@@ -7,6 +7,10 @@
     <string name="widget_tasks_description">Открытые задачи — отметь выполненные прямо здесь</string>
     <string name="widget_quickadd_name">Быстро добавить</string>
     <string name="widget_quickadd_description">Задача или событие в одно касание</string>
+    <string name="widget_week_name">Неделя</string>
+    <string name="widget_week_description">Неделя по дням — твои события и партнёра</string>
+    <string name="widget_month_name">Месяц</string>
+    <string name="widget_month_description">Весь месяц: точки показывают, чьи планы</string>
 
     <!-- Shared states -->
     <string name="widget_sign_in">Войти</string>
@@ -19,6 +23,20 @@
     <string name="widget_untitled_event">Без названия</string>
     <string name="widget_all_day">Весь день</string>
     <string name="widget_until">до %1$s</string>
+
+    <!-- Week -->
+    <string name="widget_week_title">Эта неделя</string>
+    <string name="widget_week_signed_out">Войди, чтобы видеть здесь свою неделю.</string>
+    <string name="widget_week_free">Свободно</string>
+    <plurals name="widget_week_event_count">
+        <item quantity="one">%d событие</item>
+        <item quantity="few">%d события</item>
+        <item quantity="many">%d событий</item>
+        <item quantity="other">%d события</item>
+    </plurals>
+
+    <!-- Month -->
+    <string name="widget_month_signed_out">Войди, чтобы видеть здесь свой месяц.</string>
 
     <!-- Tasks -->
     <string name="widget_tasks_signed_out">Войди, чтобы видеть здесь свои задачи.</string>
@@ -48,4 +66,16 @@
     <string name="widget_preview_task_2">Купить билеты на поезд</string>
     <string name="widget_preview_task_3">Позвонить арендодателю</string>
     <string name="widget_preview_open_count">3 открытые</string>
+    <string name="widget_preview_week_range">5–11 окт.</string>
+    <string name="widget_preview_week_day_1">Пн, 5</string>
+    <string name="widget_preview_week_day_2">Вт, 6</string>
+    <string name="widget_preview_week_day_3">Ср, 7</string>
+    <string name="widget_preview_month">Октябрь</string>
+    <string name="widget_preview_weekday_1">П</string>
+    <string name="widget_preview_weekday_2">В</string>
+    <string name="widget_preview_weekday_3">С</string>
+    <string name="widget_preview_weekday_4">Ч</string>
+    <string name="widget_preview_weekday_5">П</string>
+    <string name="widget_preview_weekday_6">С</string>
+    <string name="widget_preview_weekday_7">В</string>
 </resources>

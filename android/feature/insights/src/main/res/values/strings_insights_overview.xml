@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Insights overview strings, copied from messages/en (manifest:
+     src/test/resources/strings-source/overview.json). Names start with insights_overview_. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Lede (lede.overviewHeadline): the frame, then one clause per direction × unit (%2$s; "" for none). -->
+    <string name="insights_overview_lede_headline">You tracked %1$s%2$s.</string>
+    <string name="insights_overview_lede_up_week">, up %1$d%% (%2$s) vs the previous week</string>
+    <string name="insights_overview_lede_up_month">, up %1$d%% (%2$s) vs the previous month</string>
+    <string name="insights_overview_lede_up_period">, up %1$d%% (%2$s) vs the previous period</string>
+    <string name="insights_overview_lede_down_week">, down %1$d%% (%2$s) vs the previous week</string>
+    <string name="insights_overview_lede_down_month">, down %1$d%% (%2$s) vs the previous month</string>
+    <string name="insights_overview_lede_down_period">, down %1$d%% (%2$s) vs the previous period</string>
+    <string name="insights_overview_lede_level_week">, level with the previous week</string>
+    <string name="insights_overview_lede_level_month">, level with the previous month</string>
+    <string name="insights_overview_lede_level_period">, level with the previous period</string>
+    <string name="insights_overview_lede_support">Most of it went to %1$s (%2$d%%).</string>
+
+    <!-- Lead figures and stats. -->
+    <string name="insights_overview_lead_total">Total</string>
+    <string name="insights_overview_lead_daily_avg">Daily avg</string>
+    <string name="insights_overview_lead_active_days">Active days</string>
+    <string name="insights_overview_events">Events</string>
+    <string name="insights_overview_events_hint">tracked this period</string>
+    <string name="insights_overview_avg_session">Avg session</string>
+    <string name="insights_overview_avg_session_hint">per tracked event</string>
+    <string name="insights_overview_busiest_day">Busiest day</string>
+    <string name="insights_overview_tasks_done">Tasks done</string>
+    <string name="insights_overview_on_time">On time</string>
+    <!-- Plain strings with a count, as on the web ("{count} due", "{points} points"). -->
+    <string name="insights_overview_on_time_due" tools:ignore="PluralsCandidate">%1$d due</string>
+    <string name="insights_overview_on_time_nothing">nothing due</string>
+    <string name="insights_overview_overdue">Overdue</string>
+    <string name="insights_overview_overdue_hint">open past their due day</string>
+
+    <!-- Per day (overview.perDayHeadline, one string per trend). -->
+    <string name="insights_overview_per_day">Per day</string>
+    <string name="insights_overview_per_day_headline_none">%1$s tracked this period.</string>
+    <string name="insights_overview_per_day_headline_level">%1$s tracked, level with the previous period.</string>
+    <string name="insights_overview_per_day_headline_up">%1$s tracked, up %2$d%% vs the previous period.</string>
+    <string name="insights_overview_per_day_headline_down">%1$s tracked, down %2$d%% vs the previous period.</string>
+    <string name="insights_overview_per_day_footnote_typical">Dashed line: typical day (%1$s) · curve: trailing 7-day average · tap a day for detail</string>
+    <string name="insights_overview_per_day_footnote">Curve: trailing 7-day average · tap a day for detail</string>
+    <string name="insights_overview_per_day_aria">Tracked time per day, %1$s</string>
+    <string name="insights_overview_series_tracked">Tracked</string>
+    <string name="insights_overview_series_avg">7-day avg</string>
+    <string name="insights_overview_series_prev">Previous period</string>
+
+    <!-- By context and shifts. -->
+    <string name="insights_overview_by_context">By context</string>
+    <string name="insights_overview_other">Other</string>
+    <string name="insights_overview_shifts">Shifts vs previous period</string>
+    <string name="insights_overview_share_headline">Most time went to %1$s (%2$s).</string>
+    <string name="insights_overview_shift_points_up" tools:ignore="PluralsCandidate">%1$s: share up %2$d points vs previous period</string>
+    <string name="insights_overview_shift_points_down" tools:ignore="PluralsCandidate">%1$s: share down %2$d points vs previous period</string>
+    <string name="insights_overview_shift_pts">%1$d pts</string>
+
+    <!-- Screen-reader summary on the per-day chart. -->
+    <string name="insights_overview_sr_summary">%1$s tracked in %2$s.</string>
+    <string name="insights_overview_sr_busiest">" Busiest day %1$s with %2$s."</string>
+    <string name="insights_overview_sr_top_context">" Most time went to %1$s."</string>
+</resources>

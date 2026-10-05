@@ -4,23 +4,13 @@ import { useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { hourHeatmap } from "@/lib/analytics/patterns";
 import { formatDuration } from "@/lib/datetime/format";
+import { STEP_ALPHA, heatmapBands, stepOf } from "@/lib/insights/view-selectors";
 import { cn } from "@/lib/utils";
 import type { Occurrence, TimeWindow } from "@/lib/types";
 
 const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
-/** Quantize a cell to one of 5 steps: 0 · <30m · <1h · <2h · 2h+. */
-function stepOf(ms: number): number {
-  if (ms <= 0) return 0;
-  if (ms < 30 * 60_000) return 1;
-  if (ms < 60 * 60_000) return 2;
-  if (ms < 120 * 60_000) return 3;
-  return 4;
-}
-
 const STEP_LABELS = ["0", "<30m", "<1h", "<2h", "2h+"];
-/** Alpha of --chart-1 per step (step 0 renders the muted track instead). */
-const STEP_ALPHA = [0, 25, 45, 70, 100];
 
 function cellStyle(step: number): React.CSSProperties | undefined {
   if (step === 0) return undefined;
@@ -52,13 +42,7 @@ export function HourHeatmap({
     [occurrences, window, timeZone],
   );
 
-  const bands = useMemo(() => {
-    const out: number[] = Array.from({ length: 7 * 6 }, () => 0);
-    for (const c of cells) {
-      out[c.weekday * 6 + Math.floor(c.hour / 4)] += c.ms;
-    }
-    return out;
-  }, [cells]);
+  const bands = useMemo(() => heatmapBands(cells), [cells]);
 
   return (
     <div className="space-y-2">

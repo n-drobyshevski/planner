@@ -56,6 +56,8 @@ internal object WidgetUpdates {
     /** Every Planr widget on every home screen. */
     suspend fun refreshAll(context: Context) {
         refresh(context, TodayAgendaWidget())
+        refresh(context, WeekAgendaWidget())
+        refresh(context, MonthWidget())
         refresh(context, TasksWidget())
         // Static; re-rendered only so a language change reaches its labels.
         QuickAddWidget().updateAll(context)

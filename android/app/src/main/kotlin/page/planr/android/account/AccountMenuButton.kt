@@ -3,6 +3,7 @@ package page.planr.android.account
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -16,11 +17,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import page.planr.android.BuildConfig
 import page.planr.android.R
 
 /**
  * The account action on the Calendar and Tasks headers: a quiet icon that
- * opens a one-item menu, "Sign out", behind a confirmation. Signing out
+ * opens a menu with "Sign out" (behind a confirmation) and, below it, the
+ * app's version, for bug reports. Signing out
  * forgets the session on this device (and ends it on the server), wipes the
  * cached calendar and tasks, and blanks the widgets.
  */
@@ -43,6 +46,18 @@ fun AccountMenuButton(viewModel: AccountViewModel = hiltViewModel()) {
                 menuOpen = false
                 confirming = true
             },
+        )
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = {
+                Text(
+                    text = stringResource(R.string.app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE, BuildConfig.GIT_SHA),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            onClick = {},
+            enabled = false,
         )
     }
     if (confirming) {

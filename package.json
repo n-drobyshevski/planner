@@ -13,6 +13,7 @@
     "e2e": "playwright test",
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
     "fixtures:recurrence": "tsx scripts/export-recurrence-fixtures.ts",
+    "fixtures:insights": "tsx scripts/export-insights-fixtures.ts",
     "supabase": "supabase",
     "db:reset": "supabase db reset"
   },

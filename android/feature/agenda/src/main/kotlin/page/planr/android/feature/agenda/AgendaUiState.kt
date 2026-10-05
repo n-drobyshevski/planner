@@ -25,6 +25,8 @@ data class AgendaUiState(
     val isRefreshing: Boolean = false,
     /** Signed in, so "New event" can create something. */
     val canCreate: Boolean = false,
+    /** The other member, for the header's show/hide toggle; null in a one-person workspace. */
+    val partner: PartnerToggle? = null,
 ) {
     /** The focused period, counted in periods from today's. */
     val periodOffset: Int get() = AgendaPeriods.offsetOf(mode, today, focusDate)
@@ -38,3 +40,15 @@ data class AgendaUiState(
 
     fun schedule(date: LocalDate): DaySchedule = schedules[date] ?: DaySchedule.empty(date)
 }
+
+/**
+ * The header's partner toggle: whether the partner's personal events show
+ * (joint ones always do). [color] is their `members.color`; without one the
+ * member-slot default applies ([isMemberA]: the older member).
+ */
+data class PartnerToggle(
+    val name: String,
+    val color: String?,
+    val isMemberA: Boolean,
+    val shown: Boolean,
+)

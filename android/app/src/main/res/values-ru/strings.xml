@@ -14,8 +14,10 @@
     <string name="sign_in_error_no_browser">Нет браузера для входа. Установи или включи браузер и попробуй снова.</string>
     <string name="nav_agenda">Календарь</string>
     <string name="nav_tasks">Задачи</string>
+    <string name="nav_insights">Аналитика</string>
     <string name="account_menu">Аккаунт</string>
     <string name="sign_out">Выйти</string>
+    <string name="app_version">Planr %1$s · сборка %2$d · %3$s</string>
     <string name="sign_out_cancel">Отмена</string>
     <string name="sign_out_confirm_title">Выйти на этом телефоне?</string>
     <string name="sign_out_confirm_body">Телефон забудет сессию и удалит сохранённую копию календаря и задач. Виджеты останутся пустыми, пока ты снова не войдёшь.</string>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Insights trends strings, copied from messages/en (manifest:
+     src/test/resources/strings-source/trends.json). Names start with insights_trends_. -->
+<resources>
+    <!-- Lede (lede.trends*). The headline is a frame plus an optional rate clause (TrendsText.ledeSpec). -->
+    <string name="insights_trends_lede_none_headline">Not enough history yet to call a trend.</string>
+    <string name="insights_trends_lede_none_support">Keep tracking and a direction will show up here.</string>
+    <string name="insights_trends_lede_flat">Your tracked time is holding steady across the period.</string>
+    <string name="insights_trends_lede_up">Your tracked time is trending up%1$s.</string>
+    <string name="insights_trends_lede_down">Your tracked time is trending down%1$s.</string>
+    <string name="insights_trends_lede_rate_day">, about %1$s%2$s per day</string>
+    <string name="insights_trends_lede_rate_week">, about %1$s%2$s per week</string>
+    <string name="insights_trends_lede_rate_month">, about %1$s%2$s per month</string>
+    <string name="insights_trends_lede_support_day">Busiest day: %1$s (%2$s).</string>
+    <string name="insights_trends_lede_support_week">Busiest week: %1$s (%2$s).</string>
+    <string name="insights_trends_lede_support_month">Busiest month: %1$s (%2$s).</string>
+
+    <!-- Empty period. -->
+    <string name="insights_trends_empty_title">Nothing to chart over time</string>
+    <string name="insights_trends_empty_description">Timed events in this period will appear here as a trend across days, weeks, or months.</string>
+
+    <!-- Per-bucket chart, one string per granularity (trends.* selects). -->
+    <string name="insights_trends_series_tracked">Tracked</string>
+    <string name="insights_trends_series_avg">7-day avg</string>
+    <string name="insights_trends_per_bucket_title_day">Tracked time per day</string>
+    <string name="insights_trends_per_bucket_title_week">Tracked time per week</string>
+    <string name="insights_trends_per_bucket_title_month">Tracked time per month</string>
+    <string name="insights_trends_per_bucket_headline_day">Busiest day: %1$s (%2$s).%3$s</string>
+    <string name="insights_trends_per_bucket_headline_week">Busiest week: %1$s (%2$s).%3$s</string>
+    <string name="insights_trends_per_bucket_headline_month">Busiest month: %1$s (%2$s).%3$s</string>
+    <string name="insights_trends_per_bucket_aria_day">Tracked time per day, %1$s</string>
+    <string name="insights_trends_per_bucket_aria_week">Tracked time per week, %1$s</string>
+    <string name="insights_trends_per_bucket_aria_month">Tracked time per month, %1$s</string>
+    <string name="insights_trends_busiest_day">Busiest day</string>
+    <string name="insights_trends_busiest_week">Busiest week</string>
+    <string name="insights_trends_busiest_month">Busiest month</string>
+    <string name="insights_trends_sr_summary_day">%1$s tracked across %2$d day buckets. Busiest: %3$s with %4$s.</string>
+    <string name="insights_trends_sr_summary_week">%1$s tracked across %2$d week buckets. Busiest: %3$s with %4$s.</string>
+    <string name="insights_trends_sr_summary_month">%1$s tracked across %2$d month buckets. Busiest: %3$s with %4$s.</string>
+    <string name="insights_trends_trend_up">" Trending up across the period."</string>
+    <string name="insights_trends_trend_down">" Trending down across the period."</string>
+    <string name="insights_trends_trend_flat">" Holding steady across the period."</string>
+    <string name="insights_trends_footnote_avg">Curve: trailing 7-day average · tap a day for detail</string>
+    <string name="insights_trends_footnote_unusual">○ unusual day</string>
+    <string name="insights_trends_total_tracked">Total tracked</string>
+
+    <!-- Momentum (day granularity only). -->
+    <string name="insights_trends_momentum">Momentum</string>
+    <string name="insights_trends_current_streak">Current streak</string>
+    <string name="insights_trends_longest_streak">Longest streak</string>
+    <plurals name="insights_trends_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string name="insights_trends_consistency">Consistency</string>
+    <string name="insights_trends_trend_rate">Trend rate</string>
+    <string name="insights_trends_level">Level</string>
+    <string name="insights_trends_trend_rate_per_day">%1$s%2$s/day</string>
+    <string name="insights_trends_unusually_heavy">Unusually heavy:</string>
+    <string name="insights_trends_unusually_light">Unusually light:</string>
+
+    <!-- By context over time. -->
+    <string name="insights_trends_by_context_title">By context over time</string>
+    <string name="insights_trends_by_context_headline">%1$s leads with %2$s (%3$s of tracked time).</string>
+    <string name="insights_trends_by_context_aria_day">Tracked time per context per day, top %1$d contexts</string>
+    <string name="insights_trends_by_context_aria_week">Tracked time per context per week, top %1$d contexts</string>
+    <string name="insights_trends_by_context_aria_month">Tracked time per context per month, top %1$d contexts</string>
+    <string name="insights_trends_col_context">Context</string>
+    <string name="insights_trends_col_time">Time</string>
+    <string name="insights_trends_col_share">Share</string>
+</resources>

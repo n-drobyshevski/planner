@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.datetime.LocalDate
 
 class LaunchRouteTest {
 
@@ -31,6 +32,13 @@ class LaunchRouteTest {
     }
 
     @Test
+    fun `a day opens under the agenda`() {
+        val parsed = LaunchRoute.parse("day/2026-10-07")
+        assertEquals(LaunchRoute.Day(LocalDate(2026, 10, 7)), parsed)
+        assertEquals(TopLevelTab.Agenda, parsed?.tab)
+    }
+
+    @Test
     fun `anything else is ignored`() {
         listOf(
             null,
@@ -43,6 +51,12 @@ class LaunchRouteTest {
             "event-edit/1",
             "event-new",
             "settings",
+            "day/",
+            "day/2026-13-01",
+            "day/2026-02-30",
+            "day/2026-10-07T10:00",
+            "day/+2026-10-07",
+            "day/2026-10-07/x",
         ).forEach { assertNull(LaunchRoute.parse(it), "route: $it") }
     }
 

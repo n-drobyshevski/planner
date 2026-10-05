@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import page.planr.android.core.design.theme.PlanrTheme
 
 /**
- * Agenda / Tasks. Flat on the paper surface with a hairline above it, like
+ * Agenda / Tasks / Insights. Flat on the paper surface with a hairline above it, like
  * the web's sidebar edge, rather than a tinted slab.
  */
 @Composable

@@ -63,6 +63,7 @@ import page.planr.android.feature.agenda.model.AgendaNotice
 import page.planr.android.feature.agenda.model.UiText
 import page.planr.android.feature.agenda.ui.AgendaFormats
 import page.planr.android.feature.agenda.ui.AgendaIcons
+import page.planr.android.feature.agenda.ui.PartnerToggleButton
 import page.planr.android.feature.agenda.ui.HourHeight
 import page.planr.android.feature.agenda.ui.PeriodPage
 import page.planr.android.feature.agenda.ui.rememberAgendaFormats
@@ -142,6 +143,7 @@ fun AgendaScreen(
                 onNext = viewModel::next,
                 onToday = viewModel::goToToday,
                 onMode = viewModel::setMode,
+                onShowPartner = viewModel::setShowPartnerEvents,
                 onNew = if (state.canCreate) ({ create(null) }) else null,
                 accountAction = accountAction,
             )
@@ -227,6 +229,7 @@ private fun AgendaTopBar(
     onNext: () -> Unit,
     onToday: () -> Unit,
     onMode: (AgendaMode) -> Unit,
+    onShowPartner: (Boolean) -> Unit,
     onNew: (() -> Unit)?,
     accountAction: (@Composable () -> Unit)?,
 ) {
@@ -253,6 +256,7 @@ private fun AgendaTopBar(
                     .weight(1f)
                     .semantics { heading() },
             )
+            state.partner?.let { partner -> PartnerToggleButton(partner, onToggle = onShowPartner) }
             if (onNew != null) {
                 IconButton(onClick = onNew) {
                     Icon(AgendaIcons.Plus, contentDescription = stringResource(R.string.agenda_new_event))

@@ -58,8 +58,11 @@ internal data class MemberTone(val slot: Slot, val hex: String? = null) {
 internal object TodayAgendaModel {
 
     /** Local midnight to the next local midnight (23 or 25 hours across a DST change). */
-    fun dayWindow(day: LocalDate, zone: TimeZone): TimeWindow =
-        TimeWindow(day.atStartOfDayIn(zone), day.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone))
+    fun dayWindow(day: LocalDate, zone: TimeZone): TimeWindow = daysWindow(day, day, zone)
+
+    /** Local midnight of [first] to the local midnight after [last]. */
+    fun daysWindow(first: LocalDate, last: LocalDate, zone: TimeZone): TimeWindow =
+        TimeWindow(first.atStartOfDayIn(zone), last.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone))
 
     /**
      * Rows for [day]: all-day first, then by start, title and key. Contexts

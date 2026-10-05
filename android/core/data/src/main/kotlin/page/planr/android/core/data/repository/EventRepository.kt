@@ -63,6 +63,14 @@ class EventRepository @Inject constructor(
     /**
      * Refetches [window] (`fetchWindow`) and replaces what Room holds for it,
      * so rows deleted elsewhere disappear too.
+     *
+     * The deletion is exact because `EventDao.IN_WINDOW` is the predicate
+     * `fetchWindow` returns (its server filter plus `mayIntersect`; the
+     * `is_recurring` column is `rrule != null`): a cached row that matches it
+     * but is missing from the response was deleted on the server or moved
+     * out of the window, and nothing else is. Every page is fetched inside
+     * the `fetch` lambda, before anything is applied, so a fetch that fails
+     * partway writes nothing.
      */
     suspend fun refreshWindow(window: TimeWindow) {
         val ws = session.requireSession().workspaceId

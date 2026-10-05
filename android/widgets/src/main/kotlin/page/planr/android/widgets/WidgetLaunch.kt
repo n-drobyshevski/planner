@@ -3,12 +3,14 @@ package page.planr.android.widgets
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import kotlinx.datetime.LocalDate
 
 /**
  * How a widget tap opens the app. Every tap is an explicit intent to the app's
  * launcher activity with [ACTION_OPEN] and, optionally, [EXTRA_ROUTE]: one of
  * the app's navigation routes (`agenda`, `tasks`, `event/{ref}`, `task/{id}`,
- * the strings of `PlanrRoutes`). The activity reads it with [routeOf] in
+ * the strings of `PlanrRoutes`), or `day/{yyyy-mm-dd}` for the agenda's day
+ * view of that date. The activity reads it with [routeOf] in
  * `onCreate` and `onNewIntent` and navigates there once signed in; with no
  * route (or signed out) it simply opens where it would anyway.
  */
@@ -27,6 +29,9 @@ object WidgetLaunch {
     internal fun eventRoute(occurrenceKey: String): String = "event/${Uri.encode(occurrenceKey)}"
 
     internal fun taskRoute(taskId: String): String = "task/${Uri.encode(taskId)}"
+
+    /** The agenda's day view on [date]. */
+    internal fun dayRoute(date: LocalDate): String = "day/$date"
 
     /** Opens the app (its launcher activity) on [route], or where it would open anyway. */
     internal fun openApp(context: Context, route: String? = null): Intent {

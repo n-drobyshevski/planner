@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget-picker preview (API 31+): a static sketch of WeekAgendaWidget.
+     RemoteViews-safe views only. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_background"
+    android:orientation="vertical"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="12dp"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/widget_week_title"
+            android:textColor="@color/planr_widget_ink"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_preview_week_range"
+            android:textColor="@color/planr_widget_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewDayHeading">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-black"
+            android:text="@string/widget_preview_week_day_1"
+            android:textColor="@color/planr_widget_accent"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewRow">
+        <FrameLayout
+            style="@style/PlanrWidgetPreviewBar"
+            android:background="@color/planr_widget_shared" />
+        <TextView
+            style="@style/PlanrWidgetPreviewTime"
+            android:text="@string/widget_all_day" />
+        <TextView
+            style="@style/PlanrWidgetPreviewTitle"
+            android:text="@string/widget_preview_event_3" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewRow">
+        <FrameLayout
+            style="@style/PlanrWidgetPreviewBar"
+            android:background="@color/planr_widget_member_a" />
+        <TextView
+            style="@style/PlanrWidgetPreviewTime"
+            android:text="07:30" />
+        <TextView
+            style="@style/PlanrWidgetPreviewTitle"
+            android:text="@string/widget_preview_event_1" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewDayHeading">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/widget_preview_week_day_2"
+            android:textColor="@color/planr_widget_ink"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewRow">
+        <FrameLayout
+            style="@style/PlanrWidgetPreviewBar"
+            android:background="@color/planr_widget_member_b" />
+        <TextView
+            style="@style/PlanrWidgetPreviewTime"
+            android:text="11:00" />
+        <TextView
+            style="@style/PlanrWidgetPreviewTitle"
+            android:text="@string/widget_preview_event_2" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/PlanrWidgetPreviewDayHeading">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/widget_preview_week_day_3"
+            android:textColor="@color/planr_widget_ink"
+            android:textSize="12sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_week_free"
+            android:textColor="@color/planr_widget_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

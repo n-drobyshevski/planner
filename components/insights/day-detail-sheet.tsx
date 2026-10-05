@@ -7,11 +7,8 @@
 
 import { useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { format } from "date-fns";
-import { tz } from "@date-fns/tz";
 import { CalendarDays } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { Button } from "@/components/ui/button";
 import {
   ResponsiveDialog,
@@ -24,13 +21,14 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { ATTRIBUTE_META } from "@/lib/attributes/schema";
 import { formatDuration, formatTime, toDateParam } from "@/lib/datetime/format";
+import {
+  buildDayDetail,
+  clippedMs,
+  formatDayDetailTitle,
+} from "@/lib/insights/view-selectors";
 import { seriesFallbackLabels, seriesMeta } from "./series";
 import type { InsightsTabData } from "./insights-shell";
 import type { Occurrence } from "@/lib/types";
-
-function clippedMs(o: Occurrence, dayStart: number, dayEnd: number): number {
-  return Math.max(0, Math.min(o.end, dayEnd) - Math.max(o.start, dayStart));
-}
 
 /** Compact attribute chips, e.g. "Energy: 2 Steady · Focus: Deep". `ta` is the
  *  `common` translator (attribute labels/options live there, shared with the editor). */
@@ -63,21 +61,11 @@ export function DayDetailSheet({
   const locale = useLocale();
   const seriesLabels = seriesFallbackLabels(t);
   const { period, occurrences, categories, timeZone } = data;
-  const ctx = tz(timeZone);
-  const dfLocale = dateFnsLocale(locale);
 
-  const day = useMemo(() => {
-    if (dayMs === null) return null;
-    const idx = period.days.indexOf(dayMs);
-    const dayEnd = idx >= 0 ? (period.days[idx + 1] ?? period.window.end) : dayMs + 86_400_000;
-    const items = occurrences
-      .filter((o) => o.start < dayEnd && o.end > dayMs)
-      .sort((a, b) => a.start - b.start || a.title.localeCompare(b.title));
-    const totalMs = items
-      .filter((o) => !o.inactive)
-      .reduce((s, o) => s + clippedMs(o, dayMs, dayEnd), 0);
-    return { dayEnd, items, totalMs };
-  }, [dayMs, period, occurrences]);
+  const day = useMemo(
+    () => (dayMs === null ? null : buildDayDetail(dayMs, period, occurrences)),
+    [dayMs, period, occurrences],
+  );
 
   return (
     <ResponsiveDialog open={dayMs !== null} onOpenChange={(open) => !open && onClose()}>
@@ -86,7 +74,7 @@ export function DayDetailSheet({
           <>
             <ResponsiveDialogHeader>
               <ResponsiveDialogTitle>
-                {format(dayMs, "EEEE, d MMM yyyy", { in: ctx, locale: dfLocale })}
+                {formatDayDetailTitle(dayMs, timeZone, locale)}
               </ResponsiveDialogTitle>
               <ResponsiveDialogDescription>
                 {day.items.length === 0

@@ -5,9 +5,8 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.daysUntil
-import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import page.planr.android.core.model.CalendarWeeks
 import page.planr.android.core.model.TimeWindow
 
 /** The agenda's two layouts; a period is one day or one Monday-first week (the web's default). */
@@ -22,7 +21,7 @@ object AgendaPeriods {
     /** First day of the period containing [date]. */
     fun periodStart(mode: AgendaMode, date: LocalDate): LocalDate = when (mode) {
         AgendaMode.Day -> date
-        AgendaMode.Week -> date.minus(date.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
+        AgendaMode.Week -> CalendarWeeks.weekStart(date)
     }
 
     /** The start of the period [offset] periods after the one containing [date]. */

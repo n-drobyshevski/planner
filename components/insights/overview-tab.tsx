@@ -18,7 +18,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { computeUsage } from "@/lib/analytics/usage";
-import { rollingAverage, delta } from "@/lib/analytics/trends";
+import { delta } from "@/lib/analytics/trends";
 import { categoryShares } from "@/lib/analytics/balance";
 import { computeTaskStats } from "@/lib/analytics/task-stats";
 import { COMPARISON_COLOR, COMPARISON_OPACITY } from "@/lib/insights/palette";
@@ -33,9 +33,18 @@ import {
   useUpdateInsightsPrefs,
 } from "@/lib/hooks/use-insights-prefs";
 import { formatDuration, formatWeekdayDayMonth } from "@/lib/datetime/format";
-import { dateFnsLocale } from "@/lib/datetime/date-locale";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { deriveOverviewLede } from "@/lib/insights/ledes";
+import {
+  avgSessionMs,
+  formatWeekdayDayMonthLong,
+  formatWeekdayDayMonthShort,
+  perDaySeries,
+  shareRows,
+  shiftChips as selectShiftChips,
+  totalChange,
+  typicalDayMs as selectTypicalDayMs,
+} from "@/lib/insights/view-selectors";
 import { StatCard, StatGrid } from "./stat-card";
 import { ChartCard } from "./chart-card";
 import {
@@ -55,9 +64,6 @@ import { NEUTRAL, seriesFallbackLabels, seriesMeta } from "./series";
 import { CHART_H, Reading, SectionLabel, TabGrid, srPercent } from "./tab-bits";
 import type { InsightsTabData } from "./insights-shell";
 
-/** Categories shown individually in the share bar before collapsing into "Other". */
-const TOP_CATEGORIES = 6;
-
 /**
  * The three headline numbers are permanent lead figures in the answer zone, so
  * they never render as dashboard cards (that would duplicate them). The
@@ -72,14 +78,6 @@ const LEAD_STAT_IDS: DashboardCardId[] = ["total", "daily-avg", "active-days"];
  */
 const FULL_WIDTH_SECTIONS = new Set<DashboardCardId>(["per-day"]);
 
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const n = sorted.length;
-  if (n === 0) return 0;
-  const mid = Math.floor(n / 2);
-  return n % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
 /**
  * The Overview is a customizable dashboard read as a three-movement "reading":
  * the answer (the lede sentence + its lead figures), the evidence (a registry
@@ -91,7 +89,6 @@ function median(values: number[]): number {
 export function OverviewTab({ data }: { data: InsightsTabData }) {
   const t = useTranslations("insights");
   const locale = useLocale();
-  const dfLocale = dateFnsLocale(locale);
   const seriesLabels = useMemo(() => seriesFallbackLabels(t), [t]);
   const reduced = usePrefersReducedMotion();
   const {
@@ -140,52 +137,41 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   const total = usage.summary.totalMs;
   const ctx = tz(timeZone);
 
-  const perDayData = useMemo(() => {
-    const avg = rollingAverage(usage.perDay, 7);
-    return usage.perDay.map((d, i) => ({
-      key: String(d.dayMs),
-      ms: d.ms,
-      avg: avg[i].avgMs,
-      // Previous period aligned by position (day 1 vs day 1, …).
-      prevMs: prevUsage.perDay[i]?.ms,
-      full: formatWeekdayDayMonth(d.dayMs, timeZone, locale),
-    }));
-  }, [usage.perDay, prevUsage.perDay, timeZone, locale]);
+  const perDayData = useMemo(
+    () =>
+      perDaySeries(usage.perDay, prevUsage.perDay).map((p, i) => ({
+        ...p,
+        full: formatWeekdayDayMonth(usage.perDay[i].dayMs, timeZone, locale),
+      })),
+    [usage.perDay, prevUsage.perDay, timeZone, locale],
+  );
 
   // "Typical day" baseline: median nonzero day across both windows — the same
   // baseline the Optimize overload rule judges against.
   const typicalDayMs = useMemo(
-    () =>
-      median(
-        [...usage.perDay, ...prevUsage.perDay].map((d) => d.ms).filter((ms) => ms > 0),
-      ),
+    () => selectTypicalDayMs(usage.perDay, prevUsage.perDay),
     [usage.perDay, prevUsage.perDay],
   );
 
-  const shareData = useMemo(() => {
-    const rows = usage.byCategory.map((c) => {
-      const meta = seriesMeta(c.categoryId ?? "__uncategorized__", data.categories, seriesLabels);
-      return { id: c.categoryId ?? "uncategorized", ...meta, ms: c.ms };
-    });
-    if (rows.length <= TOP_CATEGORIES) return rows;
-    const head = rows.slice(0, TOP_CATEGORIES);
-    const restMs = rows.slice(TOP_CATEGORIES).reduce((s, r) => s + r.ms, 0);
-    return [...head, { id: "other", name: t("overview.other"), color: NEUTRAL, ms: restMs }];
-  }, [usage.byCategory, data.categories, seriesLabels, t]);
+  const shareData = useMemo(
+    () =>
+      shareRows(usage.byCategory).map((r) =>
+        r.seriesKey === null
+          ? { id: r.id, name: t("overview.other"), color: NEUTRAL, ms: r.ms }
+          : { id: r.id, ...seriesMeta(r.seriesKey, data.categories, seriesLabels), ms: r.ms },
+      ),
+    [usage.byCategory, data.categories, seriesLabels, t],
+  );
 
   // Biggest share shifts vs the previous period (only meaningful with data on
   // both sides).
   const shiftChips = useMemo(() => {
     if (total === 0 || prevUsage.summary.totalMs === 0) return [];
-    return categoryShares(
-      occurrences,
-      prevOccurrences,
-      period.window,
-      period.prevWindow,
-    )
-      .filter((s) => Math.abs(s.deltaShare) >= 0.02)
-      .sort((a, b) => Math.abs(b.deltaShare) - Math.abs(a.deltaShare))
-      .slice(0, 3);
+    return selectShiftChips(
+      categoryShares(occurrences, prevOccurrences, period.window, period.prevWindow),
+      total,
+      prevUsage.summary.totalMs,
+    );
   }, [occurrences, prevOccurrences, period, total, prevUsage.summary.totalMs]);
 
   // Tracked ms per category over the focused window, for the goals card.
@@ -204,21 +190,11 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   };
 
   // Takeaway headline: total + direction vs the previous period.
-  const totalDelta = delta(total, prevUsage.summary.totalMs);
+  const totalTrend = totalChange(total, prevUsage.summary.totalMs);
   const perDayHeadline = t("overview.perDayHeadline", {
-    trend:
-      totalDelta.deltaPct === null
-        ? "none"
-        : totalDelta.deltaPct === 0
-          ? "level"
-          : totalDelta.deltaPct > 0
-            ? "up"
-            : "down",
+    trend: totalTrend.trend,
     total: formatDuration(total, locale),
-    pct:
-      totalDelta.deltaPct === null
-        ? 0
-        : Math.round(Math.abs(totalDelta.deltaPct) * 100),
+    pct: totalTrend.pct,
   });
 
   const shareHeadline = shareData[0]
@@ -266,6 +242,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
   // The three lead figures are intentionally absent (they live in the answer
   // zone); stat cards render flat — borderless figures, not boxes.
 
+  const avgSession = avgSessionMs(usage.summary);
   const statCards: Partial<Record<DashboardCardId, React.ReactNode>> = {
     events: (
       <StatCard
@@ -282,11 +259,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
         key="avg-session"
         flat
         label={t("overview.avgSession")}
-        value={
-          usage.summary.eventCount > 0
-            ? formatDuration(total / usage.summary.eventCount, locale)
-            : "—"
-        }
+        value={avgSession !== null ? formatDuration(avgSession, locale) : "—"}
         hint={t("overview.avgSessionHint")}
       />
     ),
@@ -302,7 +275,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
         }
         hint={
           usage.summary.busiestDay
-            ? format(usage.summary.busiestDay.dayMs, "EEE d MMM", { in: ctx, locale: dfLocale })
+            ? formatWeekdayDayMonthShort(usage.summary.busiestDay.dayMs, timeZone, locale)
             : undefined
         }
       />
@@ -575,7 +548,7 @@ export function OverviewTab({ data }: { data: InsightsTabData }) {
           })}
           {usage.summary.busiestDay
             ? t("overview.srBusiest", {
-                day: format(usage.summary.busiestDay.dayMs, "EEEE d MMMM", { in: ctx, locale: dfLocale }),
+                day: formatWeekdayDayMonthLong(usage.summary.busiestDay.dayMs, timeZone, locale),
                 ms: formatDuration(usage.summary.busiestDay.ms, locale),
               })
             : ""}

@@ -34,6 +34,11 @@ interface AgendaDataSource {
     /** Expanded occurrences overlapping [window]; collecting marks it as on screen. */
     fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>>
 
+    /** Whether the partner's personal events show (device-local, default on). */
+    fun observeShowPartnerEvents(): Flow<Boolean>
+
+    suspend fun setShowPartnerEvents(show: Boolean)
+
     /** Refetches members and categories. */
     suspend fun refreshWorkspace()
 

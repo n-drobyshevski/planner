@@ -8,6 +8,7 @@
     <string name="agenda_view_day">День</string>
     <string name="agenda_view_week">Неделя</string>
     <string name="agenda_new_event">Новое событие</string>
+    <string name="agenda_partner_events">События: %1$s</string>
     <string name="agenda_quick_add">Быстро добавить</string>
     <string name="agenda_all_day_header">Весь день</string>
     <string name="agenda_untitled">Без названия</string>

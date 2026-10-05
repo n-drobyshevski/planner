@@ -2,6 +2,7 @@ package page.planr.android.core.data.local
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -50,13 +51,17 @@ class CacheGate @Inject constructor() {
 
     /**
      * Fetches a snapshot of [area] and writes it as authoritative (rows it
-     * lacks are deleted). Refetches when an incremental write to [area]
-     * landed during the fetch; after [MAX_ATTEMPTS] it applies the latest
-     * snapshot anyway, which is never older than what the cache would keep.
-     * Dropped when the cache was wiped meanwhile.
+     * lacks are deleted). Refetches, after a growing pause that lets a burst
+     * of edits settle, when an incremental write to [area] landed during the
+     * fetch. After [MAX_ATTEMPTS] it applies the latest snapshot anyway, so a
+     * refresh always completes; a change that landed during that last fetch
+     * may then be reverted (a row it inserted dropped) until the next
+     * refresh. Long paged fetches (Insights' windows) make such collisions
+     * likelier, hence the pauses. Dropped when the cache was wiped meanwhile.
      */
     suspend fun <T> refresh(area: CacheArea, fetch: suspend () -> T, write: suspend (T) -> Unit) {
-        repeat(MAX_ATTEMPTS) { attempt ->
+        for (attempt in 0 until MAX_ATTEMPTS) {
+            if (attempt > 0) delay(RETRY_PAUSE_MS shl (attempt - 1))
             val ticket = ticket()
             val snapshot = fetch()
             val lastAttempt = attempt == MAX_ATTEMPTS - 1
@@ -80,7 +85,10 @@ class CacheGate @Inject constructor() {
         clear()
     }
 
-    private companion object {
-        const val MAX_ATTEMPTS = 3
+    internal companion object {
+        const val MAX_ATTEMPTS = 5
+
+        /** The pause before the first refetch; it doubles for each one after (250 ms … 2 s). */
+        const val RETRY_PAUSE_MS = 250L
     }
 }

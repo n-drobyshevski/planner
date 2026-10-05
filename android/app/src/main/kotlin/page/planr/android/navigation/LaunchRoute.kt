@@ -1,11 +1,12 @@
 package page.planr.android.navigation
 
+import kotlinx.datetime.LocalDate
 import page.planr.android.feature.agenda.navigation.AgendaRoutes
 
 /**
  * Where an external launch (a widget tap) asked the app to open. MainActivity
- * is exported, so the requested route is untrusted input: only the four
- * shapes the widgets produce are accepted, anything else opens the app as is.
+ * is exported, so the requested route is untrusted input: only the shapes the
+ * widgets produce are accepted, anything else opens the app as is.
  */
 sealed interface LaunchRoute {
     /** The tab the target lives under; the detail (if any) is pushed on top of it. */
@@ -20,6 +21,11 @@ sealed interface LaunchRoute {
         val route get() = "event/$encodedRef"
     }
 
+    /** One day in the agenda's day view. */
+    data class Day(val date: LocalDate) : LaunchRoute {
+        override val tab get() = TopLevelTab.Agenda
+    }
+
     /** A task; [encodedId] stays URI-encoded. */
     data class Task(val encodedId: String) : LaunchRoute {
         override val tab get() = TopLevelTab.Tasks
@@ -29,16 +35,26 @@ sealed interface LaunchRoute {
     companion object {
         private const val EVENT_PREFIX = "event/"
         private const val TASK_PREFIX = "task/"
+        private const val DAY_PREFIX = "day/"
+        private val ISO_DATE = Regex("""\d{4}-\d{2}-\d{2}""")
 
-        /** Parses a widget route (`agenda`, `tasks`, `event/{ref}`, `task/{id}`); null when unknown. */
+        /**
+         * Parses a widget route (`agenda`, `tasks`, `event/{ref}`, `task/{id}`,
+         * `day/{yyyy-mm-dd}`); null when unknown.
+         */
         fun parse(route: String?): LaunchRoute? = when {
             route == null -> null
             route == PlanrRoutes.AGENDA -> Tab(TopLevelTab.Agenda)
             route == PlanrRoutes.TASKS -> Tab(TopLevelTab.Tasks)
             route.startsWith(EVENT_PREFIX) -> segment(route, EVENT_PREFIX)?.let(::Event)
             route.startsWith(TASK_PREFIX) -> segment(route, TASK_PREFIX)?.let(::Task)
+            route.startsWith(DAY_PREFIX) -> date(route.removePrefix(DAY_PREFIX))?.let(::Day)
             else -> null
         }
+
+        /** An ISO calendar date, and only that (no time, no offset); null when invalid. */
+        private fun date(value: String): LocalDate? =
+            if (ISO_DATE.matches(value)) runCatching { LocalDate.parse(value) }.getOrNull() else null
 
         /** The single path segment after [prefix]: non-empty, and no nested path or query. */
         private fun segment(route: String, prefix: String): String? =

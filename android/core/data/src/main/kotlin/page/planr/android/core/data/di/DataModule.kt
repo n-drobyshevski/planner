@@ -17,7 +17,8 @@ import page.planr.android.core.recurrence.RecurrenceExpander
 
 /**
  * App-wide data bindings. Supabase, Room, auth and widget bindings live in the
- * sibling modules (SupabaseModule, DatabaseModule, AuthModule, WidgetModule).
+ * sibling modules (SupabaseModule, DatabaseModule, AuthModule, WidgetModule,
+ * PreferencesModule).
  */
 @Module
 @InstallIn(SingletonComponent::class)

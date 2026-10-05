@@ -1,0 +1,176 @@
+package page.planr.android.feature.insights.shell
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import java.time.ZoneId
+import page.planr.android.core.design.theme.PlanrRadii
+import page.planr.android.core.design.theme.PlanrSpacing
+import page.planr.android.core.design.theme.TABULAR_NUMS
+import page.planr.android.core.insights.model.Granularity
+import page.planr.android.core.insights.model.PeriodPreset
+import page.planr.android.feature.insights.PeriodUi
+import page.planr.android.feature.insights.R
+
+/**
+ * The period controls at the top of every tab's list (they scroll with it):
+ * a compact preset trigger with the range beside it, then the Day / Week /
+ * Month buckets, the ones the window does not offer disabled.
+ *
+ * @param menuOpen whether the preset menu is open: hoisted, because the bar
+ *   moves between lists (the shell's while loading, then the tab's) and must
+ *   not close the menu when it does.
+ * @param onEditCustom reopens the custom-range dialog (the range is tappable while Custom).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun PeriodBar(
+    period: PeriodUi,
+    zone: ZoneId,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
+    onPreset: (PeriodPreset) -> Unit,
+    onGranularity: (Granularity) -> Unit,
+    onEditCustom: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(PlanrSpacing.md)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xs),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            PresetTrigger(period.preset, menuOpen, onMenuOpenChange, onPreset)
+            RangeText(period, zone, onEditCustom)
+        }
+        GranularityRow(period, onGranularity)
+    }
+}
+
+/** A FilterChip-sized button (32 dp, 48 dp touch target) opening the preset menu; the current preset is checked. */
+@Composable
+private fun PresetTrigger(
+    preset: PeriodPreset,
+    open: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    onPreset: (PeriodPreset) -> Unit,
+) {
+    val label = stringResource(ShellText.preset(preset))
+    val description = stringResource(R.string.insights_period_label) + ", " + label
+    Box {
+        TextButton(
+            onClick = { onOpenChange(true) },
+            shape = RoundedCornerShape(PlanrRadii.sm),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+            contentPadding = PaddingValues(start = PlanrSpacing.md, end = PlanrSpacing.sm),
+            modifier = Modifier
+                .height(32.dp)
+                .semantics { contentDescription = description },
+        ) {
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, maxLines = 1)
+            Icon(
+                ShellIcons.ChevronDown,
+                contentDescription = null,
+                modifier = Modifier
+                    .padding(start = PlanrSpacing.xs)
+                    .size(16.dp),
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { onOpenChange(false) }) {
+            PeriodPreset.entries.forEach { option ->
+                val current = option == preset
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(ShellText.preset(option)),
+                            fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    },
+                    onClick = {
+                        onOpenChange(false)
+                        onPreset(option)
+                    },
+                    // Spoken as selected; the check is the sighted cue (not weight alone).
+                    modifier = Modifier.semantics { selected = current },
+                    trailingIcon = if (current) {
+                        { Icon(ShellIcons.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RangeText(period: PeriodUi, zone: ZoneId, onEditCustom: () -> Unit) {
+    val range = rememberRangeText(period, zone)
+    val style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = TABULAR_NUMS)
+    if (period.preset != PeriodPreset.Custom) {
+        Text(range, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    TextButton(
+        onClick = onEditCustom,
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        contentPadding = PaddingValues(horizontal = PlanrSpacing.sm),
+        modifier = Modifier.height(32.dp),
+    ) {
+        Icon(painterResource(R.drawable.ic_insights_calendar_range), contentDescription = null, modifier = Modifier.size(14.dp))
+        Box(Modifier.width(PlanrSpacing.xs))
+        Text(range, style = style)
+    }
+}
+
+@Composable
+private fun GranularityRow(period: PeriodUi, onGranularity: (Granularity) -> Unit) {
+    val description = stringResource(R.string.insights_period_bucket_size)
+    val options = Granularity.entries
+    SingleChoiceSegmentedButtonRow(
+        Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = description },
+    ) {
+        options.forEachIndexed { index, g ->
+            SegmentedButton(
+                selected = period.granularity == g,
+                onClick = { onGranularity(g) },
+                enabled = g in period.choices,
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                label = { Text(stringResource(ShellText.granularity(g)), maxLines = 1) },
+            )
+        }
+    }
+}

@@ -18,6 +18,15 @@ import {
 } from "@/lib/analytics/correlations";
 import { formatDuration } from "@/lib/datetime/format";
 import { derivePatternsLede } from "@/lib/insights/ledes";
+import {
+  MIN_DAYPART_RATINGS,
+  bestDaypart,
+  energySummary,
+  hasAttributes,
+  topWeekday,
+  weekdayTotal,
+  worstDaypart,
+} from "@/lib/insights/view-selectors";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
 import { InsightLede } from "./insight-lede";
@@ -33,9 +42,6 @@ const DAYPART_KEYS: Record<Daypart, string> = {
   evening: "patterns.evening",
   night: "patterns.night",
 };
-
-/** Minimum rated occurrences before a daypart verdict is worth showing. */
-const MIN_DAYPART_RATINGS = 5;
 
 const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
@@ -55,10 +61,7 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
     () => fragmentation(occurrences, period.window, timeZone),
     [occurrences, period.window, timeZone],
   );
-  const total = useMemo(
-    () => weekdays.reduce((s, w) => s + w.totalMs, 0),
-    [weekdays],
-  );
+  const total = useMemo(() => weekdayTotal(weekdays), [weekdays]);
 
   // Attribute lenses: focus mode split, satisfaction by time of day, energy
   // coverage. All gated on sample size in the analytics layer or below.
@@ -90,12 +93,9 @@ export function PatternsTab({ data }: { data: InsightsTabData }) {
     total: w.totalMs,
     days: w.dayCount,
   }));
-  const top = rows.reduce((a, b) => (b.avg > a.avg ? b : a), rows[0]);
+  const top = rows[weekdays.indexOf(topWeekday(weekdays))];
 
-  const ratedParts = dayparts.filter((d) => d.agg.n >= MIN_DAYPART_RATINGS);
-  const bestPart = ratedParts.length
-    ? ratedParts.reduce((a, b) => (b.agg.mean > a.agg.mean ? b : a))
-    : null;
+  const bestPart = bestDaypart(dayparts);
   const lede = derivePatternsLede({
     topWeekday: { full: top.full, avgMs: top.avg },
     bestDaypart: bestPart ? t(DAYPART_KEYS[bestPart.daypart]).split(" ")[0] : null,
@@ -251,23 +251,13 @@ function AttributesSection({
 }) {
   const t = useTranslations("insights");
   const locale = useLocale();
-  const ratedParts = dayparts.filter((d) => d.agg.n >= MIN_DAYPART_RATINGS);
-  const best = ratedParts.length
-    ? ratedParts.reduce((a, b) => (b.agg.mean > a.agg.mean ? b : a))
-    : null;
-  const worst =
-    ratedParts.length >= 2
-      ? ratedParts.reduce((a, b) => (b.agg.mean < a.agg.mean ? b : a))
-      : null;
+  const best = bestDaypart(dayparts);
+  const worst = worstDaypart(dayparts);
 
-  const energyRatedMs = energyDays.reduce((s, d) => s + d.ratedMs, 0);
-  const energyWeightedMs = energyDays.reduce((s, d) => s + d.weightedMs, 0);
-  const energyTotalMs = energyDays.reduce((s, d) => s + d.totalMs, 0);
-  // weighted / rated = duration-weighted mean energy on the 1..4 scale.
-  const meanEnergy = energyRatedMs > 0 ? energyWeightedMs / energyRatedMs : null;
+  const energy = energySummary(energyDays);
+  const meanEnergy = energy.meanEnergy;
 
-  const hasAnything =
-    focusSplit.share !== null || best !== null || meanEnergy !== null;
+  const hasAnything = hasAttributes(focusSplit, best, energy);
 
   return (
     <section className="space-y-1.5">
@@ -317,10 +307,8 @@ function AttributesSection({
             label={t("patterns.energyLevel")}
             value={meanEnergy !== null ? `${meanEnergy.toFixed(1)}/4` : "—"}
             hint={
-              meanEnergy !== null && energyTotalMs > 0
-                ? t("patterns.energyHint", {
-                    pct: Math.round((energyRatedMs / energyTotalMs) * 100),
-                  })
+              energy.coveragePct !== null
+                ? t("patterns.energyHint", { pct: energy.coveragePct })
                 : t("patterns.energyEmptyHint")
             }
           />

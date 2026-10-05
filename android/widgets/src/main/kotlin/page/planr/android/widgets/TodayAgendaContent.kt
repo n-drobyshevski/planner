@@ -48,8 +48,9 @@ internal fun TodayAgendaContent(content: WidgetContent<TodayAgenda>) {
     }
 }
 
+/** One event row (the Week widget's too): whose bar, time, title; tapping opens the event. */
 @Composable
-private fun AgendaRowView(row: AgendaRow, formats: WidgetFormats) {
+internal fun AgendaRowView(row: AgendaRow, formats: WidgetFormats) {
     val context = LocalContext.current
     val muted = row.inactive || row.cancelled
     val ink = if (muted) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface

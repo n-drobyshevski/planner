@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Insights common strings, copied from messages/ru (manifest:
+     src/test/resources/strings-source/common.json). Names start with insights_common_. -->
+<resources>
+    <string name="insights_common_needs_attention">"Требует внимания: "</string>
+
+    <!-- Deltas (stat-card.tsx). -->
+    <string name="insights_common_delta_new">новое</string>
+    <string name="insights_common_delta_new_sr">новое — в предыдущем периоде ничего не было</string>
+    <string name="insights_common_delta_up">рост на %1$d%% к предыдущему периоду</string>
+    <string name="insights_common_delta_down">падение на %1$d%% к предыдущему периоду</string>
+    <string name="insights_common_delta_no_change">без изменений к предыдущему периоду</string>
+
+    <!-- Series names and legend states (series.ts, chart-card.tsx). -->
+    <string name="insights_common_series_other">Прочее</string>
+    <string name="insights_common_series_no_context">Без контекста</string>
+    <string name="insights_common_series_unknown">Неизвестно</string>
+    <string name="insights_common_series_hidden">(скрыто)</string>
+    <string name="insights_common_series_shown">(показано)</string>
+    <string name="insights_common_compare_previous">Сравнить с предыдущим периодом</string>
+    <string name="insights_common_view_as_table">Показать таблицей</string>
+    <string name="insights_common_open_day_action">Открыть день</string>
+
+    <!-- Empty period. -->
+    <string name="insights_common_empty_title">В этом периоде нет учтённого времени</string>
+    <string name="insights_common_empty_description">Аналитика считает события с указанным временем из твоего календаря. Запланируй что-нибудь в этом диапазоне — или выбери другой период, — чтобы увидеть, куда уходит время.</string>
+    <string name="insights_common_empty_open_calendar">Открыть календарь</string>
+
+    <!-- Day sheet (day-detail-sheet.tsx). -->
+    <string name="insights_common_day_nothing">Ничего не запланировано в текущем фильтре аналитики.</string>
+    <plurals name="insights_common_day_summary">
+        <item quantity="one">Учтено %1$s по %2$d элементу (текущий фильтр).</item>
+        <item quantity="few">Учтено %1$s по %2$d элементам (текущий фильтр).</item>
+        <item quantity="many">Учтено %1$s по %2$d элементам (текущий фильтр).</item>
+        <item quantity="other">Учтено %1$s по %2$d элемента (текущий фильтр).</item>
+    </plurals>
+    <string name="insights_common_day_inactive">неактивно</string>
+    <string name="insights_common_day_all_day">Весь день</string>
+    <string name="insights_common_day_open_in_calendar">Открыть в календаре</string>
+    <string name="insights_common_day_shared">Общее</string>
+    <string name="insights_common_attr_chip">%1$s: %2$s</string>
+
+    <!-- Event attributes (common.json attributes.*). -->
+    <string name="insights_common_attr_energy_label">Энергия</string>
+    <string name="insights_common_attr_energy_1">1 Низкая</string>
+    <string name="insights_common_attr_energy_2">2 Ровная</string>
+    <string name="insights_common_attr_energy_3">3 Высокая</string>
+    <string name="insights_common_attr_energy_4">4 Пиковая</string>
+    <string name="insights_common_attr_flexibility_label">Гибкость</string>
+    <string name="insights_common_attr_flexibility_fixed">Жёстко</string>
+    <string name="insights_common_attr_flexibility_movable">Подвижно</string>
+    <string name="insights_common_attr_flexibility_flexible">Гибко</string>
+    <string name="insights_common_attr_focus_label">Фокус</string>
+    <string name="insights_common_attr_focus_deep">Глубокий</string>
+    <string name="insights_common_attr_focus_shallow">Поверхностный</string>
+    <string name="insights_common_attr_satisfaction_label">Удовлетворённость</string>
+    <string name="insights_common_attr_satisfaction_1">1 Плохо</string>
+    <string name="insights_common_attr_satisfaction_2">2 Нормально</string>
+    <string name="insights_common_attr_satisfaction_3">3 Хорошо</string>
+    <string name="insights_common_attr_satisfaction_4">4 Отлично</string>
+</resources>

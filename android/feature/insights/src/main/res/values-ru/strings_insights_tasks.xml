@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Insights tasks strings, copied from messages/ru (manifest:
+     src/test/resources/strings-source/tasks.json). Names start with insights_tasks_. -->
+<resources>
+    <!-- Lede (lede.tasks*). The done headline is a plural frame plus a comparison clause (TasksText.ledeSpec). -->
+    <plurals name="insights_tasks_lede_overdue">
+        <item quantity="one">Просрочено и всё ещё открыто %d задача.</item>
+        <item quantity="few">Просрочено и всё ещё открыто %d задачи.</item>
+        <item quantity="many">Просрочено и всё ещё открыто %d задач.</item>
+        <item quantity="other">Просрочено и всё ещё открыто %d задачи.</item>
+    </plurals>
+    <plurals name="insights_tasks_lede_done">
+        <item quantity="one">За этот период выполнено %1$d задача%2$s.</item>
+        <item quantity="few">За этот период выполнено %1$d задачи%2$s.</item>
+        <item quantity="many">За этот период выполнено %1$d задач%2$s.</item>
+        <item quantity="other">За этот период выполнено %1$d задачи%2$s.</item>
+    </plurals>
+    <string name="insights_tasks_lede_more_week">, на %1$d больше, чем за предыдущую неделю</string>
+    <string name="insights_tasks_lede_more_month">, на %1$d больше, чем за предыдущий месяц</string>
+    <string name="insights_tasks_lede_more_period">, на %1$d больше, чем за предыдущий период</string>
+    <string name="insights_tasks_lede_fewer_week">, на %1$d меньше, чем за предыдущую неделю</string>
+    <string name="insights_tasks_lede_fewer_month">, на %1$d меньше, чем за предыдущий месяц</string>
+    <string name="insights_tasks_lede_fewer_period">, на %1$d меньше, чем за предыдущий период</string>
+    <plurals name="insights_tasks_lede_done_support">
+        <item quantity="one">За этот период выполнено %d задача.</item>
+        <item quantity="few">За этот период выполнено %d задачи.</item>
+        <item quantity="many">За этот период выполнено %d задач.</item>
+        <item quantity="other">За этот период выполнено %d задачи.</item>
+    </plurals>
+    <string name="insights_tasks_lede_adherence">%1$d%% задач к сроку сделаны вовремя.</string>
+
+    <!-- No top-level tasks. -->
+    <string name="insights_tasks_empty_title">Пока нет задач</string>
+    <string name="insights_tasks_empty_description">Создавай задачи в коллекции, и их пропускная способность появится здесь.</string>
+    <string name="insights_tasks_open_tasks">Открыть задачи</string>
+
+    <!-- Lead figures and stats. -->
+    <string name="insights_tasks_lead_completed">Выполнено</string>
+    <string name="insights_tasks_lead_created">Создано</string>
+    <string name="insights_tasks_lead_on_time">В срок</string>
+    <string name="insights_tasks_on_time_due">из %1$d к сроку</string>
+    <string name="insights_tasks_on_time_nothing">ничего не назначено</string>
+    <string name="insights_tasks_overdue">Просрочено</string>
+    <string name="insights_tasks_overdue_hint">открыты после срока</string>
+    <string name="insights_tasks_done_of_created">Сделано из созданных</string>
+    <string name="insights_tasks_done_of_created_hint">создано за период</string>
+    <string name="insights_tasks_lead_time">Время выполнения</string>
+    <string name="insights_tasks_lead_time_hint">медиана, от создания до готовности</string>
+    <string name="insights_tasks_lead_days">%1$dд</string>
+    <string name="insights_tasks_lead_days_hours">%1$dд %2$dч</string>
+    <string name="insights_tasks_top_level_note">Только задачи верхнего уровня; подзадачи учитываются в родительской.</string>
+
+    <!-- Velocity chart (tasks.velocity / velocityAria: one string per granularity). -->
+    <string name="insights_tasks_velocity_day">Скорость по дням</string>
+    <string name="insights_tasks_velocity_week">Скорость по неделям</string>
+    <string name="insights_tasks_velocity_month">Скорость по месяцам</string>
+    <string name="insights_tasks_velocity_aria_day">Создано и выполнено задач по дням, %1$s</string>
+    <string name="insights_tasks_velocity_aria_week">Создано и выполнено задач по неделям, %1$s</string>
+    <string name="insights_tasks_velocity_aria_month">Создано и выполнено задач по месяцам, %1$s</string>
+    <string name="insights_tasks_series_completed">Выполнено</string>
+    <string name="insights_tasks_series_created">Создано</string>
+    <string name="insights_tasks_sr_summary">Выполнено %1$d задач и создано %2$d за %3$s. %4$d открытых задач просрочено.</string>
+</resources>

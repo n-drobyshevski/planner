@@ -39,6 +39,7 @@ import {
 } from "@/lib/analytics/task-stats";
 import { formatDuration } from "@/lib/datetime/format";
 import { deriveTasksLede } from "@/lib/insights/ledes";
+import { hasTopLevelTasks, leadTimeParts } from "@/lib/insights/view-selectors";
 import { usePrefersReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { StatCard, StatGrid } from "./stat-card";
 import { InsightLede } from "./insight-lede";
@@ -57,10 +58,9 @@ function formatLeadTime(
   t: ReturnType<typeof useTranslations<"insights">>,
   locale: string,
 ): string {
-  const DAY = 86_400_000;
-  if (ms < 2 * DAY) return formatDuration(ms, locale);
-  const days = Math.floor(ms / DAY);
-  const hours = Math.round((ms % DAY) / 3_600_000);
+  const parts = leadTimeParts(ms);
+  if (parts.kind === "short") return formatDuration(parts.ms, locale);
+  const { days, hours } = parts;
   return hours > 0
     ? t("tasks.leadDaysHours", { days, hours })
     : t("tasks.leadDays", { days });
@@ -90,7 +90,7 @@ export function TasksTab({ data }: { data: InsightsTabData }) {
     [tasks, period, now, timeZone],
   );
 
-  const hasTopLevel = useMemo(() => tasks.some((t) => t.parentId === null), [tasks]);
+  const hasTopLevel = useMemo(() => hasTopLevelTasks(tasks), [tasks]);
   if (!hasTopLevel) {
     return (
       <Empty className="border-0">
