@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package page.planr.android.core.data.repository
 
 import androidx.room.Room
