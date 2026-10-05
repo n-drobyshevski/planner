@@ -1,4 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Insights patterns strings, copied from messages/en (manifest:
      src/test/resources/strings-source/patterns.json). Names start with insights_patterns_. -->
-<resources />
+<resources>
+    <!-- Lede (insights:lede.patterns*). -->
+    <string name="insights_patterns_lede_headline">%1$s is your heaviest weekday, averaging %2$s.</string>
+    <string name="insights_patterns_lede_support_daypart">Your best-rated stretch of the day: %1$s.</string>
+    <string name="insights_patterns_lede_support_block">Your typical unbroken block runs %1$s.</string>
+
+    <!-- Dayparts, short: the text before the first space (patterns-tab.tsx:101). -->
+    <string name="insights_patterns_daypart_morning">Morning</string>
+    <string name="insights_patterns_daypart_midday">Midday</string>
+    <string name="insights_patterns_daypart_evening">Evening</string>
+    <string name="insights_patterns_daypart_night">Night</string>
+
+    <!-- Rhythm (patterns-tab.tsx). -->
+    <string name="insights_patterns_empty_title">No patterns yet</string>
+    <string name="insights_patterns_empty_description">Weekday and hour-of-day patterns need at least one timed event in this period.</string>
+    <string name="insights_patterns_heaviest_weekday">Heaviest weekday</string>
+    <string name="insights_patterns_typical_block">Typical block</string>
+    <string name="insights_patterns_sr_peak">Average tracked time peaks on %1$s at %2$s per day.</string>
+    <string name="insights_patterns_sr_blocks">" The period splits into %1$d busy blocks, typically %2$s long."</string>
+    <string name="insights_patterns_by_weekday">By weekday</string>
+    <string name="insights_patterns_by_weekday_aria">Average tracked time per weekday, %1$s</string>
+    <string name="insights_patterns_avg_per_day">Avg per day</string>
+    <string name="insights_patterns_tooltip_avg_per_day">%1$s avg per day</string>
+    <plurals name="insights_patterns_tooltip_total">
+        <item quantity="one">%1$s total over %2$d day</item>
+        <item quantity="other">%1$s total over %2$d days</item>
+    </plurals>
+    <string name="insights_patterns_by_hour">By hour of day</string>
+    <string name="insights_patterns_fragmentation">Fragmentation</string>
+    <string name="insights_patterns_busy_blocks">Busy blocks</string>
+    <string name="insights_patterns_longest_block">Longest block</string>
+    <string name="insights_patterns_short_blocks">Short blocks</string>
+    <string name="insights_patterns_typical_gap">Typical gap</string>
+
+    <!-- Attribute lenses. -->
+    <string name="insights_patterns_attributes">Attributes</string>
+    <string name="insights_patterns_attributes_empty">Set focus, energy or satisfaction on events to unlock attribute patterns — deep-work share, your best time of day, and how demanding your days run.</string>
+    <string name="insights_patterns_deep_work">Deep work</string>
+    <string name="insights_patterns_deep_work_hint">of %1$s focus-rated time</string>
+    <string name="insights_patterns_deep_work_empty_hint">rate focus on events to track this</string>
+    <string name="insights_patterns_best_time_of_day">Best time of day</string>
+    <string name="insights_patterns_best_time_hint">satisfaction %1$s/4 · n %2$d</string>
+    <string name="insights_patterns_needs_ratings">needs %1$d+ rated items</string>
+    <string name="insights_patterns_toughest_time_of_day">Toughest time of day</string>
+    <string name="insights_patterns_energy_level">Energy level</string>
+    <string name="insights_patterns_energy_hint">rated on %1$d%% of tracked time</string>
+    <string name="insights_patterns_energy_empty_hint">rate energy on events to track this</string>
+
+    <!-- Hour heatmap, 4-hour bands (hour-heatmap.tsx). -->
+    <string name="insights_patterns_heatmap_weekday">Weekday</string>
+    <string name="insights_patterns_heatmap_caption_bands">Tracked time by weekday in 4-hour bands</string>
+    <string name="insights_patterns_heatmap_band_label">%1$s %2$d:00–%3$d:00 — %4$s</string>
+    <string name="insights_patterns_heatmap_nothing">nothing</string>
+    <string-array name="insights_patterns_weekdays_short">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <string-array name="insights_patterns_weekdays_full">
+        <item>Monday</item>
+        <item>Tuesday</item>
+        <item>Wednesday</item>
+        <item>Thursday</item>
+        <item>Friday</item>
+        <item>Saturday</item>
+        <item>Sunday</item>
+    </string-array>
+    <string name="insights_patterns_step_0">0</string>
+    <string name="insights_patterns_step_1">&lt;30m</string>
+    <string name="insights_patterns_step_2">&lt;1h</string>
+    <string name="insights_patterns_step_3">&lt;2h</string>
+    <string name="insights_patterns_step_4">2h+</string>
+
+    <!-- Balance half (balance-tab.tsx). -->
+    <string name="insights_patterns_context_mix_day">Context mix per day</string>
+    <string name="insights_patterns_context_mix_week">Context mix per week</string>
+    <string name="insights_patterns_context_mix_month">Context mix per month</string>
+    <string name="insights_patterns_context_mix_aria_day">Stacked tracked time per context per day, %1$s</string>
+    <string name="insights_patterns_context_mix_aria_week">Stacked tracked time per context per week, %1$s</string>
+    <string name="insights_patterns_context_mix_aria_month">Stacked tracked time per context per month, %1$s</string>
+    <string name="insights_patterns_share_shifts">Share shifts vs previous period</string>
+    <string name="insights_patterns_share_shifts_caption">Context shares of tracked time, this period vs the previous one</string>
+    <string name="insights_patterns_col_context">Context</string>
+    <string name="insights_patterns_col_time">Time</string>
+    <string name="insights_patterns_col_share">Share</string>
+    <string name="insights_patterns_col_delta">Δ</string>
+    <string name="insights_patterns_delta_no_change">no change</string>
+    <string name="insights_patterns_delta_points_up">up %1$d share points</string>
+    <string name="insights_patterns_delta_points_down">down %1$d share points</string>
+    <string name="insights_patterns_pts">%1$d pts</string>
+    <string name="insights_patterns_satisfaction_by_context">Satisfaction by context</string>
+    <string name="insights_patterns_satisfaction_empty">Rate satisfaction on at least %1$d events in a context to see which parts of your time feel best, looking back.</string>
+    <string name="insights_patterns_satisfaction_aria">%1$s: mean satisfaction %2$s of 4, from %3$d rated items</string>
+</resources>

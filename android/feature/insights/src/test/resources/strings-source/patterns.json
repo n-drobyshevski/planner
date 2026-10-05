@@ -1,4 +1,414 @@
 {
   "file": "strings_insights_patterns.xml",
-  "entries": []
+  "entries": [
+    {
+      "web": "insights:lede.patternsHeadline",
+      "sha": "04d13992fb763803",
+      "android": {
+        "insights_patterns_lede_headline": 2
+      }
+    },
+    {
+      "web": "insights:lede.patternsSupportDaypart",
+      "sha": "bbc70e4164bafc0c",
+      "android": {
+        "insights_patterns_lede_support_daypart": 1
+      }
+    },
+    {
+      "web": "insights:lede.patternsSupportBlock",
+      "sha": "da41732c37d0dc7b",
+      "android": {
+        "insights_patterns_lede_support_block": 1
+      }
+    },
+    {
+      "web": "insights:patterns.morning",
+      "sha": "56ead7f192326d03",
+      "android": {
+        "insights_patterns_daypart_morning": 0
+      }
+    },
+    {
+      "web": "insights:patterns.midday",
+      "sha": "673c3dad7843abf6",
+      "android": {
+        "insights_patterns_daypart_midday": 0
+      }
+    },
+    {
+      "web": "insights:patterns.evening",
+      "sha": "920b3cac9a1aae46",
+      "android": {
+        "insights_patterns_daypart_evening": 0
+      }
+    },
+    {
+      "web": "insights:patterns.night",
+      "sha": "69f04d36725fe224",
+      "android": {
+        "insights_patterns_daypart_night": 0
+      }
+    },
+    {
+      "web": "insights:patterns.emptyTitle",
+      "sha": "574ce293d41bd092",
+      "android": {
+        "insights_patterns_empty_title": 0
+      }
+    },
+    {
+      "web": "insights:patterns.emptyDescription",
+      "sha": "189914f294338c49",
+      "android": {
+        "insights_patterns_empty_description": 0
+      }
+    },
+    {
+      "web": "insights:patterns.heaviestWeekday",
+      "sha": "0340d2edca828846",
+      "android": {
+        "insights_patterns_heaviest_weekday": 0
+      }
+    },
+    {
+      "web": "insights:patterns.typicalBlock",
+      "sha": "f7ad75f53af06ef8",
+      "android": {
+        "insights_patterns_typical_block": 0
+      }
+    },
+    {
+      "web": "insights:patterns.srPeak",
+      "sha": "9fcbf22d16ddc61a",
+      "android": {
+        "insights_patterns_sr_peak": 2
+      }
+    },
+    {
+      "web": "insights:patterns.srBlocks",
+      "sha": "29a258ad8e90192a",
+      "android": {
+        "insights_patterns_sr_blocks": 2
+      }
+    },
+    {
+      "web": "insights:patterns.byWeekday",
+      "sha": "288e45506c4ff49e",
+      "android": {
+        "insights_patterns_by_weekday": 0
+      }
+    },
+    {
+      "web": "insights:patterns.byWeekdayAria",
+      "sha": "2d5121d6bfa61de4",
+      "android": {
+        "insights_patterns_by_weekday_aria": 1
+      }
+    },
+    {
+      "web": "insights:patterns.avgPerDay",
+      "sha": "05d243a328363c1e",
+      "android": {
+        "insights_patterns_avg_per_day": 0
+      }
+    },
+    {
+      "web": "insights:patterns.tooltipAvgPerDay",
+      "sha": "bc4f9e9bbe810ea3",
+      "android": {
+        "insights_patterns_tooltip_avg_per_day": 1
+      }
+    },
+    {
+      "web": "insights:patterns.tooltipTotal",
+      "sha": "6268011304327b32",
+      "android": {
+        "insights_patterns_tooltip_total": 2
+      }
+    },
+    {
+      "web": "insights:patterns.byHour",
+      "sha": "8eca62945674b739",
+      "android": {
+        "insights_patterns_by_hour": 0
+      }
+    },
+    {
+      "web": "insights:patterns.fragmentation",
+      "sha": "77eae5960932dcf6",
+      "android": {
+        "insights_patterns_fragmentation": 0
+      }
+    },
+    {
+      "web": "insights:patterns.busyBlocks",
+      "sha": "f9f57c150e6595c1",
+      "android": {
+        "insights_patterns_busy_blocks": 0
+      }
+    },
+    {
+      "web": "insights:patterns.longestBlock",
+      "sha": "e19eefe763f1f59d",
+      "android": {
+        "insights_patterns_longest_block": 0
+      }
+    },
+    {
+      "web": "insights:patterns.shortBlocks",
+      "sha": "8007500523e82bff",
+      "android": {
+        "insights_patterns_short_blocks": 0
+      }
+    },
+    {
+      "web": "insights:patterns.typicalGap",
+      "sha": "8508b9a86ddb037b",
+      "android": {
+        "insights_patterns_typical_gap": 0
+      }
+    },
+    {
+      "web": "insights:patterns.attributes",
+      "sha": "141597e6bcafa7b9",
+      "android": {
+        "insights_patterns_attributes": 0
+      }
+    },
+    {
+      "web": "insights:patterns.attributesEmpty",
+      "sha": "0e8d76db39700a10",
+      "android": {
+        "insights_patterns_attributes_empty": 0
+      }
+    },
+    {
+      "web": "insights:patterns.deepWork",
+      "sha": "1409de02bb514d4d",
+      "android": {
+        "insights_patterns_deep_work": 0
+      }
+    },
+    {
+      "web": "insights:patterns.deepWorkHint",
+      "sha": "1149b8a1a7837ef5",
+      "android": {
+        "insights_patterns_deep_work_hint": 1
+      }
+    },
+    {
+      "web": "insights:patterns.deepWorkEmptyHint",
+      "sha": "2b58507ea9f267e8",
+      "android": {
+        "insights_patterns_deep_work_empty_hint": 0
+      }
+    },
+    {
+      "web": "insights:patterns.bestTimeOfDay",
+      "sha": "2cc2eb0de2812064",
+      "android": {
+        "insights_patterns_best_time_of_day": 0
+      }
+    },
+    {
+      "web": "insights:patterns.bestTimeHint",
+      "sha": "f51696384cdd8c86",
+      "android": {
+        "insights_patterns_best_time_hint": 2
+      }
+    },
+    {
+      "web": "insights:patterns.needsRatings",
+      "sha": "181ec97c201974f8",
+      "android": {
+        "insights_patterns_needs_ratings": 1
+      }
+    },
+    {
+      "web": "insights:patterns.toughestTimeOfDay",
+      "sha": "c2e61fb258313271",
+      "android": {
+        "insights_patterns_toughest_time_of_day": 0
+      }
+    },
+    {
+      "web": "insights:patterns.energyLevel",
+      "sha": "c35e4aaf90ed3d00",
+      "android": {
+        "insights_patterns_energy_level": 0
+      }
+    },
+    {
+      "web": "insights:patterns.energyHint",
+      "sha": "def2cee5cea70809",
+      "android": {
+        "insights_patterns_energy_hint": 1
+      }
+    },
+    {
+      "web": "insights:patterns.energyEmptyHint",
+      "sha": "3ef46016fffe7c4e",
+      "android": {
+        "insights_patterns_energy_empty_hint": 0
+      }
+    },
+    {
+      "web": "insights:heatmap.weekday",
+      "sha": "b4267900044a5c9b",
+      "android": {
+        "insights_patterns_heatmap_weekday": 0
+      }
+    },
+    {
+      "web": "insights:heatmap.captionBands",
+      "sha": "8c42dc05f9264b18",
+      "android": {
+        "insights_patterns_heatmap_caption_bands": 0
+      }
+    },
+    {
+      "web": "insights:heatmap.bandLabel",
+      "sha": "ef3afd44942b9a26",
+      "android": {
+        "insights_patterns_heatmap_band_label": 4
+      }
+    },
+    {
+      "web": "insights:heatmap.nothing",
+      "sha": "e95ecb559e43e319",
+      "android": {
+        "insights_patterns_heatmap_nothing": 0
+      }
+    },
+    {
+      "web": "insights:heatmap.weekdays",
+      "sha": "8b00090e1c5ad140",
+      "android": {
+        "insights_patterns_weekdays_short": 0
+      }
+    },
+    {
+      "web": "insights:heatmap.weekdaysFull",
+      "sha": "b279f5c7d6742215",
+      "android": {
+        "insights_patterns_weekdays_full": 0
+      }
+    },
+    {
+      "web": null,
+      "source": "hour-heatmap.tsx:21 STEP_LABELS (hard-coded en; ru NEW)",
+      "sha": null,
+      "android": {
+        "insights_patterns_step_0": 0,
+        "insights_patterns_step_1": 0,
+        "insights_patterns_step_2": 0,
+        "insights_patterns_step_3": 0,
+        "insights_patterns_step_4": 0
+      }
+    },
+    {
+      "web": "insights:balance.contextMix",
+      "sha": "45100a9922f46eeb",
+      "android": {
+        "insights_patterns_context_mix_day": 0,
+        "insights_patterns_context_mix_week": 0,
+        "insights_patterns_context_mix_month": 0
+      }
+    },
+    {
+      "web": "insights:balance.contextMixAria",
+      "sha": "d536215c1f2bdebc",
+      "android": {
+        "insights_patterns_context_mix_aria_day": 1,
+        "insights_patterns_context_mix_aria_week": 1,
+        "insights_patterns_context_mix_aria_month": 1
+      }
+    },
+    {
+      "web": "insights:balance.shareShifts",
+      "sha": "de541c881c913ff7",
+      "android": {
+        "insights_patterns_share_shifts": 0
+      }
+    },
+    {
+      "web": "insights:balance.shareShiftsCaption",
+      "sha": "e7e19f775dc6cfd5",
+      "android": {
+        "insights_patterns_share_shifts_caption": 0
+      }
+    },
+    {
+      "web": "insights:balance.colContext",
+      "sha": "eaec6409cd6ceae4",
+      "android": {
+        "insights_patterns_col_context": 0
+      }
+    },
+    {
+      "web": "insights:balance.colTime",
+      "sha": "ff08ed0e79696326",
+      "android": {
+        "insights_patterns_col_time": 0
+      }
+    },
+    {
+      "web": "insights:balance.colShare",
+      "sha": "01579c1a8694dda4",
+      "android": {
+        "insights_patterns_col_share": 0
+      }
+    },
+    {
+      "web": "insights:balance.colDelta",
+      "sha": "3b5934a2d17f4f8d",
+      "android": {
+        "insights_patterns_col_delta": 0
+      }
+    },
+    {
+      "web": "insights:balance.deltaNoChange",
+      "sha": "4107bbf7f868b90f",
+      "android": {
+        "insights_patterns_delta_no_change": 0
+      }
+    },
+    {
+      "web": "insights:balance.deltaPoints",
+      "sha": "9758b0b0c825b983",
+      "android": {
+        "insights_patterns_delta_points_up": 1,
+        "insights_patterns_delta_points_down": 1
+      }
+    },
+    {
+      "web": "insights:balance.pts",
+      "sha": "76b2b74cab99e501",
+      "android": {
+        "insights_patterns_pts": 1
+      }
+    },
+    {
+      "web": "insights:balance.satisfactionByContext",
+      "sha": "6915557337fb1118",
+      "android": {
+        "insights_patterns_satisfaction_by_context": 0
+      }
+    },
+    {
+      "web": "insights:balance.satisfactionEmpty",
+      "sha": "c248fd9ecc2f77bb",
+      "android": {
+        "insights_patterns_satisfaction_empty": 1
+      }
+    },
+    {
+      "web": "insights:balance.satisfactionAria",
+      "sha": "525ce425323de013",
+      "android": {
+        "insights_patterns_satisfaction_aria": 3
+      }
+    }
+  ]
 }
