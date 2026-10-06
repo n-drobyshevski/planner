@@ -1,7 +1,9 @@
 package page.planr.android.feature.inbox.ui
 
+import android.icu.text.DisplayContext
+import android.icu.text.RelativeDateTimeFormatter
+import android.icu.util.ULocale
 import android.text.format.DateFormat
-import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
@@ -24,6 +26,12 @@ internal class InboxFormats(locale: Locale, is24Hour: Boolean) {
     private val time = formatter(locale, if (is24Hour) "Hm" else "hm")
     private val shortDate = formatter(locale, "EEEdMMM")
     private val longDate = formatter(locale, "EEEEdMMM")
+    private val relative = RelativeDateTimeFormatter.getInstance(
+        ULocale.forLocale(locale),
+        null,
+        RelativeDateTimeFormatter.Style.LONG,
+        DisplayContext.CAPITALIZATION_FOR_MIDDLE_OF_SENTENCE,
+    )
 
     /** "Thu, 8 Oct, 15:00–16:00": a request's proposed slot. */
     fun slot(start: Instant, end: Instant, zone: TimeZone): String {
@@ -39,12 +47,20 @@ internal class InboxFormats(locale: Locale, is24Hour: Boolean) {
     /** "Mon, 5 Oct": the rating sheet's night label. */
     fun shortDate(date: LocalDate): String = shortDate.format(date.toJavaLocalDate())
 
-    /** "2 hours ago", relative to [now]. */
-    fun ago(at: Instant, now: Instant): String = DateUtils.getRelativeTimeSpanString(
-        at.toEpochMilliseconds(),
-        now.toEpochMilliseconds(),
-        DateUtils.MINUTE_IN_MILLIS,
-    ).toString()
+    /**
+     * "2 hours ago", relative to [now], to sit mid-sentence ("Ended 2 hours
+     * ago"). Not `DateUtils`: it capitalizes ("Ended Yesterday"), says
+     * "0 minutes ago" and counts calendar days in the device's zone.
+     */
+    fun ago(at: Instant, now: Instant): String {
+        val ago = Ago.between(at, now)
+        val unit = when (ago.unit) {
+            AgoUnit.Minutes -> RelativeDateTimeFormatter.RelativeUnit.MINUTES
+            AgoUnit.Hours -> RelativeDateTimeFormatter.RelativeUnit.HOURS
+            AgoUnit.Days -> RelativeDateTimeFormatter.RelativeUnit.DAYS
+        }
+        return relative.format(ago.quantity.toDouble(), RelativeDateTimeFormatter.Direction.LAST, unit)
+    }
 
     private fun formatter(locale: Locale, skeleton: String): DateTimeFormatter =
         DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale)

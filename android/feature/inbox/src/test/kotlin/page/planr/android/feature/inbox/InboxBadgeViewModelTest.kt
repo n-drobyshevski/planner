@@ -2,8 +2,10 @@ package page.planr.android.feature.inbox
 
 import androidx.lifecycle.viewModelScope
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -56,6 +58,25 @@ class InboxBadgeViewModelTest {
         runCurrent()
 
         assertEquals(0, vm.count.value)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a night window read that stalls falls back to the defaults instead of holding the count`() = runTest {
+        val data = FakeInboxDataSource().apply {
+            serverLogs = ratedWeek
+            serverRequests = listOf(TestData.request("r1"))
+            stallNightWindow = true
+        }
+        val vm = InboxBadgeViewModel(data, TestData.clock)
+        keepCollecting(vm.count)
+        vm.refresh()
+        runCurrent()
+        assertEquals(0, vm.count.value) // still waiting on the read
+
+        advanceTimeBy(NIGHT_WINDOW_BUDGET + 1.milliseconds)
+        runCurrent()
+        assertEquals(1, vm.count.value)
         vm.viewModelScope.cancel()
     }
 

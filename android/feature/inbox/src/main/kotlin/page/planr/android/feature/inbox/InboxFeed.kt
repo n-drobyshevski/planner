@@ -2,6 +2,7 @@ package page.planr.android.feature.inbox
 
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
 import page.planr.android.core.data.inbox.InboxInput
 import page.planr.android.core.data.inbox.InboxItem
@@ -41,10 +43,14 @@ internal fun minuteTicks(clock: Clock): Flow<Instant> = flow {
     }
 }
 
-/** The viewer's night window, or the DB defaults when it can't be read (offline). */
+/**
+ * The viewer's night window, or the DB defaults when it can't be read
+ * (offline, or a network too slow to answer within [NIGHT_WINDOW_BUDGET]):
+ * every row waits for it, so a stalled read must not hold the count back.
+ */
 internal fun InboxDataSource.nightWindowOrDefault(): Flow<NightWindow> = flow {
     val window = try {
-        nightWindow()
+        withTimeoutOrNull(NIGHT_WINDOW_BUDGET) { nightWindow() } ?: NightWindow.DEFAULT
     } catch (e: CancellationException) {
         throw e
     } catch (_: Exception) {
@@ -89,3 +95,6 @@ internal fun InboxDataSource.snapshots(minutes: Flow<Instant>, nightWindow: Flow
     }
 
 private const val MINUTE_MS = 60_000L
+
+/** As long as the reminders wait for the same read (CacheReminderSource). */
+internal val NIGHT_WINDOW_BUDGET = 5.seconds

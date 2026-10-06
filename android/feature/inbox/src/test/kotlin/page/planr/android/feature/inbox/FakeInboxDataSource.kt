@@ -1,6 +1,7 @@
 package page.planr.android.feature.inbox
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -37,6 +38,9 @@ class FakeInboxDataSource(zone: String = "Europe/Berlin") : InboxDataSource {
     var serverLogs: List<SleepLog> = emptyList()
     var serverRequests: List<TimeslotRequest> = emptyList()
     var night: NightWindow = NightWindow.DEFAULT
+
+    /** When set, the night window read never answers (a stalled network). */
+    var stallNightWindow = false
 
     val refreshedWindows = mutableListOf<TimeWindow>()
     var requestRefreshes = 0
@@ -87,7 +91,10 @@ class FakeInboxDataSource(zone: String = "Europe/Berlin") : InboxDataSource {
         requests.value = serverRequests
     }
 
-    override suspend fun nightWindow(): NightWindow = night
+    override suspend fun nightWindow(): NightWindow {
+        if (stallNightWindow) awaitCancellation()
+        return night
+    }
 
     override suspend fun rateEvent(eventId: String, attributes: JsonObject) {
         hold?.await()
