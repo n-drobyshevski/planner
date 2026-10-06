@@ -286,7 +286,9 @@ widgets.
   `postgres_changes` channel per workspace, with the same tables and
   `workspace_id` filter as `lib/supabase/realtime.ts`. Deletes can't be
   filtered (their old record holds only the primary key), so each table also
-  has an unfiltered DELETE binding. Changes go into Room.
+  has an unfiltered DELETE binding. Changes go into Room. The channel stays
+  joined for 60 s after the app leaves the foreground, so coming back within
+  that time neither rejoins nor refetches.
   Every (re)join refetches the visible window, tasks and reference data, in
   case something was missed while disconnected.
 - **Coalesced refreshes.** `EventRepository` (per window), `TaskRepository`
