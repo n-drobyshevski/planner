@@ -29,6 +29,9 @@ interface QuickAddDataSource {
     /** The member's own zone when set, else the device zone. */
     suspend fun viewerZone(): TimeZone
 
+    /** The member's `show_success_toasts`; true when unknown. */
+    suspend fun showSuccessToasts(): Boolean
+
     /** Throws NotSignedInException when there is no session. [description] is the notes, null for none. */
     suspend fun createTask(title: String, dueDate: LocalDate?, description: String?): Task
 
@@ -65,6 +68,9 @@ class RepositoryQuickAddDataSource @Inject constructor(
         workspace.observeCurrentMember().first()?.timezone
             ?.let { runCatching { TimeZone.of(it) }.getOrNull() }
             ?: TimeZone.currentSystemDefault()
+
+    override suspend fun showSuccessToasts(): Boolean =
+        workspace.observeCurrentMember().first()?.showSuccessToasts ?: true
 
     /**
      * A private task of the signed-in member, filed like the web's "new task"

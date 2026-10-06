@@ -46,6 +46,13 @@ class QuickAddViewModelTest {
         var failDeleteWith: Exception? = null
         var zoneGate: CompletableDeferred<Unit>? = null
         var createGate: CompletableDeferred<Unit>? = null
+        var successToasts = true
+        var failToastsWith: Exception? = null
+
+        override suspend fun showSuccessToasts(): Boolean {
+            failToastsWith?.let { throw it }
+            return successToasts
+        }
 
         override suspend fun viewerZone(): TimeZone {
             zoneGate?.await()
@@ -347,5 +354,33 @@ class QuickAddViewModelTest {
 
         assertEquals(listOf(saved), failures)
         assertTrue(data.deletedTasks.isEmpty())
+    }
+
+    @Test
+    fun `a save confirms only when the member wants success toasts`() = runTest {
+        val data = FakeQuickAdd()
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Buy stamps")
+        vm.save()
+        assertEquals(true, vm.state.value.saved?.confirm)
+
+        data.successToasts = false
+        vm.start(QuickAddKind.Event)
+        vm.setTitle("Dentist")
+        vm.save()
+        assertEquals(QuickAddSaved(QuickAddKind.Event, "e", confirm = false), vm.state.value.saved)
+    }
+
+    @Test
+    fun `a preference that can't be read keeps the confirmation and the save`() = runTest {
+        val data = FakeQuickAdd().apply { failToastsWith = IllegalStateException("no member yet") }
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Buy stamps")
+        vm.save()
+
+        assertEquals(QuickAddSaved(QuickAddKind.Task, "t", confirm = true), vm.state.value.saved)
+        assertEquals(null, vm.state.value.error)
     }
 }
