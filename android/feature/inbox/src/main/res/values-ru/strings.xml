@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors messages/ru/inbox.json on the web. -->
+<resources>
+    <string name="inbox_title">Входящие</string>
+    <string name="inbox_subtitle">Пара быстрых дел, чтобы закрыть день.</string>
+    <string name="inbox_back">Назад</string>
+    <string name="inbox_all_caught_up">Всё разобрано.</string>
+    <string name="inbox_section_requests">Запросы</string>
+    <string name="inbox_section_rate">Оценить недавнее</string>
+    <string name="inbox_section_sleep">Сон</string>
+    <string name="inbox_rate_event_frame">Как прошло «%1$s»?</string>
+    <string name="inbox_rate_task_frame">Как прошла задача «%1$s»?</string>
+    <string name="inbox_log_sleep_frame">Как спалось в ночь на %1$s?</string>
+    <string name="inbox_log_sleep_open">Записать сон</string>
+    <string name="inbox_request_frame">%1$s предлагает время</string>
+    <string name="inbox_request_frame_anon">Кто-то предлагает время</string>
+    <string name="inbox_request_approve">Принять</string>
+    <string name="inbox_request_decline">Отклонить</string>
+    <string name="inbox_request_default_title">Предложенное время</string>
+    <string name="inbox_ended_ago">Закончилось %1$s</string>
+    <string name="inbox_done_ago">Выполнено %1$s</string>
+    <string name="inbox_rate_failed">Не удалось сохранить оценку. Попробуй ещё раз.</string>
+    <string name="inbox_request_failed">Не удалось обновить запрос. Попробуй ещё раз.</string>
+</resources>

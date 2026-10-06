@@ -34,6 +34,12 @@
     <string name="import_file_unreadable">Couldn\'t read this file.</string>
     <string name="import_file_too_large">This file is too large to import (over 5 MB).</string>
     <string name="account_settings">Settings</string>
+    <!-- The account menu's Inbox entry and its badge (the web's nav.json inbox / inboxCount). -->
+    <string name="account_inbox">Inbox</string>
+    <plurals name="account_inbox_count">
+        <item quantity="one">%d item needs attention</item>
+        <item quantity="other">%d items need attention</item>
+    </plurals>
     <!-- Settings screen (mirrors the web's settings.json timezone / calendarDisplay / sleep). -->
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>

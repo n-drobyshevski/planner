@@ -178,7 +178,8 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 :app ──► :feature:agenda ───┐
      ├─► :feature:tasks ────┤
      ├─► :feature:quickadd ─┼─► :core:data ─► :core:recurrence ─► :core:model
-     ├─► :feature:insights ─┤        │                               ▲
+     ├─► :feature:inbox ────┤        │                               ▲
+     ├─► :feature:insights ─┤        │                               │
      │          └───────────┼────────┼─► :core:insights ─────────────┘
      ├─► :widgets ──────────┘        │
      └─► :core:design ◄──────────────┘ (features and widgets use it too)
@@ -199,6 +200,7 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 | `:feature:tasks` | `…feature.tasks` | Task list with filters, task detail/edit, complete |
 | `:feature:quickadd` | `…feature.quickadd` | Quick add bottom sheet, plus the translucent `QuickAddActivity` the widget opens |
 | `:feature:insights` | `…feature.insights` | Insights: period bar, filters, the Overview / Trends / Patterns / Tasks tabs with hand-drawn Canvas charts, the day sheet |
+| `:feature:inbox` | `…feature.inbox` | Inbox (from the account menu, with its count badge): timeslot requests to approve or decline, recent events and tasks to rate, unlogged nights |
 | `:widgets` | `…widgets` | Glance widgets: Today, Week, Week grid, Month, Tasks, Quick add |
 
 Shared build setup is in `build-logic/`, as the convention plugins
