@@ -41,6 +41,11 @@
     <string name="agenda_detail_missing_title">Event not found</string>
     <string name="agenda_detail_missing_body">It may have been deleted on another device.</string>
     <string name="agenda_all_day">All day</string>
+    <string name="agenda_location_open_maps">Open in maps</string>
+    <string name="agenda_location_open_link">Open link</string>
+    <string name="agenda_copy">Copy</string>
+    <string name="agenda_copied">Copied</string>
+    <string name="agenda_open_failed_copied">No app to open this. Copied.</string>
 
     <!-- Common actions (common) -->
     <string name="agenda_back">Back</string>
