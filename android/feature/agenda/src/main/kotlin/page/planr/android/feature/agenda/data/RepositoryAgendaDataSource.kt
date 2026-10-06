@@ -5,6 +5,7 @@ import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.model.DeletedEventSnapshot
@@ -86,8 +87,12 @@ class RepositoryAgendaDataSource @Inject constructor(
     override suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior) =
         events.revertOverride(eventId, occurrenceDate, prior)
 
-    override suspend fun splitSeries(event: PlannerEvent, fromOccurrence: Instant, patch: OccurrencePatch): PlannerEvent =
-        events.splitSeries(event, fromOccurrence, patch)
+    override suspend fun splitSeries(
+        event: PlannerEvent,
+        fromOccurrence: Instant,
+        patch: OccurrencePatch,
+        newAttributes: JsonObject?,
+    ): PlannerEvent = events.splitSeries(event, fromOccurrence, patch, newAttributes = newAttributes)
 
     override suspend fun deleteThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): PlannerEvent =
         events.deleteThisAndFuture(event, fromOccurrence)

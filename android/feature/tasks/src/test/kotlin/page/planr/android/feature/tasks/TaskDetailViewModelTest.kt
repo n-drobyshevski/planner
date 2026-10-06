@@ -8,7 +8,10 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Rule
+import page.planr.android.core.data.attributes.AttributeKey
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.TaskPriority
@@ -235,5 +238,39 @@ class TaskDetailViewModelTest {
 
         assertEquals("Renamed on the web", vm.state.value.form?.title)
         assertFalse(vm.state.value.dirty)
+    }
+
+    @Test
+    fun `an attribute edit counts as a change and saves merged into the stored bag`() = runTest {
+        val stored = buildJsonObject {
+            put("satisfaction", 2)
+            put("future", "kept")
+        }
+        val data = FakeTasksDataSource(tasks = listOf(original.copy(attributes = stored)), boards = boards)
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        assertEquals(mapOf(AttributeKey.Satisfaction to "2"), vm.state.value.form?.attributes)
+
+        vm.setAttribute(AttributeKey.Energy, "4")
+        assertTrue(vm.state.value.dirty)
+        vm.setAttribute(AttributeKey.Energy, null)
+        assertFalse(vm.state.value.dirty, "cleared again: nothing to save")
+
+        vm.setAttribute(AttributeKey.Satisfaction, null)
+        vm.setAttribute(AttributeKey.Energy, "4")
+        vm.save()
+
+        val (_, patch, _) = data.updates.single()
+        assertEquals(
+            TaskPatch(
+                attributes = PatchField.Value(
+                    buildJsonObject {
+                        put("future", "kept")
+                        put("energy", 4)
+                    },
+                ),
+            ),
+            patch,
+        )
     }
 }

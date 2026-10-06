@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Optimization attributes, shared by the event and task editors (common.json attributes.*). -->
+<resources>
+    <string name="attributes_details">Optimization details</string>
+    <string name="attributes_clear_hint">All optional — tap a selected option again to clear it.</string>
+    <string name="attributes_expanded">Expanded</string>
+    <string name="attributes_collapsed">Collapsed</string>
+
+    <string name="attributes_energy_label">Energy</string>
+    <string name="attributes_energy_description">How demanding this is.</string>
+    <string name="attributes_energy_1">1 Low</string>
+    <string name="attributes_energy_2">2 Steady</string>
+    <string name="attributes_energy_3">3 High</string>
+    <string name="attributes_energy_4">4 Peak</string>
+
+    <string name="attributes_flexibility_label">Flexibility</string>
+    <string name="attributes_flexibility_description">How movable this is if a day fills up.</string>
+    <string name="attributes_flexibility_fixed">Fixed</string>
+    <string name="attributes_flexibility_movable">Movable</string>
+    <string name="attributes_flexibility_flexible">Flexible</string>
+
+    <string name="attributes_focus_label">Focus</string>
+    <string name="attributes_focus_description">The concentration mode this needs.</string>
+    <string name="attributes_focus_deep">Deep</string>
+    <string name="attributes_focus_shallow">Shallow</string>
+
+    <string name="attributes_satisfaction_label">Satisfaction</string>
+    <string name="attributes_satisfaction_description">How it felt, looking back.</string>
+    <string name="attributes_satisfaction_1">1 Poor</string>
+    <string name="attributes_satisfaction_2">2 Okay</string>
+    <string name="attributes_satisfaction_3">3 Good</string>
+    <string name="attributes_satisfaction_4">4 Great</string>
+</resources>

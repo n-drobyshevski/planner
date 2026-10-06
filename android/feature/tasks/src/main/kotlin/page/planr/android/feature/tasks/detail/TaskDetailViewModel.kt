@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.Board
 import page.planr.android.core.model.Category
@@ -147,6 +149,10 @@ class TaskDetailViewModel @AssistedInject constructor(
     fun setAssignee(memberId: String?) = edit { it.copy(assigneeId = memberId) }
 
     fun setCategory(categoryId: String?) = edit { it.copy(categoryId = categoryId) }
+
+    /** Sets an optimization attribute, or clears it with a null [option]. */
+    fun setAttribute(key: AttributeKey, option: String?) =
+        edit { it.copy(attributes = AttributesMerge.select(it.attributes, key, option)) }
 
     fun dismissNotice() = ui.update { it.copy(notice = null) }
 

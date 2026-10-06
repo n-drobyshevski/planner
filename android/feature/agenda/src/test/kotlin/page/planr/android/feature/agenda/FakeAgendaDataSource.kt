@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
@@ -58,7 +59,12 @@ class FakeAgendaDataSource(
         data class Restore(val snapshot: DeletedEventSnapshot) : Call
         data class Override(val input: OverrideInput) : Call
         data class Revert(val eventId: String, val occurrenceDate: Instant, val prior: OverridePrior) : Call
-        data class Split(val event: PlannerEvent, val from: Instant, val patch: OccurrencePatch) : Call
+        data class Split(
+            val event: PlannerEvent,
+            val from: Instant,
+            val patch: OccurrencePatch,
+            val newAttributes: JsonObject? = null,
+        ) : Call
         data class CapFuture(val event: PlannerEvent, val from: Instant) : Call
         data class FindImportCandidates(val uids: Set<String>, val window: TimeWindow?) : Call
         data class CreateMany(val drafts: List<PlannerEventDraft>) : Call
@@ -140,8 +146,13 @@ class FakeAgendaDataSource(
     override suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior) =
         record(Call.Revert(eventId, occurrenceDate, prior))
 
-    override suspend fun splitSeries(event: PlannerEvent, fromOccurrence: Instant, patch: OccurrencePatch): PlannerEvent {
-        record(Call.Split(event, fromOccurrence, patch))
+    override suspend fun splitSeries(
+        event: PlannerEvent,
+        fromOccurrence: Instant,
+        patch: OccurrencePatch,
+        newAttributes: JsonObject?,
+    ): PlannerEvent {
+        record(Call.Split(event, fromOccurrence, patch, newAttributes))
         return event.copy(id = "split-${calls.size}")
     }
 

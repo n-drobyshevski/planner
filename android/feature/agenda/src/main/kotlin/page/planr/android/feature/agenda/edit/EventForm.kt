@@ -14,6 +14,8 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.model.EventStatus
 import page.planr.android.core.model.Occurrence
 import page.planr.android.core.model.PlannerEvent
@@ -53,6 +55,8 @@ data class EventForm(
     val recurrence: RecurrenceForm? = null,
     val location: String = "",
     val description: String = "",
+    /** The known optimization attributes set; series-level, read from the master row. */
+    val attributes: Map<AttributeKey, String> = emptyMap(),
     // Carried through unchanged; v1 has no control for them.
     val inactive: Boolean = false,
     val status: EventStatus = EventStatus.Confirmed,
@@ -134,6 +138,8 @@ data class EventForm(
                 recurrence = RRuleBuild.parseRRule(event.rrule),
                 location = occurrence.location.orEmpty(),
                 description = occurrence.description.orEmpty(),
+                // From the MASTER event: attributes have no per-occurrence column.
+                attributes = AttributesMerge.known(event.attributes),
                 inactive = occurrence.inactive,
                 status = event.status,
                 hiddenFromPublic = event.hiddenFromPublic,

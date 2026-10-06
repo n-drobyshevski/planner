@@ -3,6 +3,7 @@ package page.planr.android.feature.agenda.data
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
@@ -71,8 +72,13 @@ interface AgendaDataSource {
 
     suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior)
 
-    /** "This and following": returns the new series. */
-    suspend fun splitSeries(event: PlannerEvent, fromOccurrence: Instant, patch: OccurrencePatch): PlannerEvent
+    /** "This and following": returns the new series, carrying [newAttributes] when set. */
+    suspend fun splitSeries(
+        event: PlannerEvent,
+        fromOccurrence: Instant,
+        patch: OccurrencePatch,
+        newAttributes: JsonObject? = null,
+    ): PlannerEvent
 
     /** "Delete this and following": caps the series before [fromOccurrence]. */
     suspend fun deleteThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): PlannerEvent
