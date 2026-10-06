@@ -1,6 +1,7 @@
 package page.planr.android.core.data.remote
 
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -125,41 +126,52 @@ class EventMutations @Inject constructor(
     /**
      * `applyOverride`: upsert a cancel/modify override for one occurrence.
      * The prior row is read best-effort first so the edit can be undone with
-     * [revertOverride]; a failed read never blocks the edit.
+     * [revertOverride]; a failed read never blocks the edit, but leaves the
+     * prior [OverridePrior.Unknown] (no undo) rather than "none".
      */
     suspend fun applyOverride(workspaceId: String, input: OverrideInput): AppliedOverride {
-        val prior = runCatching {
-            gateway.select(
+        val prior = try {
+            val rows = gateway.select(
                 SupabaseTables.EVENT_OVERRIDES,
                 filters = listOf(
                     eq("event_id", input.eventId),
                     eq("occurrence_date", PostgresTime.toIso(input.occurrenceDate)),
                 ),
-            ).singleOrNull()
-        }.getOrNull()
+            )
+            when (rows.size) {
+                0 -> OverridePrior.None
+                1 -> OverridePrior.Known(rows.single())
+                else -> OverridePrior.Unknown
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            OverridePrior.Unknown
+        }
         val stored = gateway.upsert(
             SupabaseTables.EVENT_OVERRIDES,
             listOf(EventPayloads.overrideRow(workspaceId, input)),
             onConflict = OVERRIDE_CONFLICT,
         )
         return AppliedOverride(
-            prior = OverridePrior(prior),
+            prior = prior,
             override = stored.firstOrNull()?.decodeAs(EventOverride.serializer()),
         )
     }
 
     /**
      * `revertOverride`: restore the prior override row, or remove the
-     * override when there was none. Returns the restored row, if any.
+     * override when there was none. Returns the restored row, if any. An
+     * [OverridePrior.Unknown] prior can't be reverted (see [OverridePrior.canRevert]).
      */
     suspend fun revertOverride(
         eventId: String,
         occurrenceDate: Instant,
         prior: OverridePrior,
     ): EventOverride? {
-        val row = prior.row
-        if (row != null) {
-            return gateway.upsert(SupabaseTables.EVENT_OVERRIDES, listOf(row), OVERRIDE_CONFLICT)
+        require(prior.canRevert) { "The override this edit replaced is unknown" }
+        if (prior is OverridePrior.Known) {
+            return gateway.upsert(SupabaseTables.EVENT_OVERRIDES, listOf(prior.row), OVERRIDE_CONFLICT)
                 .firstOrNull()
                 ?.decodeAs(EventOverride.serializer())
         }

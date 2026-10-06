@@ -163,7 +163,10 @@ class EventRepository @Inject constructor(
         }
     }
 
-    /** "This event": upsert a cancel/modify override; keep the prior for [revertOverride]. */
+    /**
+     * "This event": upsert a cancel/modify override; keep the prior for
+     * [revertOverride] (only when [OverridePrior.canRevert]).
+     */
     suspend fun applyOverride(input: OverrideInput): OverridePrior {
         val ws = session.requireSession().workspaceId
         val applied = write({ mutations.applyOverride(ws, input) }) { applied ->
@@ -178,7 +181,7 @@ class EventRepository @Inject constructor(
     suspend fun modifyOccurrence(eventId: String, occurrenceDate: Instant, patch: OccurrencePatch): OverridePrior =
         applyOverride(EditSemantics.modifyOccurrence(eventId, occurrenceDate, patch))
 
-    /** Undo of [applyOverride]. */
+    /** Undo of [applyOverride]; [prior] must be revertible ([OverridePrior.canRevert]). */
     suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior) {
         write({ mutations.revertOverride(eventId, occurrenceDate, prior) }) { restored ->
             if (restored != null) {

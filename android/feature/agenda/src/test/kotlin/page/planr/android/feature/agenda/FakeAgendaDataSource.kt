@@ -62,6 +62,9 @@ class FakeAgendaDataSource(
         data class DeleteMany(val ids: List<String>) : Call
     }
 
+    /** What [applyOverride] answers as the prior override. */
+    var overridePrior: OverridePrior = OverridePrior.None
+
     /** What [findImportCandidates] answers (the member's events on the server). */
     var importCandidates: List<PlannerEvent> = emptyList()
 
@@ -127,7 +130,7 @@ class FakeAgendaDataSource(
 
     override suspend fun applyOverride(input: OverrideInput): OverridePrior {
         record(Call.Override(input))
-        return OverridePrior(null)
+        return overridePrior
     }
 
     override suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior) =

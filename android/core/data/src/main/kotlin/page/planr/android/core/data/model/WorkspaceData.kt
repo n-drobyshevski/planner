@@ -32,7 +32,17 @@ data class DeletedEventSnapshot(
 )
 
 /**
- * What [applyOverride] replaced: the prior override row for that occurrence,
- * or null when there was none (undo then deletes the override).
+ * What [applyOverride] replaced for that occurrence, the undo token for
+ * `revertOverride`:
+ * - [Known]: the prior override row (undo restores it)
+ * - [None]: there was no override (undo deletes the new one)
+ * - [Unknown]: the prior couldn't be read. Undo isn't possible: deleting
+ *   could erase an earlier override, so callers offer none ([canRevert]).
  */
-data class OverridePrior(val row: JsonObject?)
+sealed interface OverridePrior {
+    data class Known(val row: JsonObject) : OverridePrior
+    data object None : OverridePrior
+    data object Unknown : OverridePrior
+
+    val canRevert: Boolean get() = this !is Unknown
+}

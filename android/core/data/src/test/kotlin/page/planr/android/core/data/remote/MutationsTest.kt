@@ -3,8 +3,10 @@ package page.planr.android.core.data.remote
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
@@ -12,6 +14,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import page.planr.android.core.data.model.EventPatch
+import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.model.OverrideType
 import page.planr.android.core.model.PlannerEvent
@@ -86,10 +89,10 @@ class MutationsTest {
     fun `applyOverride upserts on the occurrence key and returns the prior row`() = runTest {
         val date = Instant.parse("2026-06-02T07:00:00Z")
         val first = events.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
-        assertNull(first.prior.row)
+        assertEquals(OverridePrior.None, first.prior)
 
         val second = events.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
-        assertEquals(JsonPrimitive("cancel"), second.prior.row?.get("type"))
+        assertEquals(JsonPrimitive("cancel"), assertIs<OverridePrior.Known>(second.prior).row["type"])
         assertEquals(1, gateway.rows(SupabaseTables.EVENT_OVERRIDES).size)
         assertEquals(
             "event_id,occurrence_date",
@@ -99,6 +102,54 @@ class MutationsTest {
         // Undo with no prior deletes the override again.
         events.revertOverride(Fixtures.EVENT_ID, date, first.prior)
         assertEquals(0, gateway.rows(SupabaseTables.EVENT_OVERRIDES).size)
+    }
+
+    @Test
+    fun `a failed prior read still applies the override, but leaves no undo that could erase it`() = runTest {
+        val date = Instant.parse("2026-06-02T07:00:00Z")
+        // An earlier edit of this occurrence already exists.
+        events.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
+        val failing = object : PostgrestGateway by gateway {
+            override suspend fun select(
+                table: String,
+                columns: String,
+                filters: List<RowFilter>,
+                order: List<RowOrder>,
+                limit: Long?,
+            ): List<JsonObject> = throw IOException("timeout")
+        }
+        val mutations = EventMutations(failing)
+
+        val applied = mutations.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
+        assertEquals(OverridePrior.Unknown, applied.prior)
+        assertFalse(applied.prior.canRevert)
+        assertEquals(1, gateway.rows(SupabaseTables.EVENT_OVERRIDES).size)
+
+        // Reverting an unknown prior is refused, never a delete.
+        assertFailsWith<IllegalArgumentException> { mutations.revertOverride(Fixtures.EVENT_ID, date, applied.prior) }
+        assertEquals(1, gateway.rows(SupabaseTables.EVENT_OVERRIDES).size)
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Delete>().isEmpty())
+    }
+
+    @Test
+    fun `a cancelled prior read cancels the override instead of applying it`() = runTest {
+        val cancelled = object : PostgrestGateway by gateway {
+            override suspend fun select(
+                table: String,
+                columns: String,
+                filters: List<RowFilter>,
+                order: List<RowOrder>,
+                limit: Long?,
+            ): List<JsonObject> = throw CancellationException("left the screen")
+        }
+
+        assertFailsWith<CancellationException> {
+            EventMutations(cancelled).applyOverride(
+                Fixtures.WS,
+                OverrideInput(Fixtures.EVENT_ID, Instant.parse("2026-06-02T07:00:00Z"), OverrideType.Cancel),
+            )
+        }
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Upsert>().isEmpty())
     }
 
     @Test

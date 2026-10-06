@@ -108,9 +108,12 @@ class EventDetailViewModel @AssistedInject constructor(
                     }
                     RecurrenceScope.This -> {
                         val prior = data.applyOverride(EditSemantics.cancelOccurrence(event.id, occurrenceDate))
-                        AgendaNotice(UiText(R.string.agenda_toast_event_deleted)) {
-                            data.revertOverride(event.id, occurrenceDate, prior)
-                        }
+                        AgendaNotice(
+                            UiText(R.string.agenda_toast_event_deleted),
+                            // Without a known prior, an undo could erase an earlier override.
+                            undo = suspend { data.revertOverride(event.id, occurrenceDate, prior) }
+                                .takeIf { prior.canRevert },
+                        )
                     }
                     RecurrenceScope.Following -> {
                         data.deleteThisAndFuture(event, occurrenceDate)

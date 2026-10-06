@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalTime
 import org.junit.Rule
 import org.junit.Test
+import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.model.Occurrence
@@ -225,6 +226,24 @@ class EventEditViewModelTest {
         // Its Undo reverts the override.
         posted.single().undo!!.invoke()
         assertIs<Call.Revert>(data.calls.last())
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `this event offers no undo when the override it replaced is unknown`() = runTest {
+        data.events.value = listOf(series)
+        data.overridePrior = OverridePrior.Unknown
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+
+        vm.save()
+        vm.chooseScope(RecurrenceScope.This)
+        runCurrent()
+
+        assertIs<Call.Override>(data.calls.single())
+        assertEquals(UiText(R.string.agenda_toast_this_event_updated), posted.single().message)
+        assertNull(posted.single().undo)
         vm.viewModelScope.cancel()
     }
 

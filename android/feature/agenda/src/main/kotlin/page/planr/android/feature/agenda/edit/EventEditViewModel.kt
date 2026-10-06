@@ -140,9 +140,12 @@ class EventEditViewModel @AssistedInject constructor(
                 val input = EditSemantics.modifyOccurrence(event.id, occurrenceDate, EventWrites.occurrencePatch(form))
                 val prior = data.applyOverride(input)
                 notices.post(
-                    AgendaNotice(UiText(R.string.agenda_toast_this_event_updated)) {
-                        data.revertOverride(event.id, occurrenceDate, prior)
-                    },
+                    AgendaNotice(
+                        UiText(R.string.agenda_toast_this_event_updated),
+                        // Without a known prior, an undo could erase an earlier override.
+                        undo = suspend { data.revertOverride(event.id, occurrenceDate, prior) }
+                            .takeIf { prior.canRevert },
+                    ),
                 )
             }
             RecurrenceScope.Following -> {
