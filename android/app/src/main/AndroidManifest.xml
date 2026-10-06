@@ -8,6 +8,15 @@
          and nights older than 30 days on the first sync. -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+    <!-- Event reminders (off unless turned on in Settings): the notification
+         itself, alarms on time (a calendar may use USE_EXACT_ALARM from
+         Android 13; SCHEDULE_EXACT_ALARM before), and re-arming after a reboot. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Package visibility (Android 11+): lets the sign-in screen find a
          browser that supports Custom Tabs, so it can prefer Chrome. -->
@@ -30,6 +39,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Planr"
         android:localeConfig="@xml/locales_config"
+        android:enableOnBackInvokedCallback="true"
         tools:ignore="UnusedAttribute">
 
         <activity
@@ -41,6 +51,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Launcher shortcuts: New task, New event, Tasks. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
 
             <!-- OAuth sign-in returns here: an App Link verified by
                  https://auth.planr.page/.well-known/assetlinks.json. Its own
@@ -111,6 +125,24 @@
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity-alias>
+
+        <!-- Event reminders: their alarms and Snooze button (explicit intents
+             only), and re-arming them when the system may have dropped or
+             skewed them (exported for the system's broadcasts). -->
+        <receiver
+            android:name=".reminders.ReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".reminders.ReminderRescheduleReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- WorkManager is configured by PlanrApplication (HiltWorkerFactory),
              so its default startup initializer is removed. The provider stays

@@ -2,11 +2,13 @@ package page.planr.android.core.data.sync
 
 import androidx.room.withTransaction
 import javax.inject.Inject
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
 import page.planr.android.core.data.local.entity.toEntity
+import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.remote.decodeAs
 import page.planr.android.core.data.remote.string
@@ -14,6 +16,7 @@ import page.planr.android.core.model.Board
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.PlannerEvent
+import page.planr.android.core.model.PostgresInstantSerializer
 import page.planr.android.core.model.Task
 
 /** One Realtime row change, reduced to what the cache needs. */
@@ -34,6 +37,10 @@ sealed interface RowChange {
  * Applies Realtime `postgres_changes` to Room, table by table. Cascades the
  * database performs are mirrored where Realtime might not deliver every row
  * (an event's overrides, a task's linked blocks and subtasks).
+ *
+ * Changes can arrive out of order (and after the row a write returned was
+ * already cached), so an event or task row older than the cached one is
+ * skipped: see [isOutdated].
  */
 class RealtimeChangeApplier @Inject constructor(
     private val db: PlanrDatabase,
@@ -67,12 +74,22 @@ class RealtimeChangeApplier @Inject constructor(
 
     private suspend fun upsert(table: String, record: JsonObject): Boolean {
         when (table) {
-            SupabaseTables.EVENTS ->
+            SupabaseTables.EVENTS -> {
+                val cached = record.string("id")?.let { db.eventDao().getById(it) }
+                if (isOutdated(record.updatedAt(), cached?.let { runCatching { it.toModel().updatedAt }.getOrNull() })) {
+                    return false
+                }
                 db.eventDao().upsertEvents(listOf(record.decodeAs(PlannerEvent.serializer()).toEntity()))
+            }
             SupabaseTables.EVENT_OVERRIDES ->
                 db.eventDao().upsertOverrides(listOf(record.decodeAs(EventOverride.serializer()).toEntity()))
-            SupabaseTables.TASKS ->
+            SupabaseTables.TASKS -> {
+                val cached = record.string("id")?.let { db.taskDao().getById(it) }
+                if (isOutdated(record.updatedAt(), cached?.let { runCatching { it.toModel().updatedAt }.getOrNull() })) {
+                    return false
+                }
                 db.taskDao().upsert(listOf(record.decodeAs(Task.serializer()).toEntity()))
+            }
             SupabaseTables.CATEGORIES ->
                 db.workspaceDao().upsertCategories(listOf(record.decodeAs(Category.serializer()).toEntity()))
             SupabaseTables.BOARDS ->
@@ -101,7 +118,20 @@ class RealtimeChangeApplier @Inject constructor(
         return true
     }
 
+    /** The row's `updated_at`; null when missing or unreadable. */
+    private fun JsonObject.updatedAt(): Instant? =
+        string("updated_at")?.let { runCatching { PostgresInstantSerializer.parse(it) }.getOrNull() }
+
     companion object {
+        /**
+         * True when an incoming row is older than the cached one: an
+         * out-of-order echo that would revert a newer change. The same
+         * `updated_at` applies (a repeat is harmless), and so does a row
+         * when either time is unknown.
+         */
+        internal fun isOutdated(incoming: Instant?, cached: Instant?): Boolean =
+            incoming != null && cached != null && incoming < cached
+
         /** The v1 subset of lib/supabase/realtime.ts's tables. */
         val TABLES = listOf(
             SupabaseTables.EVENTS,

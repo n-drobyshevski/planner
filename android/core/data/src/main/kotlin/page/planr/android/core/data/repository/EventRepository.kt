@@ -3,6 +3,7 @@ package page.planr.android.core.data.repository
 import androidx.room.withTransaction
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -11,6 +12,8 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
+import page.planr.android.core.data.local.RefreshCoalescer
+import page.planr.android.core.data.local.dao.sameRows
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.model.DeletedEventSnapshot
@@ -50,6 +53,7 @@ class EventRepository @Inject constructor(
     private val db: PlanrDatabase,
     private val gate: CacheGate,
     private val widgets: WidgetRefreshDispatcher,
+    private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, Clock.System),
 ) {
     private val dao get() = db.eventDao()
 
@@ -59,6 +63,36 @@ class EventRepository @Inject constructor(
         dao.observeOverridesFor(eventId).map { rows -> rows.map { it.toModel() } }
 
     suspend fun getEvent(id: String): PlannerEvent? = dao.getById(id)?.toModel()
+
+    /**
+     * [taskId]'s calendar blocks as Room holds them, by start. Call
+     * [refreshTaskBlocks] first: the windows the agenda syncs need not cover
+     * them all.
+     */
+    fun observeTaskBlocks(taskId: String): Flow<List<PlannerEvent>> =
+        session.inWorkspace(emptyList()) { ws ->
+            dao.observeOfTask(ws, taskId).map { rows -> rows.map { it.toModel() } }
+        }
+
+    /**
+     * Refetches [taskId]'s blocks and replaces what Room holds for the task,
+     * so blocks deleted or unlinked elsewhere disappear too (the same exact
+     * replace as [refreshWindow], over `task_id` instead of a window).
+     */
+    suspend fun refreshTaskBlocks(taskId: String) {
+        val ws = session.requireSession().workspaceId
+        gate.refresh(CacheArea.Events, fetch = { queries.fetchTaskBlocks(ws, taskId) }) { blocks ->
+            db.withTransaction {
+                val kept = blocks.map { it.id }.toSet()
+                val stale = dao.idsOfTask(ws, taskId).filter { it !in kept }
+                stale.chunked(SQL_CHUNK).forEach { chunk ->
+                    dao.deleteOverridesOf(chunk)
+                    dao.deleteEvents(chunk)
+                }
+                dao.upsertEvents(blocks.map { it.toEntity() })
+            }
+        }
+    }
 
     /**
      * Refetches [window] (`fetchWindow`) and replaces what Room holds for it,
@@ -71,20 +105,38 @@ class EventRepository @Inject constructor(
      * out of the window, and nothing else is. Every page is fetched inside
      * the `fetch` lambda, before anything is applied, so a fetch that fails
      * partway writes nothing.
+     *
+     * A refresh of the same window already running is joined, and one done
+     * in the last few seconds is not repeated unless [force]d (see
+     * [RefreshCoalescer]): pull-to-refresh forces, screens opening don't.
+     *
+     * Returns whether the cache changed: a snapshot identical to what Room
+     * holds for the window is not written at all (false), nor is a skipped
+     * or dropped one.
      */
-    suspend fun refreshWindow(window: TimeWindow) {
+    suspend fun refreshWindow(window: TimeWindow, force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
         val start = window.start.toEpochMilliseconds()
         val end = window.end.toEpochMilliseconds()
-        gate.refresh(CacheArea.Events, fetch = { queries.fetchWindow(ws, window) }) { data ->
-            db.withTransaction {
-                val stale = dao.idsInWindow(ws, start, end)
-                val touched = (stale + data.events.map { it.id }).distinct()
-                touched.chunked(SQL_CHUNK).forEach { dao.deleteOverridesOf(it) }
-                stale.chunked(SQL_CHUNK).forEach { dao.deleteEvents(it) }
-                dao.upsertEvents(data.events.map { it.toEntity() })
-                dao.upsertOverrides(data.overrides.map { it.toEntity() })
+        return coalescer.refresh(WindowKey(ws, start, end), force) {
+            var changed = false
+            gate.refresh(CacheArea.Events, fetch = { queries.fetchWindow(ws, window) }) { data ->
+                changed = db.withTransaction {
+                    val events = data.events.map { it.toEntity() }
+                    val overrides = data.overrides.map { it.toEntity() }
+                    val same = sameRows(dao.eventsInWindow(ws, start, end), events) &&
+                        sameRows(dao.overridesInWindow(ws, start, end), overrides)
+                    if (same) return@withTransaction false
+                    val stale = dao.idsInWindow(ws, start, end)
+                    val touched = (stale + data.events.map { it.id }).distinct()
+                    touched.chunked(SQL_CHUNK).forEach { dao.deleteOverridesOf(it) }
+                    stale.chunked(SQL_CHUNK).forEach { dao.deleteEvents(it) }
+                    dao.upsertEvents(events)
+                    dao.upsertOverrides(overrides)
+                    true
+                }
             }
+            changed
         }
     }
 
@@ -163,7 +215,10 @@ class EventRepository @Inject constructor(
         }
     }
 
-    /** "This event": upsert a cancel/modify override; keep the prior for [revertOverride]. */
+    /**
+     * "This event": upsert a cancel/modify override; keep the prior for
+     * [revertOverride] (only when [OverridePrior.canRevert]).
+     */
     suspend fun applyOverride(input: OverrideInput): OverridePrior {
         val ws = session.requireSession().workspaceId
         val applied = write({ mutations.applyOverride(ws, input) }) { applied ->
@@ -178,7 +233,7 @@ class EventRepository @Inject constructor(
     suspend fun modifyOccurrence(eventId: String, occurrenceDate: Instant, patch: OccurrencePatch): OverridePrior =
         applyOverride(EditSemantics.modifyOccurrence(eventId, occurrenceDate, patch))
 
-    /** Undo of [applyOverride]. */
+    /** Undo of [applyOverride]; [prior] must be revertible ([OverridePrior.canRevert]). */
     suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior) {
         write({ mutations.revertOverride(eventId, occurrenceDate, prior) }) { restored ->
             if (restored != null) {
@@ -194,8 +249,11 @@ class EventRepository @Inject constructor(
         write({ mutations.updateAll(event, patch) }) { storeLocally(it) }
 
     /**
-     * "This and following": cap [event] before [fromOccurrence] and start a new
-     * series there carrying [patch]. Returns the new series.
+     * "This and following": start a new series at [fromOccurrence] carrying
+     * [patch] and cap [event] before it. Returns the new series. The remote
+     * split is all or nothing, and Room only sees it once both writes landed,
+     * so a failure never hides an occurrence locally either. Fails with
+     * [StaleWriteException] (after reloading the row) when the series is gone.
      */
     suspend fun splitSeries(
         event: PlannerEvent,
@@ -204,8 +262,10 @@ class EventRepository @Inject constructor(
         newColor: PatchField<String?> = PatchField.Unchanged,
         newAttributes: JsonObject? = null,
     ): PlannerEvent {
-        val result = write({ mutations.splitSeries(event, fromOccurrence, patch, newColor, newAttributes) }) { result ->
-            dao.upsertEvents(listOfNotNull(result.original, result.created).map { it.toEntity() })
+        val result = write({
+            reloadingOnStale(event.id) { mutations.splitSeries(event, fromOccurrence, patch, newColor, newAttributes) }
+        }) { result ->
+            dao.upsertEvents(listOf(result.original, result.created).map { it.toEntity() })
         }
         return result.created
     }
@@ -252,6 +312,8 @@ class EventRepository @Inject constructor(
             if (latest == null) deleteLocally(id) else storeLocally(latest)
         }
     }
+
+    private data class WindowKey(val workspaceId: String, val start: Long, val end: Long)
 
     private companion object {
         /** Stay well under SQLite's bound-variable limit in `IN (...)` lists. */

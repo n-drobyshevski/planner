@@ -16,6 +16,13 @@
     <string name="nav_agenda">Calendar</string>
     <string name="nav_tasks">Tasks</string>
     <string name="nav_insights">Insights</string>
+    <!-- Launcher shortcuts (res/xml/shortcuts.xml). -->
+    <string name="shortcut_new_task_short">New task</string>
+    <string name="shortcut_new_task_long">New task</string>
+    <string name="shortcut_new_event_short">New event</string>
+    <string name="shortcut_new_event_long">New event</string>
+    <string name="shortcut_tasks_short">Tasks</string>
+    <string name="shortcut_tasks_long">Open tasks</string>
     <string name="account_menu">Account</string>
     <string name="sign_out">Sign out</string>
     <!-- Account menu footer: version name, version code, commit. -->
@@ -26,9 +33,62 @@
     <string name="account_import_ics">Import .ics file</string>
     <string name="import_file_unreadable">Couldn\'t read this file.</string>
     <string name="import_file_too_large">This file is too large to import (over 5 MB).</string>
+    <string name="account_settings">Settings</string>
+    <!-- The account menu's Inbox entry and its badge (the web's nav.json inbox / inboxCount). -->
+    <string name="account_inbox">Inbox</string>
+    <plurals name="account_inbox_count">
+        <item quantity="one">%d item needs attention</item>
+        <item quantity="other">%d items need attention</item>
+    </plurals>
+    <!-- Settings screen (mirrors the web's settings.json timezone / calendarDisplay / sleep). -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_save_failed">Couldn\'t save that change. Check your connection and try again.</string>
+    <string name="settings_retry">Try again</string>
+    <string name="settings_time_title">Time zone</string>
+    <string name="settings_time_description">The whole calendar shows times in your zone. A shared event stays anchored to the same moment, so each person sees it in their own time.</string>
+    <string name="settings_time_primary">Your time zone</string>
+    <string name="settings_time_primary_description">Event times, day boundaries, and the “now” line all render in this zone — even when you travel and your phone’s clock changes.</string>
+    <string name="settings_time_device">Use device time zone</string>
+    <!-- %1$s: the phone's zone, e.g. "Europe / Berlin". -->
+    <string name="settings_time_device_trigger">Device time zone (%1$s)</string>
+    <!-- %1$s: weekday and time, e.g. "Tue, 14:05"; %2$s: the zone. -->
+    <string name="settings_time_currently">Currently %1$s in %2$s</string>
+    <string name="settings_time_secondary">Secondary time zone</string>
+    <string name="settings_time_secondary_description">A second clock beside yours in the week and day views on the web — handy for a partner in another zone.</string>
+    <string name="settings_time_search">Search time zones…</string>
+    <string name="settings_time_group_default">Default</string>
+    <string name="settings_time_group_workspace">In your workspace</string>
+    <string name="settings_time_group_all">All time zones</string>
+    <string name="settings_time_empty">No time zone found.</string>
+    <string name="settings_notifications_title">Notifications</string>
+    <string name="settings_success_toasts">Show success notifications</string>
+    <string name="settings_success_toasts_description">Brief confirmations after an action (like “Event updated”). Turn off to mute them — errors and anything you can undo always show.</string>
+    <string name="settings_reminders_title">Reminders</string>
+    <string name="settings_reminders_description">A quiet notification before your own and shared timed events. Set for this phone only.</string>
+    <string name="settings_reminders_lead">Remind me</string>
+    <string name="settings_reminders_off">Off</string>
+    <plurals name="settings_reminders_minutes_before">
+        <item quantity="one">%d minute before</item>
+        <item quantity="other">%d minutes before</item>
+    </plurals>
+    <string name="settings_reminders_blocked">Notifications are blocked for Planr, so reminders can’t show. You can allow them in the system settings.</string>
+    <string name="settings_reminders_open_settings">Open notification settings</string>
+    <string name="settings_sleep_title">Sleep</string>
+    <string name="settings_sleep_description">Which calendar blocks count as your nights, and whether sleep check-ins move them. Private to you.</string>
+    <string name="settings_sleep_unavailable">Couldn\'t load your sleep settings.</string>
+    <string name="settings_sleep_auto_adjust">Update calendar from check-ins</string>
+    <string name="settings_sleep_auto_adjust_description">When you log a bedtime and wake time, snap that night’s sleep block to match. If there’s no block yet, one is added to your sleep category.</string>
+    <string name="settings_sleep_auto_adjust_description_inactive">When you log a bedtime and wake time, snap that night’s sleep block to match. With no sleep category set, a new block is added as an inactive event.</string>
+    <string name="settings_sleep_category">Sleep category</string>
+    <string name="settings_sleep_category_none">None — count inactive events as sleep</string>
+    <string name="settings_sleep_category_description">When set, only this category’s timed events count as your nights — other inactive blocks (focus time, commutes) stop reading as sleep.</string>
+    <string name="settings_sleep_night_start">Night starts after</string>
+    <string name="settings_sleep_night_end">Night ends by</string>
+    <string name="settings_sleep_night_description">Nights collect sleep between these hours — the start on the evening before, the end on the wake day. Widen it if you sleep past noon or keep unusual hours.</string>
     <string name="account_health">Sleep from Health Connect</string>
     <string name="health_title">Sleep from Health Connect</string>
-    <string name="health_body">Bring in the nights your watch or sleep app saves to Health Connect: bedtime, wake time and sleep stages show up in Insights → Sleep on the web. Your morning ratings stay yours. Only you can see this data.</string>
+    <string name="health_body">Bring in the nights your watch or sleep app saves to Health Connect: bedtime, wake time and sleep stages show up in Insights → Sleep on the web. For the last 4 nights, your sleep blocks in the calendar move to match (turn off with “Update calendar from check-ins” in Settings → Sleep). Your morning ratings stay yours. Only you can see this data.</string>
     <string name="health_connect">Connect</string>
     <string name="health_connected">Connected.</string>
     <string name="health_sync_now">Sync now</string>
@@ -49,4 +109,10 @@
     <string name="health_rationale_title">How Planr uses your sleep data</string>
     <string name="health_rationale_body">Planr reads your sleep sessions from Health Connect: when you went to bed, when you woke up, and the time spent in each sleep stage. It saves one entry per night to your Planr account so the Sleep insights on the web can show them.\n\nThis data is private to you: your partner in Planr can\'t see it, it isn\'t shared with anyone else, and it is never sent to an AI model. Planr only reads; it never writes to Health Connect.\n\nTo stop, choose Disconnect in Planr (account menu → Sleep from Health Connect) or remove Planr\'s access in Health Connect. Nights already brought in stay in your account until you delete them on the web.</string>
     <string name="health_rationale_close">Close</string>
+    <string name="reminders_channel_name">Event reminders</string>
+    <string name="reminders_channel_description">A short note before your events start, as set in Settings.</string>
+    <string name="reminders_text_in">%1$s · in %2$d min</string>
+    <string name="reminders_text_now">%1$s · now</string>
+    <string name="reminders_text_started">%1$s · started %2$d min ago</string>
+    <string name="reminders_snooze">Snooze 10 min</string>
 </resources>

@@ -39,15 +39,21 @@ import page.planr.android.core.data.remote.Fixtures
 import page.planr.android.core.data.remote.PostgrestGateway
 import page.planr.android.core.data.remote.SleepRemote
 import page.planr.android.core.data.remote.SupabaseTables
+import page.planr.android.core.model.EventKind
+import page.planr.android.core.model.EventStatus
+import page.planr.android.core.model.Occurrence
+import page.planr.android.core.model.TimeWindow
 
 /** [HealthSleepSync] over a fake Health Connect, a fake PostgREST and an in-memory store. */
 class HealthSleepSyncTest {
     private val fake = FakePostgrestGateway()
     private var offline = false
+    /** The server stores the upload, but the response never arrives. */
+    private var responseLost = false
     private val gateway = object : PostgrestGateway by fake {
         override suspend fun upsert(table: String, rows: List<JsonObject>, onConflict: String): List<JsonObject> {
             if (offline) throw IOException("offline")
-            return fake.upsert(table, rows, onConflict)
+            return fake.upsert(table, rows, onConflict).also { if (responseLost) throw IOException("connection reset") }
         }
     }
 
@@ -89,11 +95,32 @@ class HealthSleepSyncTest {
             mutex.withLock { transform(state.value).also { state.value = it } }
     }
 
+    /** A calendar holding [blocks]; records what the sync did to it. [offline] fails every call. */
+    private class FakeCalendar : SleepBlockCalendar {
+        var blocks = listOf<Occurrence>()
+        var offline = false
+        val actions = mutableListOf<String>()
+        override suspend fun occurrences(window: TimeWindow, zoneId: String): List<Occurrence> {
+            if (offline) throw IOException("offline")
+            return blocks.filter { window.intersects(it.start, it.end) }
+        }
+        override suspend fun create(workspaceId: String, ownerId: String, start: Instant, end: Instant, zoneId: String, sleepCategoryId: String?) {
+            actions += "create $start $end ${sleepCategoryId ?: "inactive"}"
+        }
+        override suspend fun move(eventId: String, start: Instant, end: Instant) {
+            actions += "move $eventId $start $end"
+        }
+        override suspend fun moveOccurrence(eventId: String, occurrenceDate: Instant, start: Instant, end: Instant) {
+            actions += "override $eventId $start $end"
+        }
+    }
+
+    private val calendar = FakeCalendar()
     private val source = FakeSource()
     private val store = MemoryDataStore()
 
     private fun TestScope.sync(member: String = Fixtures.MEMBER_A): HealthSleepSync =
-        HealthSleepSync(source, SleepRemote(gateway), session(member), store, clock, backgroundScope)
+        HealthSleepSync(source, SleepRemote(gateway), calendar, session(member), store, clock, backgroundScope)
             .also { it.zone = { zone } }
 
     private fun TestScope.session(member: String): SessionManager {
@@ -149,7 +176,7 @@ class HealthSleepSyncTest {
 
         val result = sync.connect()
 
-        assertEquals(HealthSyncResult.Synced(nights = 2, written = 2), result)
+        assertEquals(HealthSyncResult.Synced(nights = 2, written = 2, blocks = 2), result)
         // 30 days back, plus a day so the first night is read whole.
         assertEquals(now.minusSeconds(31L * 86400), source.reads.single().first)
         val upsert = upserts().single()
@@ -251,7 +278,7 @@ class HealthSleepSyncTest {
         assertNull(sync.status.first().lastSyncAt)
 
         offline = false
-        assertEquals(HealthSyncResult.Synced(nights = 1, written = 1), sync.sync())
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 1, blocks = 1), sync.sync())
         assertNull(sync.status.first().problem)
     }
 
@@ -287,5 +314,214 @@ class HealthSleepSyncTest {
         sync.connect()
         sync.clearLocal()
         assertFalse(sync.status.first().connected)
+    }
+
+    private fun sleepBlock(id: String, start: String, end: String, recurring: Boolean = false) = Occurrence(
+        key = id, eventId = id, occurrenceDate = Instant.parse(start), start = Instant.parse(start), end = Instant.parse(end),
+        allDay = false, inactive = true, status = EventStatus.Confirmed, title = "Sleep", description = null, location = null,
+        categoryId = null, color = null, kind = EventKind.Event, ownerId = Fixtures.MEMBER_A, isPrivate = false,
+        isShared = false, hiddenFromPublic = false, taskId = null, attributes = JsonObject(emptyMap()),
+        isRecurring = recurring, isException = false,
+    )
+
+    @Test
+    fun `the last four nights snap their sleep blocks, older ones are left alone`() = runTest {
+        // Nights ending 1–5 October; today is the 5th, so the 2nd–5th are recent.
+        source.sessions = (1..5).map { night(it) }
+        calendar.blocks = listOf(
+            sleepBlock("routine-5", "2026-10-04T20:00:00Z", "2026-10-05T04:00:00Z", recurring = true),
+            sleepBlock("single-4", "2026-10-03T22:00:00Z", "2026-10-04T05:30:00Z"),
+            sleepBlock("same-3", "2026-10-02T21:30:00Z", "2026-10-03T05:00:00Z"),
+        )
+
+        val result = sync().connect()
+
+        assertIs<HealthSyncResult.Synced>(result)
+        assertEquals(3, result.blocks)
+        assertEquals(
+            listOf(
+                "create 2026-10-01T21:30:00Z 2026-10-02T05:00:00Z inactive",
+                "move single-4 2026-10-03T21:30:00Z 2026-10-04T05:00:00Z",
+                "override routine-5 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z",
+            ),
+            calendar.actions,
+        )
+    }
+
+    @Test
+    fun `a re-sync with the same times leaves blocks moved by hand alone`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        sync.connect()
+        calendar.actions.clear()
+        calendar.blocks = listOf(sleepBlock("moved", "2026-10-04T23:00:00Z", "2026-10-05T06:00:00Z"))
+
+        now = now.plusSeconds(3600)
+        val result = sync.sync()
+
+        assertIs<HealthSyncResult.Synced>(result)
+        assertEquals(0, result.blocks)
+        assertTrue(calendar.actions.isEmpty())
+    }
+
+    @Test
+    fun `turning off the auto-adjust setting keeps the calendar untouched`() = runTest {
+        fake.seed(
+            SupabaseTables.MEMBER_SLEEP_PREFS,
+            JsonObject(
+                mapOf(
+                    "member_id" to JsonPrimitive(Fixtures.MEMBER_A),
+                    "auto_adjust_sleep_on_feedback" to JsonPrimitive(false),
+                ),
+            ),
+        )
+        source.sessions = listOf(night(5))
+
+        sync().connect()
+
+        assertTrue(calendar.actions.isEmpty())
+    }
+
+    @Test
+    fun `a dedicated sleep category files the new block there`() = runTest {
+        fake.seed(
+            SupabaseTables.MEMBER_SLEEP_PREFS,
+            JsonObject(
+                mapOf(
+                    "member_id" to JsonPrimitive(Fixtures.MEMBER_A),
+                    "sleep_category_id" to JsonPrimitive("cat-sleep"),
+                ),
+            ),
+        )
+        source.sessions = listOf(night(5))
+        // An inactive block that isn't in the sleep category doesn't count.
+        calendar.blocks = listOf(sleepBlock("inactive", "2026-10-04T20:00:00Z", "2026-10-05T04:00:00Z"))
+
+        sync().connect()
+
+        assertEquals(listOf("create 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z cat-sleep"), calendar.actions)
+    }
+
+    private suspend fun pendingSnaps() = store.data.first()[HealthSleepSync.PENDING_SNAP].orEmpty()
+
+    @Test
+    fun `a block that couldn't be snapped is retried on the next sync`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+
+        // The night is saved; only its block is left for later.
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 1, blocks = 0), sync.connect())
+        assertEquals(setOf("2026-10-05"), pendingSnaps())
+
+        // Same device data: the night itself is unchanged, the block still gets snapped.
+        calendar.offline = false
+        now = now.plusSeconds(3600)
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 0, blocks = 1), sync.sync())
+        assertEquals(listOf("create 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z inactive"), calendar.actions)
+        assertEquals(emptySet(), pendingSnaps())
+
+        // ...and only once.
+        now = now.plusSeconds(3600)
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 0, blocks = 0), sync.sync())
+        assertEquals(1, calendar.actions.size)
+    }
+
+    @Test
+    fun `a pending night older than the re-read overlap is read again`() = runTest {
+        source.sessions = (2..5).map { night(it) }
+        val sync = sync()
+        calendar.offline = true
+        sync.connect()
+        assertEquals(setOf("2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"), pendingSnaps())
+
+        // An hour later the overlap alone reaches back to the 3rd only.
+        calendar.offline = false
+        now = now.plusSeconds(3600)
+        val result = sync.sync()
+
+        assertIs<HealthSyncResult.Synced>(result)
+        assertEquals(4, result.blocks)
+        assertEquals(0, result.written)
+        assertEquals(
+            listOf("2026-10-01T21:30:00Z", "2026-10-02T21:30:00Z", "2026-10-03T21:30:00Z", "2026-10-04T21:30:00Z"),
+            calendar.actions.map { it.split(' ')[1] },
+        )
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `a pending night that is no longer recent is let go`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+        sync.connect()
+
+        calendar.offline = false
+        now = LocalDate.of(2026, 10, 10).atTime(9, 0).toInstant(plus2)
+        sync.sync()
+
+        assertTrue(calendar.actions.isEmpty())
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `turning auto-adjust off drops the pending blocks`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+        sync.connect()
+
+        calendar.offline = false
+        fake.seed(
+            SupabaseTables.MEMBER_SLEEP_PREFS,
+            JsonObject(
+                mapOf(
+                    "member_id" to JsonPrimitive(Fixtures.MEMBER_A),
+                    "auto_adjust_sleep_on_feedback" to JsonPrimitive(false),
+                ),
+            ),
+        )
+        now = now.plusSeconds(3600)
+        sync.sync()
+
+        assertTrue(calendar.actions.isEmpty())
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `disconnecting or signing out forgets the pending blocks`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+
+        sync.connect()
+        assertEquals(setOf("2026-10-05"), pendingSnaps())
+        sync.disconnect()
+        assertEquals(emptySet(), pendingSnaps())
+
+        // The 5th is already imported now; a new night fails instead.
+        source.sessions = listOf(night(4), night(5))
+        sync.connect()
+        assertEquals(setOf("2026-10-04"), pendingSnaps())
+        sync.clearLocal()
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `a night stored by an upload whose response was lost still gets its block`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        responseLost = true
+
+        assertEquals(HealthSyncResult.Failed, sync.connect())
+        assertEquals(1, fake.rows(SupabaseTables.SLEEP_LOGS).size)
+        assertTrue(calendar.actions.isEmpty())
+
+        // The stored row now matches the device: only the remembered night brings the block.
+        responseLost = false
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 0, blocks = 1), sync.sync())
+        assertEquals(listOf("create 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z inactive"), calendar.actions)
+        assertEquals(emptySet(), pendingSnaps())
     }
 }

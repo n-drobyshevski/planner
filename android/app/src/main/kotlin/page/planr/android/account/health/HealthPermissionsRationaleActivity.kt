@@ -3,6 +3,7 @@ package page.planr.android.account.health
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,11 +15,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import page.planr.android.R
+import page.planr.android.core.data.appearance.ThemeModeStore
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTheme
 
@@ -27,11 +33,17 @@ import page.planr.android.core.design.theme.PlanrTheme
  * permission screen ("Read privacy policy") and from Android's permission
  * usage settings; it refuses to grant access to an app without it.
  */
+@AndroidEntryPoint
 class HealthPermissionsRationaleActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var themeMode: ThemeModeStore
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            PlanrTheme {
+            val forcedDark by themeMode.forcedDark.collectAsStateWithLifecycle()
+            PlanrTheme(darkTheme = forcedDark ?: isSystemInDarkTheme()) {
                 Surface(Modifier.fillMaxSize()) {
                     Column(
                         Modifier

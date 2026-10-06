@@ -1,9 +1,11 @@
 package page.planr.android.feature.agenda
 
 import android.content.Context
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,12 +29,16 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -51,27 +57,39 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import kotlin.time.Instant
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import page.planr.android.core.design.component.PlanrFloatingButton
+import page.planr.android.core.design.component.PlanrHaptics
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.feature.agenda.model.AgendaMode
 import page.planr.android.feature.agenda.model.AgendaNotice
 import page.planr.android.feature.agenda.model.UiText
+import page.planr.android.feature.agenda.sleep.SleepCheckin
+import page.planr.android.feature.agenda.sleep.SleepCheckinViewModel
 import page.planr.android.feature.agenda.ui.AgendaFormats
 import page.planr.android.feature.agenda.ui.AgendaIcons
+import page.planr.android.feature.agenda.ui.CalendarFiltersButton
+import page.planr.android.feature.agenda.ui.CalendarFiltersSheet
+import page.planr.android.feature.agenda.ui.LocalAgendaMetrics
+import page.planr.android.feature.agenda.ui.MonthPage
 import page.planr.android.feature.agenda.ui.PartnerToggleButton
-import page.planr.android.feature.agenda.ui.HourHeight
 import page.planr.android.feature.agenda.ui.PeriodPage
+import page.planr.android.feature.agenda.ui.gridHoursAt
 import page.planr.android.feature.agenda.ui.rememberAgendaFormats
+import page.planr.android.feature.agenda.ui.rememberAgendaMetrics
 import page.planr.android.feature.agenda.ui.scrollOffsetFor
 
 /**
- * Day / week agenda for both members: swipe or use the arrows between
- * periods, Today to come back, pull down to refresh.
+ * Day / week / month agenda for both members: swipe or use the arrows between
+ * periods, Today to come back, pull down to refresh; the filter sheet hides
+ * calendars and contexts.
  *
  * @param onOpenEvent opens an occurrence's detail. The argument is the
  *   occurrence key — the event id for a single event, `eventId:epochMs` for
@@ -81,6 +99,8 @@ import page.planr.android.feature.agenda.ui.scrollOffsetFor
  * @param onQuickAdd shows a floating "Quick add" button when set (the host
  *   opens the Quick add sheet); the top bar's "+" still opens the full editor.
  * @param accountAction the host's account menu, at the end of the top bar.
+ * @param todayRequests each emission goes back to today, as the Today button
+ *   does (the host's bottom-bar tab tapped again).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +110,9 @@ fun AgendaScreen(
     onCreateEvent: ((start: Instant?) -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     accountAction: (@Composable () -> Unit)? = null,
+    todayRequests: Flow<Unit> = emptyFlow(),
     viewModel: AgendaViewModel = hiltViewModel(),
+    sleepCheckin: SleepCheckinViewModel = hiltViewModel(),
 ) {
     // Without a create route, host the editor here (seed in epoch ms; MIN = no seed).
     var inlineCreate by rememberSaveable { mutableIntStateOf(0) }
@@ -113,60 +135,104 @@ fun AgendaScreen(
     }
 
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // The startup metric (time to full display) ends when the first period shows its events.
+    ReportDrawnWhen { state.isLoaded }
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val undoLabel = stringResource(R.string.agenda_undo)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(viewModel, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.messages.collect { notice -> showNotice(snackbar, notice, context, undoLabel, viewModel::undo) }
+            viewModel.messages.collect { notice -> showNotice(snackbar, notice, context, undoLabel, haptics, viewModel::undo) }
         }
+    }
+    LaunchedEffect(viewModel, todayRequests) { todayRequests.collect { viewModel.goToToday() } }
+
+    var filtersOpen by rememberSaveable { mutableStateOf(false) }
+    if (filtersOpen) {
+        CalendarFiltersSheet(
+            filters = state.filters,
+            partner = state.partner,
+            onOwnShown = viewModel::setOwnCalendarShown,
+            onPartnerShown = viewModel::setShowPartnerEvents,
+            onContextShown = viewModel::setContextShown,
+            onShowAllContexts = viewModel::showAllContexts,
+            onDismiss = { filtersOpen = false },
+        )
     }
 
     val formats = rememberAgendaFormats()
-    Scaffold(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = {
-            if (onQuickAdd != null && state.canCreate) {
-                PlanrFloatingButton(onClick = onQuickAdd) {
-                    Icon(AgendaIcons.Plus, contentDescription = stringResource(R.string.agenda_quick_add))
+    CompositionLocalProvider(LocalAgendaMetrics provides rememberAgendaMetrics()) {
+        Scaffold(
+            modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.background,
+            snackbarHost = { SnackbarHost(snackbar) },
+            floatingActionButton = {
+                if (onQuickAdd != null && state.canCreate) {
+                    PlanrFloatingButton(onClick = onQuickAdd) {
+                        Icon(AgendaIcons.Plus, contentDescription = stringResource(R.string.agenda_quick_add))
+                    }
                 }
+            },
+            topBar = {
+                AgendaTopBar(
+                    state = state,
+                    formats = formats,
+                    onPrevious = viewModel::previous,
+                    onNext = viewModel::next,
+                    onToday = viewModel::goToToday,
+                    onMode = viewModel::setMode,
+                    onShowPartner = viewModel::setShowPartnerEvents,
+                    onFilters = { filtersOpen = true },
+                    onNew = if (state.canCreate) ({ create(null) }) else null,
+                    accountAction = accountAction,
+                )
+            },
+        ) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                SleepCheckin(
+                    viewModel = sleepCheckin,
+                    formats = formats,
+                    modifier = Modifier.padding(start = PlanrSpacing.lg, end = PlanrSpacing.lg, bottom = PlanrSpacing.sm),
+                )
+                AgendaContent(state, formats, viewModel, sleepCheckin, onOpenEvent, create)
             }
-        },
-        topBar = {
-            AgendaTopBar(
-                state = state,
-                formats = formats,
-                onPrevious = viewModel::previous,
-                onNext = viewModel::next,
-                onToday = viewModel::goToToday,
-                onMode = viewModel::setMode,
-                onShowPartner = viewModel::setShowPartnerEvents,
-                onNew = if (state.canCreate) ({ create(null) }) else null,
-                accountAction = accountAction,
-            )
-        },
-    ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::refresh,
-            modifier = Modifier.fillMaxSize().padding(padding),
-        ) {
-            AgendaPager(
-                state = state,
-                formats = formats,
-                onSettled = viewModel::showPeriod,
-                onOpenEvent = onOpenEvent,
-                onOpenDay = viewModel::openDay,
-                onCreateAt = if (state.canCreate) {
-                    { date, minute -> create(date.atTime(LocalTime(minute / 60, minute % 60)).toInstant(state.zone)) }
-                } else {
-                    null
-                },
-            )
         }
+    }
+}
+
+/** The pager under pull-to-refresh, which also rereads the sleep check-in's nights. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ColumnScope.AgendaContent(
+    state: AgendaUiState,
+    formats: AgendaFormats,
+    viewModel: AgendaViewModel,
+    sleepCheckin: SleepCheckinViewModel,
+    onOpenEvent: (eventId: String) -> Unit,
+    create: (Instant?) -> Unit,
+) {
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = {
+            viewModel.refresh()
+            sleepCheckin.refresh()
+        },
+        modifier = Modifier.fillMaxWidth().weight(1f),
+    ) {
+        AgendaPager(
+            state = state,
+            formats = formats,
+            onSettled = viewModel::showPeriod,
+            onOpenEvent = onOpenEvent,
+            onOpenDay = viewModel::openDay,
+            onCreateAt = if (state.canCreate) {
+                { date, minute -> create(date.atTime(LocalTime(minute / 60, minute % 60)).toInstant(state.zone)) }
+            } else {
+                null
+            },
+        )
     }
 }
 
@@ -184,11 +250,14 @@ private fun AgendaPager(
     onOpenDay: (LocalDate) -> Unit,
     onCreateAt: ((LocalDate, Int) -> Unit)?,
 ) {
-    val hourPx = with(LocalDensity.current) { HourHeight.toPx() }
-    // Start near the current hour on today, else at 07:00.
-    var gridScroll by rememberSaveable {
+    val hourPx = with(LocalDensity.current) { LocalAgendaMetrics.current.hourHeight.toPx() }
+    val currentHourPx by rememberUpdatedState(hourPx)
+    // Start near the current hour on today, else at 07:00. Kept in hours, not
+    // pixels: a font-size change recreates the screen with a taller or shorter
+    // hour, and the same pixel offset would land on a different time.
+    var gridHours by rememberSaveable {
         val hour = state.now.toLocalDateTime(state.zone).hour - 1
-        mutableIntStateOf(scrollOffsetFor(if (state.periodOffset == 0) maxOf(hour, 0) else 7, hourPx))
+        mutableFloatStateOf((if (state.periodOffset == 0) maxOf(hour, 0) else 7).toFloat())
     }
     key(state.mode) {
         val pager = rememberPagerState(initialPage = CENTER_PAGE + state.periodOffset) { PAGE_COUNT }
@@ -200,9 +269,21 @@ private fun AgendaPager(
             if (pager.currentPage != target && !pager.isScrollInProgress) pager.animateScrollToPage(target)
         }
         HorizontalPager(state = pager, key = { it }, modifier = Modifier.fillMaxSize()) { page ->
-            val scroll = remember { ScrollState(gridScroll) }
+            if (state.mode == AgendaMode.Month) {
+                MonthPage(
+                    month = state.periodStartAt(page - CENTER_PAGE),
+                    schedule = state::schedule,
+                    today = state.today,
+                    formats = formats,
+                    onOpenDay = onOpenDay,
+                )
+                return@HorizontalPager
+            }
+            val scroll = remember { ScrollState(scrollOffsetFor(gridHours, hourPx)) }
             LaunchedEffect(scroll) {
-                snapshotFlow { scroll.value }.collect { if (page == pager.settledPage) gridScroll = it }
+                snapshotFlow { scroll.value }.collect {
+                    if (page == pager.settledPage) gridHours = gridHoursAt(it, currentHourPx)
+                }
             }
             PeriodPage(
                 days = state.daysAt(page - CENTER_PAGE),
@@ -230,14 +311,15 @@ private fun AgendaTopBar(
     onToday: () -> Unit,
     onMode: (AgendaMode) -> Unit,
     onShowPartner: (Boolean) -> Unit,
+    onFilters: () -> Unit,
     onNew: (() -> Unit)?,
     accountAction: (@Composable () -> Unit)?,
 ) {
     val days = state.days
-    val title = if (days.size == 1) {
-        formats.dayTitle(days.single(), state.today.year)
-    } else {
-        formats.rangeTitle(days.first(), days.last())
+    val title = when (state.mode) {
+        AgendaMode.Day -> formats.dayTitle(days.single(), state.today.year)
+        AgendaMode.Week -> formats.rangeTitle(days.first(), days.last())
+        AgendaMode.Month -> formats.monthTitle(state.periodStartAt(state.periodOffset))
     }
     Column(
         modifier = Modifier
@@ -256,6 +338,7 @@ private fun AgendaTopBar(
                     .weight(1f)
                     .semantics { heading() },
             )
+            CalendarFiltersButton(narrowed = state.filters.narrowed, onClick = onFilters)
             state.partner?.let { partner -> PartnerToggleButton(partner, onToggle = onShowPartner) }
             if (onNew != null) {
                 IconButton(onClick = onNew) {
@@ -274,7 +357,13 @@ private fun AgendaTopBar(
                         icon = {},
                         label = {
                             Text(
-                                stringResource(if (mode == AgendaMode.Day) R.string.agenda_view_day else R.string.agenda_view_week),
+                                stringResource(
+                                    when (mode) {
+                                        AgendaMode.Day -> R.string.agenda_view_day
+                                        AgendaMode.Week -> R.string.agenda_view_week
+                                        AgendaMode.Month -> R.string.agenda_view_month
+                                    },
+                                ),
                                 maxLines = 1,
                             )
                         },
@@ -305,14 +394,19 @@ private suspend fun showNotice(
     notice: AgendaNotice,
     context: Context,
     undoLabel: String,
+    haptics: PlanrHaptics,
     onUndo: (AgendaNotice) -> Unit,
 ) {
+    if (notice.failedWrite) haptics.reject()
     val result = host.showSnackbar(
         message = notice.message.resolve(context),
         actionLabel = if (notice.undo != null) undoLabel else null,
         duration = if (notice.undo != null) SnackbarDuration.Long else SnackbarDuration.Short,
     )
-    if (result == SnackbarResult.ActionPerformed) onUndo(notice)
+    if (result == SnackbarResult.ActionPerformed) {
+        haptics.tick()
+        onUndo(notice)
+    }
 }
 
 internal fun UiText.resolve(context: Context): String {

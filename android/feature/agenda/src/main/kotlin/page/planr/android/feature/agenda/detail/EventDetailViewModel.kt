@@ -68,6 +68,11 @@ class EventDetailViewModel @AssistedInject constructor(
     /** Emits when the screen should close (after a delete). */
     val closed: Flow<Unit> = _closed.receiveAsFlow()
 
+    private val _failed = Channel<Unit>(Channel.CONFLATED)
+
+    /** Emits when a delete didn't go through (the agenda gets the message). */
+    val failed: Flow<Unit> = _failed.receiveAsFlow()
+
     private val _deleting = MutableStateFlow(false)
     val deleting: StateFlow<Boolean> = _deleting.asStateFlow()
 
@@ -81,11 +86,12 @@ class EventDetailViewModel @AssistedInject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EventDetailUiState.Loading)
 
     init {
-        // Opened from a widget or a link before the cache has the event: fetch around it.
+        // Opened from a widget or a link before the cache has the event: fetch around it
+        // (forced: the cache is known to lack it, however recently that window was fetched).
         viewModelScope.launch {
             val anchor = this@EventDetailViewModel.ref.occurrenceDate
             if (anchor != null && data.getEvent(this@EventDetailViewModel.ref.eventId) == null) {
-                runCatchingNonCancel { data.refreshWindow(TimeWindow(anchor - 1.days, anchor + 1.days)) }
+                runCatchingNonCancel { data.refreshWindow(TimeWindow(anchor - 1.days, anchor + 1.days), force = true) }
             }
         }
     }
@@ -108,9 +114,12 @@ class EventDetailViewModel @AssistedInject constructor(
                     }
                     RecurrenceScope.This -> {
                         val prior = data.applyOverride(EditSemantics.cancelOccurrence(event.id, occurrenceDate))
-                        AgendaNotice(UiText(R.string.agenda_toast_event_deleted)) {
-                            data.revertOverride(event.id, occurrenceDate, prior)
-                        }
+                        AgendaNotice(
+                            UiText(R.string.agenda_toast_event_deleted),
+                            // Without a known prior, an undo could erase an earlier override.
+                            undo = suspend { data.revertOverride(event.id, occurrenceDate, prior) }
+                                .takeIf { prior.canRevert },
+                        )
                     }
                     RecurrenceScope.Following -> {
                         data.deleteThisAndFuture(event, occurrenceDate)
@@ -129,7 +138,8 @@ class EventDetailViewModel @AssistedInject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                notices.post(AgendaNotice(UiText(R.string.agenda_something_went_wrong)))
+                notices.post(AgendaNotice(UiText(R.string.agenda_something_went_wrong), failedWrite = true))
+                _failed.send(Unit)
             } finally {
                 _deleting.value = false
             }

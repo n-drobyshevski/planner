@@ -1,12 +1,11 @@
 package page.planr.android.core.data.remote
 
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
@@ -125,41 +124,52 @@ class EventMutations @Inject constructor(
     /**
      * `applyOverride`: upsert a cancel/modify override for one occurrence.
      * The prior row is read best-effort first so the edit can be undone with
-     * [revertOverride]; a failed read never blocks the edit.
+     * [revertOverride]; a failed read never blocks the edit, but leaves the
+     * prior [OverridePrior.Unknown] (no undo) rather than "none".
      */
     suspend fun applyOverride(workspaceId: String, input: OverrideInput): AppliedOverride {
-        val prior = runCatching {
-            gateway.select(
+        val prior = try {
+            val rows = gateway.select(
                 SupabaseTables.EVENT_OVERRIDES,
                 filters = listOf(
                     eq("event_id", input.eventId),
                     eq("occurrence_date", PostgresTime.toIso(input.occurrenceDate)),
                 ),
-            ).singleOrNull()
-        }.getOrNull()
+            )
+            when (rows.size) {
+                0 -> OverridePrior.None
+                1 -> OverridePrior.Known(rows.single())
+                else -> OverridePrior.Unknown
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            OverridePrior.Unknown
+        }
         val stored = gateway.upsert(
             SupabaseTables.EVENT_OVERRIDES,
             listOf(EventPayloads.overrideRow(workspaceId, input)),
             onConflict = OVERRIDE_CONFLICT,
         )
         return AppliedOverride(
-            prior = OverridePrior(prior),
+            prior = prior,
             override = stored.firstOrNull()?.decodeAs(EventOverride.serializer()),
         )
     }
 
     /**
      * `revertOverride`: restore the prior override row, or remove the
-     * override when there was none. Returns the restored row, if any.
+     * override when there was none. Returns the restored row, if any. An
+     * [OverridePrior.Unknown] prior can't be reverted (see [OverridePrior.canRevert]).
      */
     suspend fun revertOverride(
         eventId: String,
         occurrenceDate: Instant,
         prior: OverridePrior,
     ): EventOverride? {
-        val row = prior.row
-        if (row != null) {
-            return gateway.upsert(SupabaseTables.EVENT_OVERRIDES, listOf(row), OVERRIDE_CONFLICT)
+        require(prior.canRevert) { "The override this edit replaced is unknown" }
+        if (prior is OverridePrior.Known) {
+            return gateway.upsert(SupabaseTables.EVENT_OVERRIDES, listOf(prior.row), OVERRIDE_CONFLICT)
                 .firstOrNull()
                 ?.decodeAs(EventOverride.serializer())
         }
@@ -175,9 +185,15 @@ class EventMutations @Inject constructor(
         updateEvent(event.id, EventPayloads.fromOccurrencePatch(EditSemantics.editAll(event, patch)))
 
     /**
-     * `splitSeries`: cap the original series and create the new one. The new
+     * `splitSeries`: create the new series, then cap the original. The new
      * series inherits kind + category; [newColor] / [newAttributes] override
      * its own color / attributes when set.
+     *
+     * All or nothing, in this order: a failed insert leaves the original
+     * untouched, and a failed cap deletes the new series again before the
+     * failure is rethrown. (Capping first would lose every future occurrence,
+     * for both members, whenever the insert failed.) A cap that finds no row
+     * (the series was deleted meanwhile) fails with [StaleWriteException].
      */
     suspend fun splitSeries(
         event: PlannerEvent,
@@ -187,23 +203,30 @@ class EventMutations @Inject constructor(
         newAttributes: JsonObject? = null,
     ): SplitResult {
         val split = EditSemantics.splitThisAndFuture(event, fromOccurrence, patch)
-        val capped = gateway.update(
-            SupabaseTables.EVENTS,
-            buildJsonObject {
-                put("rrule", split.original.rrule)
-                put("recurrence_ends_at", split.original.recurrenceEndsAt?.let(PostgresTime::toIso))
-            },
-            listOf(eq("id", split.original.id)),
-        )
         var draft = split.newSeries
         if (newColor is PatchField.Value) draft = draft.copy(color = newColor.value)
         if (newAttributes != null) draft = draft.copy(attributes = newAttributes)
         val created = createEvent(draft)
-        return SplitResult(
-            original = capped.firstOrNull()?.decodeAs(PlannerEvent.serializer()),
-            created = created,
-        )
+        val capped = try {
+            updateEvent(split.original.id, recurrencePatch(split.original.rrule, split.original.recurrenceEndsAt))
+        } catch (e: Throwable) {
+            withContext(NonCancellable) {
+                // The cap may have landed with only its answer lost (a timeout,
+                // or the screen closing mid-request): put the original rule
+                // back before dropping the new series, or the future is gone.
+                runCatching { gateway.update(SupabaseTables.EVENTS, recurrenceRow(event), listOf(eq("id", event.id))) }
+                runCatching { deleteEvents(listOf(created.id)) }
+            }
+            throw e
+        }
+        return SplitResult(original = capped, created = created)
     }
+
+    private fun recurrencePatch(rrule: String?, recurrenceEndsAt: Instant?) =
+        EventPatch(rrule = PatchField.Value(rrule), recurrenceEndsAt = PatchField.Value(recurrenceEndsAt))
+
+    private fun recurrenceRow(event: PlannerEvent): JsonObject =
+        EventPayloads.patchRow(recurrencePatch(event.rrule, event.recurrenceEndsAt))
 
     /**
      * `deleteThisAndFuture`: cap the series with UNTIL one second before
@@ -232,8 +255,8 @@ class EventMutations @Inject constructor(
 /** Result of [EventMutations.applyOverride]: the undo token and the stored row. */
 data class AppliedOverride(val prior: OverridePrior, val override: EventOverride?)
 
-/** Result of [EventMutations.splitSeries]: the capped original (if returned) and the new series. */
-data class SplitResult(val original: PlannerEvent?, val created: PlannerEvent)
+/** Result of [EventMutations.splitSeries]: the capped original and the new series. */
+data class SplitResult(val original: PlannerEvent, val created: PlannerEvent)
 
 /** Rows written back by [EventMutations.restoreDeleted]. */
 data class RestoredEvents(val events: List<PlannerEvent>, val overrides: List<EventOverride>)

@@ -384,22 +384,53 @@ export async function removeDependency(sb: SupabaseClient, id: string): Promise<
 // --- Recurring edits -------------------------------------------------------
 
 /**
+ * The override row an `applyOverride` replaced: a known row, none at all, or
+ * unknown (its read failed). Only a known or absent prior can be reverted; an
+ * unknown one would make the undo delete an override that was already there.
+ */
+export type OverridePrior =
+  | { kind: "known"; row: Record<string, unknown> }
+  | { kind: "none" }
+  | { kind: "unknown" };
+
+/** Whether `revertOverride` can undo an edit that replaced `prior`. */
+export function canRevertOverride(prior: OverridePrior): boolean {
+  return prior.kind !== "unknown";
+}
+
+/** Reads the override row for one occurrence, best-effort (see `OverridePrior`). */
+async function readOverridePrior(
+  sb: SupabaseClient,
+  eventId: string,
+  occurrenceDateMs: number,
+): Promise<OverridePrior> {
+  try {
+    const { data, error } = await sb
+      .from("event_overrides")
+      .select("*")
+      .eq("event_id", eventId)
+      .eq("occurrence_date", toIso(occurrenceDateMs))
+      .maybeSingle();
+    if (error) return { kind: "unknown" };
+    return data ? { kind: "known", row: data as Record<string, unknown> } : { kind: "none" };
+  } catch {
+    return { kind: "unknown" };
+  }
+}
+
+/**
  * Apply a cancel/modify override for a single occurrence (this-occurrence edit).
- * Returns any pre-existing override row for this occurrence (or null) so the
- * change can be undone via `revertOverride`. The prior-read is best-effort: a
- * failed read never blocks the edit, it just yields a delete-style inverse.
+ * Returns the override row it replaced (see `OverridePrior`) so the change can
+ * be undone via `revertOverride`. The prior-read is best-effort: a failed read
+ * never blocks the edit, but leaves the prior unknown (no undo) rather than
+ * "none", whose inverse would delete an earlier override.
  */
 export async function applyOverride(
   sb: SupabaseClient,
   workspaceId: string,
   input: OverrideInput,
-): Promise<{ prior: Record<string, unknown> | null }> {
-  const { data: prior } = await sb
-    .from("event_overrides")
-    .select("*")
-    .eq("event_id", input.eventId)
-    .eq("occurrence_date", toIso(input.occurrenceDate))
-    .maybeSingle();
+): Promise<{ prior: OverridePrior }> {
+  const prior = await readOverridePrior(sb, input.eventId, input.occurrenceDate);
   const row: Record<string, unknown> = {
     workspace_id: workspaceId,
     event_id: input.eventId,
@@ -420,23 +451,25 @@ export async function applyOverride(
     .from("event_overrides")
     .upsert(row, { onConflict: "event_id,occurrence_date" });
   if (error) throw error;
-  return { prior: prior ?? null };
+  return { prior };
 }
 
 /**
  * Undo an `applyOverride`: restore the prior override row if there was one,
- * otherwise remove the override entirely (back to the plain occurrence).
+ * otherwise remove the override entirely (back to the plain occurrence). An
+ * unknown prior can't be reverted (see `canRevertOverride`).
  */
 export async function revertOverride(
   sb: SupabaseClient,
   eventId: string,
   occurrenceDateMs: number,
-  prior: Record<string, unknown> | null,
+  prior: OverridePrior,
 ): Promise<void> {
-  if (prior) {
+  if (prior.kind === "unknown") throw new Error("The override this edit replaced is unknown.");
+  if (prior.kind === "known") {
     const { error } = await sb
       .from("event_overrides")
-      .upsert(prior, { onConflict: "event_id,occurrence_date" });
+      .upsert(prior.row, { onConflict: "event_id,occurrence_date" });
     if (error) throw error;
   } else {
     const { error } = await sb
@@ -459,9 +492,15 @@ export async function updateAll(
 }
 
 /**
- * "This and future": cap the original series and create a new one. The new
+ * "This and future": create the new series, then cap the original. The new
  * series inherits the original's kind + category; pass `newColor`
  * (string | null) to give the future series a different own-color.
+ *
+ * All or nothing, in this order: a failed insert leaves the original
+ * untouched, and a failed cap deletes the new series again before the error
+ * is rethrown. (Capping first would lose every future occurrence, for both
+ * members, whenever the insert failed.) A cap that finds no row (the series
+ * was deleted meanwhile) fails with StaleWriteError.
  */
 export async function splitSeries(
   sb: SupabaseClient,
@@ -472,16 +511,6 @@ export async function splitSeries(
   newAttributes?: ItemAttributes,
 ): Promise<EventRow> {
   const { original, newSeries } = splitThisAndFuture(event, fromOccurrenceMs, patch);
-  const { error } = await sb
-    .from("events")
-    .update({
-      rrule: original.rrule,
-      recurrence_ends_at:
-        original.recurrenceEndsAt == null ? null : toIso(original.recurrenceEndsAt),
-    })
-    .eq("id", original.id);
-  if (error) throw error;
-
   const input: EventInput = {
     workspaceId: newSeries.workspaceId,
     ownerId: newSeries.ownerId,
@@ -505,7 +534,41 @@ export async function splitSeries(
     taskId: newSeries.taskId,
     attributes: newAttributes !== undefined ? newAttributes : newSeries.attributes,
   };
-  return createEvent(sb, input);
+  const created = await createEvent(sb, input);
+  try {
+    await updateEvent(sb, original.id, {
+      rrule: original.rrule,
+      recurrenceEndsAt: original.recurrenceEndsAt,
+    });
+  } catch (e) {
+    // The cap may have landed with only its answer lost: put the original
+    // rule back before dropping the new series, or the future is gone.
+    await updateEvent(sb, event.id, {
+      rrule: event.rrule,
+      recurrenceEndsAt: event.recurrenceEndsAt,
+    }).catch(() => {});
+    await deleteEvent(sb, created.id).catch(() => {});
+    throw e;
+  }
+  return created;
+}
+
+/**
+ * Undo a `splitSeries`: put the original's rule back FIRST, then delete the
+ * new series. If the restore fails, the new series stays and the error is
+ * rethrown, so the future occurrences survive in one of the two rows.
+ * (Deleting first would lose them whenever the restore then failed.)
+ */
+export async function revertSplit(
+  sb: SupabaseClient,
+  original: EventRow,
+  newSeriesId: string,
+): Promise<void> {
+  await updateEvent(sb, original.id, {
+    rrule: original.rrule,
+    recurrenceEndsAt: original.recurrenceEndsAt,
+  });
+  await deleteEvent(sb, newSeriesId);
 }
 
 /** "This and following": cap the series with UNTIL just before the occurrence. */

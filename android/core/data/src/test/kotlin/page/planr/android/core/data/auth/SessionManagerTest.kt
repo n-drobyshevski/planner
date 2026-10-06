@@ -7,6 +7,7 @@ import java.net.URI
 import java.net.URLDecoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
@@ -27,8 +28,16 @@ class SessionManagerTest {
     private class MemoryStore : SessionStore {
         var session: StoredSession? = null
         var pending: PendingAuthorization? = null
-        override suspend fun readSession() = session
-        override suspend fun writeSession(session: StoredSession?) { this.session = session }
+        /** A broken disk or Keystore: every read / write throws. */
+        var broken = false
+        override suspend fun readSession(): StoredSession? {
+            if (broken) throw IOException("unreadable")
+            return session
+        }
+        override suspend fun writeSession(session: StoredSession?) {
+            if (broken) throw IOException("disk full")
+            this.session = session
+        }
         override suspend fun readPending() = pending
         override suspend fun writePending(pending: PendingAuthorization?) { this.pending = pending }
     }
@@ -250,6 +259,32 @@ class SessionManagerTest {
 
         assertEquals(store.session?.accessToken, manager.accessToken())
         assertEquals(AuthState.SignedIn(SessionInfo("user-1", "m1", "ws1")), manager.authState.value)
+    }
+
+    @Test
+    fun `an unreadable store starts signed out instead of crashing`() = runTest {
+        store.session = signedInSession(3600)
+        store.broken = true
+        assertEquals(AuthState.SignedOut(), manager().authState.value)
+    }
+
+    @Test
+    fun `rotated tokens that can't be stored still replace the in-memory session`() = runTest {
+        val old = signedInSession(expiresInSec = 30)
+        store.session = old
+        val tokens = FakeTokenClient(clock()::now)
+        val manager = manager(tokens)
+        store.broken = true
+
+        val fresh = manager.accessToken()
+
+        assertEquals(1, tokens.refreshes)
+        assertNotNull(fresh)
+        assertNotEquals(old.accessToken, fresh)
+        assertEquals(AuthState.SignedIn(SessionInfo("user-1", "m1", "ws1")), manager.authState.value)
+        // The spent refresh token isn't used again: the new one lives in memory.
+        assertEquals(fresh, manager.accessToken())
+        assertEquals(1, tokens.refreshes)
     }
 
     @Test

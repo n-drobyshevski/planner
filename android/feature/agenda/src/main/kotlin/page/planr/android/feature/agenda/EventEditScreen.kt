@@ -52,6 +52,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.data.attributes.AttributesMerge
+import page.planr.android.core.design.component.AttributeDetails
+import page.planr.android.core.design.component.AttributeScale
+import page.planr.android.core.design.component.DiscardChangesDialog
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTokens
@@ -77,10 +83,13 @@ import page.planr.android.feature.agenda.ui.rememberAgendaFormats
 
 /**
  * Create or edit an event: title, all-day, start / end, time zone (defaults
- * to the member's), context, sharing, repeat, place and notes. Saving an
- * instance of a series asks "this / this and following / all events" first.
+ * to the member's), context, sharing, repeat, place, notes and the optional
+ * optimization details. Saving an instance of a series asks "this / this
+ * and following / all events" first.
  * A conflicting edit made elsewhere surfaces as a calm snackbar offering to
- * reload; the form is never discarded on failure.
+ * reload; the form is never discarded on failure. Leaving with unsaved
+ * changes (Back or Close) asks to discard them first; while a save is in
+ * flight Back waits for it (no prompt, and no pop that would cancel it).
  *
  * @param onDone called after a successful save.
  * @param onClose called when the editor is closed without saving.
@@ -97,24 +106,39 @@ fun EventEditScreen(
     onClose: () -> Unit = onDone,
     viewModelKey: String? = null,
 ) {
-    BackHandler(enabled = viewModelKey != null, onBack = onClose)
     val viewModel = hiltViewModel<EventEditViewModel, EventEditViewModel.Factory>(key = viewModelKey) {
         it.create(target)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
+    val close: () -> Unit = {
+        when {
+            state.saving -> Unit
+            state.dirty -> confirmingDiscard = true
+            else -> onClose()
+        }
+    }
+    // An in-place editor always takes over Back; a route only while there is
+    // something to lose, or a save in flight (it leaves by itself once it lands).
+    BackHandler(enabled = viewModelKey != null || state.dirty || state.saving, onBack = close)
     val snackbar = remember { SnackbarHostState() }
     val staleText = stringResource(R.string.agenda_stale_event)
     val reloadText = stringResource(R.string.agenda_stale_reload)
     val failedText = stringResource(R.string.agenda_something_went_wrong)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 EventEditEffect.Done -> onDone()
                 EventEditEffect.Stale -> {
+                    haptics.reject()
                     val result = snackbar.showSnackbar(staleText, actionLabel = reloadText, duration = SnackbarDuration.Indefinite, withDismissAction = true)
                     if (result == SnackbarResult.ActionPerformed) viewModel.reloadLatest()
                 }
-                EventEditEffect.Failed -> snackbar.showSnackbar(failedText)
+                EventEditEffect.Failed -> {
+                    haptics.reject()
+                    snackbar.showSnackbar(failedText)
+                }
             }
         }
     }
@@ -129,7 +153,7 @@ fun EventEditScreen(
                     Text(stringResource(if (state.isNew) R.string.agenda_editor_new_event else R.string.agenda_editor_edit_event))
                 },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
+                    IconButton(onClick = close, enabled = !state.saving) {
                         Icon(AgendaIcons.Close, contentDescription = stringResource(R.string.agenda_close))
                     }
                 },
@@ -137,7 +161,7 @@ fun EventEditScreen(
                     if (state.phase == EventEditUiState.Phase.Ready) {
                         Button(
                             onClick = viewModel::save,
-                            enabled = !state.saving,
+                            enabled = state.dirty && !state.saving,
                             modifier = Modifier.padding(end = PlanrSpacing.sm),
                         ) {
                             Text(stringResource(if (state.saving) R.string.agenda_saving else R.string.agenda_save))
@@ -169,6 +193,15 @@ fun EventEditScreen(
 
     if (state.askScope) {
         RecurrenceScopeDialog(delete = false, onChoose = viewModel::chooseScope, onDismiss = viewModel::dismissScope)
+    }
+    if (confirmingDiscard) {
+        DiscardChangesDialog(
+            onDiscard = {
+                confirmingDiscard = false
+                onClose()
+            },
+            onKeepEditing = { confirmingDiscard = false },
+        )
     }
 }
 
@@ -245,6 +278,14 @@ private fun EditorFields(
             minLines = 3,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             modifier = Modifier.fillMaxWidth(),
+        )
+        AttributeDetails(
+            scales = AttributeScales,
+            selected = form.attributes.mapKeys { it.key.key },
+            onSelect = { key, option ->
+                val attribute = AttributeKey.of(key) ?: return@AttributeDetails
+                onChange { it.copy(attributes = AttributesMerge.select(it.attributes, attribute, option)) }
+            },
         )
         Spacer(Modifier.size(PlanrSpacing.xl))
     }
@@ -426,3 +467,6 @@ private fun Swatch(hex: String) {
             .background(parseHexColor(hex, PlanrTokens.WarmStone)),
     )
 }
+
+/** The known attributes, as the shared details editor shows them. */
+private val AttributeScales = AttributeKey.entries.map { AttributeScale(it.key, it.options) }

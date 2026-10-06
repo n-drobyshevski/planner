@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut icon: Tasks, on warm paper like the app icon. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/planr_paper" />
+    <foreground android:drawable="@drawable/ic_shortcut_tasks_foreground" />
+    <monochrome android:drawable="@drawable/ic_shortcut_tasks_foreground" />
+</adaptive-icon>

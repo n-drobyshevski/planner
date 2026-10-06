@@ -40,6 +40,7 @@ internal object ShellText {
         InsightsTab.Trends -> R.string.insights_tab_trends
         InsightsTab.Patterns -> R.string.insights_tab_patterns
         InsightsTab.Tasks -> R.string.insights_tab_tasks
+        InsightsTab.Sleep -> R.string.insights_tab_sleep
     }
 }
 

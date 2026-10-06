@@ -32,7 +32,30 @@ data class DeletedEventSnapshot(
 )
 
 /**
- * What [applyOverride] replaced: the prior override row for that occurrence,
- * or null when there was none (undo then deletes the override).
+ * A task's own row, captured before it was deleted, so the delete can be
+ * undone by re-inserting it verbatim (`DeletedSnapshot`, task part, for a
+ * task without subtasks or calendar blocks: those rows are not in it). The
+ * task's flow checkpoints and its dependency edges (either end), which the
+ * DB cascades away with it, are captured too.
  */
-data class OverridePrior(val row: JsonObject?)
+data class DeletedTaskSnapshot(
+    val tasks: List<JsonObject>,
+    val checkpoints: List<JsonObject> = emptyList(),
+    val dependencies: List<JsonObject> = emptyList(),
+)
+
+/**
+ * What [applyOverride] replaced for that occurrence, the undo token for
+ * `revertOverride`:
+ * - [Known]: the prior override row (undo restores it)
+ * - [None]: there was no override (undo deletes the new one)
+ * - [Unknown]: the prior couldn't be read. Undo isn't possible: deleting
+ *   could erase an earlier override, so callers offer none ([canRevert]).
+ */
+sealed interface OverridePrior {
+    data class Known(val row: JsonObject) : OverridePrior
+    data object None : OverridePrior
+    data object Unknown : OverridePrior
+
+    val canRevert: Boolean get() = this !is Unknown
+}

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut glyph: Tasks (Lucide list-checks, ISC), as the Tasks tab. The 24 dp stroke icon
+     scaled to 44 dp in the middle of the 108 dp adaptive-icon canvas. One
+     stroke colour, so it also serves as the themed (monochrome) layer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.8333"
+        android:scaleY="1.8333"
+        android:translateX="32"
+        android:translateY="32">
+        <path
+            android:pathData="M3,17L5,19L9,15"
+            android:strokeWidth="2"
+            android:strokeColor="@color/planr_warm_stone"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M3,7L5,9L9,5"
+            android:strokeWidth="2"
+            android:strokeColor="@color/planr_warm_stone"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M13,6H21"
+            android:strokeWidth="2"
+            android:strokeColor="@color/planr_warm_stone"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M13,12H21"
+            android:strokeWidth="2"
+            android:strokeColor="@color/planr_warm_stone"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M13,18H21"
+            android:strokeWidth="2"
+            android:strokeColor="@color/planr_warm_stone"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

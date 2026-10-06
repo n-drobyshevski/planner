@@ -5,9 +5,6 @@ import android.content.Context
 import android.content.Intent
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.todayIn
@@ -33,8 +30,12 @@ class WidgetTimeReceiver : BroadcastReceiver() {
                 }
             } finally {
                 // Always re-arm: the alarm is one-shot, and a zone change moves midnight.
-                DayRollover.sync(app)
-                pending.finish()
+                // A failed re-arm is logged by the scope; the broadcast still finishes.
+                try {
+                    DayRollover.sync(app)
+                } finally {
+                    pending.finish()
+                }
             }
         }
     }
@@ -54,6 +55,6 @@ class WidgetTimeReceiver : BroadcastReceiver() {
         /** goAsync() allows ~10 s before the broadcast is considered stuck. */
         val RECEIVER_BUDGET = 8.seconds
 
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val scope = widgetScope()
     }
 }

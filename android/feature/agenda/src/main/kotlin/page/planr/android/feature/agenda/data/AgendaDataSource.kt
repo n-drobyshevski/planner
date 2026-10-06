@@ -3,10 +3,12 @@ package page.planr.android.feature.agenda.data
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
+import page.planr.android.core.model.CalendarFilter
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.Member
@@ -35,21 +37,33 @@ interface AgendaDataSource {
     /** Expanded occurrences overlapping [window]; collecting marks it as on screen. */
     fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>>
 
-    /** Whether the partner's personal events show (synced to the account, default on). */
-    fun observeShowPartnerEvents(): Flow<Boolean>
+    /**
+     * What the calendar shows: whether the partner's personal events do
+     * (synced to the account, default on), the viewer's own calendar and the
+     * hidden contexts (kept on this device).
+     */
+    fun observeCalendarFilter(): Flow<CalendarFilter>
 
     suspend fun setShowPartnerEvents(show: Boolean)
 
-    /** The last-used Day / Week mode (synced to the account, default Day). */
+    suspend fun setOwnCalendarHidden(hidden: Boolean)
+
+    /** Hides or shows one context (category id), in one read-and-write step. */
+    suspend fun setCategoryHidden(id: String, hidden: Boolean)
+
+    /** Shows every context again. */
+    suspend fun showAllCategories()
+
+    /** The last-used mode (Day / Week synced to the account, Month kept on the device; default Day). */
     fun observeAgendaMode(): Flow<AgendaMode>
 
     suspend fun setAgendaMode(mode: AgendaMode)
 
-    /** Refetches members and categories. */
-    suspend fun refreshWorkspace()
+    /** Refetches members and categories; skipped when just fetched, unless [force]d. */
+    suspend fun refreshWorkspace(force: Boolean = false)
 
-    /** Refetches the events and overrides of [window]. */
-    suspend fun refreshWindow(window: TimeWindow)
+    /** Refetches the events and overrides of [window]; skipped when just fetched, unless [force]d. */
+    suspend fun refreshWindow(window: TimeWindow, force: Boolean = false)
 
     fun observeEvent(id: String): Flow<PlannerEvent?>
 
@@ -71,8 +85,13 @@ interface AgendaDataSource {
 
     suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior)
 
-    /** "This and following": returns the new series. */
-    suspend fun splitSeries(event: PlannerEvent, fromOccurrence: Instant, patch: OccurrencePatch): PlannerEvent
+    /** "This and following": returns the new series, carrying [newAttributes] when set. */
+    suspend fun splitSeries(
+        event: PlannerEvent,
+        fromOccurrence: Instant,
+        patch: OccurrencePatch,
+        newAttributes: JsonObject? = null,
+    ): PlannerEvent
 
     /** "Delete this and following": caps the series before [fromOccurrence]. */
     suspend fun deleteThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): PlannerEvent

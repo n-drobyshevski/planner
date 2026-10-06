@@ -85,6 +85,48 @@
         <item quantity="other">%1$d of %2$d subtasks done</item>
     </plurals>
     <string name="task_subtask_of">Subtask of %1$s</string>
+    <string name="task_subtask_open_parent">Open the parent task</string>
+    <string name="task_subtask_open">Open subtask</string>
+    <string name="task_subtask_blocked">Finish the previous subtask first</string>
+    <string name="task_subtask_add_placeholder">Add a subtask</string>
+    <string name="task_subtask_add">Add subtask</string>
+
+    <!-- Delete -->
+    <string name="task_delete">Delete task</string>
+    <string name="task_deleted">Task deleted</string>
+    <string name="task_delete_title">Delete “%1$s”?</string>
+    <plurals name="task_delete_body_subtasks">
+        <item quantity="one">Its %1$d subtask goes with it. This can’t be undone.</item>
+        <item quantity="other">Its %1$d subtasks go with it. This can’t be undone.</item>
+    </plurals>
+    <plurals name="task_delete_body_subtasks_blocks">
+        <item quantity="one">Its %1$d subtask and the linked blocks on the calendar go with it. This can’t be undone.</item>
+        <item quantity="other">Its %1$d subtasks and the linked blocks on the calendar go with it. This can’t be undone.</item>
+    </plurals>
+    <string name="task_delete_body_blocks">The blocks it placed on the calendar go with it. This can’t be undone.</string>
+    <string name="task_delete_confirm">Delete</string>
+    <string name="task_delete_cancel">Cancel</string>
     <string name="task_date_pick">Pick</string>
     <string name="task_date_cancel">Cancel</string>
+
+    <!-- Calendar blocks (the web's "Add to calendar" dialog) -->
+    <string name="task_blocks_title">On the calendar</string>
+    <string name="task_block_range">%1$s · %2$s–%3$s</string>
+    <string name="task_block_open">Open event</string>
+    <string name="task_block_remove">Remove from calendar</string>
+    <string name="task_block_added">Added to calendar</string>
+    <string name="task_block_removed">Removed from calendar</string>
+    <string name="task_schedule_title">Add to calendar</string>
+    <string name="task_schedule_date">Date</string>
+    <string name="task_schedule_start">Start</string>
+    <string name="task_schedule_duration">Duration</string>
+    <string name="task_schedule_15min">15 min</string>
+    <string name="task_schedule_30min">30 min</string>
+    <string name="task_schedule_45min">45 min</string>
+    <string name="task_schedule_1hour">1 hour</string>
+    <string name="task_schedule_1and_half_hours">1.5 hours</string>
+    <string name="task_schedule_2hours">2 hours</string>
+    <string name="task_schedule_add">Add to calendar</string>
+    <string name="task_schedule_adding">Adding…</string>
+    <string name="task_schedule_cancel">Cancel</string>
 </resources>

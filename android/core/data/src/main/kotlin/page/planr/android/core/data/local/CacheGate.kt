@@ -28,11 +28,34 @@ enum class CacheArea { Events, Tasks, Workspace }
 @Singleton
 class CacheGate @Inject constructor() {
     private val mutex = Mutex()
+
+    @Volatile
     private var epoch = 0L
     private val changes = LongArray(CacheArea.entries.size)
 
     /** Where a writer started: take it before the network call the write depends on. */
     class Ticket internal constructor(internal val epoch: Long, internal val changes: LongArray)
+
+    /** The current wipe count, read without waiting for the lock ([RefreshCoalescer]'s freshness). */
+    internal val currentEpoch: Long get() = epoch
+
+    @Volatile
+    private var outdated = 0L
+
+    /** How often [outdateSnapshots] was called ([RefreshCoalescer]'s freshness). */
+    internal val currentOutdated: Long get() = outdated
+
+    /**
+     * Marks every snapshot fetched, or still being fetched, until now as
+     * possibly behind the server: [RefreshCoalescer] then neither skips a
+     * refresh because of one nor lets a caller join one. The Realtime join
+     * calls it, since changes committed before the channel was subscribed
+     * never arrive over it. Writes are unaffected.
+     */
+    @Synchronized
+    fun outdateSnapshots() {
+        outdated++
+    }
 
     suspend fun ticket(): Ticket = mutex.withLock { Ticket(epoch, changes.copyOf()) }
 

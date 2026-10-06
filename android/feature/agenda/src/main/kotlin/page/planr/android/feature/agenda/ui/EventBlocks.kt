@@ -53,9 +53,9 @@ import page.planr.android.feature.agenda.model.AgendaBlock
 import page.planr.android.feature.agenda.model.Ownership
 
 /**
- * A timed block in a day column. [height] decides how much fits: the title
- * always, then the time range, then the context hint. [compact] (week view)
- * shows the title alone.
+ * A timed block in a day column. [height] decides how much fits (see
+ * [blockFit]): the title always, then the time range, then the context hint.
+ * [compact] (week view) shows the title alone.
  */
 @Composable
 internal fun TimedEventBlock(
@@ -75,6 +75,7 @@ internal fun TimedEventBlock(
         formats.time(block.end, zone),
     )
     val description = blockDescription(block, title, range)
+    val fit = LocalAgendaMetrics.current.blockFit(height, compact)
     BlockSurface(
         style = style,
         shape = EventBlockShape,
@@ -83,8 +84,8 @@ internal fun TimedEventBlock(
             .clickable(role = Role.Button, onClick = onClick),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = if (compact) 3.dp else 6.dp, vertical = 3.dp),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+            modifier = Modifier.padding(horizontal = if (compact) 3.dp else 6.dp, vertical = BlockPaddingVertical),
+            verticalArrangement = Arrangement.spacedBy(BlockRowGap),
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Text(
@@ -92,10 +93,10 @@ internal fun TimedEventBlock(
                     color = style.content,
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontSize = if (compact) 11.sp else 12.sp,
-                        lineHeight = if (compact) 13.sp else 15.sp,
+                        lineHeight = if (compact) CompactBlockTitleLineHeight else BlockTitleLineHeight,
                     ),
                     textDecoration = if (style.strikethrough) TextDecoration.LineThrough else null,
-                    maxLines = maxTitleLines(height, compact),
+                    maxLines = fit.titleLines,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -104,7 +105,7 @@ internal fun TimedEventBlock(
                     Icon(AgendaIcons.Users, contentDescription = null, tint = style.content, modifier = Modifier.size(11.dp))
                 }
             }
-            if (!compact && height >= 40.dp) {
+            if (fit.showTime) {
                 Text(
                     text = "${formats.time(block.start, zone)} – ${formats.time(block.end, zone)}",
                     color = style.content.copy(alpha = 0.85f),
@@ -112,7 +113,7 @@ internal fun TimedEventBlock(
                     maxLines = 1,
                 )
             }
-            if (!compact && height >= 58.dp && block.categoryName != null) {
+            if (fit.showHint && block.categoryName != null) {
                 CategoryHint(block.categoryName, block.categoryColor, style)
             }
         }
@@ -157,7 +158,7 @@ private fun AllDayChipSurface(style: BlockStyle, title: String) {
         shape = androidx.compose.foundation.shape.RoundedCornerShape(PlanrRadii.sm),
         modifier = Modifier
             .fillMaxWidth()
-            .height(22.dp),
+            .height(LocalAgendaMetrics.current.allDayChipHeight),
     ) {
         Text(
             text = title,
@@ -279,10 +280,4 @@ private fun blockDescription(block: AgendaBlock, title: String, whenText: String
         if (block.status == EventStatus.Planned) add(stringResource(R.string.agenda_block_planned))
     }
     return (listOf(title, whenText) + states).joinToString(", ")
-}
-
-private fun maxTitleLines(height: Dp, compact: Boolean): Int = when {
-    compact -> ((height.value - 6f) / 13f).toInt().coerceAtLeast(1)
-    height < 40.dp -> 1
-    else -> 2
 }

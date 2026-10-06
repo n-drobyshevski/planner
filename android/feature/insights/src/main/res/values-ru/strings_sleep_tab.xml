@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Insights Sleep tab (SleepTab.kt). Stage copy from messages/ru/sleep.json. -->
+<resources>
+    <string name="sleep_tab_lede">Твои последние 14 ночей. Их видишь только ты.</string>
+    <string name="sleep_tab_empty">Ночей пока нет. Подключи Health Connect в меню аккаунта или ответь на утреннюю отметку в календаре.</string>
+    <string name="sleep_tab_times">%1$s–%2$s</string>
+    <string name="sleep_tab_in_bed">%1$s в постели</string>
+    <string name="sleep_tab_asleep">%1$s сна</string>
+    <string name="sleep_tab_not_rated">Без оценки</string>
+    <string name="sleep_tab_rate">Оценить или изменить эту ночь</string>
+    <string name="sleep_tab_stage_deep">Глубокий</string>
+    <string name="sleep_tab_stage_light">Лёгкий</string>
+    <string name="sleep_tab_stage_rem">Быстрый (REM)</string>
+    <string name="sleep_tab_stage_awake">Бодрствование</string>
+    <string name="sleep_tab_sr_deep">глубокий %1$s</string>
+    <string name="sleep_tab_sr_light">лёгкий %1$s</string>
+    <string name="sleep_tab_sr_rem">быстрый %1$s</string>
+    <string name="sleep_tab_sr_awake">бодрствование %1$s</string>
+    <string name="sleep_tab_sr_night">%1$s: %2$s.</string>
+</resources>

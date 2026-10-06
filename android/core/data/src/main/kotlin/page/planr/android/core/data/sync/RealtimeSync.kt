@@ -12,13 +12,20 @@ import io.github.jan.supabase.realtime.realtime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -28,6 +35,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import page.planr.android.core.data.auth.AuthState
@@ -38,7 +46,9 @@ import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.remote.SupabaseTables
 
 /**
- * Live sync while the app is in the foreground: one Realtime channel per
+ * Live sync while the app is in the foreground (and for [BACKGROUND_LINGER]
+ * after it leaves, so a quick look at another app doesn't drop and rejoin
+ * the channel, and refetch everything on return): one Realtime channel per
  * workspace with `postgres_changes` on the v1 tables, filtered by
  * `workspace_id` exactly like `subscribeWorkspace` in lib/supabase/realtime.ts.
  * RLS applies, so the partner's private rows never arrive.
@@ -66,14 +76,20 @@ class RealtimeSync @Inject constructor(
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private var started = false
+    private val _subscribed = MutableStateFlow(false)
+
+    /**
+     * Whether the channel is joined right now, so the cache is being kept
+     * live (the periodic sync has nothing to add then; see [SyncWorker]).
+     */
+    val subscribed: StateFlow<Boolean> = _subscribed.asStateFlow()
 
     /** Call once from Application.onCreate. */
     fun start() {
         if (started) return
         started = true
         scope.launch {
-            combine(isForeground(), workspaceIds()) { foreground, ws -> ws.takeIf { foreground } }
-                .distinctUntilChanged()
+            channelWorkspace(isForeground(), workspaceIds(), BACKGROUND_LINGER)
                 .collectLatest { ws -> if (ws != null) runChannel(ws) }
         }
     }
@@ -103,9 +119,19 @@ class RealtimeSync @Inject constructor(
                     }
                 }
                 launch {
+                    channel.status.collect { _subscribed.value = it == RealtimeChannel.Status.SUBSCRIBED }
+                }
+                launch {
+                    // Changes committed before the channel was subscribed never arrive
+                    // over it, so a snapshot begun before then (a screen's own refresh
+                    // on opening the app) can't stand in for this refetch. Screens
+                    // refreshing after it join it instead.
                     channel.status
                         .filter { it == RealtimeChannel.Status.SUBSCRIBED }
-                        .collect { refetchQuietly() }
+                        .collect {
+                            cacheGate.outdateSnapshots()
+                            refetchQuietly()
+                        }
                 }
                 launch {
                     // A refreshed token must reach the open socket before the old one expires.
@@ -117,6 +143,7 @@ class RealtimeSync @Inject constructor(
                 awaitCancellation()
             }
         } finally {
+            _subscribed.value = false
             withContext(NonCancellable) { runCatching { supabase.realtime.removeChannel(channel) } }
         }
     }
@@ -159,4 +186,31 @@ class RealtimeSync @Inject constructor(
         ProcessLifecycleOwner.get().lifecycle.currentStateFlow
             .map { it.isAtLeast(Lifecycle.State.STARTED) }
             .flowOn(Dispatchers.Main)
+
+    internal companion object {
+        /** How long the channel stays joined after the app leaves the foreground. */
+        val BACKGROUND_LINGER = 60.seconds
+    }
 }
+
+/**
+ * The workspace whose channel should be open, or null for none: the
+ * signed-in one while [foreground], and for [linger] after the app leaves
+ * the foreground. Coming back within [linger] changes nothing (no rejoin, no
+ * refetch); signing out closes the channel at once.
+ */
+internal fun channelWorkspace(
+    foreground: Flow<Boolean>,
+    workspaceIds: Flow<String?>,
+    linger: Duration,
+): Flow<String?> =
+    combine(foreground.lingering(linger), workspaceIds) { live, ws -> ws.takeIf { live } }
+        .distinctUntilChanged()
+
+/** [this], with each `false` held back until it has lasted [linger] (a `true` meanwhile cancels it). */
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun Flow<Boolean>.lingering(linger: Duration): Flow<Boolean> =
+    transformLatest { foreground ->
+        if (!foreground) delay(linger)
+        emit(foreground)
+    }.distinctUntilChanged()

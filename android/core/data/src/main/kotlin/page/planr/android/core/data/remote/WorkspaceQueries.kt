@@ -145,6 +145,31 @@ class WorkspaceQueries @Inject constructor(
     ).firstOrNull()?.decodeAs(Task.serializer())
 
     /**
+     * The calendar blocks linked to [taskId] (`fetchTaskBlocks` narrowed to
+     * one task), every page, by start. Un-windowed: a task's blocks are few,
+     * and the detail lists past ones too.
+     */
+    suspend fun fetchTaskBlocks(workspaceId: String, taskId: String): List<PlannerEvent> =
+        selectAllPages(SupabaseTables.EVENTS, filters = listOf(eq("workspace_id", workspaceId), eq("task_id", taskId)))
+            .decodeAll(PlannerEvent.serializer())
+            .sortedBy { it.start }
+
+    /**
+     * Whether any calendar block (an event with `task_id`) is linked to one of
+     * [taskIds], in IN lists of [OVERRIDE_ID_CHUNK]. Asked of the server, not
+     * the cache, which only holds the windows the agenda has shown.
+     */
+    suspend fun hasEventsOfTasks(workspaceId: String, taskIds: Collection<String>): Boolean =
+        taskIds.distinct().chunked(OVERRIDE_ID_CHUNK).any { chunk ->
+            gateway.select(
+                SupabaseTables.EVENTS,
+                columns = "id",
+                filters = listOf(eq("workspace_id", workspaceId), isIn("task_id", chunk)),
+                limit = 1,
+            ).isNotEmpty()
+        }
+
+    /**
      * The member a token belongs to, like `verifyMcpToken` in lib/mcp/auth.ts:
      * the `members` row where `auth_user_id = sub`. Null when there is none.
      */

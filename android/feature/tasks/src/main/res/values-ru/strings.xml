@@ -87,6 +87,52 @@
         <item quantity="other">%1$d из %2$d подзадачи выполнено</item>
     </plurals>
     <string name="task_subtask_of">Подзадача «%1$s»</string>
+    <string name="task_subtask_open_parent">Открыть родительскую задачу</string>
+    <string name="task_subtask_open">Открыть подзадачу</string>
+    <string name="task_subtask_blocked">Сначала закончи предыдущую подзадачу</string>
+    <string name="task_subtask_add_placeholder">Добавить подзадачу</string>
+    <string name="task_subtask_add">Добавить подзадачу</string>
+
+    <!-- Delete -->
+    <string name="task_delete">Удалить задачу</string>
+    <string name="task_deleted">Задача удалена</string>
+    <string name="task_delete_title">Удалить «%1$s»?</string>
+    <plurals name="task_delete_body_subtasks">
+        <item quantity="one">Вместе с ней удалится %1$d подзадача. Это нельзя отменить.</item>
+        <item quantity="few">Вместе с ней удалятся %1$d подзадачи. Это нельзя отменить.</item>
+        <item quantity="many">Вместе с ней удалятся %1$d подзадач. Это нельзя отменить.</item>
+        <item quantity="other">Вместе с ней удалятся %1$d подзадачи. Это нельзя отменить.</item>
+    </plurals>
+    <plurals name="task_delete_body_subtasks_blocks">
+        <item quantity="one">Вместе с ней удалятся %1$d подзадача и блоки в календаре. Это нельзя отменить.</item>
+        <item quantity="few">Вместе с ней удалятся %1$d подзадачи и блоки в календаре. Это нельзя отменить.</item>
+        <item quantity="many">Вместе с ней удалятся %1$d подзадач и блоки в календаре. Это нельзя отменить.</item>
+        <item quantity="other">Вместе с ней удалятся %1$d подзадачи и блоки в календаре. Это нельзя отменить.</item>
+    </plurals>
+    <string name="task_delete_body_blocks">Вместе с ней удалятся блоки, которые она поставила в календарь. Это нельзя отменить.</string>
+    <string name="task_delete_confirm">Удалить</string>
+    <string name="task_delete_cancel">Отмена</string>
     <string name="task_date_pick">Выбрать</string>
     <string name="task_date_cancel">Отмена</string>
+
+    <!-- Calendar blocks (the web's "Add to calendar" dialog) -->
+    <string name="task_blocks_title">В календаре</string>
+    <string name="task_block_range">%1$s · %2$s–%3$s</string>
+    <string name="task_block_open">Открыть событие</string>
+    <string name="task_block_remove">Убрать из календаря</string>
+    <string name="task_block_added">Добавлено в календарь</string>
+    <string name="task_block_removed">Убрано из календаря</string>
+    <string name="task_schedule_title">Добавить в календарь</string>
+    <string name="task_schedule_date">Дата</string>
+    <string name="task_schedule_start">Начало</string>
+    <string name="task_schedule_duration">Длительность</string>
+    <string name="task_schedule_15min">15 мин</string>
+    <string name="task_schedule_30min">30 мин</string>
+    <string name="task_schedule_45min">45 мин</string>
+    <string name="task_schedule_1hour">1 час</string>
+    <string name="task_schedule_1and_half_hours">1,5 часа</string>
+    <string name="task_schedule_2hours">2 часа</string>
+    <string name="task_schedule_add">Добавить в календарь</string>
+    <string name="task_schedule_adding">Добавление…</string>
+    <string name="task_schedule_cancel">Отмена</string>
 </resources>

@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
+import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.Occurrence
 import page.planr.android.core.model.OverrideType
@@ -46,17 +48,24 @@ class EventDetailViewModelTest {
     )
     private val monday = Instant.parse("2026-10-05T07:00:00Z")
 
-    private class Harness(val vm: EventDetailViewModel, val closed: List<Unit>, val posted: List<AgendaNotice>)
+    private class Harness(
+        val vm: EventDetailViewModel,
+        val closed: List<Unit>,
+        val posted: List<AgendaNotice>,
+        val failed: List<Unit>,
+    )
 
     private fun TestScope.open(ref: String): Harness {
         val vm = EventDetailViewModel(ref, data, DefaultRecurrenceExpander, notices)
         val closed = mutableListOf<Unit>()
         val posted = mutableListOf<AgendaNotice>()
+        val failed = mutableListOf<Unit>()
         backgroundScope.launch { vm.state.collect {} }
         backgroundScope.launch { vm.closed.toList(closed) }
+        backgroundScope.launch { vm.failed.toList(failed) }
         backgroundScope.launch { notices.notices.toList(posted) }
         runCurrent()
-        return Harness(vm, closed, posted)
+        return Harness(vm, closed, posted, failed)
     }
 
     private fun Harness.ready(): EventDetail = assertIs<EventDetailUiState.Ready>(vm.state.value).detail
@@ -120,6 +129,8 @@ class EventDetailViewModelTest {
         val gone = open(Occurrence.recurringKey("nope", monday))
         assertEquals(EventDetailUiState.Missing, gone.vm.state.value)
         assertTrue(data.refreshedWindows.any { monday in it.start..it.end })
+        // Forced: a window fetched moments ago still lacks the event, so its freshness can't count.
+        assertEquals(1, data.forcedRefreshes)
         h.vm.viewModelScope.cancel()
         gone.vm.viewModelScope.cancel()
     }
@@ -134,6 +145,7 @@ class EventDetailViewModelTest {
 
         assertEquals(Call.Delete("one"), data.calls.single())
         assertEquals(1, h.closed.size)
+        assertTrue(h.failed.isEmpty())
         val notice = h.posted.single()
         assertEquals(UiText(R.string.agenda_toast_event_deleted), notice.message)
         notice.undo!!.invoke()
@@ -152,6 +164,21 @@ class EventDetailViewModelTest {
         val input = assertIs<Call.Override>(data.calls.single()).input
         assertEquals(OverrideType.Cancel, input.type)
         assertEquals(monday, input.occurrenceDate)
+        h.vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `deleting this instance offers no undo when the override it replaced is unknown`() = runTest {
+        data.events.value = listOf(series)
+        data.overridePrior = OverridePrior.Unknown
+        val h = open(Occurrence.recurringKey("series", monday))
+
+        h.vm.delete(RecurrenceScope.This)
+        runCurrent()
+
+        assertIs<Call.Override>(data.calls.single())
+        assertEquals(UiText(R.string.agenda_toast_event_deleted), h.posted.single().message)
+        assertNull(h.posted.single().undo)
         h.vm.viewModelScope.cancel()
     }
 
@@ -195,7 +222,9 @@ class EventDetailViewModelTest {
         runCurrent()
 
         assertTrue(h.closed.isEmpty())
+        assertEquals(1, h.failed.size)
         assertEquals(UiText(R.string.agenda_something_went_wrong), h.posted.single().message)
+        assertTrue(h.posted.single().failedWrite, "a failure shows even with success toasts off")
         assertFalse(h.vm.deleting.value)
         h.vm.viewModelScope.cancel()
     }

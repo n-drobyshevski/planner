@@ -12,8 +12,8 @@ import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.feature.insights.InsightsTab
 
 /**
- * Overview / Trends / Patterns / Tasks. Scrollable, because the Russian
- * «Закономерности» does not fit four equal columns on a 360 dp phone.
+ * Overview / Trends / Patterns / Tasks / Sleep. Scrollable, because the
+ * Russian «Закономерности» does not fit equal columns on a 360 dp phone.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

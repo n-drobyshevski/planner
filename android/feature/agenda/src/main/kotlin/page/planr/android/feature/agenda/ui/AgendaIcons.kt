@@ -53,6 +53,20 @@ internal object AgendaIcons {
             "M16 3.13a4 4 0 0 1 0 7.75",
         )
     }
+    val SlidersHorizontal by lazy {
+        lucide(
+            "SlidersHorizontal",
+            "M21 4h-7",
+            "M10 4H3",
+            "M21 12h-9",
+            "M8 12H3",
+            "M21 20h-5",
+            "M12 20H3",
+            "M14 2v4",
+            "M8 10v4",
+            "M16 18v4",
+        )
+    }
     val Eye by lazy {
         lucide(
             "Eye",
@@ -76,6 +90,19 @@ internal object AgendaIcons {
         )
     }
     val Notes by lazy { lucide("Notes", "M15 18H3", "M17 6H3", "M21 12H3") }
+    val Sunrise by lazy {
+        lucide(
+            "Sunrise",
+            "M12 2v8",
+            "m4.93 10.93 1.41 1.41",
+            "M2 18h2",
+            "M20 18h2",
+            "m19.07 10.93-1.41 1.41",
+            "M22 22H2",
+            "m8 6 4-4 4 4",
+            "M16 18a4 4 0 0 0-8 0",
+        )
+    }
 
     private fun lucide(name: String, vararg paths: String): ImageVector =
         ImageVector.Builder(

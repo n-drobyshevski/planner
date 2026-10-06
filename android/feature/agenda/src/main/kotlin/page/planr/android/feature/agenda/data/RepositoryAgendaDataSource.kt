@@ -5,6 +5,7 @@ import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.model.DeletedEventSnapshot
@@ -15,6 +16,7 @@ import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.OccurrenceRepository
 import page.planr.android.core.data.repository.WorkspaceRepository
+import page.planr.android.core.model.CalendarFilter
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.Member
@@ -44,14 +46,22 @@ class RepositoryAgendaDataSource @Inject constructor(
     override fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>> =
         occurrences.observeOccurrences(window, zone)
 
-    override fun observeShowPartnerEvents(): Flow<Boolean> = viewPreferences.showPartnerEvents
+    override fun observeCalendarFilter(): Flow<CalendarFilter> = viewPreferences.calendarFilter
 
     override suspend fun setShowPartnerEvents(show: Boolean) = viewPreferences.setShowPartnerEvents(show)
+
+    override suspend fun setOwnCalendarHidden(hidden: Boolean) = viewPreferences.setOwnCalendarHidden(hidden)
+
+    override suspend fun setCategoryHidden(id: String, hidden: Boolean) =
+        viewPreferences.setCalendarCategoryHidden(id, hidden)
+
+    override suspend fun showAllCategories() = viewPreferences.setHiddenCalendarCategories(emptySet())
 
     override fun observeAgendaMode(): Flow<AgendaMode> = viewPreferences.agendaMode.map {
         when (it) {
             AgendaViewMode.Day -> AgendaMode.Day
             AgendaViewMode.Week -> AgendaMode.Week
+            AgendaViewMode.Month -> AgendaMode.Month
         }
     }
 
@@ -59,12 +69,17 @@ class RepositoryAgendaDataSource @Inject constructor(
         when (mode) {
             AgendaMode.Day -> AgendaViewMode.Day
             AgendaMode.Week -> AgendaViewMode.Week
+            AgendaMode.Month -> AgendaViewMode.Month
         },
     )
 
-    override suspend fun refreshWorkspace() = workspace.refresh()
+    override suspend fun refreshWorkspace(force: Boolean) {
+        workspace.refresh(force)
+    }
 
-    override suspend fun refreshWindow(window: TimeWindow) = occurrences.refresh(window)
+    override suspend fun refreshWindow(window: TimeWindow, force: Boolean) {
+        occurrences.refresh(window, force)
+    }
 
     override fun observeEvent(id: String): Flow<PlannerEvent?> = events.observeEvent(id)
 
@@ -86,8 +101,12 @@ class RepositoryAgendaDataSource @Inject constructor(
     override suspend fun revertOverride(eventId: String, occurrenceDate: Instant, prior: OverridePrior) =
         events.revertOverride(eventId, occurrenceDate, prior)
 
-    override suspend fun splitSeries(event: PlannerEvent, fromOccurrence: Instant, patch: OccurrencePatch): PlannerEvent =
-        events.splitSeries(event, fromOccurrence, patch)
+    override suspend fun splitSeries(
+        event: PlannerEvent,
+        fromOccurrence: Instant,
+        patch: OccurrencePatch,
+        newAttributes: JsonObject?,
+    ): PlannerEvent = events.splitSeries(event, fromOccurrence, patch, newAttributes = newAttributes)
 
     override suspend fun deleteThisAndFuture(event: PlannerEvent, fromOccurrence: Instant): PlannerEvent =
         events.deleteThisAndFuture(event, fromOccurrence)

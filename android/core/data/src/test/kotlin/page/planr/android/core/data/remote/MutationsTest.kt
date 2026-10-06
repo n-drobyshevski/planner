@@ -1,14 +1,21 @@
 package page.planr.android.core.data.remote
 
+import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import page.planr.android.core.data.model.EventPatch
+import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.model.OverrideType
 import page.planr.android.core.model.PlannerEvent
@@ -83,10 +90,10 @@ class MutationsTest {
     fun `applyOverride upserts on the occurrence key and returns the prior row`() = runTest {
         val date = Instant.parse("2026-06-02T07:00:00Z")
         val first = events.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
-        assertNull(first.prior.row)
+        assertEquals(OverridePrior.None, first.prior)
 
         val second = events.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
-        assertEquals(JsonPrimitive("cancel"), second.prior.row?.get("type"))
+        assertEquals(JsonPrimitive("cancel"), assertIs<OverridePrior.Known>(second.prior).row["type"])
         assertEquals(1, gateway.rows(SupabaseTables.EVENT_OVERRIDES).size)
         assertEquals(
             "event_id,occurrence_date",
@@ -99,6 +106,54 @@ class MutationsTest {
     }
 
     @Test
+    fun `a failed prior read still applies the override, but leaves no undo that could erase it`() = runTest {
+        val date = Instant.parse("2026-06-02T07:00:00Z")
+        // An earlier edit of this occurrence already exists.
+        events.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
+        val failing = object : PostgrestGateway by gateway {
+            override suspend fun select(
+                table: String,
+                columns: String,
+                filters: List<RowFilter>,
+                order: List<RowOrder>,
+                limit: Long?,
+            ): List<JsonObject> = throw IOException("timeout")
+        }
+        val mutations = EventMutations(failing)
+
+        val applied = mutations.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, date, OverrideType.Cancel))
+        assertEquals(OverridePrior.Unknown, applied.prior)
+        assertFalse(applied.prior.canRevert)
+        assertEquals(1, gateway.rows(SupabaseTables.EVENT_OVERRIDES).size)
+
+        // Reverting an unknown prior is refused, never a delete.
+        assertFailsWith<IllegalArgumentException> { mutations.revertOverride(Fixtures.EVENT_ID, date, applied.prior) }
+        assertEquals(1, gateway.rows(SupabaseTables.EVENT_OVERRIDES).size)
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Delete>().isEmpty())
+    }
+
+    @Test
+    fun `a cancelled prior read cancels the override instead of applying it`() = runTest {
+        val cancelled = object : PostgrestGateway by gateway {
+            override suspend fun select(
+                table: String,
+                columns: String,
+                filters: List<RowFilter>,
+                order: List<RowOrder>,
+                limit: Long?,
+            ): List<JsonObject> = throw CancellationException("left the screen")
+        }
+
+        assertFailsWith<CancellationException> {
+            EventMutations(cancelled).applyOverride(
+                Fixtures.WS,
+                OverrideInput(Fixtures.EVENT_ID, Instant.parse("2026-06-02T07:00:00Z"), OverrideType.Cancel),
+            )
+        }
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Upsert>().isEmpty())
+    }
+
+    @Test
     fun `deleteEventDeep snapshots the event and its overrides, then deletes`() = runTest {
         events.applyOverride(Fixtures.WS, OverrideInput(Fixtures.EVENT_ID, Instant.parse("2026-06-02T07:00:00Z"), OverrideType.Cancel))
         val snapshot = events.deleteEventDeep(Fixtures.EVENT_ID)
@@ -108,6 +163,41 @@ class MutationsTest {
 
         val restored = events.restoreDeleted(snapshot)
         assertEquals(Fixtures.EVENT_ID, restored.events.single().id)
+    }
+
+    @Test
+    fun `deleteTask snapshots the task's row, and restoring brings it back with its id`() = runTest {
+        val snapshot = tasks.deleteTask(Fixtures.TASK_ID)
+        assertEquals(1, snapshot.tasks.size)
+        assertTrue(gateway.rows(SupabaseTables.TASKS).isEmpty())
+
+        val restored = tasks.restoreDeleted(snapshot)
+        assertEquals(Fixtures.TASK_ID, restored.single().id)
+        assertEquals("Buy paint", restored.single().title)
+        assertEquals(Fixtures.taskRow(), gateway.callsOf<FakePostgrestGateway.Call.Insert>().single().rows.single())
+    }
+
+    @Test
+    fun `deleteTask also snapshots the checkpoints and dependency edges it cascades, restored after the task`() = runTest {
+        fun row(vararg pairs: Pair<String, String>) = JsonObject(pairs.associate { (k, v) -> k to JsonPrimitive(v) })
+        val checkpoint = row("id" to "cp-1", "task_id" to Fixtures.TASK_ID, "workspace_id" to Fixtures.WS)
+        val blockedBy = row("id" to "dep-1", "task_id" to "other", "depends_on_task_id" to Fixtures.TASK_ID)
+        val blocks = row("id" to "dep-2", "task_id" to Fixtures.TASK_ID, "depends_on_task_id" to "other")
+        val unrelated = row("id" to "dep-3", "task_id" to "a", "depends_on_task_id" to "b")
+        gateway.seed(SupabaseTables.TASK_CHECKPOINTS, checkpoint, row("id" to "cp-2", "task_id" to "other"))
+        gateway.seed(SupabaseTables.TASK_DEPENDENCIES, blockedBy, blocks, unrelated)
+
+        val snapshot = tasks.deleteTask(Fixtures.TASK_ID)
+        assertEquals(listOf("cp-1"), snapshot.checkpoints.map { it.getValue("id").jsonPrimitive.content })
+        assertEquals(setOf("dep-1", "dep-2"), snapshot.dependencies.map { it.getValue("id").jsonPrimitive.content }.toSet())
+
+        tasks.restoreDeleted(snapshot)
+        val inserts = gateway.callsOf<FakePostgrestGateway.Call.Insert>()
+        assertEquals(
+            listOf(SupabaseTables.TASKS, SupabaseTables.TASK_CHECKPOINTS, SupabaseTables.TASK_DEPENDENCIES),
+            inserts.map { it.table },
+        )
+        assertEquals(snapshot.dependencies, inserts.last().rows)
     }
 
     @Test
@@ -146,6 +236,108 @@ class MutationsTest {
         assertEquals(JsonPrimitive("2026-06-15T09:00:00.000Z"), insert["starts_at"])
         assertEquals(JsonNull, insert["recurrence_ends_at"])
         assertEquals("Later standup", result.created.title)
-        assertEquals(Fixtures.EVENT_ID, result.original?.id)
+        assertEquals(Fixtures.EVENT_ID, result.original.id)
+    }
+
+    @Test
+    fun `splitSeries inserts the new series before capping the original`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+
+        events.splitSeries(row.decodeAs(PlannerEvent.serializer()), Instant.parse("2026-06-15T09:00:00Z"), OccurrencePatch())
+
+        val writes = gateway.calls.filter { it is FakePostgrestGateway.Call.Insert || it is FakePostgrestGateway.Call.Update }
+        assertEquals(
+            listOf(FakePostgrestGateway.Call.Insert::class, FakePostgrestGateway.Call.Update::class),
+            writes.map { it::class },
+        )
+    }
+
+    @Test
+    fun `a failed insert leaves the original series untouched`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        val failing = object : PostgrestGateway by gateway {
+            override suspend fun insert(table: String, rows: List<JsonObject>): List<JsonObject> = throw IOException("offline")
+        }
+
+        assertFailsWith<IOException> {
+            EventMutations(failing).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(),
+            )
+        }
+
+        assertEquals(listOf(row), gateway.rows(SupabaseTables.EVENTS))
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Update>().isEmpty())
+    }
+
+    @Test
+    fun `a failed cap deletes the new series again, then rethrows`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        val failing = object : PostgrestGateway by gateway {
+            override suspend fun update(table: String, patch: JsonObject, filters: List<RowFilter>): List<JsonObject> =
+                throw IOException("connection reset")
+        }
+
+        assertFailsWith<IOException> {
+            EventMutations(failing).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(title = "Later standup"),
+            )
+        }
+
+        // Only the original remains, its rule unchanged.
+        assertEquals(listOf(row), gateway.rows(SupabaseTables.EVENTS))
+        val created = gateway.callsOf<FakePostgrestGateway.Call.Insert>().single()
+        assertEquals(JsonPrimitive("Later standup"), created.rows.single()["title"])
+        assertEquals(1, gateway.callsOf<FakePostgrestGateway.Call.Delete>().size)
+    }
+
+    @Test
+    fun `a cap that landed but lost its answer is undone before the new series is deleted`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        var answered = false
+        val lossy = object : PostgrestGateway by gateway {
+            override suspend fun update(table: String, patch: JsonObject, filters: List<RowFilter>): List<JsonObject> {
+                val rows = gateway.update(table, patch, filters)
+                if (!answered) {
+                    answered = true
+                    throw IOException("timeout after commit")
+                }
+                return rows
+            }
+        }
+
+        assertFailsWith<IOException> {
+            EventMutations(lossy).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(),
+            )
+        }
+
+        // The original runs on uncapped; the new series is gone again.
+        val remaining = gateway.rows(SupabaseTables.EVENTS).single()
+        assertEquals(Fixtures.EVENT_ID, remaining["id"]?.let { (it as JsonPrimitive).content })
+        assertEquals(JsonPrimitive("FREQ=WEEKLY;BYDAY=MO"), remaining["rrule"])
+        assertEquals(JsonNull, remaining["recurrence_ends_at"])
+    }
+
+    @Test
+    fun `splitting a series deleted meanwhile is stale and leaves no new series`() = runTest {
+        val series = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO").decodeAs(PlannerEvent.serializer())
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf()
+
+        assertFailsWith<StaleWriteException> {
+            events.splitSeries(series, Instant.parse("2026-06-15T09:00:00Z"), OccurrencePatch())
+        }
+
+        assertTrue(gateway.rows(SupabaseTables.EVENTS).isEmpty())
+        assertEquals(1, gateway.callsOf<FakePostgrestGateway.Call.Delete>().size)
     }
 }

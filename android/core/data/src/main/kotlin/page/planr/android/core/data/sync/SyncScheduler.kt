@@ -21,10 +21,15 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.di.ApplicationScope
 
 /**
- * Keeps [SyncWorker] scheduled while someone is signed in: a 30-minute
- * periodic sync, plus one immediate sync right after a fresh sign-in (a
- * restored session is caught up by the Realtime join instead); both are
- * cancelled on sign-out.
+ * Keeps [SyncWorker] scheduled while someone is signed in: a two-hourly
+ * periodic sync (on a network, never on a low battery), plus one immediate
+ * sync right after a fresh sign-in (a restored session is caught up by the
+ * Realtime join instead); both are cancelled on sign-out.
+ *
+ * Two hours is enough for what the periodic sync serves: Realtime keeps the
+ * cache live while the app is open, reminders are planned a day ahead
+ * ([page.planr.android.core.data.reminders.ReminderPlanner.HORIZON]), and the
+ * widgets turn the day over with their own midnight alarm.
  */
 @Singleton
 class SyncScheduler @Inject constructor(
@@ -72,9 +77,11 @@ class SyncScheduler @Inject constructor(
     private fun schedule(syncNow: Boolean) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             PERIODIC,
-            ExistingPeriodicWorkPolicy.KEEP,
+            // UPDATE, not KEEP: an install that scheduled the old 30-minute
+            // request picks up the new period and constraints (its timing stays).
+            ExistingPeriodicWorkPolicy.UPDATE,
             PeriodicWorkRequestBuilder<SyncWorker>(PERIOD_MINUTES, TimeUnit.MINUTES)
-                .setConstraints(networkConstraint())
+                .setConstraints(periodicConstraints())
                 .build(),
         )
         if (syncNow) syncNow()
@@ -89,9 +96,16 @@ class SyncScheduler @Inject constructor(
     private fun networkConstraint() =
         Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
+    /** A sync nobody asked for waits for a network and a battery that isn't low. */
+    private fun periodicConstraints() =
+        Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
+            .build()
+
     private companion object {
         const val PERIODIC = "planr-sync-periodic"
         const val ONE_TIME = "planr-sync-now"
-        const val PERIOD_MINUTES = 30L
+        const val PERIOD_MINUTES = 120L
     }
 }

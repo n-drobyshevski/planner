@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors messages/en/inbox.json on the web. -->
+<resources>
+    <string name="inbox_title">Inbox</string>
+    <string name="inbox_subtitle">A few quick things to close out.</string>
+    <string name="inbox_back">Back</string>
+    <string name="inbox_all_caught_up">You’re all caught up.</string>
+    <string name="inbox_section_requests">Requests</string>
+    <string name="inbox_section_rate">Rate recent</string>
+    <string name="inbox_section_sleep">Sleep</string>
+    <string name="inbox_rate_event_frame">How was “%1$s”?</string>
+    <string name="inbox_rate_task_frame">How did “%1$s” go?</string>
+    <string name="inbox_log_sleep_frame">How did you sleep on %1$s?</string>
+    <string name="inbox_log_sleep_open">Log sleep</string>
+    <string name="inbox_request_frame">%1$s requested a time</string>
+    <string name="inbox_request_frame_anon">Someone requested a time</string>
+    <string name="inbox_request_approve">Approve</string>
+    <string name="inbox_request_decline">Decline</string>
+    <string name="inbox_request_default_title">Requested time</string>
+    <string name="inbox_ended_ago">Ended %1$s</string>
+    <string name="inbox_done_ago">Done %1$s</string>
+    <string name="inbox_rate_failed">Couldn\'t save the rating. Try again.</string>
+    <string name="inbox_request_failed">Couldn\'t update the request. Try again.</string>
+</resources>

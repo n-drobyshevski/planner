@@ -1,6 +1,8 @@
 package page.planr.android.feature.agenda.edit
 
 import kotlin.time.Instant
+import kotlinx.serialization.json.JsonObject
+import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.EventKind
@@ -58,16 +60,18 @@ object EventWrites {
             timeZone = form.timeZone,
             rrule = RRuleBuild.buildRRule(form.recurrence),
             recurrenceEndsAt = recurrenceEndsAt(form.recurrence),
+            attributes = AttributesMerge.apply(JsonObject(emptyMap()), form.attributes),
         )
     }
 
     /**
      * A non-recurring event (which may gain a recurrence): the whole row. The
      * rule and zone are only written when they changed from [initial], so an
-     * untouched rule the editor can't express survives the save.
+     * untouched rule the editor can't express survives the save; likewise
+     * the stored [attributes] only take the edited keys.
      */
-    fun singlePatch(form: EventForm, initial: EventForm, categories: List<Category>): EventPatch =
-        rowPatch(form, initial, categories, start = form.start, end = form.end)
+    fun singlePatch(form: EventForm, initial: EventForm, categories: List<Category>, attributes: JsonObject): EventPatch =
+        rowPatch(form, initial, categories, attributes, start = form.start, end = form.end)
 
     /**
      * "All events": the master row. The series moves by how far this
@@ -81,7 +85,7 @@ object EventWrites {
         categories: List<Category>,
     ): EventPatch {
         val start = event.start + (form.start - occurrence.start)
-        return rowPatch(form, initial, categories, start = start, end = start + (form.end - form.start))
+        return rowPatch(form, initial, categories, event.attributes, start = start, end = start + (form.end - form.start))
     }
 
     /**
@@ -101,6 +105,17 @@ object EventWrites {
         status = form.status,
     )
 
+    /**
+     * The stored [attributes] with the keys edited between [initial] and
+     * [form] applied (icalUid and unknown keys kept), or null when none
+     * changed. Attributes are series-level, so a "this event" save writes
+     * them to the master and a split hands them to the new series.
+     */
+    fun mergedAttributes(form: EventForm, initial: EventForm, attributes: JsonObject): JsonObject? {
+        val edits = AttributesMerge.edits(initial.attributes, form.attributes)
+        return if (edits.isEmpty()) null else AttributesMerge.merge(attributes, edits)
+    }
+
     /** `recurrence_ends_at`: the UNTIL bound, or null (open-ended / COUNT). */
     fun recurrenceEndsAt(recurrence: RecurrenceForm?): Instant? = (recurrence?.end as? RecurrenceEnd.Until)?.date
 
@@ -108,11 +123,13 @@ object EventWrites {
         form: EventForm,
         initial: EventForm,
         categories: List<Category>,
+        attributes: JsonObject,
         start: Instant,
         end: Instant,
     ): EventPatch {
         val sharing = sharingOf(form, categories)
         val recurrenceChanged = form.recurrence != initial.recurrence
+        val merged = mergedAttributes(form, initial, attributes)
         return EventPatch(
             categoryId = Value(form.categoryId),
             title = Value(form.title.trim()),
@@ -129,6 +146,7 @@ object EventWrites {
             timeZone = if (form.timeZone != initial.timeZone) Value(form.timeZone) else Unchanged,
             rrule = if (recurrenceChanged) Value(RRuleBuild.buildRRule(form.recurrence)) else Unchanged,
             recurrenceEndsAt = if (recurrenceChanged) Value(recurrenceEndsAt(form.recurrence)) else Unchanged,
+            attributes = if (merged != null) Value(merged) else Unchanged,
         )
     }
 }

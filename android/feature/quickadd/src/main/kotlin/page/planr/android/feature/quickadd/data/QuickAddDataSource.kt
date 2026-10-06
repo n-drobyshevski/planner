@@ -29,10 +29,23 @@ interface QuickAddDataSource {
     /** The member's own zone when set, else the device zone. */
     suspend fun viewerZone(): TimeZone
 
-    /** Throws NotSignedInException when there is no session. */
-    suspend fun createTask(title: String, dueDate: LocalDate?): Task
+    /** Throws NotSignedInException when there is no session. [description] is the notes, null for none. */
+    suspend fun createTask(title: String, dueDate: LocalDate?, description: String?): Task
 
-    suspend fun createEvent(title: String, start: Instant, end: Instant, allDay: Boolean, zone: TimeZone): PlannerEvent
+    suspend fun createEvent(
+        title: String,
+        start: Instant,
+        end: Instant,
+        allDay: Boolean,
+        zone: TimeZone,
+        description: String?,
+    ): PlannerEvent
+
+    /** Deletes a task this sheet just created (Undo). */
+    suspend fun deleteTask(id: String)
+
+    /** Deletes an event this sheet just created (Undo). */
+    suspend fun deleteEvent(id: String)
 }
 
 /**
@@ -59,7 +72,7 @@ class RepositoryQuickAddDataSource @Inject constructor(
      * else the first) and its first column, so it shows on the web's Tasks
      * board and can be completed. New tasks sort to the bottom (position = now).
      */
-    override suspend fun createTask(title: String, dueDate: LocalDate?): Task {
+    override suspend fun createTask(title: String, dueDate: LocalDate?, description: String?): Task {
         val current = session.requireSession()
         val board = defaultBoard()
         val now = clock.now()
@@ -68,6 +81,7 @@ class RepositoryQuickAddDataSource @Inject constructor(
                 workspaceId = current.workspaceId,
                 ownerId = current.memberId,
                 title = title,
+                description = description,
                 dueDate = dueDate,
                 collectionId = board?.collectionId,
                 boardId = board?.id,
@@ -84,6 +98,7 @@ class RepositoryQuickAddDataSource @Inject constructor(
         end: Instant,
         allDay: Boolean,
         zone: TimeZone,
+        description: String?,
     ): PlannerEvent {
         val current = session.requireSession()
         return events.createEvent(
@@ -91,6 +106,7 @@ class RepositoryQuickAddDataSource @Inject constructor(
                 workspaceId = current.workspaceId,
                 ownerId = current.memberId,
                 title = title.trim(),
+                description = description,
                 allDay = allDay,
                 start = start,
                 end = end,
@@ -98,6 +114,14 @@ class RepositoryQuickAddDataSource @Inject constructor(
             ),
         )
     }
+
+    /** Through the repository, so Room and the widgets drop it too. */
+    override suspend fun deleteTask(id: String) {
+        tasks.deleteTask(id)
+    }
+
+    /** The undo of a create: no snapshot to restore is kept. */
+    override suspend fun deleteEvent(id: String) = events.deleteEvents(listOf(id))
 
     /**
      * The first column of the default collection (`defaultTaskCollectionId` in

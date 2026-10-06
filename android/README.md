@@ -178,7 +178,8 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 :app ──► :feature:agenda ───┐
      ├─► :feature:tasks ────┤
      ├─► :feature:quickadd ─┼─► :core:data ─► :core:recurrence ─► :core:model
-     ├─► :feature:insights ─┤        │                               ▲
+     ├─► :feature:inbox ────┤        │                               ▲
+     ├─► :feature:insights ─┤        │                               │
      │          └───────────┼────────┼─► :core:insights ─────────────┘
      ├─► :widgets ──────────┘        │
      └─► :core:design ◄──────────────┘ (features and widgets use it too)
@@ -199,6 +200,7 @@ One-time repository setup (Settings → Secrets and variables → Actions):
 | `:feature:tasks` | `…feature.tasks` | Task list with filters, task detail/edit, complete |
 | `:feature:quickadd` | `…feature.quickadd` | Quick add bottom sheet, plus the translucent `QuickAddActivity` the widget opens |
 | `:feature:insights` | `…feature.insights` | Insights: period bar, filters, the Overview / Trends / Patterns / Tasks tabs with hand-drawn Canvas charts, the day sheet |
+| `:feature:inbox` | `…feature.inbox` | Inbox (from the account menu, with its count badge): timeslot requests to approve or decline, recent events and tasks to rate, unlogged nights |
 | `:widgets` | `…widgets` | Glance widgets: Today, Week, Week grid, Month, Tasks, Quick add |
 
 Shared build setup is in `build-logic/`, as the convention plugins
@@ -286,14 +288,29 @@ widgets.
   `postgres_changes` channel per workspace, with the same tables and
   `workspace_id` filter as `lib/supabase/realtime.ts`. Deletes can't be
   filtered (their old record holds only the primary key), so each table also
-  has an unfiltered DELETE binding. Changes go into Room.
+  has an unfiltered DELETE binding. Changes go into Room. The channel stays
+  joined for 60 s after the app leaves the foreground, so coming back within
+  that time neither rejoins nor refetches.
   Every (re)join refetches the visible window, tasks and reference data, in
   case something was missed while disconnected.
-- **Periodic, while signed in.** `SyncScheduler` keeps a 30-minute periodic
-  `SyncWorker` (network required), plus one immediate run after a fresh
-  sign-in. It cancels both on sign-out. The worker syncs the days the widgets
-  can show (today ±7 days and this month's whole weeks, `SyncWindows`),
-  tasks and reference data.
+- **Coalesced refreshes.** `EventRepository` (per window), `TaskRepository`
+  and `WorkspaceRepository` refresh through a `RefreshCoalescer`: a caller
+  joins a refresh of the same data already running, and one that succeeded
+  less than 30 s ago is not repeated unless forced (pull-to-refresh, the
+  periodic or requested sync). A sign-out wipe makes it stale at once, and
+  so does every Realtime (re)join: a refresh begun before the channel was
+  subscribed may miss changes that will never arrive over it, so the join's
+  refetch neither joins nor skips one. A snapshot identical to the cache is not
+  written; the refresh reports `changed = false` and `SyncRunner` then skips
+  the widgets, re-planning only reminders (their plan rolls with the clock).
+- **Periodic, while signed in.** `SyncScheduler` keeps a two-hourly periodic
+  `SyncWorker` (network required, not on a low battery), plus one immediate
+  run after a fresh sign-in. It cancels both on sign-out. The worker syncs the
+  days the widgets can show (today ±7 days and this month's whole weeks,
+  `SyncWindows`), tasks and reference data. It does nothing while the app is
+  in the foreground with the Realtime channel joined (`RealtimeSync.subscribed`):
+  the cache is live then. Two hours is enough: reminders are planned a day
+  ahead and the widgets turn the day over with their own midnight alarm.
 - **Start-up.** `PlanrApplication.onCreate` starts both through
   `DataInitializer`.
 - **Workers.** WorkManager is configured by `PlanrApplication` with
@@ -321,6 +338,7 @@ widgets.
   - `event-new?start=…`
   - `ics-import` (the .ics import review)
   - `task/{id}`
+  - `settings` (from the account menu)
 - **Quick add.** The floating button opens the Quick add sheet: an event on
   Calendar, a task on Tasks. Insights has no floating button. The agenda's top-bar "+" opens the
   full event editor instead.
@@ -380,6 +398,25 @@ invitation) are reviewed before anything is written.
   overrides (`cancelOccurrences`); if that fails, the created events are
   deleted again. The agenda then shows "Imported N events" with an Undo that
   deletes them all (`deleteEvents`).
+
+### Settings
+
+**Settings** in the account menu holds what the member sets for the app,
+in self-contained sections (`SettingsScreen`):
+
+- **Time zone.** The primary zone (null follows the device) and the
+  secondary zone on `members`, picked from a searchable list with the
+  device zone first.
+- **Notifications.** `members.show_success_toasts`. Off mutes plain
+  confirmations; failures and notices with Undo always show.
+- **Sleep.** "Update calendar from check-ins", the sleep category and the
+  night window on `member_sleep_prefs`, upserted on `member_id` with only
+  the edited columns.
+
+Every control applies at once and is shown ahead of its write; a failed
+write puts it back with one error line. Member writes go through
+`WorkspaceRepository.updateMemberPreferences`, which caches the stored row,
+so the agenda's zone and the notices follow at once.
 
 ### Insights
 

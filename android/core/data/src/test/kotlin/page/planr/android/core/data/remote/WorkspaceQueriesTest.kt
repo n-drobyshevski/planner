@@ -2,6 +2,7 @@ package page.planr.android.core.data.remote
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
@@ -203,6 +204,29 @@ class WorkspaceQueriesTest {
         assertEquals(MemberRef("m1", Fixtures.WS), queries.findMemberByAuthUser("user-1"))
         assertNull(queries.findMemberByAuthUser("someone-else"))
         assertEquals("id, workspace_id", gateway.callsOf<FakePostgrestGateway.Call.Select>().first().columns)
+    }
+
+    @Test
+    fun `calendar blocks of tasks are looked up by task_id, one row is enough`() = runTest {
+        val block = JsonObject(Fixtures.eventRow() + ("task_id" to JsonPrimitive(Fixtures.TASK_ID)))
+        val gateway = FakePostgrestGateway().apply { seed(SupabaseTables.EVENTS, block) }
+        val queries = WorkspaceQueries(gateway)
+
+        assertTrue(queries.hasEventsOfTasks(Fixtures.WS, listOf("other", Fixtures.TASK_ID)))
+        assertFalse(queries.hasEventsOfTasks(Fixtures.WS, listOf("other")))
+        val select = gateway.callsOf<FakePostgrestGateway.Call.Select>().first()
+        assertEquals(SupabaseTables.EVENTS, select.table)
+        assertEquals("id", select.columns)
+        assertEquals(1L, select.limit)
+        assertEquals(RowFilter.In("task_id", listOf("other", Fixtures.TASK_ID)), select.filters.last())
+    }
+
+    @Test
+    fun `a long subtree is asked about in chunks`() = runTest {
+        val gateway = FakePostgrestGateway()
+        val ids = (0 until 250).map { "task-$it" }
+        assertFalse(WorkspaceQueries(gateway).hasEventsOfTasks(Fixtures.WS, ids))
+        assertEquals(3, gateway.callsOf<FakePostgrestGateway.Call.Select>().size)
     }
 
     @Test

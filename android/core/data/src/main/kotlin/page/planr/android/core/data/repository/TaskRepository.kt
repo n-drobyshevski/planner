@@ -5,14 +5,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
+import page.planr.android.core.data.model.DeletedTaskSnapshot
 import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
@@ -38,22 +42,33 @@ class TaskRepository @Inject constructor(
     private val gate: CacheGate,
     private val widgets: WidgetRefreshDispatcher,
     private val clock: Clock,
+    private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, clock),
 ) {
     private val dao get() = db.taskDao()
 
-    /** Every visible task (top-level and subtasks), ordered by position. */
+    /** Every visible task (top-level and subtasks), ordered by position. Decoded off the main thread. */
     fun observeTasks(): Flow<List<Task>> =
         session.inWorkspace(emptyList()) { ws -> dao.observeAll(ws).map { rows -> rows.map { it.toModel() } } }
+            .flowOn(Dispatchers.Default)
 
     fun observeTask(id: String): Flow<Task?> = dao.observeById(id).map { it?.toModel() }
 
     suspend fun getTask(id: String): Task? = dao.getById(id)?.toModel()
 
-    /** Refetches all tasks (`fetchTasks`) and replaces the cached set. */
-    suspend fun refresh() {
+    /**
+     * Refetches all tasks (`fetchTasks`) and replaces the cached set. Joins a
+     * refresh already running and skips one done moments ago unless [force]d
+     * ([RefreshCoalescer]). Returns whether the cache changed (an identical
+     * snapshot is not written).
+     */
+    suspend fun refresh(force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
-        gate.refresh(CacheArea.Tasks, fetch = { queries.fetchTasks(ws) }) { rows ->
-            dao.replaceAll(ws, rows.map { it.toEntity() })
+        return coalescer.refresh(ws, force) {
+            var changed = false
+            gate.refresh(CacheArea.Tasks, fetch = { queries.fetchTasks(ws) }) { rows ->
+                changed = dao.replaceIfChanged(ws, rows.map { it.toEntity() })
+            }
+            changed
         }
     }
 
@@ -96,8 +111,12 @@ class TaskRepository @Inject constructor(
         return saved
     }
 
-    /** Deletes a task; the DB cascades subtasks and linked calendar blocks, mirrored locally. */
-    suspend fun deleteTask(id: String) {
+    /**
+     * Deletes a task; the DB cascades subtasks and linked calendar blocks,
+     * mirrored locally. Keep the snapshot to [restoreTask] (undo) a task
+     * that had neither: it holds the task's own row only.
+     */
+    suspend fun deleteTask(id: String): DeletedTaskSnapshot =
         write({ mutations.deleteTask(id) }, CacheArea.Tasks, CacheArea.Events) {
             db.withTransaction {
                 val ids = dao.subtreeIds(id)
@@ -105,7 +124,18 @@ class TaskRepository @Inject constructor(
                 dao.delete(ids)
             }
         }
+
+    /** Undo of [deleteTask]: re-inserts the captured rows as they were (same ids). */
+    suspend fun restoreTask(snapshot: DeletedTaskSnapshot) {
+        write({ mutations.restoreDeleted(snapshot) }) { restored -> dao.upsert(restored.map { it.toEntity() }) }
     }
+
+    /**
+     * Whether calendar blocks are linked to any of [taskIds] (deleting those
+     * tasks would take the blocks with them). Asks the server.
+     */
+    suspend fun hasCalendarBlocks(taskIds: Collection<String>): Boolean =
+        queries.hasEventsOfTasks(session.requireSession().workspaceId, taskIds)
 
     /**
      * Runs the Supabase write [remote], then mirrors its result into Room with

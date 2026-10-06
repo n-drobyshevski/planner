@@ -22,6 +22,12 @@ abstract class EventDao {
     )
     abstract fun observeWindow(workspaceId: String, start: Long, end: Long): Flow<List<EventEntity>>
 
+    @Query("SELECT * FROM events WHERE $IN_WINDOW")
+    abstract suspend fun eventsInWindow(workspaceId: String, start: Long, end: Long): List<EventEntity>
+
+    @Query("SELECT * FROM event_overrides WHERE event_id IN (SELECT id FROM events WHERE $IN_WINDOW)")
+    abstract suspend fun overridesInWindow(workspaceId: String, start: Long, end: Long): List<EventOverrideEntity>
+
     @Query("SELECT id FROM events WHERE $IN_WINDOW")
     abstract suspend fun idsInWindow(workspaceId: String, start: Long, end: Long): List<String>
 
@@ -35,6 +41,13 @@ abstract class EventDao {
 
     @Query("SELECT * FROM events WHERE id = :id")
     abstract fun observeById(id: String): Flow<EventEntity?>
+
+    /** A task's calendar blocks (events linked by `task_id`), by start. */
+    @Query("SELECT * FROM events WHERE workspace_id = :workspaceId AND task_id = :taskId ORDER BY starts_at")
+    abstract fun observeOfTask(workspaceId: String, taskId: String): Flow<List<EventEntity>>
+
+    @Query("SELECT id FROM events WHERE workspace_id = :workspaceId AND task_id = :taskId")
+    abstract suspend fun idsOfTask(workspaceId: String, taskId: String): List<String>
 
     @Query("SELECT * FROM events WHERE id = :id")
     abstract suspend fun getById(id: String): EventEntity?

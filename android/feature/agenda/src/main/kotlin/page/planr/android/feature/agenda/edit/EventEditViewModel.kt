@@ -81,7 +81,7 @@ class EventEditViewModel @AssistedInject constructor(
     fun update(transform: (EventForm) -> EventForm) {
         _state.update { s ->
             val form = s.form?.let(transform) ?: return@update s
-            s.copy(form = form, error = s.error?.let { form.validate() })
+            s.copy(form = form, dirty = form != initialForm, error = s.error?.let { form.validate() })
         }
     }
 
@@ -126,7 +126,7 @@ class EventEditViewModel @AssistedInject constructor(
         val initial = initialForm ?: form
         data.updateEvent(
             current.event.id,
-            EventWrites.singlePatch(form, initial, allCategories),
+            EventWrites.singlePatch(form, initial, allCategories, current.event.attributes),
             expectedUpdatedAt = current.event.updatedAt,
         )
         notices.post(AgendaNotice(UiText(R.string.agenda_toast_event_updated)))
@@ -135,23 +135,32 @@ class EventEditViewModel @AssistedInject constructor(
     private suspend fun updateRecurring(form: EventForm, current: Editing, scope: RecurrenceScope) {
         val event = current.event
         val occurrenceDate = current.occurrence.occurrenceDate
+        val attributes = EventWrites.mergedAttributes(form, initialForm ?: form, event.attributes)
         when (scope) {
             RecurrenceScope.This -> {
+                // An override can't carry series-level fields: an attribute
+                // change goes to the whole series in a side patch (as on the web).
+                if (attributes != null) data.updateEvent(event.id, EventPatch(attributes = PatchField.Value(attributes)))
                 val input = EditSemantics.modifyOccurrence(event.id, occurrenceDate, EventWrites.occurrencePatch(form))
                 val prior = data.applyOverride(input)
                 notices.post(
-                    AgendaNotice(UiText(R.string.agenda_toast_this_event_updated)) {
-                        data.revertOverride(event.id, occurrenceDate, prior)
-                    },
+                    AgendaNotice(
+                        UiText(R.string.agenda_toast_this_event_updated),
+                        // Without a known prior, an undo could erase an earlier override.
+                        undo = suspend { data.revertOverride(event.id, occurrenceDate, prior) }
+                            .takeIf { prior.canRevert },
+                    ),
                 )
             }
             RecurrenceScope.Following -> {
-                val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form))
+                val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form), attributes)
                 notices.post(
                     AgendaNotice(UiText(R.string.agenda_toast_this_and_future_updated)) {
-                        // Undo the split: drop the new series, restore the original rule.
-                        data.deleteEvent(created.id)
+                        // Undo the split: restore the original rule FIRST, then drop the
+                        // new series. A failed restore keeps the new series, so the
+                        // future occurrences are never lost.
                         data.updateEvent(event.id, restoreRecurrence(event))
+                        data.deleteEvent(created.id)
                     },
                 )
             }
@@ -219,6 +228,7 @@ class EventEditViewModel @AssistedInject constructor(
                 form = form,
                 categories = usable + current,
                 isRecurringEdit = editing?.event?.isRecurring == true,
+                dirty = false,
                 error = null,
             )
         }

@@ -9,10 +9,13 @@ import kotlinx.coroutines.flow.receiveAsFlow
 
 /**
  * A result message for the agenda's snackbar, optionally with an Undo that
- * reverses exactly that write (the web's toast + `undoById`).
+ * reverses exactly that write (the web's toast + `undoById`). [failedWrite]
+ * marks a write that didn't go through, which the snackbar backs with a
+ * reject haptic.
  */
 data class AgendaNotice(
     val message: UiText,
+    val failedWrite: Boolean = false,
     val undo: (suspend () -> Unit)? = null,
 )
 

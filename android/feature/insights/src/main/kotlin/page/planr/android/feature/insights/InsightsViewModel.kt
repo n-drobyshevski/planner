@@ -339,7 +339,7 @@ class InsightsViewModel @Inject constructor(
             refreshing.value = true
             try {
                 val (windowOk, referenceOk) = coroutineScope {
-                    val window = fetch(union)
+                    val window = fetch(union, force = true)
                     val reference = async { runCatchingNonCancel { data.refreshReference() } }
                     window.await() to reference.await()
                 }
@@ -439,10 +439,11 @@ class InsightsViewModel @Inject constructor(
      * Refreshes [window] into Room, joining a refresh of the same window that
      * is already running. Runs in viewModelScope, so leaving the screen does
      * not cancel a nearly finished write. Never throws: false on failure.
+     * Only pull-to-refresh [force]s past the repository's freshness window.
      */
-    private fun fetch(window: MsWindow): Deferred<Boolean> {
+    private fun fetch(window: MsWindow, force: Boolean = false): Deferred<Boolean> {
         inFlight[window]?.takeIf { it.isActive }?.let { return it }
-        return viewModelScope.async { runCatchingNonCancel { data.refreshWindow(window.toTimeWindow()) } }
+        return viewModelScope.async { runCatchingNonCancel { data.refreshWindow(window.toTimeWindow(), force) } }
             .also { inFlight[window] = it }
     }
 
@@ -490,6 +491,7 @@ class InsightsViewModel @Inject constructor(
         InsightsTab.Trends -> TabContent.Trends(models.trends(inputs))
         InsightsTab.Patterns -> TabContent.Patterns(models.patterns(inputs))
         InsightsTab.Tasks -> TabContent.Tasks(models.tasks(inputs))
+        InsightsTab.Sleep -> TabContent.Sleep
     }
 
     /**

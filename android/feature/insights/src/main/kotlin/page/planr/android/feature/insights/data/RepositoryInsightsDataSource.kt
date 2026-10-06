@@ -46,13 +46,16 @@ class RepositoryInsightsDataSource @Inject constructor(
     override fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>> =
         occurrences.observeUntracked(window, zone)
 
-    override suspend fun refreshWindow(window: TimeWindow) = occurrences.refresh(window)
+    override suspend fun refreshWindow(window: TimeWindow, force: Boolean) {
+        occurrences.refresh(window, force)
+    }
 
     override suspend fun refreshReference() = coroutineScope {
-        val bundle = async { workspace.refresh() }
-        val rows = async { tasks.refresh() }
+        val bundle = async { workspace.refresh(force = true) }
+        val rows = async { tasks.refresh(force = true) }
         bundle.await()
         rows.await()
+        Unit
     }
 
     override fun observeFilters(viewerId: String): Flow<InsightsFilterPrefs> = preferences.filters(viewerId)

@@ -1,7 +1,13 @@
 package page.planr.android.core.data.auth
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import java.io.File
+import java.io.IOException
+import java.security.KeyStoreException
 import java.nio.file.Files
 import javax.crypto.AEADBadTagException
 import javax.crypto.KeyGenerator
@@ -13,6 +19,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 
@@ -91,5 +99,53 @@ class TokenStoreTest {
         // ...and the undecryptable value was removed, not left behind.
         key = original
         assertNull(store.readSession())
+    }
+
+    /** A DataStore on a broken disk: reading and writing both throw. */
+    private class BrokenDataStore : DataStore<Preferences> {
+        override val data: Flow<Preferences> = flow { throw IOException("unreadable") }
+        override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+            throw IOException("disk full")
+    }
+
+    @Test
+    fun `an unreadable store reads as signed out and drops writes`() = runTest {
+        val store = DataStoreSessionStore(BrokenDataStore(), cipher)
+
+        assertNull(store.readSession())
+        assertNull(store.readPending())
+        store.writeSession(session)
+        store.writePending(null)
+        assertNull(store.readSession())
+    }
+
+    @Test
+    fun `a session that can't be encrypted is not stored, and nothing throws`() = runTest {
+        val store = DataStoreSessionStore(
+            PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { File(dir, "session.preferences_pb") }),
+            object : TokenCipher by cipher {
+                override fun encrypt(plaintext: ByteArray): ByteArray = throw KeyStoreException("locked")
+            },
+        )
+
+        store.writeSession(session)
+        assertNull(store.readSession())
+    }
+
+    @Test
+    fun `a corrupt file is replaced with an empty one`() = runTest {
+        File(dir, "session.preferences_pb").writeBytes(byteArrayOf(0x7f, 0x01, 0x02, 0x03))
+        val store = DataStoreSessionStore(
+            PreferenceDataStoreFactory.create(
+                corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+                scope = backgroundScope,
+                produceFile = { File(dir, "session.preferences_pb") },
+            ),
+            cipher,
+        )
+
+        assertNull(store.readSession())
+        store.writeSession(session)
+        assertEquals(session, store.readSession())
     }
 }
