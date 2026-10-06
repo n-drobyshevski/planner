@@ -202,6 +202,100 @@ class TaskDetailSubtasksTest {
     }
 
     @Test
+    fun `a subtask add in flight holds Back and Save until it lands`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        val gate = CompletableDeferred<Unit>()
+        data.createGate = gate
+
+        vm.setTitle("Renamed")
+        vm.setSubtaskTitle("Pack bags")
+        vm.addSubtask()
+
+        // The screen holds Back on this: a pop now would cancel the create half-way.
+        assertTrue(vm.state.value.subtaskWriting)
+        assertTrue(vm.state.value.holdsBack)
+        vm.save()
+        assertTrue(data.updates.isEmpty(), "the save would close the screen and cancel the add")
+        assertFalse(vm.state.value.saved)
+
+        gate.complete(Unit)
+        assertFalse(vm.state.value.holdsBack)
+        vm.save()
+        assertEquals(1, data.updates.size)
+        assertTrue(vm.state.value.saved)
+    }
+
+    @Test
+    fun `a subtask check-off in flight holds Back and Save`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent, task("s1", parent = "t1", collection = COL)))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        val gate = CompletableDeferred<Unit>()
+        data.setDoneGate = gate
+
+        vm.setTitle("Renamed")
+        vm.toggleSubtask("s1")
+        assertTrue(vm.state.value.holdsBack)
+        vm.save()
+        assertTrue(data.updates.isEmpty())
+
+        gate.complete(Unit)
+        assertFalse(vm.state.value.holdsBack)
+    }
+
+    @Test
+    fun `an undo in flight holds Back until it lands`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent, task("s1", parent = "t1")))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        val snapshot = data.deleteTask("s1")
+        val gate = CompletableDeferred<Unit>()
+
+        vm.undoDelete(
+            TaskDeleted("s1") {
+                gate.await()
+                data.restoreTask(snapshot)
+            },
+        )
+        assertTrue(vm.state.value.holdsBack)
+        vm.delete()
+        assertTrue(data.blockChecks.isEmpty(), "the plan would miss the subtask being put back")
+
+        gate.complete(Unit)
+        assertFalse(vm.state.value.holdsBack)
+        assertEquals(listOf("s1"), vm.state.value.subtasks.map { it.task.id })
+    }
+
+    @Test
+    fun `a failed undo releases Back too`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+
+        vm.undoDelete(TaskDeleted("s1") { error("offline") })
+
+        assertFalse(vm.state.value.holdsBack)
+        assertEquals(TaskDetailNotice.Failed, vm.state.value.notice)
+    }
+
+    @Test
+    fun `an unsent subtask title is a draft to discard, though the form is clean`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        assertFalse(vm.state.value.hasDraft)
+
+        vm.setSubtaskTitle("Pack bags")
+        assertFalse(vm.state.value.dirty)
+        assertTrue(vm.state.value.hasDraft)
+
+        vm.setSubtaskTitle("   ")
+        assertFalse(vm.state.value.hasDraft)
+    }
+
+    @Test
     fun `the delete plan asks first whenever something would go with the task`() {
         assertEquals(DeletePlan.Immediate, deletePlan(subtasks = 0, hasBlocks = false))
         assertEquals(DeletePlan.Confirm(2, withBlocks = false), deletePlan(subtasks = 2, hasBlocks = false))

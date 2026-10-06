@@ -112,7 +112,18 @@ data class TaskDetailUiState(
      * isn't dirty, but the screen holds Back, Save and Delete until it lands.
      */
     val blockWriting: Boolean = false,
-)
+    /**
+     * A subtask is being added, checked off or put back (Undo). Its own
+     * write, like a block's: the screen holds Back and Save until it lands.
+     */
+    val subtaskWriting: Boolean = false,
+) {
+    /** A write is in flight that leaving now would cancel half-way. */
+    val holdsBack: Boolean get() = saving || deleting || blockWriting || subtaskWriting
+
+    /** Something typed would be lost by leaving: an unsaved edit, or an unsent subtask title. */
+    val hasDraft: Boolean get() = dirty || (canEdit && subtaskTitle.isNotBlank())
+}
 
 /**
  * One task: its details, the editor form and the save (`updateTask` with the
@@ -256,9 +267,9 @@ class TaskDetailViewModel @AssistedInject constructor(
     fun delete() {
         val current = state.value
         val task = current.task ?: return
-        // Not while a subtask is being added: the plan would miss it, and the
-        // cascade would take it with no Undo.
-        if (!current.canEdit || current.saving || current.deleting || current.addingSubtask || current.blockWriting) return
+        // Not while a subtask is being added or put back: the plan would miss
+        // it, and the cascade would take it with no Undo.
+        if (!current.canEdit || current.saving || current.deleting || current.subtaskWriting || current.blockWriting) return
         val subtree = descendantIds(task.id, latest?.tasks.orEmpty().groupBy { it.parentId })
         ui.update { it.copy(deleting = true, notice = null) }
         viewModelScope.launch {
@@ -297,6 +308,7 @@ class TaskDetailViewModel @AssistedInject constructor(
 
     /** Undo from this screen's snackbar (a subtask deleted from its own detail). */
     fun undoDelete(deleted: TaskDeleted) {
+        ui.update { it.copy(undoing = it.undoing + 1) }
         viewModelScope.launch {
             try {
                 deleted.undo()
@@ -304,6 +316,8 @@ class TaskDetailViewModel @AssistedInject constructor(
                 throw e
             } catch (_: Exception) {
                 ui.update { it.copy(notice = TaskDetailNotice.Failed) }
+            } finally {
+                ui.update { it.copy(undoing = it.undoing - 1) }
             }
         }
     }
@@ -319,8 +333,8 @@ class TaskDetailViewModel @AssistedInject constructor(
         val current = state.value
         val task = current.task ?: return
         val form = current.form ?: return
-        // Not mid block write: the save closes the screen, which would cancel it.
-        if (!current.canEdit || current.saving || current.blockWriting) return
+        // Not mid block or subtask write: the save closes the screen, which would cancel it.
+        if (!current.canEdit || current.saving || current.blockWriting || current.subtaskWriting) return
         if (!form.isTitleValid) {
             ui.update { it.copy(notice = TaskDetailNotice.TitleRequired) }
             return
@@ -538,6 +552,7 @@ class TaskDetailViewModel @AssistedInject constructor(
             subtasks = subtaskItems(byParent[task.id].orEmpty(), snapshot, pending),
             subtaskTitle = flags.subtaskTitle,
             addingSubtask = flags.addingSubtask,
+            subtaskWriting = flags.addingSubtask || pending.isNotEmpty() || flags.undoing > 0,
             progress = progressDeep(task.id, byParent),
             overdue = !form.done && isOverdue(form.dueDate, clock.today(viewerZone(viewer))),
             zone = viewerZone(viewer),
@@ -573,6 +588,8 @@ class TaskDetailViewModel @AssistedInject constructor(
         val saved: Boolean = false,
         val subtaskTitle: String = "",
         val addingSubtask: Boolean = false,
+        /** Subtask deletes being undone from this screen's snackbar. */
+        val undoing: Int = 0,
         val deleting: Boolean = false,
         val confirmDelete: DeletePlan.Confirm? = null,
         val deleted: Boolean = false,
