@@ -25,10 +25,9 @@ sealed interface RowChange {
     data class Upsert(val record: JsonObject) : RowChange
 
     /**
-     * DELETE: the old record, which carries only the primary key (default
-     * replica identity; and with RLS on, Realtime strips it to the key
-     * anyway), so `id` is all we can rely on. Deletes arrive through their
-     * own unfiltered binding: see [RealtimeSync].
+     * DELETE (or a row turned private, gone for this member): a record that
+     * carries only `id`. Built from a [RowGone] broadcast, since a filtered
+     * Postgres Changes binding never sees a delete: see [RealtimeSync].
      */
     data class Delete(val oldRecord: JsonObject) : RowChange
 }

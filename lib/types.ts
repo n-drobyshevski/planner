@@ -241,6 +241,8 @@ export interface EventRow {
   attributes: ItemAttributes;
   createdAt: number;
   updatedAt: number;
+  /** member whose write last touched the row (server-stamped, read-only; never sent); null = unknown */
+  updatedBy: string | null;
 }
 
 export interface TaskRow {
@@ -277,6 +279,8 @@ export interface TaskRow {
   attributes: ItemAttributes;
   createdAt: number;
   updatedAt: number;
+  /** member whose write last touched the row (server-stamped, read-only; never sent); null = unknown */
+  updatedBy: string | null;
 }
 
 /**

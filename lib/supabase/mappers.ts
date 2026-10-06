@@ -324,6 +324,7 @@ export function mapEvent(r: Row): EventRow {
     attributes: parseAttributes(r.attributes),
     createdAt: toMs(r.created_at),
     updatedAt: toMs(r.updated_at),
+    updatedBy: (r.updated_by as string | null) ?? null,
   };
 }
 
@@ -351,6 +352,7 @@ export function mapTask(r: Row): TaskRow {
     attributes: parseAttributes(r.attributes),
     createdAt: toMs(r.created_at),
     updatedAt: toMs(r.updated_at),
+    updatedBy: (r.updated_by as string | null) ?? null,
   };
 }
 

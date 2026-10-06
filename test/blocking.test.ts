@@ -34,6 +34,7 @@ function mk(id: string, done = false): TaskRow {
     attributes: {},
     createdAt: 0,
     updatedAt: 0,
+    updatedBy: null,
   };
 }
 

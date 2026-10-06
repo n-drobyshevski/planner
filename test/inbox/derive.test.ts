@@ -71,6 +71,7 @@ function task(over: Partial<TaskRow> = {}): TaskRow {
     attributes: {},
     createdAt: NOW - DAY,
     updatedAt: NOW - HOUR,
+    updatedBy: null,
     ...over,
   };
 }

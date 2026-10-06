@@ -80,6 +80,7 @@ const series: EventRow = {
   attributes: {},
   createdAt: Date.UTC(2025, 11, 1),
   updatedAt: Date.UTC(2025, 11, 1),
+  updatedBy: null,
 };
 const from = Date.UTC(2026, 1, 2, 10);
 
