@@ -137,7 +137,7 @@ class EventDetailViewModel @AssistedInject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                notices.post(AgendaNotice(UiText(R.string.agenda_something_went_wrong)))
+                notices.post(AgendaNotice(UiText(R.string.agenda_something_went_wrong), failedWrite = true))
                 _failed.send(Unit)
             } finally {
                 _deleting.value = false

@@ -144,10 +144,12 @@ class AgendaViewModel @Inject constructor(
     /**
      * Snackbar messages: results posted by the detail / editor screens plus
      * this screen's own. Plain confirmations respect the member's
-     * `show_success_toasts`; anything offering Undo always shows.
+     * `show_success_toasts`; failures and anything offering Undo always show.
      */
     val messages: Flow<AgendaNotice> = merge(
-        notices.notices.filter { it.undo != null || workspace.value.viewer?.showSuccessToasts != false },
+        notices.notices.filter {
+            it.failedWrite || it.undo != null || workspace.value.viewer?.showSuccessToasts != false
+        },
         ownNotices.receiveAsFlow(),
     )
 

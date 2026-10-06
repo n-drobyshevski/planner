@@ -327,4 +327,20 @@ class AgendaViewModelTest {
         assertEquals(listOf(UiText(R.string.agenda_toast_event_deleted)), messages.map { it.message })
         vm.close()
     }
+
+    @Test
+    fun `failures always show even with success toasts off`() = runTest {
+        data.members.value = listOf(Fixtures.anna.copy(showSuccessToasts = false), Fixtures.boris)
+        val vm = viewModel()
+        val messages = mutableListOf<AgendaNotice>()
+        backgroundScope.launch { vm.messages.toList(messages) }
+
+        notices.post(AgendaNotice(UiText(R.string.agenda_toast_event_updated)))
+        notices.post(AgendaNotice(UiText(R.string.agenda_something_went_wrong), failedWrite = true))
+        runCurrent()
+
+        assertEquals(listOf(UiText(R.string.agenda_something_went_wrong)), messages.map { it.message })
+        assertTrue(messages.single().failedWrite)
+        vm.close()
+    }
 }
