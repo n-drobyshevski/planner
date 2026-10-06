@@ -140,7 +140,9 @@ describe("revertSplit", () => {
     const { sb, calls } = fakeClient(respond("fail"));
     await expect(revertSplit(sb, series, "new-series", from)).rejects.toThrow("cap failed");
 
-    expect(calls.map(kind)).toEqual(["update"]);
+    // The restore may have landed with only its answer lost: the cap is tried again.
+    expect(calls.map(kind)).toEqual(["update", "update"]);
+    expect(patchOf(calls[1]).rrule).toBe(capThisAndFuture(series, from).rrule);
   });
 
   it("caps the original again when the delete fails, so the future doesn't show twice", async () => {
@@ -149,10 +151,10 @@ describe("revertSplit", () => {
     );
     await expect(revertSplit(sb, series, "new-series", from)).rejects.toThrow("delete failed");
 
-    expect(calls.map(kind)).toEqual(["update", "delete", "update"]);
-    expect(eqId(calls[2])).toEqual(["id", "evt-1"]);
+    expect(calls.map(kind)).toEqual(["update", "delete", "delete", "update"]);
+    expect(eqId(calls[3])).toEqual(["id", "evt-1"]);
     const cap = capThisAndFuture(series, from);
-    expect(patchOf(calls[2])).toEqual({
+    expect(patchOf(calls[3])).toEqual({
       rrule: cap.rrule,
       recurrence_ends_at: new Date(from - 1000).toISOString(),
     });
@@ -167,6 +169,16 @@ describe("revertSplit", () => {
     });
     await expect(revertSplit(sb, series, "new-series", from)).rejects.toThrow("delete failed");
 
-    expect(calls.map(kind)).toEqual(["update", "delete", "update"]);
+    expect(calls.map(kind)).toEqual(["update", "delete", "delete", "update"]);
+  });
+
+  it("tries a failed delete once more instead of capping, since it may have landed", async () => {
+    let deletes = 0;
+    const { sb, calls } = fakeClient((call) =>
+      kind(call) === "delete" && deletes++ === 0 ? { error: new Error("timeout") } : respond("ok")(call),
+    );
+    await expect(revertSplit(sb, series, "new-series", from)).resolves.toBeUndefined();
+
+    expect(calls.map(kind)).toEqual(["update", "delete", "delete"]);
   });
 });

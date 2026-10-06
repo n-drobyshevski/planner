@@ -397,6 +397,47 @@ class EventEditViewModelTest {
     }
 
     @Test
+    fun `an undo whose delete fails once tries it again instead of capping`() = runTest {
+        data.events.value = listOf(series)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+        // The first delete's answer is lost (it may have landed): capping then would end the future.
+        var deletes = 0
+        data.failWhen = { if (it is Call.Delete && deletes++ == 0) IllegalStateException("timeout") else null }
+
+        posted.single().undo!!.invoke()
+
+        val (restore, delete) = data.calls.drop(1)
+        assertEquals(PatchField.Value("FREQ=DAILY"), assertIs<Call.Update>(restore).patch.rrule)
+        assertEquals(Call.Delete("split-1"), delete)
+        assertEquals(3, data.calls.size, "no cap after the second try dropped the new series")
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a failed restore caps again, in case it landed with only its answer lost`() = runTest {
+        data.events.value = listOf(series)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+        data.failNext = IllegalStateException("timeout")
+
+        assertFailsWith<IllegalStateException> { posted.single().undo!!.invoke() }
+
+        val recap = assertIs<Call.Update>(data.calls.drop(1).single())
+        assertEquals(PatchField.Value(monday - 1.seconds), recap.patch.recurrenceEndsAt)
+        assertTrue(data.calls.none { it is Call.Delete })
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun `all events moves the master by the instance's shift and keeps the guard`() = runTest {
         data.events.value = listOf(series)
         val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))

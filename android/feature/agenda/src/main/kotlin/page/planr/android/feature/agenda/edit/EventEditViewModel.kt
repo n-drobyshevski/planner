@@ -165,15 +165,31 @@ class EventEditViewModel @AssistedInject constructor(
                         // Undo the split: restore the original rule FIRST, then drop the
                         // new series. A failed restore keeps the new series, so the
                         // future occurrences are never lost.
-                        data.updateEvent(event.id, restoreRecurrence(event))
+                        try {
+                            data.updateEvent(event.id, restoreRecurrence(event))
+                        } catch (e: Throwable) {
+                            // The restore may have landed with only its answer lost (a
+                            // timeout, or the agenda closing mid-request): cap again so the
+                            // future doesn't show twice. The new series is untouched.
+                            withContext(NonCancellable) { runCatching { data.updateEvent(event.id, cap) } }
+                            throw e
+                        }
                         try {
                             data.deleteEvent(created.id)
                         } catch (e: Throwable) {
-                            // Both series are live now, so every future occurrence shows
-                            // twice: cap the original again (back to the split), then
-                            // report the undo as failed.
-                            withContext(NonCancellable) { runCatching { data.updateEvent(event.id, cap) } }
-                            throw e
+                            withContext(NonCancellable) {
+                                // The delete may have landed with only its answer lost, and
+                                // capping then would end the future for both members. It is
+                                // idempotent, so try it once more first.
+                                if (runCatching { data.deleteEvent(created.id) }.isFailure) {
+                                    // Both series are live, so every future occurrence shows
+                                    // twice: cap the original again (back to the split).
+                                    runCatching { data.updateEvent(event.id, cap) }
+                                    throw e
+                                }
+                            }
+                            // The second try dropped it: the undo is done.
+                            if (e is CancellationException) throw e
                         }
                     },
                 )
