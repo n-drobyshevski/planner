@@ -154,8 +154,19 @@ class AgendaMetricsTest {
     @Test
     fun `the initial scroll lands on the hour line`() {
         val hourPx = metrics(1.6f).hourHeight.value * 2f
-        assertEquals((7 * hourPx).toInt(), scrollOffsetFor(7, hourPx))
-        assertEquals((23 * hourPx).toInt(), scrollOffsetFor(30, hourPx))
-        assertEquals(0, scrollOffsetFor(-1, hourPx))
+        assertEquals((7 * hourPx).toInt(), scrollOffsetFor(7f, hourPx))
+        assertEquals((23 * hourPx).toInt(), scrollOffsetFor(30f, hourPx))
+        assertEquals(0, scrollOffsetFor(-1f, hourPx))
+    }
+
+    @Test
+    fun `a saved grid position keeps its time when the font size changes`() {
+        val density = 2.75f
+        val before = metrics(1f).hourHeight.value * density
+        val after = metrics(2f).hourHeight.value * density
+        val hours = gridHoursAt(scrollOffsetFor(9.5f, before), before)
+        assertEquals(9.5f, hours, 0.01f)
+        // Restored on the taller grid, the same time is at the top, not the same pixels.
+        assertEquals(9.5f, gridHoursAt(scrollOffsetFor(hours, after), after), 0.01f)
     }
 }

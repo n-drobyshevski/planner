@@ -31,9 +31,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -67,6 +69,7 @@ import page.planr.android.feature.agenda.ui.AgendaIcons
 import page.planr.android.feature.agenda.ui.LocalAgendaMetrics
 import page.planr.android.feature.agenda.ui.PartnerToggleButton
 import page.planr.android.feature.agenda.ui.PeriodPage
+import page.planr.android.feature.agenda.ui.gridHoursAt
 import page.planr.android.feature.agenda.ui.rememberAgendaFormats
 import page.planr.android.feature.agenda.ui.rememberAgendaMetrics
 import page.planr.android.feature.agenda.ui.scrollOffsetFor
@@ -189,10 +192,13 @@ private fun AgendaPager(
     onCreateAt: ((LocalDate, Int) -> Unit)?,
 ) {
     val hourPx = with(LocalDensity.current) { LocalAgendaMetrics.current.hourHeight.toPx() }
-    // Start near the current hour on today, else at 07:00.
-    var gridScroll by rememberSaveable {
+    val currentHourPx by rememberUpdatedState(hourPx)
+    // Start near the current hour on today, else at 07:00. Kept in hours, not
+    // pixels: a font-size change recreates the screen with a taller or shorter
+    // hour, and the same pixel offset would land on a different time.
+    var gridHours by rememberSaveable {
         val hour = state.now.toLocalDateTime(state.zone).hour - 1
-        mutableIntStateOf(scrollOffsetFor(if (state.periodOffset == 0) maxOf(hour, 0) else 7, hourPx))
+        mutableFloatStateOf((if (state.periodOffset == 0) maxOf(hour, 0) else 7).toFloat())
     }
     key(state.mode) {
         val pager = rememberPagerState(initialPage = CENTER_PAGE + state.periodOffset) { PAGE_COUNT }
@@ -204,9 +210,11 @@ private fun AgendaPager(
             if (pager.currentPage != target && !pager.isScrollInProgress) pager.animateScrollToPage(target)
         }
         HorizontalPager(state = pager, key = { it }, modifier = Modifier.fillMaxSize()) { page ->
-            val scroll = remember { ScrollState(gridScroll) }
+            val scroll = remember { ScrollState(scrollOffsetFor(gridHours, hourPx)) }
             LaunchedEffect(scroll) {
-                snapshotFlow { scroll.value }.collect { if (page == pager.settledPage) gridScroll = it }
+                snapshotFlow { scroll.value }.collect {
+                    if (page == pager.settledPage) gridHours = gridHoursAt(it, currentHourPx)
+                }
             }
             PeriodPage(
                 days = state.daysAt(page - CENTER_PAGE),

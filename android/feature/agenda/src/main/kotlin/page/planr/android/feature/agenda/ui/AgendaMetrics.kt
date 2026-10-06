@@ -124,8 +124,11 @@ internal fun slotMinuteAt(yPx: Float, hourHeightPx: Float): Int {
     return (minute / 30 * 30).coerceIn(0, 23 * 60 + 30)
 }
 
-/** Scroll offset (px) that puts [hour] near the top of the grid. */
-internal fun scrollOffsetFor(hour: Int, hourHeightPx: Float): Int = (hour.coerceIn(0, 23) * hourHeightPx).toInt()
+/** Scroll offset (px) that puts [hours] (from midnight) at the top of the grid. */
+internal fun scrollOffsetFor(hours: Float, hourHeightPx: Float): Int = (hours.coerceIn(0f, 23f) * hourHeightPx).toInt()
+
+/** The grid position, in hours from midnight, at scroll offset [scrollPx]; the inverse of [scrollOffsetFor]. */
+internal fun gridHoursAt(scrollPx: Int, hourHeightPx: Float): Float = scrollPx / hourHeightPx
 
 /** The agenda's metrics; provided at [page.planr.android.feature.agenda.AgendaScreen]'s root. */
 internal val LocalAgendaMetrics = staticCompositionLocalOf {
