@@ -7,7 +7,6 @@ import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +21,7 @@ import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
 import page.planr.android.core.model.Task
 import page.planr.android.core.model.TaskCompletion
+import page.planr.android.feature.tasks.data.TasksCompute
 import page.planr.android.feature.tasks.data.TasksDataSource
 import page.planr.android.feature.tasks.model.TaskFilters
 import page.planr.android.feature.tasks.model.TaskGroup
@@ -59,17 +59,14 @@ data class TasksUiState(
 
 /**
  * The tasks list: Room-backed rows, filters, and the checkbox (`setDone`).
- * The list is built on [listDispatcher] (Dispatchers.Default; a test
- * dispatcher in tests), never on the main thread.
+ * The list is built on [listDispatcher], never on the main thread.
  */
 @HiltViewModel
-class TasksViewModel internal constructor(
+class TasksViewModel @Inject constructor(
     private val data: TasksDataSource,
     private val clock: Clock,
-    private val listDispatcher: CoroutineDispatcher,
+    @TasksCompute private val listDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
-
-    @Inject constructor(data: TasksDataSource, clock: Clock) : this(data, clock, Dispatchers.Default)
 
     private val filters = MutableStateFlow(TaskFilters())
     /** Optimistic completion by task id while a write is in flight. */
