@@ -13,4 +13,6 @@ dependencies {
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.material3)
     api(libs.androidx.glance.material3)
+    // enableEdgeToEdge, for the themed system bars (PlanrSystemBars.kt).
+    implementation(libs.androidx.activity.compose)
 }

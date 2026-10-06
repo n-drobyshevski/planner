@@ -13,8 +13,10 @@ import androidx.compose.ui.text.font.FontFamily
  * The Planr theme: warm paper, stone ink, one warm-stone accent, and member
  * colors that carry meaning. Wrap every screen (and previews) in it.
  *
- * @param darkTheme defaults to the system setting; pass the member's
- *   `theme_preference` once it is known.
+ * @param darkTheme defaults to the configuration, which from Android 12
+ *   already carries the member's `theme_preference`; activities pass
+ *   `ThemeModeStore.forcedDark ?: isSystemInDarkTheme()` so older versions
+ *   follow it too.
  */
 @Composable
 fun PlanrTheme(

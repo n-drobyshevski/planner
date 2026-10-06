@@ -6,9 +6,15 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import page.planr.android.core.data.appearance.ThemeModeStore
 import page.planr.android.core.design.theme.PlanrTheme
+import page.planr.android.core.design.theme.enablePlanrEdgeToEdge
 
 /**
  * A see-through activity that only hosts [QuickAddSheet] over whatever is
@@ -21,12 +27,18 @@ import page.planr.android.core.design.theme.PlanrTheme
 @AndroidEntryPoint
 class QuickAddActivity : ComponentActivity() {
 
+    @Inject
+    lateinit var themeMode: ThemeModeStore
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // After super: Hilt injects [themeMode] there.
+        enablePlanrEdgeToEdge(themeMode.forcedDark.value)
         val kind = kindOf(intent)
         setContent {
-            PlanrTheme {
+            val forcedDark by themeMode.forcedDark.collectAsStateWithLifecycle()
+            LaunchedEffect(forcedDark) { enablePlanrEdgeToEdge(forcedDark) }
+            PlanrTheme(darkTheme = forcedDark ?: isSystemInDarkTheme()) {
                 QuickAddSheet(
                     kind = kind,
                     onDismiss = ::finish,
