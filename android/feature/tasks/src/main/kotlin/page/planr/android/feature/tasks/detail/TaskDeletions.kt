@@ -26,14 +26,14 @@ class TaskDeleted(val taskId: String, val undo: suspend () -> Unit)
 class TaskDeletions @Inject constructor(private val clock: Clock) {
     private val _pending = MutableStateFlow<TaskDeleted?>(null)
 
-    /** When the current [pending] was posted. */
-    @Volatile private var postedAt: Instant? = null
+    /** The current [pending] and when it was posted, written together. */
+    @Volatile private var posted: Pair<TaskDeleted, Instant>? = null
 
     /** The latest delete no screen has shown yet. */
     val pending: StateFlow<TaskDeleted?> = _pending.asStateFlow()
 
     fun post(deleted: TaskDeleted) {
-        postedAt = clock.now()
+        posted = deleted to clock.now()
         _pending.value = deleted
     }
 
@@ -45,7 +45,7 @@ class TaskDeletions @Inject constructor(private val clock: Clock) {
      */
     fun claims(except: String? = null): Flow<TaskDeleted> =
         pending.filterNotNull().filter {
-            if (isExpired()) {
+            if (isExpired(it)) {
                 _pending.compareAndSet(it, null)
                 false
             } else {
@@ -53,9 +53,10 @@ class TaskDeletions @Inject constructor(private val clock: Clock) {
             }
         }
 
-    private fun isExpired(): Boolean {
-        val at = postedAt ?: return false
-        return clock.now() - at > EXPIRY
+    /** Timed by [deleted]'s own post, never a newer one's. */
+    private fun isExpired(deleted: TaskDeleted): Boolean {
+        val (current, at) = posted ?: return false
+        return current === deleted && clock.now() - at > EXPIRY
     }
 
     companion object {
