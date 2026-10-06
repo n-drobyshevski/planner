@@ -33,17 +33,31 @@ class TaskMutations @Inject constructor(
 
     /**
      * Deletes the task; the DB cascades its subtasks and linked calendar
-     * blocks. The task's own row is read first and returned, so the delete of
-     * a task with neither can be undone ([restoreDeleted]).
+     * blocks. The task's own row, its checkpoints and its dependency edges
+     * are read first and returned, so the delete of a task with neither
+     * subtasks nor blocks can be undone ([restoreDeleted]).
      */
     suspend fun deleteTask(id: String): DeletedTaskSnapshot {
         val rows = gateway.select(SupabaseTables.TASKS, filters = listOf(eq("id", id)))
+        val checkpoints = gateway.select(SupabaseTables.TASK_CHECKPOINTS, filters = listOf(eq("task_id", id)))
+        val dependencies = gateway.select(
+            SupabaseTables.TASK_DEPENDENCIES,
+            filters = listOf(anyOf(eq("task_id", id), eq("depends_on_task_id", id))),
+        )
         gateway.delete(SupabaseTables.TASKS, listOf(eq("id", id)))
-        return DeletedTaskSnapshot(rows)
+        return DeletedTaskSnapshot(rows, checkpoints, dependencies)
     }
 
-    /** `restoreDeleted` (task part): re-insert the raw rows verbatim, parents first. */
-    suspend fun restoreDeleted(snapshot: DeletedTaskSnapshot): List<Task> =
-        snapshot.tasks.map { row -> gateway.insert(SupabaseTables.TASKS, listOf(row)).single() }
+    /**
+     * `restoreDeleted` (task part): re-insert the raw rows verbatim, parents
+     * first, then the checkpoints, then the dependency edges (both ends are
+     * back by then). Returns the restored tasks.
+     */
+    suspend fun restoreDeleted(snapshot: DeletedTaskSnapshot): List<Task> {
+        val tasks = snapshot.tasks.map { row -> gateway.insert(SupabaseTables.TASKS, listOf(row)).single() }
             .decodeAll(Task.serializer())
+        if (snapshot.checkpoints.isNotEmpty()) gateway.insert(SupabaseTables.TASK_CHECKPOINTS, snapshot.checkpoints)
+        if (snapshot.dependencies.isNotEmpty()) gateway.insert(SupabaseTables.TASK_DEPENDENCIES, snapshot.dependencies)
+        return tasks
+    }
 }

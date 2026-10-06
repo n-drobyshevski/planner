@@ -11,6 +11,8 @@ object SupabaseTables {
     const val EVENTS = "events"
     const val EVENT_OVERRIDES = "event_overrides"
     const val TASKS = "tasks"
+    const val TASK_CHECKPOINTS = "task_checkpoints"
+    const val TASK_DEPENDENCIES = "task_dependencies"
     const val COLLECTIONS = "collections"
     const val BOARDS = "boards"
     const val MEMBER_APP_PREFS = "member_app_prefs"

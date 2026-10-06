@@ -34,10 +34,15 @@ data class DeletedEventSnapshot(
 /**
  * A task's own row, captured before it was deleted, so the delete can be
  * undone by re-inserting it verbatim (`DeletedSnapshot`, task part, for a
- * task without subtasks or calendar blocks: rows the DB cascaded away are
- * not in it).
+ * task without subtasks or calendar blocks: those rows are not in it). The
+ * task's flow checkpoints and its dependency edges (either end), which the
+ * DB cascades away with it, are captured too.
  */
-data class DeletedTaskSnapshot(val tasks: List<JsonObject>)
+data class DeletedTaskSnapshot(
+    val tasks: List<JsonObject>,
+    val checkpoints: List<JsonObject> = emptyList(),
+    val dependencies: List<JsonObject> = emptyList(),
+)
 
 /**
  * What [applyOverride] replaced for that occurrence, the undo token for
