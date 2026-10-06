@@ -17,11 +17,14 @@ import page.planr.android.feature.quickadd.QuickAddKind
  * The Quick add fields: a title plus the minimum to place it. A task gets an
  * optional due date; an event gets a day, and either "all day" or a start and
  * end time. An end at or before the start on the clock means the next day, so
- * an evening event can run past midnight without a second date field.
+ * an evening event can run past midnight without a second date field. Notes
+ * are optional (the task's or event's description), filled mostly by text
+ * shared from another app.
  */
 data class QuickAddForm(
     val kind: QuickAddKind,
     val title: String = "",
+    val notes: String = "",
     val dueDate: LocalDate? = null,
     val date: LocalDate,
     val startTime: LocalTime,
@@ -29,6 +32,9 @@ data class QuickAddForm(
     val allDay: Boolean = false,
 ) {
     val isTitleValid: Boolean get() = title.isNotBlank()
+
+    /** The notes to save as the description; null when there are none. */
+    val description: String? get() = notes.trim().ifEmpty { null }
 
     /** A timed event whose end time is on the following day. */
     val endsNextDay: Boolean get() = !allDay && endTime < startTime

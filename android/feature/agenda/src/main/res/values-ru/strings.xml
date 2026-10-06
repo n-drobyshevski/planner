@@ -31,6 +31,11 @@
     <string name="agenda_detail_missing_title">Событие не найдено</string>
     <string name="agenda_detail_missing_body">Возможно, его удалили на другом устройстве.</string>
     <string name="agenda_all_day">Весь день</string>
+    <string name="agenda_location_open_maps">Открыть на карте</string>
+    <string name="agenda_location_open_link">Открыть ссылку</string>
+    <string name="agenda_copy">Копировать</string>
+    <string name="agenda_copied">Скопировано</string>
+    <string name="agenda_open_failed_copied">Нечем открыть. Скопировано.</string>
 
     <string name="agenda_back">Назад</string>
     <string name="agenda_close">Закрыть</string>

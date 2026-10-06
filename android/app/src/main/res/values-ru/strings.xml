@@ -15,6 +15,12 @@
     <string name="nav_agenda">Календарь</string>
     <string name="nav_tasks">Задачи</string>
     <string name="nav_insights">Аналитика</string>
+    <string name="shortcut_new_task_short">Новая задача</string>
+    <string name="shortcut_new_task_long">Новая задача</string>
+    <string name="shortcut_new_event_short">Новое событие</string>
+    <string name="shortcut_new_event_long">Новое событие</string>
+    <string name="shortcut_tasks_short">Задачи</string>
+    <string name="shortcut_tasks_long">Открыть задачи</string>
     <string name="account_menu">Аккаунт</string>
     <string name="sign_out">Выйти</string>
     <string name="app_version">Planr %1$s · сборка %2$d · %3$s</string>

@@ -9,6 +9,8 @@
     <string name="quickadd_title_label">Title</string>
     <string name="quickadd_title_task_placeholder">What needs doing?</string>
     <string name="quickadd_title_event_placeholder">Add title</string>
+    <string name="quickadd_notes">Notes</string>
+    <string name="quickadd_add_notes">Add notes</string>
     <string name="quickadd_due">Due date</string>
     <string name="quickadd_no_due">No due date</string>
     <string name="quickadd_date">Date</string>
@@ -25,6 +27,11 @@
     <string name="quickadd_apply">Apply</string>
     <string name="quickadd_task_created">Task created</string>
     <string name="quickadd_event_created">Event created</string>
+    <!-- In-app confirmation snackbar, with Undo. -->
+    <string name="quickadd_task_added">Task added</string>
+    <string name="quickadd_event_added">Event added</string>
+    <string name="quickadd_undo">Undo</string>
+    <string name="quickadd_undo_failed">Couldn\'t undo. It\'s still there.</string>
     <string name="quickadd_error_title">Add a title.</string>
     <string name="quickadd_error_end">End must be after start.</string>
     <string name="quickadd_error_signed_out">Sign in to Planr first.</string>

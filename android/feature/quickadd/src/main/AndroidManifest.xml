@@ -3,8 +3,9 @@
 
     <application>
         <!-- Hosts the Quick add sheet over the home screen. Launched only by
-             our own widget (explicit intent), so it isn't exported; its own
-             empty task affinity keeps it out of the main app's back stack. -->
+             our own widget and launcher shortcuts (explicit intents, started
+             as this app), so it isn't exported; its own empty task affinity
+             keeps it out of the main app's back stack. -->
         <activity
             android:name=".QuickAddActivity"
             android:exported="false"
@@ -13,5 +14,19 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Planr.QuickAdd"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- Text or a link shared from another app opens Quick add on a task,
+             prefilled. Only text/plain: a calendar file (text/calendar) still
+             goes to the app's .ics import. -->
+        <activity-alias
+            android:name=".ShareToQuickAddActivity"
+            android:exported="true"
+            android:targetActivity=".QuickAddActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcuts (long-press the app icon). Static shortcut intents
+     must name the package outright: targetPackage is the applicationId (no
+     build type adds a suffix). Quick add opens on its kind through
+     QuickAddActivity.EXTRA_MODE, as the Quick add widget does; Tasks opens
+     the app through the widgets' open action and route (WidgetLaunch).
+     ShortcutsXmlTest checks these names against the code. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_task"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_task"
+        android:shortcutShortLabel="@string/shortcut_new_task_short"
+        android:shortcutLongLabel="@string/shortcut_new_task_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="page.planr.android"
+            android:targetClass="page.planr.android.feature.quickadd.QuickAddActivity">
+            <extra
+                android:name="page.planr.android.feature.quickadd.extra.MODE"
+                android:value="Task" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_event"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_event"
+        android:shortcutShortLabel="@string/shortcut_new_event_short"
+        android:shortcutLongLabel="@string/shortcut_new_event_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="page.planr.android"
+            android:targetClass="page.planr.android.feature.quickadd.QuickAddActivity">
+            <extra
+                android:name="page.planr.android.feature.quickadd.extra.MODE"
+                android:value="Event" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="tasks"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_tasks"
+        android:shortcutShortLabel="@string/shortcut_tasks_short"
+        android:shortcutLongLabel="@string/shortcut_tasks_long">
+        <intent
+            android:action="page.planr.android.widgets.action.OPEN"
+            android:targetPackage="page.planr.android"
+            android:targetClass="page.planr.android.MainActivity">
+            <extra
+                android:name="page.planr.android.widgets.extra.ROUTE"
+                android:value="tasks" />
+        </intent>
+    </shortcut>
+</shortcuts>

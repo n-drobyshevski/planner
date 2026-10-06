@@ -3,11 +3,16 @@ package page.planr.android.feature.quickadd
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -18,7 +23,9 @@ import page.planr.android.core.model.PlannerEvent
 import page.planr.android.core.model.Task
 import page.planr.android.feature.quickadd.data.QuickAddDataSource
 import page.planr.android.feature.quickadd.model.QuickAddError
+import page.planr.android.feature.quickadd.model.SharedText
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class QuickAddViewModelTest {
     @get:Rule val main = MainDispatcherRule()
 
@@ -31,23 +38,39 @@ class QuickAddViewModelTest {
     private class FakeQuickAdd(var zone: TimeZone = TimeZone.of("Europe/Berlin")) : QuickAddDataSource {
         val tasks = mutableListOf<Pair<String, LocalDate?>>()
         val events = mutableListOf<List<Any>>()
+        /** The description of every create, task or event, in order. */
+        val descriptions = mutableListOf<String?>()
+        val deletedTasks = mutableListOf<String>()
+        val deletedEvents = mutableListOf<String>()
         var failWith: Exception? = null
+        var failDeleteWith: Exception? = null
         var zoneGate: CompletableDeferred<Unit>? = null
+        var createGate: CompletableDeferred<Unit>? = null
 
         override suspend fun viewerZone(): TimeZone {
             zoneGate?.await()
             return zone
         }
 
-        override suspend fun createTask(title: String, dueDate: LocalDate?): Task {
+        override suspend fun createTask(title: String, dueDate: LocalDate?, description: String?): Task {
+            createGate?.await()
             failWith?.let { throw it }
             tasks += title to dueDate
+            descriptions += description
             return Task(id = "t", workspaceId = "ws", ownerId = "me", title = title, createdAt = Instant.DISTANT_PAST, updatedAt = Instant.DISTANT_PAST)
         }
 
-        override suspend fun createEvent(title: String, start: Instant, end: Instant, allDay: Boolean, zone: TimeZone): PlannerEvent {
+        override suspend fun createEvent(
+            title: String,
+            start: Instant,
+            end: Instant,
+            allDay: Boolean,
+            zone: TimeZone,
+            description: String?,
+        ): PlannerEvent {
             failWith?.let { throw it }
             events += listOf(title, start, end, allDay, zone.id)
+            descriptions += description
             return PlannerEvent(
                 id = "e",
                 workspaceId = "ws",
@@ -59,6 +82,16 @@ class QuickAddViewModelTest {
                 createdAt = Instant.DISTANT_PAST,
                 updatedAt = Instant.DISTANT_PAST,
             )
+        }
+
+        override suspend fun deleteTask(id: String) {
+            failDeleteWith?.let { throw it }
+            deletedTasks += id
+        }
+
+        override suspend fun deleteEvent(id: String) {
+            failDeleteWith?.let { throw it }
+            deletedEvents += id
         }
     }
 
@@ -86,7 +119,7 @@ class QuickAddViewModelTest {
         vm.save()
 
         assertEquals(listOf<Pair<String, LocalDate?>>("Buy stamps" to LocalDate(2026, 10, 5)), data.tasks)
-        assertEquals(QuickAddKind.Task, vm.state.value.saved)
+        assertEquals(QuickAddKind.Task, vm.state.value.saved?.kind)
         assertTrue(data.events.isEmpty())
     }
 
@@ -105,7 +138,7 @@ class QuickAddViewModelTest {
             listOf<Any>("Dentist", Instant.parse("2026-10-04T13:00:00Z"), Instant.parse("2026-10-04T14:00:00Z"), false, "Europe/Berlin"),
             data.events.single(),
         )
-        assertEquals(QuickAddKind.Event, vm.state.value.saved)
+        assertEquals(QuickAddKind.Event, vm.state.value.saved?.kind)
     }
 
     @Test
@@ -164,13 +197,34 @@ class QuickAddViewModelTest {
         vm.start(QuickAddKind.Task)
         vm.setTitle("Old")
         vm.save()
-        assertEquals(QuickAddKind.Task, vm.state.value.saved)
+        assertEquals(QuickAddKind.Task, vm.state.value.saved?.kind)
 
         vm.start(QuickAddKind.Event)
 
         assertNull(vm.state.value.saved)
         assertEquals("", vm.state.value.form.title)
         assertEquals(QuickAddKind.Event, vm.state.value.form.kind)
+    }
+
+    @Test
+    fun `a save still in flight when the sheet was closed can't close the next opening`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val data = FakeQuickAdd().apply { createGate = gate }
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Slow network")
+        vm.save()
+        assertTrue(vm.state.value.saving)
+
+        // Cancelled while saving, then opened again and typed into.
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Next")
+        gate.complete(Unit)
+
+        assertEquals(listOf<Pair<String, LocalDate?>>("Slow network" to null), data.tasks)
+        assertNull(vm.state.value.saved)
+        assertEquals("Next", vm.state.value.form.title)
+        assertTrue(vm.state.value.hasDraft)
     }
 
     @Test
@@ -209,5 +263,89 @@ class QuickAddViewModelTest {
 
         assertEquals(LocalTime(7, 0), vm.state.value.form.startTime)
         assertEquals(LocalDate(2026, 10, 4), vm.state.value.today)
+    }
+
+    @Test
+    fun `shared text prefills a task whose notes reach the save`() = runTest {
+        val data = FakeQuickAdd()
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task, SharedText(title = "Read this", notes = "Read this\nhttps://example.com/post"))
+
+        assertEquals("Read this", vm.state.value.form.title)
+        vm.save()
+
+        assertEquals(listOf<Pair<String, LocalDate?>>("Read this" to null), data.tasks)
+        assertEquals(listOf<String?>("Read this\nhttps://example.com/post"), data.descriptions)
+    }
+
+    @Test
+    fun `typed notes are saved trimmed with an event, and blank notes as none`() = runTest {
+        val data = FakeQuickAdd()
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Event)
+        vm.setTitle("Dinner")
+        vm.setNotes("  Table for two  \n")
+        vm.save()
+
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Stamps")
+        vm.setNotes("   ")
+        vm.save()
+
+        assertEquals(listOf<String?>("Table for two", null), data.descriptions)
+    }
+
+    @Test
+    fun `notes alone are a draft worth asking about`() = runTest {
+        val vm = QuickAddViewModel(FakeQuickAdd(), clock)
+        vm.start(QuickAddKind.Task)
+        vm.setNotes("Bring the receipt")
+        assertTrue(vm.state.value.hasDraft)
+
+        vm.start(QuickAddKind.Task, SharedText(title = "", notes = "shared"))
+        assertTrue(vm.state.value.hasDraft, "shared text is a draft before any typing")
+    }
+
+    @Test
+    fun `saving reports the created row, and undo deletes exactly it`() = runTest {
+        val data = FakeQuickAdd()
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Buy stamps")
+        vm.save()
+        val task = assertNotNull(vm.state.value.saved)
+        assertEquals(QuickAddSaved(QuickAddKind.Task, "t"), task)
+
+        vm.start(QuickAddKind.Event)
+        vm.setTitle("Dentist")
+        vm.save()
+        val event = assertNotNull(vm.state.value.saved)
+        assertEquals(QuickAddSaved(QuickAddKind.Event, "e"), event)
+
+        // The sheet has been reopened since: undo still targets what each confirmation named.
+        vm.start(QuickAddKind.Task)
+        vm.undo(task)
+        vm.undo(event)
+
+        assertEquals(listOf("t"), data.deletedTasks)
+        assertEquals(listOf("e"), data.deletedEvents)
+    }
+
+    @Test
+    fun `an undo that fails is reported and leaves the item`() = runTest {
+        val data = FakeQuickAdd().apply { failDeleteWith = IllegalStateException("offline") }
+        val vm = QuickAddViewModel(data, clock)
+        val failures = mutableListOf<QuickAddSaved>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.undoFailures.collect { failures += it } }
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Call mum")
+        vm.save()
+
+        val saved = assertNotNull(vm.state.value.saved)
+        vm.undo(saved)
+        runCurrent()
+
+        assertEquals(listOf(saved), failures)
+        assertTrue(data.deletedTasks.isEmpty())
     }
 }
