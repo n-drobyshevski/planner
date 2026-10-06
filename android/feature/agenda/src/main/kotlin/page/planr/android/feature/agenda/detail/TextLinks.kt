@@ -13,15 +13,17 @@ data class TextLink(val start: Int, val end: Int, val target: String)
  * Finds the links in free text (an event's notes or location): web addresses
  * (`http(s)://…` and `www.…`), email addresses and phone numbers. Deliberately
  * conservative, since a wrong link is worse than none: a phone number needs 7
- * to 15 digits, and an ISO date (2026-10-06) or a spaced amount
- * (1 500 000) is never one. Earlier kinds
+ * to 15 digits, and nothing holding a dashed date (2026-10-06, 06-10-2026,
+ * also when a time follows: "2026-10-06 14:00") or a spaced amount
+ * (1 500 000) is one. Earlier kinds
  * win where they overlap, so the digits or `@` inside a URL stay part of it.
  */
 object TextLinks {
     private val WEB = Regex("""(?i)\b(?:https?://|www\.)[^\s<>"]+""")
     private val EMAIL = Regex("""(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b""")
     private val PHONE = Regex("""(?<![\w+])\+?\(?\d[\d  ()-]{5,}\d(?![\w])""")
-    private val ISO_DATE = Regex("""\d{4}-\d{2}-\d{2}""")
+    private val DASHED_DATE = Regex("""\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2}-\d{4})\b""")
+    private val WEB_SCHEME = Regex("""(?i)^https?://""")
     private val THOUSANDS = Regex("""\d{1,3}(?:[ \u00A0]\d{3})+""")
 
     /** Trailing characters that end a sentence rather than the address. */
@@ -34,7 +36,8 @@ object TextLinks {
         WEB.findAll(text).forEach { match ->
             val raw = trimTrailing(match.value)
             if (raw.substringAfter("://").removePrefix("www.").isEmpty()) return@forEach
-            val target = if (raw.startsWith("www.", ignoreCase = true)) "https://$raw" else raw
+            // Lower-case scheme: Android matches intent-filter schemes case-sensitively.
+            val target = if (raw.startsWith("www.", ignoreCase = true)) "https://$raw" else raw.replace(WEB_SCHEME) { it.value.lowercase() }
             links += TextLink(match.range.first, match.range.first + raw.length, target)
         }
         EMAIL.findAll(text).forEach { match ->
@@ -44,7 +47,7 @@ object TextLinks {
             val raw = match.value.trimEnd(')', ' ', ' ', '-')
             val range = match.range.first until match.range.first + raw.length
             val digits = raw.count(Char::isDigit)
-            if (digits !in 7..15 || ISO_DATE.matches(raw) || THOUSANDS.matches(raw) || overlaps(range)) return@forEach
+            if (digits !in 7..15 || DASHED_DATE.containsMatchIn(raw) || THOUSANDS.matches(raw) || overlaps(range)) return@forEach
             val dial = (if (raw.startsWith("+")) "+" else "") + raw.filter(Char::isDigit)
             links += TextLink(range.first, range.last + 1, "tel:$dial")
         }

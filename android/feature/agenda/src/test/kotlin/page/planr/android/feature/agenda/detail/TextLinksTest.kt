@@ -44,6 +44,13 @@ class TextLinksTest {
     fun `dates, times and amounts are not phone numbers`() {
         assertTrue(targets("Due 2026-10-06 at 10:00-11:30").isEmpty())
         assertTrue(targets("Budget 1 500 000").isEmpty())
+        assertTrue(targets("Starts 2026-10-06 14:00, ends 06-10-2026 18:30").isEmpty())
+        assertTrue(targets("2026-10-06 - 2026-10-07").isEmpty())
+    }
+
+    @Test
+    fun `an upper-case scheme is lower-cased so a browser still matches it`() {
+        assertEquals(listOf("https://Example.com/A"), targets("HTTPS://Example.com/A"))
     }
 
     @Test
