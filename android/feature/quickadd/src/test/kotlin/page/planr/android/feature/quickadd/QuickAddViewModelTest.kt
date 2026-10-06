@@ -45,6 +45,7 @@ class QuickAddViewModelTest {
         var failWith: Exception? = null
         var failDeleteWith: Exception? = null
         var zoneGate: CompletableDeferred<Unit>? = null
+        var createGate: CompletableDeferred<Unit>? = null
 
         override suspend fun viewerZone(): TimeZone {
             zoneGate?.await()
@@ -52,6 +53,7 @@ class QuickAddViewModelTest {
         }
 
         override suspend fun createTask(title: String, dueDate: LocalDate?, description: String?): Task {
+            createGate?.await()
             failWith?.let { throw it }
             tasks += title to dueDate
             descriptions += description
@@ -202,6 +204,27 @@ class QuickAddViewModelTest {
         assertNull(vm.state.value.saved)
         assertEquals("", vm.state.value.form.title)
         assertEquals(QuickAddKind.Event, vm.state.value.form.kind)
+    }
+
+    @Test
+    fun `a save still in flight when the sheet was closed can't close the next opening`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val data = FakeQuickAdd().apply { createGate = gate }
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Slow network")
+        vm.save()
+        assertTrue(vm.state.value.saving)
+
+        // Cancelled while saving, then opened again and typed into.
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Next")
+        gate.complete(Unit)
+
+        assertEquals(listOf<Pair<String, LocalDate?>>("Slow network" to null), data.tasks)
+        assertNull(vm.state.value.saved)
+        assertEquals("Next", vm.state.value.form.title)
+        assertTrue(vm.state.value.hasDraft)
     }
 
     @Test

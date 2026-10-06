@@ -47,7 +47,9 @@ class QuickAddActivity : ComponentActivity() {
             return
         }
         val kind = kindOf(intent)
-        val shared = text?.let { SharedText.parse(intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString(), it) }
+        // A share may carry only a subject (no EXTRA_TEXT): it still prefills the title.
+        val shared = intent?.takeIf { it.action == Intent.ACTION_SEND }
+            ?.let { SharedText.parse(it.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString(), text) }
         setContent {
             val forcedDark by themeMode.forcedDark.collectAsStateWithLifecycle()
             LaunchedEffect(forcedDark) { enablePlanrEdgeToEdge(forcedDark) }

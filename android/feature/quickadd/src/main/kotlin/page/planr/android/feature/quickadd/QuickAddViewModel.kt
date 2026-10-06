@@ -62,6 +62,8 @@ class QuickAddViewModel @Inject constructor(
     /** The user picked a date or time; a late-arriving zone must not move it. */
     private var whenEdited = false
     private var zoneJob: Job? = null
+    /** Counts [start]s, so a save still in flight from a closed opening can't land in the next one. */
+    private var opening = 0
 
     private val _state = MutableStateFlow(fresh(QuickAddKind.Task))
     val state: StateFlow<QuickAddUiState> = _state.asStateFlow()
@@ -77,6 +79,7 @@ class QuickAddViewModel @Inject constructor(
      */
     fun start(kind: QuickAddKind, shared: SharedText? = null) {
         whenEdited = false
+        opening++
         _state.value = fresh(kind).let { state ->
             if (shared == null) state else state.copy(form = state.form.copy(title = shared.title, notes = shared.notes))
         }
@@ -115,6 +118,7 @@ class QuickAddViewModel @Inject constructor(
         }
         _state.update { it.copy(saving = true, error = null) }
         val form = current.form
+        val savingOpening = opening
         viewModelScope.launch {
             var saved: QuickAddSaved? = null
             val error = try {
@@ -134,6 +138,9 @@ class QuickAddViewModel @Inject constructor(
             } catch (_: Exception) {
                 QuickAddError.Failed
             }
+            // Cancelled mid-save and reopened: the result belongs to a sheet that is gone,
+            // and must not close (or mark as failed) the one now being filled in.
+            if (savingOpening != opening) return@launch
             _state.update { it.copy(saving = false, error = error, saved = saved) }
         }
     }
