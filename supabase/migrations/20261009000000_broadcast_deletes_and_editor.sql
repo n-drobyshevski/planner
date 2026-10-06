@@ -35,7 +35,8 @@
 -- keep the previous value.
 --
 -- Last, timeslot_requests joins the realtime publication (its RLS is already
--- owner-only), so the owner's Inbox updates live.
+-- owner-only), so the owner's Inbox can follow it live (no client subscribes
+-- to it yet).
 -- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
@@ -172,5 +173,18 @@ create policy workspace_sync_read on realtime.messages
 
 -- ---------------------------------------------------------------------------
 -- 4. Live Inbox: timeslot requests over Postgres Changes (owner-only RLS).
+--    Guarded: a table switched on for Realtime from the dashboard is already
+--    in the publication, and adding it twice would fail the whole migration.
 -- ---------------------------------------------------------------------------
-alter publication supabase_realtime add table timeslot_requests;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'timeslot_requests'
+  ) then
+    alter publication supabase_realtime add table timeslot_requests;
+  end if;
+end;
+$$;
