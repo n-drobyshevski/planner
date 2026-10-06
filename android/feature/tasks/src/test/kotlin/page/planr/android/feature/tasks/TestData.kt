@@ -17,7 +17,10 @@ import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.Board
 import page.planr.android.core.model.Category
+import page.planr.android.core.model.EventKind
+import page.planr.android.core.model.EventStatus
 import page.planr.android.core.model.Member
+import page.planr.android.core.model.Occurrence
 import page.planr.android.core.model.Task
 import page.planr.android.core.recurrence.PatchField
 import page.planr.android.feature.tasks.data.TasksDataSource
@@ -70,6 +73,41 @@ fun task(
     completedAt = completedAt,
     createdAt = Instant.parse("2026-09-01T00:00:00Z"),
     updatedAt = Instant.parse("2026-09-02T00:00:00Z"),
+)
+
+/** A calendar occurrence, Anna's and timed unless told otherwise. */
+fun occurrence(
+    id: String,
+    start: Instant,
+    end: Instant,
+    owner: String = ANNA,
+    shared: Boolean = false,
+    allDay: Boolean = false,
+    status: EventStatus = EventStatus.Confirmed,
+    kind: EventKind = EventKind.Event,
+): Occurrence = Occurrence(
+    key = id,
+    eventId = id,
+    occurrenceDate = start,
+    start = start,
+    end = end,
+    allDay = allDay,
+    inactive = false,
+    status = status,
+    title = id,
+    description = null,
+    location = null,
+    categoryId = null,
+    color = null,
+    kind = kind,
+    ownerId = owner,
+    isPrivate = false,
+    isShared = shared,
+    hiddenFromPublic = false,
+    taskId = null,
+    attributes = JsonObject(emptyMap()),
+    isRecurring = false,
+    isException = false,
 )
 
 /** A collection with an open and a done column, so its tasks can be checked off. */
