@@ -459,9 +459,14 @@ export async function updateAll(
 }
 
 /**
- * "This and future": cap the original series and create a new one. The new
+ * "This and future": create the new series, then cap the original. The new
  * series inherits the original's kind + category; pass `newColor`
  * (string | null) to give the future series a different own-color.
+ *
+ * All or nothing, in this order: a failed insert leaves the original
+ * untouched, and a failed cap deletes the new series again before the error
+ * is rethrown. (Capping first would lose every future occurrence, for both
+ * members, whenever the insert failed.)
  */
 export async function splitSeries(
   sb: SupabaseClient,
@@ -472,16 +477,6 @@ export async function splitSeries(
   newAttributes?: ItemAttributes,
 ): Promise<EventRow> {
   const { original, newSeries } = splitThisAndFuture(event, fromOccurrenceMs, patch);
-  const { error } = await sb
-    .from("events")
-    .update({
-      rrule: original.rrule,
-      recurrence_ends_at:
-        original.recurrenceEndsAt == null ? null : toIso(original.recurrenceEndsAt),
-    })
-    .eq("id", original.id);
-  if (error) throw error;
-
   const input: EventInput = {
     workspaceId: newSeries.workspaceId,
     ownerId: newSeries.ownerId,
@@ -505,7 +500,22 @@ export async function splitSeries(
     taskId: newSeries.taskId,
     attributes: newAttributes !== undefined ? newAttributes : newSeries.attributes,
   };
-  return createEvent(sb, input);
+  const created = await createEvent(sb, input);
+  try {
+    const { error } = await sb
+      .from("events")
+      .update({
+        rrule: original.rrule,
+        recurrence_ends_at:
+          original.recurrenceEndsAt == null ? null : toIso(original.recurrenceEndsAt),
+      })
+      .eq("id", original.id);
+    if (error) throw error;
+  } catch (e) {
+    await deleteEvent(sb, created.id).catch(() => {});
+    throw e;
+  }
+  return created;
 }
 
 /** "This and following": cap the series with UNTIL just before the occurrence. */

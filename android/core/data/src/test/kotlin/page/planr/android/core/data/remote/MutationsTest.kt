@@ -1,12 +1,15 @@
 package page.planr.android.core.data.remote
 
+import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.TaskPatch
@@ -147,5 +150,63 @@ class MutationsTest {
         assertEquals(JsonNull, insert["recurrence_ends_at"])
         assertEquals("Later standup", result.created.title)
         assertEquals(Fixtures.EVENT_ID, result.original?.id)
+    }
+
+    @Test
+    fun `splitSeries inserts the new series before capping the original`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+
+        events.splitSeries(row.decodeAs(PlannerEvent.serializer()), Instant.parse("2026-06-15T09:00:00Z"), OccurrencePatch())
+
+        val writes = gateway.calls.filter { it is FakePostgrestGateway.Call.Insert || it is FakePostgrestGateway.Call.Update }
+        assertEquals(
+            listOf(FakePostgrestGateway.Call.Insert::class, FakePostgrestGateway.Call.Update::class),
+            writes.map { it::class },
+        )
+    }
+
+    @Test
+    fun `a failed insert leaves the original series untouched`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        val failing = object : PostgrestGateway by gateway {
+            override suspend fun insert(table: String, rows: List<JsonObject>): List<JsonObject> = throw IOException("offline")
+        }
+
+        assertFailsWith<IOException> {
+            EventMutations(failing).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(),
+            )
+        }
+
+        assertEquals(listOf(row), gateway.rows(SupabaseTables.EVENTS))
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Update>().isEmpty())
+    }
+
+    @Test
+    fun `a failed cap deletes the new series again, then rethrows`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        val failing = object : PostgrestGateway by gateway {
+            override suspend fun update(table: String, patch: JsonObject, filters: List<RowFilter>): List<JsonObject> =
+                throw IOException("connection reset")
+        }
+
+        assertFailsWith<IOException> {
+            EventMutations(failing).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(title = "Later standup"),
+            )
+        }
+
+        // Only the original remains, its rule unchanged.
+        assertEquals(listOf(row), gateway.rows(SupabaseTables.EVENTS))
+        val created = gateway.callsOf<FakePostgrestGateway.Call.Insert>().single()
+        assertEquals(JsonPrimitive("Later standup"), created.rows.single()["title"])
+        assertEquals(1, gateway.callsOf<FakePostgrestGateway.Call.Delete>().size)
     }
 }

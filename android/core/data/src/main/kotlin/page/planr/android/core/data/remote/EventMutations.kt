@@ -175,9 +175,14 @@ class EventMutations @Inject constructor(
         updateEvent(event.id, EventPayloads.fromOccurrencePatch(EditSemantics.editAll(event, patch)))
 
     /**
-     * `splitSeries`: cap the original series and create the new one. The new
+     * `splitSeries`: create the new series, then cap the original. The new
      * series inherits kind + category; [newColor] / [newAttributes] override
      * its own color / attributes when set.
+     *
+     * All or nothing, in this order: a failed insert leaves the original
+     * untouched, and a failed cap deletes the new series again before the
+     * failure is rethrown. (Capping first would lose every future occurrence,
+     * for both members, whenever the insert failed.)
      */
     suspend fun splitSeries(
         event: PlannerEvent,
@@ -187,18 +192,23 @@ class EventMutations @Inject constructor(
         newAttributes: JsonObject? = null,
     ): SplitResult {
         val split = EditSemantics.splitThisAndFuture(event, fromOccurrence, patch)
-        val capped = gateway.update(
-            SupabaseTables.EVENTS,
-            buildJsonObject {
-                put("rrule", split.original.rrule)
-                put("recurrence_ends_at", split.original.recurrenceEndsAt?.let(PostgresTime::toIso))
-            },
-            listOf(eq("id", split.original.id)),
-        )
         var draft = split.newSeries
         if (newColor is PatchField.Value) draft = draft.copy(color = newColor.value)
         if (newAttributes != null) draft = draft.copy(attributes = newAttributes)
         val created = createEvent(draft)
+        val capped = try {
+            gateway.update(
+                SupabaseTables.EVENTS,
+                buildJsonObject {
+                    put("rrule", split.original.rrule)
+                    put("recurrence_ends_at", split.original.recurrenceEndsAt?.let(PostgresTime::toIso))
+                },
+                listOf(eq("id", split.original.id)),
+            )
+        } catch (e: Throwable) {
+            withContext(NonCancellable) { runCatching { deleteEvents(listOf(created.id)) } }
+            throw e
+        }
         return SplitResult(
             original = capped.firstOrNull()?.decodeAs(PlannerEvent.serializer()),
             created = created,

@@ -194,8 +194,10 @@ class EventRepository @Inject constructor(
         write({ mutations.updateAll(event, patch) }) { storeLocally(it) }
 
     /**
-     * "This and following": cap [event] before [fromOccurrence] and start a new
-     * series there carrying [patch]. Returns the new series.
+     * "This and following": start a new series at [fromOccurrence] carrying
+     * [patch] and cap [event] before it. Returns the new series. The remote
+     * split is all or nothing, and Room only sees it once both writes landed,
+     * so a failure never hides an occurrence locally either.
      */
     suspend fun splitSeries(
         event: PlannerEvent,
