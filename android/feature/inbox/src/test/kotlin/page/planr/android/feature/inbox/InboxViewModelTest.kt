@@ -23,6 +23,8 @@ import org.junit.Test
 import page.planr.android.core.data.inbox.InboxItem
 import page.planr.android.core.data.inbox.InboxRules
 import page.planr.android.core.data.model.SleepLog
+import page.planr.android.core.data.remote.StaleWriteException
+import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.design.component.SleepRatingDraft
 import page.planr.android.core.model.PlannerEventDraft
 
@@ -119,6 +121,43 @@ class InboxViewModelTest {
         )
         assertEquals(listOf("rate-task:tk"), vm.state.value.ratings.map { it.id })
         assertNull(vm.state.value.error)
+        vm.close()
+    }
+
+    @Test
+    fun `a rating merges into the attributes as stored when it's written, not the row's old copy`() = runTest {
+        val data = data()
+        data.occurrences.value = listOf(TestData.event("ev", attributes = JsonObject(mapOf("energy" to JsonPrimitive(2)))))
+        val vm = viewModel(data)
+        data.hold = CompletableDeferred()
+
+        vm.rate(vm.state.value.ratings.first { it is InboxItem.RateEvent }, "3")
+        runCurrent()
+        // The partner's attribute lands before the write does.
+        data.occurrences.value = listOf(
+            TestData.event("ev", attributes = JsonObject(mapOf("energy" to JsonPrimitive(2), "priority" to JsonPrimitive(1)))),
+        )
+        data.hold!!.complete(Unit)
+        runCurrent()
+
+        assertEquals(
+            JsonObject(mapOf("energy" to JsonPrimitive(2), "priority" to JsonPrimitive(1), "satisfaction" to JsonPrimitive(3))),
+            data.ratedEvents.single().second,
+        )
+        vm.close()
+    }
+
+    @Test
+    fun `a rating that a change elsewhere got ahead of comes back to rate again`() = runTest {
+        val data = data().apply { failRate = StaleWriteException(SupabaseTables.TASKS, "tk") }
+        val vm = viewModel(data)
+
+        vm.rate(vm.state.value.ratings.first { it is InboxItem.RateTask }, "2")
+        runCurrent()
+
+        assertEquals(listOf("rate-event:ev", "rate-task:tk"), vm.state.value.ratings.map { it.id })
+        assertEquals(InboxError.RateFailed, vm.state.value.error)
+        assertEquals(emptyList(), data.ratedTasks)
         vm.close()
     }
 

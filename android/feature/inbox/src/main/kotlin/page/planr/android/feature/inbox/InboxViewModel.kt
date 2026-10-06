@@ -138,15 +138,19 @@ class InboxViewModel @Inject constructor(
         }
     }
 
-    /** Rates a finished event or task: satisfaction [option] ("1".."4") merged into its attributes. */
+    /**
+     * Rates a finished event or task: satisfaction [option] ("1".."4") merged
+     * into its attributes as stored, guarded against a change made meanwhile
+     * (the row comes back, reread, with [InboxError.RateFailed]).
+     */
     fun rate(item: InboxItem, option: String) {
         if (option !in InboxRules.satisfactionOptions) return
         when (item) {
             is InboxItem.RateEvent -> resolve(item.id, InboxError.RateFailed) {
-                data.rateEvent(item.eventId, InboxRules.rated(item.attributes, option))
+                data.rateEvent(item.eventId) { InboxRules.rated(it, option) }
             }
             is InboxItem.RateTask -> resolve(item.id, InboxError.RateFailed) {
-                data.rateTask(item.taskId, InboxRules.rated(item.attributes, option))
+                data.rateTask(item.taskId) { InboxRules.rated(it, option) }
             }
             else -> Unit
         }

@@ -37,6 +37,7 @@ import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.model.EventPatch
+import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.EventMutations
 import page.planr.android.core.data.remote.FakePostgrestGateway
 import page.planr.android.core.data.remote.Fixtures
@@ -153,6 +154,68 @@ class RepositoryTest {
             repo.updateEvent(Fixtures.EVENT_ID, EventPatch(title = PatchField.Value("Mine")), original.updatedAt)
         }
         assertEquals("Partner's", repo.getEvent(Fixtures.EVENT_ID)?.title)
+    }
+
+    private fun JsonObject.with(key: String, value: Int) = JsonObject(this + (key to JsonPrimitive(value)))
+
+    @Test
+    fun `attributes are rewritten from the cached bag, guarded by its updated_at`() = runTest {
+        gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow())
+        val repo = events()
+        val cached = WorkspaceQueries(gateway).fetchEvent(Fixtures.WS, Fixtures.EVENT_ID)!!
+        db.eventDao().upsertEvents(listOf(cached.toEntity()))
+
+        val rated = repo.updateAttributes(Fixtures.EVENT_ID) { it.with("satisfaction", 3) }
+
+        assertEquals(buildJsonObject { put("energy", "high"); put("satisfaction", 3) }, rated.attributes)
+        val update = gateway.callsOf<FakePostgrestGateway.Call.Update>().single()
+        assertTrue(update.filters.any { it.column == "updated_at" }, "guarded by updated_at")
+        assertEquals(rated.attributes, repo.getEvent(Fixtures.EVENT_ID)?.attributes)
+    }
+
+    @Test
+    fun `an attribute rewrite never overwrites a change Room hasn't seen`() = runTest {
+        gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow())
+        val repo = events()
+        val cached = WorkspaceQueries(gateway).fetchEvent(Fixtures.WS, Fixtures.EVENT_ID)!!
+        db.eventDao().upsertEvents(listOf(cached.toEntity()))
+        // The partner sets another attribute; Realtime hasn't brought it in yet.
+        val partners = cached.attributes.with("priority", 2)
+        EventMutations(gateway).updateEvent(Fixtures.EVENT_ID, EventPatch(attributes = PatchField.Value(partners)))
+
+        assertFailsWith<StaleWriteException> {
+            repo.updateAttributes(Fixtures.EVENT_ID) { it.with("satisfaction", 3) }
+        }
+        val stored = gateway.rows(SupabaseTables.EVENTS).single()["attributes"]
+        assertEquals(partners, stored)
+        // Reloaded: the next rating merges into the partner's bag.
+        assertEquals(partners, repo.getEvent(Fixtures.EVENT_ID)?.attributes)
+        val rated = repo.updateAttributes(Fixtures.EVENT_ID) { it.with("satisfaction", 3) }
+        assertEquals(partners.with("satisfaction", 3), rated.attributes)
+    }
+
+    @Test
+    fun `a task's attribute rewrite is guarded the same way`() = runTest {
+        gateway.seed(SupabaseTables.TASKS, Fixtures.taskRow())
+        val repo = tasks()
+        val cached = WorkspaceQueries(gateway).fetchTasks(Fixtures.WS).single()
+        db.taskDao().upsert(listOf(cached.toEntity()))
+        val partners = cached.attributes.with("priority", 2)
+        TaskMutations(gateway).updateTask(cached.id, TaskPatch(attributes = PatchField.Value(partners)))
+
+        assertFailsWith<StaleWriteException> {
+            repo.updateAttributes(cached.id) { it.with("satisfaction", 4) }
+        }
+        assertEquals(partners, gateway.rows(SupabaseTables.TASKS).single()["attributes"])
+        assertEquals(partners, repo.getTask(cached.id)?.attributes)
+    }
+
+    @Test
+    fun `an attribute rewrite of a row that isn't cached writes nothing`() = runTest {
+        gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow())
+
+        assertFailsWith<IllegalStateException> { events().updateAttributes(Fixtures.EVENT_ID) { it } }
+        assertEquals(emptyList(), gateway.callsOf<FakePostgrestGateway.Call.Update>())
     }
 
     @Test

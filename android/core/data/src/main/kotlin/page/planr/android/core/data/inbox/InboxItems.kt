@@ -45,7 +45,10 @@ sealed interface InboxItem {
         override val sortAt: Instant,
         val eventId: String,
         val title: String,
-        /** The event's current attribute bag; the rating merges into it. */
+        /**
+         * The event's attribute bag as derived. The rating merges into the
+         * bag stored when it is written, guarded by `updated_at`, not this copy.
+         */
         val attributes: JsonObject,
     ) : InboxItem {
         override val severity: InboxSeverity get() = InboxSeverity.Info

@@ -49,10 +49,16 @@ interface InboxDataSource {
     /** The viewer's night window (`member_sleep_prefs`), read from the server. */
     suspend fun nightWindow(): NightWindow
 
-    /** Writes [attributes] (satisfaction merged in) to the event's master row. */
-    suspend fun rateEvent(eventId: String, attributes: JsonObject)
+    /**
+     * Writes the event's master row's attributes as [rate] makes them
+     * (satisfaction merged in) from the bag Room holds, guarded by the row's
+     * `updated_at`. Throws `StaleWriteException`, with the row reloaded,
+     * when the partner changed it meanwhile, rather than overwriting their change.
+     */
+    suspend fun rateEvent(eventId: String, rate: (JsonObject) -> JsonObject)
 
-    suspend fun rateTask(taskId: String, attributes: JsonObject)
+    /** [rateEvent] for a task. */
+    suspend fun rateTask(taskId: String, rate: (JsonObject) -> JsonObject)
 
     suspend fun saveSleep(rating: SleepRating): SleepLog
 
