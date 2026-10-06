@@ -132,7 +132,7 @@ class TimeslotRequestRepositoryTest {
             },
             update.patch,
         )
-        assertEquals(listOf<RowFilter>(RowFilter.Eq("id", "r-old")), update.filters)
+        assertEquals(listOf<RowFilter>(RowFilter.Eq("id", "r-old"), RowFilter.Eq("status", "pending")), update.filters)
         assertEquals(listOf("r-new"), repo.pending.first()!!.map { it.id })
         // The server agrees: a fresh read no longer has it.
         repo.refresh()
@@ -149,6 +149,25 @@ class TimeslotRequestRepositoryTest {
 
         val update = fake.callsOf<FakePostgrestGateway.Call.Update>().single()
         assertEquals(JsonPrimitive("declined"), update.patch["status"])
+        assertEquals(listOf("r-old"), repo.pending.first()!!.map { it.id })
+    }
+
+    @Test
+    fun `a request resolved elsewhere keeps its outcome`() = runTest {
+        seed()
+        val repo = repository()
+        repo.refresh()
+        // Approved on the web since this device read it.
+        fake.update(
+            SupabaseTables.TIMESLOT_REQUESTS,
+            buildJsonObject { put("status", "approved") },
+            listOf(RowFilter.Eq("id", "r-new")),
+        )
+
+        repo.markDeclined("r-new")
+
+        val row = fake.rows(SupabaseTables.TIMESLOT_REQUESTS).single { it["id"] == JsonPrimitive("r-new") }
+        assertEquals(JsonPrimitive("approved"), row["status"])
         assertEquals(listOf("r-old"), repo.pending.first()!!.map { it.id })
     }
 
