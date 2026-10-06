@@ -22,6 +22,7 @@ import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.model.OverrideType
 import page.planr.android.core.model.PlannerEvent
+import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.recurrence.OccurrencePatch
 import page.planr.android.core.recurrence.OverrideInput
 import page.planr.android.core.recurrence.PatchField
@@ -70,6 +71,31 @@ class MutationsTest {
             ),
             update.filters,
         )
+    }
+
+    @Test
+    fun `an event created once under an id is stored with it, and not again`() = runTest {
+        val id = "4f9c1d36-1d0b-3d6e-9a4c-6c3f0e2a7b11"
+        val draft = PlannerEventDraft(
+            workspaceId = Fixtures.WS,
+            ownerId = Fixtures.MEMBER_A,
+            title = "Jordan",
+            start = Instant.parse("2026-06-11T15:00:00Z"),
+            end = Instant.parse("2026-06-11T16:00:00Z"),
+            timeZone = "Europe/Berlin",
+        )
+
+        val first = events.createEventOnce(id, draft)
+        assertEquals(id, first.id)
+        assertEquals("Jordan", first.title)
+        val insert = gateway.callsOf<FakePostgrestGateway.Call.Insert>().single()
+        assertEquals(JsonPrimitive(id), insert.rows.single()["id"])
+
+        // A retry (the first answer was lost) finds the row instead of inserting a second one.
+        val again = events.createEventOnce(id, draft.copy(title = "changed"))
+        assertEquals(first, again)
+        assertEquals(1, gateway.callsOf<FakePostgrestGateway.Call.Insert>().size)
+        assertEquals(1, gateway.rows(SupabaseTables.EVENTS).count { it["id"] == JsonPrimitive(id) })
     }
 
     @Test

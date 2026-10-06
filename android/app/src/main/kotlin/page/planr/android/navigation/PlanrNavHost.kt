@@ -205,9 +205,9 @@ fun PlanrNavHost(
                 },
             )
             composable(PlanrRoutes.SETTINGS) {
-                SettingsScreen(onBack = { navController.popBackStack() })
+                SettingsScreen(onBack = { navController.leave(PlanrRoutes.SETTINGS) })
             }
-            inboxScreen(onBack = { navController.popBackStack() })
+            inboxScreen(onBack = { navController.leave(PlanrRoutes.INBOX) })
         }
     }
 

@@ -11,6 +11,9 @@
     <string name="inbox_rate_event_frame">Как прошло «%1$s»?</string>
     <string name="inbox_rate_task_frame">Как прошла задача «%1$s»?</string>
     <string name="inbox_log_sleep_frame">Как спалось в ночь на %1$s?</string>
+    <!-- Только дата, «7 октября»: после «в ночь на» нужен винительный
+         падеж, а дни недели в формате только в именительном («на среда»). -->
+    <string name="inbox_log_sleep_date_skeleton">dMMMM</string>
     <string name="inbox_log_sleep_open">Записать сон</string>
     <string name="inbox_request_frame">%1$s предлагает время</string>
     <string name="inbox_request_frame_anon">Кто-то предлагает время</string>

@@ -42,6 +42,22 @@ class EventMutations @Inject constructor(
     }
 
     /**
+     * [createEvent] under a client-chosen [id], at most once: when a row with
+     * that id is already stored (an earlier attempt whose insert landed but
+     * whose answer was lost, or was cancelled after it), that row is returned
+     * and nothing is inserted. For a write that may be retried from scratch,
+     * such as approving a timeslot request.
+     */
+    suspend fun createEventOnce(id: String, draft: PlannerEventDraft): PlannerEvent {
+        gateway.select(SupabaseTables.EVENTS, filters = listOf(eq("id", id))).firstOrNull()
+            ?.let { return it.decodeAs(PlannerEvent.serializer()) }
+        val row = JsonObject(EventPayloads.insertRow(draft) + ("id" to JsonPrimitive(id)))
+        return gateway.insert(SupabaseTables.EVENTS, listOf(row))
+            .single()
+            .decodeAs(PlannerEvent.serializer())
+    }
+
+    /**
      * `createEventsBulk`: many events in a few statements, one
      * `INSERT … RETURNING` per [BULK_INSERT_CHUNK] drafts (an .ics import).
      * The rows come back in [drafts] order (Postgres returns a multi-row

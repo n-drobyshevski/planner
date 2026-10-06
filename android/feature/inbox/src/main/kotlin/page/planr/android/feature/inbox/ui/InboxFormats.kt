@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.time.Instant
@@ -16,16 +17,23 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toJavaLocalTime
 import kotlinx.datetime.toLocalDateTime
+import page.planr.android.feature.inbox.R
 
 /**
  * The Inbox's date and time labels (inbox-row.tsx `describe`), in the
  * viewer's zone and the device's 12/24-hour setting. Patterns come from the
  * platform's best-pattern lookup, so English and Russian read naturally.
+ *
+ * [nightSkeleton] is the sleep row's date, as its sentence takes it
+ * (`inbox_log_sleep_date_skeleton`): with the weekday in English ("on
+ * Monday, 5 Oct"), the date alone in Russian, where "в ночь на" needs the
+ * accusative and weekday names only come nominative ("на среда"), while
+ * "на 7 октября" reads right.
  */
-internal class InboxFormats(locale: Locale, is24Hour: Boolean) {
+internal class InboxFormats(locale: Locale, is24Hour: Boolean, nightSkeleton: String = "EEEEdMMM") {
     private val time = formatter(locale, if (is24Hour) "Hm" else "hm")
     private val shortDate = formatter(locale, "EEEdMMM")
-    private val longDate = formatter(locale, "EEEEdMMM")
+    private val nightDate = formatter(locale, nightSkeleton)
     private val relative = RelativeDateTimeFormatter.getInstance(
         ULocale.forLocale(locale),
         null,
@@ -41,8 +49,8 @@ internal class InboxFormats(locale: Locale, is24Hour: Boolean) {
         return "$day, ${time.format(from.time.toJavaLocalTime())}–${time.format(to.time.toJavaLocalTime())}"
     }
 
-    /** "Monday, 5 Oct": the night a sleep row asks about. */
-    fun night(date: LocalDate): String = longDate.format(date.toJavaLocalDate())
+    /** "Monday, 5 Oct" ("5 октября"): the night a sleep row asks about. */
+    fun night(date: LocalDate): String = nightDate.format(date.toJavaLocalDate())
 
     /** "Mon, 5 Oct": the rating sheet's night label. */
     fun shortDate(date: LocalDate): String = shortDate.format(date.toJavaLocalDate())
@@ -71,5 +79,6 @@ internal fun rememberInboxFormats(): InboxFormats {
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
     val is24Hour = DateFormat.is24HourFormat(context)
-    return remember(locale, is24Hour) { InboxFormats(locale, is24Hour) }
+    val nightSkeleton = stringResource(R.string.inbox_log_sleep_date_skeleton)
+    return remember(locale, is24Hour, nightSkeleton) { InboxFormats(locale, is24Hour, nightSkeleton) }
 }

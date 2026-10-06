@@ -11,6 +11,10 @@
     <string name="inbox_rate_event_frame">How was “%1$s”?</string>
     <string name="inbox_rate_task_frame">How did “%1$s” go?</string>
     <string name="inbox_log_sleep_frame">How did you sleep on %1$s?</string>
+    <!-- Not shown: the date in inbox_log_sleep_frame as a date-format
+         skeleton (the platform picks the locale's pattern), "Monday, 5 Oct".
+         Translate it to what the sentence's grammar takes. -->
+    <string name="inbox_log_sleep_date_skeleton">EEEEdMMM</string>
     <string name="inbox_log_sleep_open">Log sleep</string>
     <string name="inbox_request_frame">%1$s requested a time</string>
     <string name="inbox_request_frame_anon">Someone requested a time</string>

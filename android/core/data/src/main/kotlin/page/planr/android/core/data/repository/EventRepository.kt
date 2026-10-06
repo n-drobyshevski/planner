@@ -152,6 +152,10 @@ class EventRepository @Inject constructor(
     suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent =
         write({ mutations.createEvent(draft) }) { storeLocally(it) }
 
+    /** [createEvent] under [id], at most once ([EventMutations.createEventOnce]). */
+    suspend fun createEventOnce(id: String, draft: PlannerEventDraft): PlannerEvent =
+        write({ mutations.createEventOnce(id, draft) }) { storeLocally(it) }
+
     /**
      * Creates many events at once (an .ics import): one insert per 200
      * drafts, all or nothing, then one Room upsert and one widget refresh.
@@ -210,6 +214,19 @@ class EventRepository @Inject constructor(
      */
     suspend fun updateEvent(id: String, patch: EventPatch, expectedUpdatedAt: Instant? = null): PlannerEvent =
         write({ reloadingOnStale(id) { mutations.updateEvent(id, patch, expectedUpdatedAt) } }) { storeLocally(it) }
+
+    /**
+     * Rewrites the master row's attributes as [change] makes them from the
+     * bag Room holds, guarded by that row's `updated_at`: a change made
+     * elsewhere meanwhile (a partner's attribute that Room hasn't caught up
+     * with) throws [StaleWriteException], with the latest row reloaded,
+     * instead of being overwritten. Throws [IllegalStateException] when the
+     * event isn't cached.
+     */
+    suspend fun updateAttributes(id: String, change: (JsonObject) -> JsonObject): PlannerEvent {
+        val current = checkNotNull(getEvent(id)) { "Event $id is not cached" }
+        return updateEvent(id, EventPatch(attributes = PatchField.Value(change(current.attributes))), current.updatedAt)
+    }
 
     /** Deletes an event / whole series; keep the snapshot to [restoreEvent] (undo). */
     suspend fun deleteEvent(id: String): DeletedEventSnapshot =
