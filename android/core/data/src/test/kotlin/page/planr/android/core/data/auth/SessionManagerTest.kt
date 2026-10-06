@@ -167,6 +167,26 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `a sign-in wipes what a session lost without a sign-out left cached`() = runTest {
+        // The previous member's session file was unreadable: no sign-out ran.
+        store.session = signedInSession(3600)
+        store.broken = true
+        val manager = manager()
+        assertEquals(AuthState.SignedOut(), manager.authState.value)
+        assertEquals(0, cleared)
+        store.broken = false
+
+        member = MemberRef("m2", "ws1") // the partner signs in on this device
+        val url = manager.beginSignIn()
+        assertNull(manager.completeSignIn("$callback?code=x&state=${stateOf(url)}"))
+
+        assertEquals(1, cleared)
+        // Wiped before the new member is signed in (widgets re-render signed out).
+        assertEquals(AuthState.SignedOut(), stateWhenCleared)
+        assertEquals(AuthState.SignedIn(SessionInfo("user-1", "m2", "ws1")), manager.authState.value)
+    }
+
+    @Test
     fun `an account without a member is not signed in`() = runTest {
         member = null
         val manager = manager()

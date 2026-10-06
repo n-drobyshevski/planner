@@ -221,6 +221,17 @@ class SessionManager @Inject constructor(
             session.value = null
             return SignInError.NoMember
         }
+        // Whatever this device still caches belongs to whoever was signed in
+        // before: a session lost without a sign-out (an unreadable or corrupt
+        // store) never wiped it, and it may hold that member's private rows.
+        // Reads are scoped by workspace only, so the partner signing in here
+        // would see them. Still signed out, so widgets re-render as such.
+        try {
+            localData.clearAll()
+        } catch (e: Throwable) {
+            session.value = null
+            throw e
+        }
         val complete = fresh.copy(memberId = member.memberId, workspaceId = member.workspaceId)
         store.writeSession(complete)
         session.value = complete
