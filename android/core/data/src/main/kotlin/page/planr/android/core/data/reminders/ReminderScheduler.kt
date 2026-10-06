@@ -27,6 +27,14 @@ interface AlarmPort {
 
     fun cancel(id: Int, snoozed: Boolean = false)
 
+    /**
+     * Arms (or moves) the one alarm that calls [ReminderScheduler.replan]
+     * at [at]. It need not be exact: it only moves the horizon forward.
+     */
+    fun setReplan(at: Instant)
+
+    fun cancelReplan()
+
     /** Takes down reminders already showing (sign-out). */
     fun dismissShown()
 }
@@ -96,7 +104,9 @@ data class ReminderDiff(val set: List<ReminderAlarm>, val cancel: List<Int>) {
  * sync, write and Realtime change (through [ReminderRefresher]), on a
  * setting change, and from the app's receivers after a reboot or a clock
  * or zone change. The first plan in a process re-arms everything, since a
- * reboot or force-stop clears alarms without telling anyone.
+ * reboot or force-stop clears alarms without telling anyone. While reminders
+ * are on, each plan also arms the next one [ReminderPlanner.REPLAN_AFTER]
+ * on, so the horizon keeps moving when no sync runs (offline, low battery).
  */
 @Singleton
 class ReminderScheduler @Inject constructor(
@@ -144,6 +154,7 @@ class ReminderScheduler @Inject constructor(
         diff.cancel.forEach { alarms.cancel(it) }
         diff.set.forEach { alarms.set(it) }
         store.setScheduled(planned)
+        if (viewer == null) alarms.cancelReplan() else alarms.setReplan(now + ReminderPlanner.REPLAN_AFTER)
 
         val snoozed = store.snoozed()
         if (viewer == null) {
@@ -196,6 +207,7 @@ class ReminderScheduler @Inject constructor(
     suspend fun clearLocal() = mutex.withLock {
         store.scheduled().forEach { alarms.cancel(it.id) }
         store.snoozed().forEach { alarms.cancel(it.id, snoozed = true) }
+        alarms.cancelReplan()
         store.clearMember()
         alarms.dismissShown()
     }
