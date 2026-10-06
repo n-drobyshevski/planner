@@ -50,6 +50,25 @@ class ReminderSchedulerTest {
     }
 
     @Test
+    fun `a forced re-plan re-arms unchanged alarms and snoozes in the same process`() = runTest {
+        source.occurrences = listOf(standup, lunch)
+        val scheduler = scheduler()
+        scheduler.replan()
+        scheduler.snooze(alarms.armed.getValue(id(standup)))
+        val before = alarms.sets
+
+        scheduler.replan()
+        assertEquals(before, alarms.sets, "a plain re-plan sets nothing unchanged")
+
+        // Exact-alarm access granted: what was armed inexact must be set again.
+        scheduler.replan(rearmAll = true)
+        assertEquals(before + 3, alarms.sets)
+        assertEquals(setOf(id(standup), id(lunch)), alarms.armed.keys)
+        assertEquals(listOf(id(standup)), alarms.snoozed.keys.toList())
+        assertEquals(emptyList(), alarms.cancelled)
+    }
+
+    @Test
     fun `a new process re-arms what the last one armed, since a reboot clears alarms`() = runTest {
         source.occurrences = listOf(standup)
         scheduler().replan()

@@ -132,7 +132,13 @@ class ReminderScheduler @Inject constructor(
         replan()
     }
 
-    suspend fun replan() = mutex.withLock {
+    /**
+     * Plans and arms the difference. [rearmAll] sets every alarm again even
+     * if unchanged, as the first plan in a process does: after exact-alarm
+     * access is granted, alarms armed inexact without it stay inexact until
+     * they are set again.
+     */
+    suspend fun replan(rearmAll: Boolean = false) = mutex.withLock {
         val now = clock.now()
         val lead = store.lead.first()
         val viewer = if (lead == ReminderLead.Off) null else source.viewer()
@@ -149,8 +155,8 @@ class ReminderScheduler @Inject constructor(
                 formatTime = source::formatTime,
             )
         }
-        val rearmAll = !armedThisProcess
-        val diff = ReminderDiff.between(store.scheduled(), planned, now, rearmAll)
+        val rearm = rearmAll || !armedThisProcess
+        val diff = ReminderDiff.between(store.scheduled(), planned, now, rearm)
         diff.cancel.forEach { alarms.cancel(it) }
         diff.set.forEach { alarms.set(it) }
         store.setScheduled(planned)
@@ -163,7 +169,7 @@ class ReminderScheduler @Inject constructor(
         } else {
             // A snooze past its delivery slack is spent; a pending one is re-armed after a reboot.
             val pending = snoozed.filter { it.triggerAt > now - DELIVERY_SLACK }
-            if (rearmAll) pending.filter { it.triggerAt > now }.forEach { alarms.set(it, snoozed = true) }
+            if (rearm) pending.filter { it.triggerAt > now }.forEach { alarms.set(it, snoozed = true) }
             if (pending.size != snoozed.size) store.setSnoozed(pending)
         }
         armedThisProcess = true

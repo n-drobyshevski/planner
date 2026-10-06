@@ -94,7 +94,9 @@ class ReminderReceiver : BroadcastReceiver() {
 /**
  * Re-arms reminders when the system may have dropped or skewed them: a
  * reboot or app update clears alarms, a clock or zone change moves "now"
- * and the times shown, and exact-alarm access may have changed. Exported
+ * and the times shown, and exact-alarm access may have changed. Every
+ * alarm is set again, not just the changed ones: alarms armed inexact
+ * while exact access was missing only become exact when re-set. Exported
  * only so the system can deliver these broadcasts.
  */
 class ReminderRescheduleReceiver : BroadcastReceiver() {
@@ -105,7 +107,7 @@ class ReminderRescheduleReceiver : BroadcastReceiver() {
         val pending = goAsync()
         entry.applicationScope().launch {
             try {
-                withTimeoutOrNull(RECEIVER_BUDGET) { entry.reminderScheduler().replan() }
+                withTimeoutOrNull(RECEIVER_BUDGET) { entry.reminderScheduler().replan(rearmAll = true) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
