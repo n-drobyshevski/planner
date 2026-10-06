@@ -2,6 +2,7 @@ package page.planr.android.core.data.sync
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import page.planr.android.core.data.appearance.MemberAppearanceApplier
 import page.planr.android.core.data.health.HealthSleepSync
 import page.planr.android.core.data.prefs.AppPrefsSync
 
@@ -12,8 +13,10 @@ class DataInitializer @Inject constructor(
     private val syncScheduler: SyncScheduler,
     private val appPrefs: AppPrefsSync,
     private val healthSleep: HealthSleepSync,
+    private val appearance: MemberAppearanceApplier,
 ) {
     fun start() {
+        appearance.start()
         appPrefs.start()
         healthSleep.start()
         realtimeSync.start()

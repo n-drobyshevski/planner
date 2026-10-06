@@ -17,6 +17,9 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import page.planr.android.core.data.appearance.AndroidAppearancePlatform
+import page.planr.android.core.data.appearance.AppearanceDataStore
+import page.planr.android.core.data.appearance.AppearancePlatform
 import page.planr.android.core.data.health.HealthConnectSleepSource
 import page.planr.android.core.data.health.HealthPrefsDataStore
 import page.planr.android.core.data.health.HealthSleepSource
@@ -33,7 +36,8 @@ import page.planr.android.core.data.prefs.ViewPreferencesDataStore
 
 /**
  * Display preferences ([ViewPreferences], [InsightsPreferences]), synced by
- * [AppPrefsSync], and the per-device Health Connect connection.
+ * [AppPrefsSync], the per-device Health Connect connection, and the member's
+ * appearance as last applied on this device.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -53,6 +57,9 @@ abstract class PreferencesModule {
 
     @Binds
     abstract fun bindSleepBlockCalendar(impl: RepositorySleepBlockCalendar): SleepBlockCalendar
+
+    @Binds
+    abstract fun bindAppearancePlatform(impl: AndroidAppearancePlatform): AppearancePlatform
 
     companion object {
         @Provides
@@ -83,6 +90,16 @@ abstract class PreferencesModule {
                 corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 produceFile = { context.preferencesDataStoreFile("planr_health") },
+            )
+
+        @Provides
+        @Singleton
+        @AppearanceDataStore
+        fun provideAppearanceDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+            PreferenceDataStoreFactory.create(
+                corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+                produceFile = { context.preferencesDataStoreFile("planr_appearance") },
             )
     }
 }

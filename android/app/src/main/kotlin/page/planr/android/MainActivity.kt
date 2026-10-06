@@ -7,10 +7,11 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.annotation.StringRes
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,9 +23,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
+import page.planr.android.core.data.appearance.ThemeModeStore
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.design.theme.PlanrTheme
+import page.planr.android.core.design.theme.enablePlanrEdgeToEdge
 import page.planr.android.feature.agenda.importics.IcsImportRequests
 import page.planr.android.feature.agenda.model.AgendaDayRequests
 import page.planr.android.importics.IcsFileReader
@@ -64,17 +67,23 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var icsFileReader: IcsFileReader
 
+    @Inject
+    lateinit var themeMode: ThemeModeStore
+
     /** A widget's requested destination, until the nav host has opened it. */
     private var launchRoute by mutableStateOf<LaunchRoute?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enablePlanrEdgeToEdge(themeMode.forcedDark.value)
         // Only on a fresh launch: a recreated activity must not replay an old
         // callback, or reopen a widget's target over where the user went since.
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
-            PlanrTheme {
+            // The member's theme_preference; null (always, from Android 12) follows the configuration.
+            val forcedDark by themeMode.forcedDark.collectAsStateWithLifecycle()
+            LaunchedEffect(forcedDark) { enablePlanrEdgeToEdge(forcedDark) }
+            PlanrTheme(darkTheme = forcedDark ?: isSystemInDarkTheme()) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
