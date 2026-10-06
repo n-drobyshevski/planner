@@ -24,6 +24,7 @@ import {
 import { ATTRIBUTE_META } from "@/lib/attributes/schema";
 import { dateInputToMs } from "@/lib/datetime/local";
 import { dateFnsLocale } from "@/lib/datetime/date-locale";
+import { formatSleepPromptDate } from "@/lib/datetime/format";
 import { cn } from "@/lib/utils";
 import type {
   InboxItem,
@@ -288,10 +289,7 @@ function describe(
   }
   return {
     frame: t("logSleep.frame", {
-      date: format(dateInputToMs(item.dateKey, timeZone), "EEEE d MMM", {
-        in: tz(timeZone),
-        locale: dfLocale,
-      }),
+      date: formatSleepPromptDate(dateInputToMs(item.dateKey, timeZone), timeZone, locale),
     }),
     subtitle: null,
   };

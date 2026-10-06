@@ -43,6 +43,21 @@ export function formatWeekdayDayMonth(
   return format(ms, "EEE, d MMM", { in: tz(timeZone), locale: dateFnsLocale(locale) });
 }
 
+/**
+ * The date in the inbox's sleep prompt ("How did you sleep on {date}?"), by
+ * the wake day: "Monday 5 Oct" / "5 октября". Russian's "в ночь на {date}"
+ * takes the day and the genitive month, not a weekday (date-fns would print
+ * the nominative "среда" there). Mirrors Android's inbox_log_sleep_date_skeleton.
+ */
+export function formatSleepPromptDate(
+  ms: number,
+  timeZone: string = localTimeZone(),
+  locale = "en",
+): string {
+  const pattern = locale === "ru" ? "d MMMM" : "EEEE d MMM";
+  return format(ms, pattern, { in: tz(timeZone), locale: dateFnsLocale(locale) });
+}
+
 /** Day, month, year, e.g. "1 Jun 2026" / "1 июн. 2026 г.". */
 export function formatDayMonthYear(
   ms: number,

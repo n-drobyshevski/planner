@@ -3,9 +3,10 @@
 
     <application>
         <!-- Hosts the Quick add sheet over the home screen. Launched only by
-             our own widget and launcher shortcuts (explicit intents, started
-             as this app), so it isn't exported; its own empty task affinity
-             keeps it out of the main app's back stack. -->
+             our own widget, launcher shortcuts and Quick Settings tile
+             (explicit intents, started as this app), so it isn't exported;
+             its own empty task affinity keeps it out of the main app's back
+             stack. -->
         <activity
             android:name=".QuickAddActivity"
             android:exported="false"
@@ -28,5 +29,18 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity-alias>
+
+        <!-- The "Add to Planr" Quick Settings tile: opens Quick add on a task.
+             Bound only by the system (BIND_QUICK_SETTINGS_TILE). -->
+        <service
+            android:name=".QuickAddTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_quick_add"
+            android:label="@string/quickadd_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- A see-through window: the Compose bottom sheet draws its own scrim. -->
-    <style name="Theme.Planr.QuickAdd" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- A see-through window: the Compose bottom sheet draws its own scrim.
+         AppCompat, as QuickAddActivity is an AppCompatActivity; DayNight
+         follows the night configuration. -->
+    <style name="Theme.Planr.QuickAdd" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>

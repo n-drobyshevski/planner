@@ -35,4 +35,6 @@
     <string name="quickadd_error_end">Конец должен быть позже начала.</string>
     <string name="quickadd_error_signed_out">Сначала войди в Planr.</string>
     <string name="quickadd_error_failed">Что-то пошло не так</string>
+    <!-- Плитка быстрых настроек (QuickAddTileService). -->
+    <string name="quickadd_tile_label">Добавить в Planr</string>
 </resources>
