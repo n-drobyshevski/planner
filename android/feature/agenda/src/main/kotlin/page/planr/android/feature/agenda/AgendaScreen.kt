@@ -62,6 +62,8 @@ import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import page.planr.android.core.design.component.PlanrFloatingButton
+import page.planr.android.core.design.component.PlanrHaptics
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.feature.agenda.model.AgendaMode
 import page.planr.android.feature.agenda.model.AgendaNotice
@@ -127,9 +129,10 @@ fun AgendaScreen(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val undoLabel = stringResource(R.string.agenda_undo)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(viewModel, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.messages.collect { notice -> showNotice(snackbar, notice, context, undoLabel, viewModel::undo) }
+            viewModel.messages.collect { notice -> showNotice(snackbar, notice, context, undoLabel, haptics, viewModel::undo) }
         }
     }
     LaunchedEffect(viewModel, todayRequests) { todayRequests.collect { viewModel.goToToday() } }
@@ -323,14 +326,19 @@ private suspend fun showNotice(
     notice: AgendaNotice,
     context: Context,
     undoLabel: String,
+    haptics: PlanrHaptics,
     onUndo: (AgendaNotice) -> Unit,
 ) {
+    if (notice.failedWrite) haptics.reject()
     val result = host.showSnackbar(
         message = notice.message.resolve(context),
         actionLabel = if (notice.undo != null) undoLabel else null,
         duration = if (notice.undo != null) SnackbarDuration.Long else SnackbarDuration.Short,
     )
-    if (result == SnackbarResult.ActionPerformed) onUndo(notice)
+    if (result == SnackbarResult.ActionPerformed) {
+        haptics.tick()
+        onUndo(notice)
+    }
 }
 
 internal fun UiText.resolve(context: Context): String {

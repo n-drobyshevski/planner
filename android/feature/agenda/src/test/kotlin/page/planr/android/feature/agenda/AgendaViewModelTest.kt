@@ -293,6 +293,23 @@ class AgendaViewModelTest {
 
         assertTrue(undone)
         assertEquals(UiText(R.string.agenda_toast_undone), messages.last().message)
+        assertFalse(messages.last().failedWrite)
+        vm.close()
+    }
+
+    @Test
+    fun `a failed undo says so as a failed write`() = runTest {
+        val vm = viewModel()
+        val messages = mutableListOf<AgendaNotice>()
+        backgroundScope.launch { vm.messages.toList(messages) }
+
+        notices.post(AgendaNotice(UiText(R.string.agenda_toast_event_deleted)) { error("offline") })
+        runCurrent()
+        vm.undo(messages.single())
+        runCurrent()
+
+        assertEquals(UiText(R.string.agenda_toast_couldnt_undo), messages.last().message)
+        assertTrue(messages.last().failedWrite)
         vm.close()
     }
 

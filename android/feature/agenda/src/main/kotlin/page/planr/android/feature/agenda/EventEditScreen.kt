@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import page.planr.android.core.design.component.DiscardChangesDialog
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTokens
@@ -117,15 +118,20 @@ fun EventEditScreen(
     val staleText = stringResource(R.string.agenda_stale_event)
     val reloadText = stringResource(R.string.agenda_stale_reload)
     val failedText = stringResource(R.string.agenda_something_went_wrong)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 EventEditEffect.Done -> onDone()
                 EventEditEffect.Stale -> {
+                    haptics.reject()
                     val result = snackbar.showSnackbar(staleText, actionLabel = reloadText, duration = SnackbarDuration.Indefinite, withDismissAction = true)
                     if (result == SnackbarResult.ActionPerformed) viewModel.reloadLatest()
                 }
-                EventEditEffect.Failed -> snackbar.showSnackbar(failedText)
+                EventEditEffect.Failed -> {
+                    haptics.reject()
+                    snackbar.showSnackbar(failedText)
+                }
             }
         }
     }

@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.component.PlanrFloatingButton
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.TABULAR_NUMS
 import page.planr.android.feature.tasks.list.TasksNotice
@@ -143,6 +144,7 @@ private fun NoticeEffect(notice: TasksNotice?, snackbar: SnackbarHostState, view
     val stale = stringResource(R.string.task_stale)
     val failed = stringResource(R.string.task_failed)
     val undo = stringResource(R.string.task_undo)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(notice) {
         if (notice == null) return@LaunchedEffect
         try {
@@ -153,10 +155,19 @@ private fun NoticeEffect(notice: TasksNotice?, snackbar: SnackbarHostState, view
                         actionLabel = undo,
                         duration = SnackbarDuration.Short,
                     )
-                    if (result == SnackbarResult.ActionPerformed) viewModel.undo(notice)
+                    if (result == SnackbarResult.ActionPerformed) {
+                        haptics.tick()
+                        viewModel.undo(notice)
+                    }
                 }
-                TasksNotice.Stale -> snackbar.showSnackbar(stale)
-                TasksNotice.Failed -> snackbar.showSnackbar(failed)
+                TasksNotice.Stale -> {
+                    haptics.reject()
+                    snackbar.showSnackbar(stale)
+                }
+                TasksNotice.Failed -> {
+                    haptics.reject()
+                    snackbar.showSnackbar(failed)
+                }
             }
         } finally {
             // Consumed even when cancelled (the user navigated away mid-snackbar):

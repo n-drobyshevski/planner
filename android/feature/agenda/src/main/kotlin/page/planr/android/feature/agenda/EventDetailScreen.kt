@@ -48,6 +48,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.milliseconds
 import page.planr.android.core.design.component.PlaceholderScreen
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTheme
 import page.planr.android.core.design.theme.PlanrTokens
@@ -101,6 +102,8 @@ fun EventDetailScreen(
     val deleting by viewModel.deleting.collectAsStateWithLifecycle()
     var askDeleteScope by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(viewModel) { viewModel.closed.collect { onBack() } }
+    val haptics = rememberPlanrHaptics()
+    LaunchedEffect(viewModel) { viewModel.failed.collect { haptics.reject() } }
 
     val detail = (state as? EventDetailUiState.Ready)?.detail
     Scaffold(

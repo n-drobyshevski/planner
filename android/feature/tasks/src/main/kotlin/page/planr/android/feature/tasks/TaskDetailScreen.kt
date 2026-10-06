@@ -34,6 +34,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.PlaceholderScreen
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.feature.tasks.detail.TaskDetailNotice
 import page.planr.android.feature.tasks.detail.TaskDetailUiState
@@ -146,6 +147,7 @@ private fun NoticeEffect(notice: TaskDetailNotice?, snackbar: SnackbarHostState,
     val stale = stringResource(R.string.task_stale)
     val failed = stringResource(R.string.task_failed)
     val titleRequired = stringResource(R.string.task_field_title_required)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(notice) {
         val message = when (notice) {
             null -> return@LaunchedEffect
@@ -153,6 +155,7 @@ private fun NoticeEffect(notice: TaskDetailNotice?, snackbar: SnackbarHostState,
             TaskDetailNotice.Failed -> failed
             TaskDetailNotice.TitleRequired -> titleRequired
         }
+        if (notice != TaskDetailNotice.TitleRequired) haptics.reject()
         snackbar.showSnackbar(message)
         dismiss()
     }
