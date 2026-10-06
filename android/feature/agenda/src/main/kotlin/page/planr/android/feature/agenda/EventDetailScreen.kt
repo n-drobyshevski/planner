@@ -63,6 +63,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -321,7 +322,7 @@ private fun NotesLine(notes: String, copier: Copier) {
     val listener = remember(context, copier, openFailed) {
         LinkInteractionListener { link ->
             val url = (link as? LinkAnnotation.Url)?.url ?: return@LinkInteractionListener
-            if (!context.view(Uri.parse(url))) copier.copy(url.substringAfter("mailto:").substringAfter("tel:"), openFailed)
+            if (!context.view(url.toUri())) copier.copy(url.substringAfter("mailto:").substringAfter("tel:"), openFailed)
         }
     }
     val annotated = remember(notes, styles, listener) { TextLinks.annotate(notes, styles, listener) }
@@ -335,8 +336,8 @@ private fun NotesLine(notes: String, copier: Copier) {
 }
 
 private fun LocationTarget.uri(): Uri = when (this) {
-    is LocationTarget.Web -> Uri.parse(url)
-    is LocationTarget.Place -> Uri.parse("geo:0,0?q=" + Uri.encode(query))
+    is LocationTarget.Web -> url.toUri()
+    is LocationTarget.Place -> ("geo:0,0?q=" + Uri.encode(query)).toUri()
 }
 
 /** Opens [uri] in whichever app handles it; false when none does. */
