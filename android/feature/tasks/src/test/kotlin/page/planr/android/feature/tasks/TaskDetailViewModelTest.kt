@@ -36,7 +36,7 @@ class TaskDetailViewModelTest {
         board("elsewhere", "other", position = 0.0),
     )
 
-    private fun subject(data: FakeTasksDataSource) = TaskDetailViewModel("t1", data, FixedClock, TaskDeletions())
+    private fun subject(data: FakeTasksDataSource) = TaskDetailViewModel("t1", data, FixedClock, TaskDeletions(FixedClock))
 
     @Test
     fun `loads the task with its collection columns, subtasks and eligible contexts`() = runTest {
