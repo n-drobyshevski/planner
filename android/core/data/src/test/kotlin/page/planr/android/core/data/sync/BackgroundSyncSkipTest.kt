@@ -1,11 +1,12 @@
 package page.planr.android.core.data.sync
 
 import androidx.lifecycle.Lifecycle
+import androidx.work.Data
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** When the periodic [SyncWorker] has something to do ([backgroundSyncNeeded]). */
+/** When [SyncWorker] has something to do ([backgroundSyncNeeded]). */
 class BackgroundSyncSkipTest {
 
     @Test
@@ -25,5 +26,19 @@ class BackgroundSyncSkipTest {
             assertTrue(backgroundSyncNeeded(state, subscribed = true), "$state")
             assertTrue(backgroundSyncNeeded(state, subscribed = false), "$state")
         }
+    }
+
+    @Test
+    fun `a requested sync runs even on screen with Realtime joined`() {
+        for (state in Lifecycle.State.entries) {
+            assertTrue(backgroundSyncNeeded(state, subscribed = true, requested = true), "$state")
+        }
+    }
+
+    @Test
+    fun `the sync-now request is marked requested, a request without input is not`() {
+        val input = SyncScheduler.syncNowRequest().workSpec.input
+        assertTrue(input.getBoolean(SyncScheduler.KEY_REQUESTED, false))
+        assertFalse(Data.EMPTY.getBoolean(SyncScheduler.KEY_REQUESTED, false))
     }
 }

@@ -16,9 +16,11 @@ import page.planr.android.core.data.auth.NotSignedInException
 /**
  * Periodic background refresh (every two hours on a network, see
  * [SyncScheduler]): the widgets' days ([SyncWindows.aroundToday]), tasks and
- * reference data into Room, then the widgets. Skipped while the app is on
- * screen with Realtime joined: the cache is live already. Built by the app's
- * HiltWorkerFactory (see PlanrApplication's WorkManager configuration).
+ * reference data into Room, then the widgets. The periodic run is skipped
+ * while the app is on screen with Realtime joined (the cache is live
+ * already); a requested one ([SyncScheduler.syncNow]: a fresh sign-in, a
+ * widget placed) always runs. Built by the app's HiltWorkerFactory (see
+ * PlanrApplication's WorkManager configuration).
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -29,8 +31,9 @@ class SyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = try {
+        val requested = inputData.getBoolean(SyncScheduler.KEY_REQUESTED, false)
         val process = ProcessLifecycleOwner.get().lifecycle.currentStateFlow.value
-        if (backgroundSyncNeeded(process, realtime.subscribed.value)) runner.syncAll() else runner.catchUpClock()
+        if (backgroundSyncNeeded(process, realtime.subscribed.value, requested)) runner.syncAll() else runner.catchUpClock()
         Result.success()
     } catch (e: CancellationException) {
         throw e
@@ -47,9 +50,10 @@ class SyncWorker @AssistedInject constructor(
  * Whether a background sync has anything to do: not while the app is in the
  * foreground ([process] at least STARTED) with Realtime [subscribed], since
  * every change is reaching the cache already (and the join refetched).
+ * A [requested] sync always runs: someone asked for it.
  */
-internal fun backgroundSyncNeeded(process: Lifecycle.State, subscribed: Boolean): Boolean =
-    !(process.isAtLeast(Lifecycle.State.STARTED) && subscribed)
+internal fun backgroundSyncNeeded(process: Lifecycle.State, subscribed: Boolean, requested: Boolean = false): Boolean =
+    requested || !(process.isAtLeast(Lifecycle.State.STARTED) && subscribed)
 
 /** What a failed background sync should do next. */
 internal enum class SyncFailureOutcome {
