@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sleep rating sheet (SleepRatingSheet). Copy from messages/ru/sleep.json. -->
+<resources>
+    <string name="sleep_rating_title">Как спалось?</string>
+    <string name="sleep_rating_morning_of">Утро, %1$s</string>
+    <string name="sleep_rating_from_health_connect">из Health Connect</string>
+    <string name="sleep_rating_private">Всё необязательно и остаётся только у тебя.</string>
+    <string name="sleep_rating_went_to_bed">Лёг спать</string>
+    <string name="sleep_rating_woke_up">Проснулся</string>
+    <string name="sleep_rating_time_value">%1$s, %2$s</string>
+    <string name="sleep_rating_quality">Качество сна</string>
+    <string name="sleep_rating_fatigue">Насколько ты устал?</string>
+    <string name="sleep_rating_clear_hint">Нажми на выбранный уровень ещё раз, чтобы сбросить.</string>
+    <string name="sleep_rating_note">Заметка</string>
+    <string name="sleep_rating_optional">Необязательно</string>
+    <string name="sleep_rating_save">Сохранить отметку</string>
+    <string name="sleep_rating_saving">Сохранение…</string>
+    <string name="sleep_rating_saved">Отметка сохранена</string>
+    <string name="sleep_rating_save_failed">Не удалось сохранить отметку. Попробуй ещё раз.</string>
+    <string name="sleep_rating_cancel">Отмена</string>
+    <string name="sleep_rating_done">Готово</string>
+    <string-array name="sleep_rating_quality_levels">
+        <item>1 Плохо</item>
+        <item>2 Слабо</item>
+        <item>3 Так себе</item>
+        <item>4 Нормально</item>
+        <item>5 Неплохо</item>
+        <item>6 Хорошо</item>
+        <item>7 Отлично</item>
+    </string-array>
+    <string-array name="sleep_rating_fatigue_levels">
+        <item>1 Крайне бодрый</item>
+        <item>2 Очень бодрый</item>
+        <item>3 Бодрый</item>
+        <item>4 Довольно бодрый</item>
+        <item>5 Ни бодрый, ни сонный</item>
+        <item>6 Лёгкая сонливость</item>
+        <item>7 Сонный, без усилий бодрствовать</item>
+        <item>8 Сонный, с усилием бодрствовать</item>
+        <item>9 Борюсь со сном</item>
+    </string-array>
+</resources>

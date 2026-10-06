@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sleep rating sheet (SleepRatingSheet), shared by the agenda's morning
+     check-in and the Insights Sleep tab. Copy from messages/en/sleep.json. -->
+<resources>
+    <string name="sleep_rating_title">How did you sleep?</string>
+    <string name="sleep_rating_morning_of">Morning of %1$s</string>
+    <string name="sleep_rating_from_health_connect">from Health Connect</string>
+    <string name="sleep_rating_private">Everything is optional and stays private to you.</string>
+    <string name="sleep_rating_went_to_bed">Went to bed</string>
+    <string name="sleep_rating_woke_up">Woke up</string>
+    <!-- A time button's spoken label: "Went to bed, 23:40". -->
+    <string name="sleep_rating_time_value">%1$s, %2$s</string>
+    <string name="sleep_rating_quality">Sleep quality</string>
+    <string name="sleep_rating_fatigue">How tired do you feel?</string>
+    <string name="sleep_rating_clear_hint">Tap a selected level again to clear.</string>
+    <string name="sleep_rating_note">Note</string>
+    <string name="sleep_rating_optional">Optional</string>
+    <string name="sleep_rating_save">Save check-in</string>
+    <string name="sleep_rating_saving">Saving…</string>
+    <string name="sleep_rating_saved">Check-in saved</string>
+    <string name="sleep_rating_save_failed">Couldn\'t save the check-in. Try again.</string>
+    <string name="sleep_rating_cancel">Cancel</string>
+    <string name="sleep_rating_done">Done</string>
+    <string-array name="sleep_rating_quality_levels">
+        <item>1 Poor</item>
+        <item>2 Weak</item>
+        <item>3 Fair</item>
+        <item>4 OK</item>
+        <item>5 Decent</item>
+        <item>6 Good</item>
+        <item>7 Great</item>
+    </string-array>
+    <string-array name="sleep_rating_fatigue_levels">
+        <item>1 Extremely alert</item>
+        <item>2 Very alert</item>
+        <item>3 Alert</item>
+        <item>4 Rather alert</item>
+        <item>5 Neither alert nor sleepy</item>
+        <item>6 Some sleepiness</item>
+        <item>7 Sleepy, no effort to stay awake</item>
+        <item>8 Sleepy, some effort to stay awake</item>
+        <item>9 Fighting sleep</item>
+    </string-array>
+</resources>
