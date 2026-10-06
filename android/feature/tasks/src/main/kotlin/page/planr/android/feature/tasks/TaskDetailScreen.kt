@@ -54,7 +54,8 @@ import page.planr.android.feature.tasks.ui.DeletedTaskEffect
  * subtasks (checked off, opened, added). Save writes only the changed fields
  * and is rejected, not merged, if the task changed elsewhere meanwhile.
  * Leaving with unsaved changes (Back or the top bar) asks to discard them
- * first. Delete is immediate with Undo when nothing goes with the task, and
+ * first; while a save is in flight Back waits for it (no prompt, and no pop
+ * that would cancel the write). Delete is immediate with Undo when nothing goes with the task, and
  * asks first when its subtasks or calendar blocks would.
  *
  * @param onOpenTask opens another task's detail (a subtask, or the parent).
@@ -75,10 +76,10 @@ fun TaskDetailScreen(
 
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val leave: () -> Unit = {
-        if (state.dirty) {
-            confirmingDiscard = true
-        } else {
-            onBack()
+        when {
+            state.saving -> Unit
+            state.dirty -> confirmingDiscard = true
+            else -> onBack()
         }
     }
 
@@ -86,7 +87,8 @@ fun TaskDetailScreen(
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
     DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
-    BackHandler(enabled = state.dirty) { confirmingDiscard = true }
+    // Held while saving too: the save closes the screen itself once it lands.
+    BackHandler(enabled = state.dirty || state.saving, onBack = leave)
 
     Scaffold(
         modifier = modifier,
@@ -178,7 +180,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
             .padding(horizontal = PlanrSpacing.xs, vertical = PlanrSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, enabled = !state.saving) {
             Icon(painterResource(R.drawable.ic_task_back), contentDescription = stringResource(R.string.task_detail_back))
         }
         Text(

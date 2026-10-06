@@ -83,7 +83,8 @@ import page.planr.android.feature.agenda.ui.rememberAgendaFormats
  * instance of a series asks "this / this and following / all events" first.
  * A conflicting edit made elsewhere surfaces as a calm snackbar offering to
  * reload; the form is never discarded on failure. Leaving with unsaved
- * changes (Back or Close) asks to discard them first.
+ * changes (Back or Close) asks to discard them first; while a save is in
+ * flight Back waits for it (no prompt, and no pop that would cancel it).
  *
  * @param onDone called after a successful save.
  * @param onClose called when the editor is closed without saving.
@@ -106,14 +107,15 @@ fun EventEditScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val close: () -> Unit = {
-        if (state.dirty) {
-            confirmingDiscard = true
-        } else {
-            onClose()
+        when {
+            state.saving -> Unit
+            state.dirty -> confirmingDiscard = true
+            else -> onClose()
         }
     }
-    // An in-place editor always takes over Back; a route only while there is something to lose.
-    BackHandler(enabled = viewModelKey != null || state.dirty, onBack = close)
+    // An in-place editor always takes over Back; a route only while there is
+    // something to lose, or a save in flight (it leaves by itself once it lands).
+    BackHandler(enabled = viewModelKey != null || state.dirty || state.saving, onBack = close)
     val snackbar = remember { SnackbarHostState() }
     val staleText = stringResource(R.string.agenda_stale_event)
     val reloadText = stringResource(R.string.agenda_stale_reload)
@@ -146,7 +148,7 @@ fun EventEditScreen(
                     Text(stringResource(if (state.isNew) R.string.agenda_editor_new_event else R.string.agenda_editor_edit_event))
                 },
                 navigationIcon = {
-                    IconButton(onClick = close) {
+                    IconButton(onClick = close, enabled = !state.saving) {
                         Icon(AgendaIcons.Close, contentDescription = stringResource(R.string.agenda_close))
                     }
                 },

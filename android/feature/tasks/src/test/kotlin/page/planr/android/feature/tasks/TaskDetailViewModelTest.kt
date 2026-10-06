@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import org.junit.Rule
@@ -158,6 +159,29 @@ class TaskDetailViewModelTest {
 
         assertTrue(data.updates.isEmpty())
         assertEquals(TaskDetailNotice.TitleRequired, vm.state.value.notice)
+    }
+
+    @Test
+    fun `a save in flight stays saving and dirty until it lands`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(original))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        val gate = CompletableDeferred<Unit>()
+        data.updateGate = gate
+
+        vm.setTitle("Book train")
+        vm.save()
+
+        // The screen holds Back on `saving`: no discard prompt, no pop that cancels the write.
+        assertTrue(vm.state.value.saving)
+        assertTrue(vm.state.value.dirty)
+        assertFalse(vm.state.value.saved)
+        vm.setTitle("Edited meanwhile")
+        assertEquals("Book train", vm.state.value.form?.title, "the form is frozen while saving")
+
+        gate.complete(Unit)
+        assertFalse(vm.state.value.saving)
+        assertTrue(vm.state.value.saved)
     }
 
     @Test

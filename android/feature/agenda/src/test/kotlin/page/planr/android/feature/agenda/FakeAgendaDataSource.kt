@@ -1,6 +1,7 @@
 package page.planr.android.feature.agenda
 
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -46,6 +47,9 @@ class FakeAgendaDataSource(
     /** Thrown by the next write (and by refreshes while set). */
     var failNext: Exception? = null
     var failRefresh: Exception? = null
+
+    /** When set, every write suspends until it completes (a write in flight). */
+    var writeGate: CompletableDeferred<Unit>? = null
 
     sealed interface Call {
         data class Create(val draft: PlannerEventDraft) : Call
@@ -172,7 +176,8 @@ class FakeAgendaDataSource(
     /** Throws what it returns for a matching write, every time (e.g. only the cancel overrides fail). */
     var failWhen: (Call) -> Exception? = { null }
 
-    private fun record(call: Call) {
+    private suspend fun record(call: Call) {
+        writeGate?.await()
         failNext?.let {
             failNext = null
             throw it
