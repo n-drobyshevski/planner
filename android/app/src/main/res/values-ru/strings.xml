@@ -31,6 +31,14 @@
     <string name="import_file_unreadable">Не получилось прочитать файл.</string>
     <string name="import_file_too_large">Файл слишком большой для импорта (больше 5 МБ).</string>
     <string name="account_settings">Настройки</string>
+    <!-- The account menu's Inbox entry and its badge (the web's nav.json inbox / inboxCount). -->
+    <string name="account_inbox">Входящие</string>
+    <plurals name="account_inbox_count">
+        <item quantity="one">%d дело требует внимания</item>
+        <item quantity="few">%d дела требуют внимания</item>
+        <item quantity="many">%d дел требуют внимания</item>
+        <item quantity="other">%d дела требуют внимания</item>
+    </plurals>
     <!-- Settings screen (mirrors the web's settings.json timezone / calendarDisplay / sleep). -->
     <string name="settings_title">Настройки</string>
     <string name="settings_back">Назад</string>

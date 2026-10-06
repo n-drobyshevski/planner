@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.datetime.LocalDate
 import page.planr.android.account.AccountMenuButton
 import page.planr.android.feature.agenda.navigation.agendaGraph
+import page.planr.android.feature.inbox.inboxScreen
 import page.planr.android.feature.insights.insightsScreen
 import page.planr.android.feature.quickadd.QuickAddKind
 import page.planr.android.feature.quickadd.QuickAddSheet
@@ -45,8 +46,8 @@ import page.planr.android.feature.quickadd.R as QuickAddR
 
 /**
  * App navigation. Signed out, only sign-in; signed in, the Agenda, Tasks and
- * Insights tabs (bottom bar on their roots, hidden on detail screens and
- * Settings, which the account menu opens) with
+ * Insights tabs (bottom bar on their roots, hidden on detail screens and on
+ * Settings and the Inbox, which the account menu opens) with
  * Quick add behind the floating button of the tabs that have one. The agenda is always the root of the
  * signed-in back stack, so switching tabs saves and restores each tab's stack
  * against it. Losing the session (the account menu's "Sign out", or a
@@ -80,6 +81,9 @@ fun PlanrNavHost(
     val openImport: () -> Unit = remember(navController) { { navController.open(LaunchRoute.Import) } }
     val openSettings: () -> Unit = remember(navController) {
         { navController.navigate(PlanrRoutes.SETTINGS) { launchSingleTop = true } }
+    }
+    val openInbox: () -> Unit = remember(navController) {
+        { navController.navigate(PlanrRoutes.INBOX) { launchSingleTop = true } }
     }
     val snackbar = remember { SnackbarHostState() }
     // Activity-scoped (this is outside the NavHost), so the sheet's view model
@@ -159,13 +163,17 @@ fun PlanrNavHost(
             agendaGraph(
                 navController,
                 onQuickAdd = { quickAdd = TopLevelTab.Agenda.quickAddKind },
-                accountAction = { AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings) },
+                accountAction = {
+                    AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings, onOpenInbox = openInbox)
+                },
                 todayRequests = agendaToday,
             )
             tasksScreen(
                 onOpenTask = { id -> navController.navigateToTask(id) },
                 onNewTask = { quickAdd = TopLevelTab.Tasks.quickAddKind },
-                accountAction = { AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings) },
+                accountAction = {
+                    AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings, onOpenInbox = openInbox)
+                },
                 scrollToTopRequests = tasksToTop,
             )
             taskDetailScreen(
@@ -192,11 +200,14 @@ fun PlanrNavHost(
                 },
                 onOpenAgenda = { navController.selectTab(TopLevelTab.Agenda) },
                 onOpenTasks = { navController.selectTab(TopLevelTab.Tasks) },
-                accountAction = { AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings) },
+                accountAction = {
+                    AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings, onOpenInbox = openInbox)
+                },
             )
             composable(PlanrRoutes.SETTINGS) {
                 SettingsScreen(onBack = { navController.popBackStack() })
             }
+            inboxScreen(onBack = { navController.popBackStack() })
         }
     }
 

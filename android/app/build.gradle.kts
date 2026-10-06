@@ -89,6 +89,7 @@ dependencies {
     implementation(projects.feature.tasks)
     implementation(projects.feature.insights)
     implementation(projects.feature.quickadd)
+    implementation(projects.feature.inbox)
     implementation(projects.widgets)
 
     implementation(libs.androidx.core.ktx)

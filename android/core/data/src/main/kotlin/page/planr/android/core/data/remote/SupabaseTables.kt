@@ -18,4 +18,5 @@ object SupabaseTables {
     const val MEMBER_APP_PREFS = "member_app_prefs"
     const val SLEEP_LOGS = "sleep_logs"
     const val MEMBER_SLEEP_PREFS = "member_sleep_prefs"
+    const val TIMESLOT_REQUESTS = "timeslot_requests"
 }
