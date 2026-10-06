@@ -315,7 +315,9 @@ function joinSyncChannel(
         if (!created.closed && rowGoneRemoves(gone, memberId)) dispatch(gone);
       });
     });
-    let hadSession = false;
+    // A first join that comes only after failed attempts is a reconnect too:
+    // deletes sent meanwhile were missed (the main channel was likely live).
+    let mayHaveMissed = false;
     let warned = false;
     // A private channel joins with the session's token: make sure the socket
     // holds it first (the client also refreshes it on its own afterwards).
@@ -326,11 +328,14 @@ function joinSyncChannel(
         if (created.closed) return;
         channel.subscribe((status) => {
           if (status === "SUBSCRIBED") {
-            if (hadSession) for (const l of created.listeners) l.onReconnect();
-            hadSession = true;
-          } else if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && !warned) {
-            warned = true;
-            console.warn("[planner] Sync realtime channel error; deletes may show late until it reconnects.");
+            if (mayHaveMissed) for (const l of created.listeners) l.onReconnect();
+            mayHaveMissed = true;
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            mayHaveMissed = true;
+            if (!warned) {
+              warned = true;
+              console.warn("[planner] Sync realtime channel error; deletes may show late until it reconnects.");
+            }
           }
         });
       });

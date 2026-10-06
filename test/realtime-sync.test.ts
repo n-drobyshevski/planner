@@ -230,6 +230,23 @@ describe("subscribeWorkspace — sync channel", () => {
     leave();
   });
 
+  it("reports a first join that only came after failed attempts as a reconnect", async () => {
+    const { sb, channels } = mockClient();
+    const onStatus = vi.fn();
+    const leave = subscribeWorkspace(sb, WS, () => {}, "main", { onStatus });
+    await flush();
+    const sync = channels.get(syncTopic(WS))!;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    sync.onStatus?.("TIMED_OUT");
+    expect(onStatus).not.toHaveBeenCalled();
+    sync.onStatus?.("SUBSCRIBED");
+
+    expect(onStatus).toHaveBeenCalledWith("subscribed", true);
+    warn.mockRestore();
+    leave();
+  });
+
   it("removes the sync channel only once the last subscriber has been gone a moment", async () => {
     const { sb, raw, channels } = mockClient();
     const leaveA = subscribeWorkspace(sb, WS, () => {}, "main");
