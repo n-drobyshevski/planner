@@ -20,6 +20,7 @@ object Fixtures {
         rrule: String? = null,
         recurrenceEndsAt: String? = null,
         updatedAt: String = "2026-05-20T08:15:30.123456+00:00",
+        taskId: String? = null,
     ) = row(
         """
         {
@@ -43,7 +44,7 @@ object Fixtures {
           "time_zone": "Europe/Berlin",
           "rrule": ${rrule?.let { "\"$it\"" } ?: "null"},
           "recurrence_ends_at": ${recurrenceEndsAt?.let { "\"$it\"" } ?: "null"},
-          "task_id": null,
+          "task_id": ${taskId?.let { "\"$it\"" } ?: "null"},
           "attributes": {"energy": "high"},
           "created_at": "2026-05-01T10:00:00.5+00:00",
           "updated_at": "$updatedAt"
