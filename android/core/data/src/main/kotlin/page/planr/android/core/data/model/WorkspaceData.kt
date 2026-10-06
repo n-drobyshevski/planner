@@ -32,6 +32,14 @@ data class DeletedEventSnapshot(
 )
 
 /**
+ * A task's own row, captured before it was deleted, so the delete can be
+ * undone by re-inserting it verbatim (`DeletedSnapshot`, task part, for a
+ * task without subtasks or calendar blocks: rows the DB cascaded away are
+ * not in it).
+ */
+data class DeletedTaskSnapshot(val tasks: List<JsonObject>)
+
+/**
  * What [applyOverride] replaced for that occurrence, the undo token for
  * `revertOverride`:
  * - [Known]: the prior override row (undo restores it)

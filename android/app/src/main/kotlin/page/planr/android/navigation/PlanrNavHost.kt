@@ -143,7 +143,10 @@ fun PlanrNavHost(
                 accountAction = { AccountMenuButton(onImportIcs = openImport) },
                 scrollToTopRequests = tasksToTop,
             )
-            taskDetailScreen(onBack = { navController.popBackStack() })
+            taskDetailScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTask = { id -> navController.navigateToTask(id) },
+            )
             insightsScreen(
                 onOpenDay = { date ->
                     // selectTab saves the Insights stack (its ViewModel and saved state),

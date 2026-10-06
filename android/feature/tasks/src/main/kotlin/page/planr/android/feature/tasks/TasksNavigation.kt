@@ -41,8 +41,8 @@ fun NavGraphBuilder.tasksScreen(
     }
 }
 
-/** The task detail/edit destination (`task/{id}`). */
-fun NavGraphBuilder.taskDetailScreen(onBack: () -> Unit) {
+/** The task detail/edit destination (`task/{id}`); [onOpenTask] opens a subtask or the parent. */
+fun NavGraphBuilder.taskDetailScreen(onBack: () -> Unit, onOpenTask: (taskId: String) -> Unit = {}) {
     composable(
         route = TasksDestinations.DETAIL,
         arguments = listOf(navArgument(TasksDestinations.ARG_ID) { type = NavType.StringType }),
@@ -50,6 +50,7 @@ fun NavGraphBuilder.taskDetailScreen(onBack: () -> Unit) {
         TaskDetailScreen(
             taskId = entry.arguments?.getString(TasksDestinations.ARG_ID).orEmpty(),
             onBack = onBack,
+            onOpenTask = onOpenTask,
         )
     }
 }

@@ -7,6 +7,7 @@ import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,8 @@ import page.planr.android.core.model.Task
 import page.planr.android.core.model.TaskCompletion
 import page.planr.android.feature.tasks.data.TasksCompute
 import page.planr.android.feature.tasks.data.TasksDataSource
+import page.planr.android.feature.tasks.detail.TaskDeleted
+import page.planr.android.feature.tasks.detail.TaskDeletions
 import page.planr.android.feature.tasks.model.TaskFilters
 import page.planr.android.feature.tasks.model.TaskGroup
 import page.planr.android.feature.tasks.model.TaskListBuilder
@@ -66,6 +69,7 @@ class TasksViewModel @Inject constructor(
     private val data: TasksDataSource,
     private val clock: Clock,
     @TasksCompute private val listDispatcher: CoroutineDispatcher,
+    deletions: TaskDeletions,
 ) : ViewModel() {
 
     private val filters = MutableStateFlow(TaskFilters())
@@ -112,6 +116,9 @@ class TasksViewModel @Inject constructor(
         }.flowOn(listDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), TasksUiState())
 
+    /** Tasks deleted from their detail, for this screen's "Deleted · Undo". */
+    val deletedTasks: Flow<TaskDeleted> = deletions.claims()
+
     init {
         // Room already has the last sync; this just tops it up quietly.
         viewModelScope.launch { runRefresh(reportFailure = false) }
@@ -147,6 +154,19 @@ class TasksViewModel @Inject constructor(
         notice.value = null
         if (task.id in pending.value) return
         setDone(task, done = !toggled.done)
+    }
+
+    /** Undo of a delete made in the detail: puts the task back as it was. */
+    fun undoDelete(deleted: TaskDeleted) {
+        viewModelScope.launch {
+            try {
+                deleted.undo()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                notice.value = TasksNotice.Failed
+            }
+        }
     }
 
     fun dismissNotice() {

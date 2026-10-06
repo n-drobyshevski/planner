@@ -2,6 +2,7 @@ package page.planr.android.core.data.remote
 
 import javax.inject.Inject
 import kotlin.time.Instant
+import page.planr.android.core.data.model.DeletedTaskSnapshot
 import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.model.Task
@@ -30,8 +31,19 @@ class TaskMutations @Inject constructor(
         return row.decodeAs(Task.serializer())
     }
 
-    /** Deletes the task; the DB cascades its subtasks and linked calendar blocks. */
-    suspend fun deleteTask(id: String) {
+    /**
+     * Deletes the task; the DB cascades its subtasks and linked calendar
+     * blocks. The task's own row is read first and returned, so the delete of
+     * a task with neither can be undone ([restoreDeleted]).
+     */
+    suspend fun deleteTask(id: String): DeletedTaskSnapshot {
+        val rows = gateway.select(SupabaseTables.TASKS, filters = listOf(eq("id", id)))
         gateway.delete(SupabaseTables.TASKS, listOf(eq("id", id)))
+        return DeletedTaskSnapshot(rows)
     }
+
+    /** `restoreDeleted` (task part): re-insert the raw rows verbatim, parents first. */
+    suspend fun restoreDeleted(snapshot: DeletedTaskSnapshot): List<Task> =
+        snapshot.tasks.map { row -> gateway.insert(SupabaseTables.TASKS, listOf(row)).single() }
+            .decodeAll(Task.serializer())
 }

@@ -15,6 +15,7 @@ import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
+import page.planr.android.core.data.model.DeletedTaskSnapshot
 import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
@@ -99,8 +100,12 @@ class TaskRepository @Inject constructor(
         return saved
     }
 
-    /** Deletes a task; the DB cascades subtasks and linked calendar blocks, mirrored locally. */
-    suspend fun deleteTask(id: String) {
+    /**
+     * Deletes a task; the DB cascades subtasks and linked calendar blocks,
+     * mirrored locally. Keep the snapshot to [restoreTask] (undo) a task
+     * that had neither: it holds the task's own row only.
+     */
+    suspend fun deleteTask(id: String): DeletedTaskSnapshot =
         write({ mutations.deleteTask(id) }, CacheArea.Tasks, CacheArea.Events) {
             db.withTransaction {
                 val ids = dao.subtreeIds(id)
@@ -108,7 +113,18 @@ class TaskRepository @Inject constructor(
                 dao.delete(ids)
             }
         }
+
+    /** Undo of [deleteTask]: re-inserts the captured rows as they were (same ids). */
+    suspend fun restoreTask(snapshot: DeletedTaskSnapshot) {
+        write({ mutations.restoreDeleted(snapshot) }) { restored -> dao.upsert(restored.map { it.toEntity() }) }
     }
+
+    /**
+     * Whether calendar blocks are linked to any of [taskIds] (deleting those
+     * tasks would take the blocks with them). Asks the server.
+     */
+    suspend fun hasCalendarBlocks(taskIds: Collection<String>): Boolean =
+        queries.hasEventsOfTasks(session.requireSession().workspaceId, taskIds)
 
     /**
      * Runs the Supabase write [remote], then mirrors its result into Room with

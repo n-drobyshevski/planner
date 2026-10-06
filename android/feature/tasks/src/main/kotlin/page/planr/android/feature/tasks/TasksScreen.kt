@@ -60,6 +60,7 @@ import page.planr.android.feature.tasks.model.TaskGroup
 import page.planr.android.feature.tasks.model.TaskGroupKey
 import page.planr.android.feature.tasks.model.TaskScope
 import page.planr.android.feature.tasks.model.TaskStateFilter
+import page.planr.android.feature.tasks.ui.DeletedTaskEffect
 import page.planr.android.feature.tasks.ui.TaskCard
 import page.planr.android.feature.tasks.ui.groupLabel
 
@@ -85,6 +86,7 @@ fun TasksScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     NoticeEffect(state.notice, snackbar, viewModel)
+    DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
     val listState = rememberLazyListState()
     LaunchedEffect(scrollToTopRequests) {
         scrollToTopRequests.collect { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(0) }

@@ -31,6 +31,44 @@ internal fun progressDeep(rootId: String, byParent: Map<String?, List<Task>>): S
     return if (total == 0) null else SubtaskProgress(done, total)
 }
 
+/**
+ * Every task id in [rootId]'s subtree, excluding the root (what a delete
+ * cascades to).
+ */
+internal fun descendantIds(rootId: String, byParent: Map<String?, List<Task>>): List<String> {
+    val out = ArrayList<String>()
+    val seen = HashSet<String>()
+    fun walk(id: String) {
+        for (child in byParent[id].orEmpty()) {
+            if (!seen.add(child.id)) continue
+            out += child.id
+            walk(child.id)
+        }
+    }
+    walk(rootId)
+    return out
+}
+
+/**
+ * Subtasks waiting on an earlier sibling, as `blockedIds` in
+ * lib/tasks/blocking.ts, under every sequential parent in [tasks]: the first
+ * not-done child (in [TaskOrder]) can be completed, every later not-done one
+ * is blocked. Done subtasks are never blocked, so they can always be reopened.
+ */
+internal fun sequentiallyBlockedIds(tasks: List<Task>): Set<String> {
+    val blocked = HashSet<String>()
+    val byParent = groupByParent(tasks)
+    for (parent in tasks) {
+        if (!parent.sequential) continue
+        var sawOpen = false
+        for (child in byParent[parent.id].orEmpty().sortedWith(TaskOrder)) {
+            if (child.completedAt != null) continue
+            if (sawOpen) blocked += child.id else sawOpen = true
+        }
+    }
+    return blocked
+}
+
 /** A due date before the viewer's today (`isDateTokenPast`); the caller excludes done tasks. */
 internal fun isOverdue(dueDate: LocalDate?, today: LocalDate): Boolean = dueDate != null && dueDate < today
 

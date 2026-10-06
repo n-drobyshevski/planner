@@ -8,6 +8,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
+import page.planr.android.core.data.model.DeletedTaskSnapshot
+import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.Board
@@ -103,6 +108,16 @@ class FakeTasksDataSource(
     var failWith: Exception? = null
     /** When set, setDone suspends until it completes (a write in flight). */
     var setDoneGate: CompletableDeferred<Unit>? = null
+    /** When set, updateTask suspends until it completes (a save in flight). */
+    var updateGate: CompletableDeferred<Unit>? = null
+
+    val created = mutableListOf<TaskDraft>()
+    val deletedIds = mutableListOf<String>()
+    val restoredIds = mutableListOf<String>()
+    /** Tasks with a calendar block linked to them. */
+    var blockedTaskIds: Set<String> = emptySet()
+    val blockChecks = mutableListOf<Collection<String>>()
+    private val deletedRows = mutableMapOf<String, Task>()
 
     override val currentMemberId: Flow<String?> = this.viewer
 
@@ -130,6 +145,7 @@ class FakeTasksDataSource(
 
     override suspend fun updateTask(id: String, patch: TaskPatch, expectedUpdatedAt: Instant?): Task {
         updates += Triple(id, patch, expectedUpdatedAt)
+        updateGate?.await()
         failWith?.let { throw it }
         val current = tasks.value.first { it.id == id }
         if (expectedUpdatedAt != null && expectedUpdatedAt != current.updatedAt) throw StaleWriteException("tasks", id)
@@ -146,6 +162,59 @@ class FakeTasksDataSource(
         )
         replace(updated)
         return updated
+    }
+
+    override suspend fun createTask(draft: TaskDraft): Task {
+        created += draft
+        failWith?.let { throw it }
+        val task = Task(
+            id = "new-${created.size}",
+            workspaceId = draft.workspaceId,
+            ownerId = draft.ownerId,
+            assigneeId = draft.assigneeId,
+            parentId = draft.parentId,
+            collectionId = draft.collectionId,
+            categoryId = draft.categoryId,
+            title = draft.title,
+            isPrivate = draft.isPrivate,
+            boardId = draft.boardId,
+            position = draft.position,
+            createdAt = NOW,
+            updatedAt = NOW,
+        )
+        tasks.update { it + task }
+        return task
+    }
+
+    override suspend fun deleteTask(id: String): DeletedTaskSnapshot {
+        deletedIds += id
+        failWith?.let { throw it }
+        val row = tasks.value.first { it.id == id }
+        val gone = HashSet<String>().apply { add(id) }
+        // The DB cascades the subtree.
+        while (true) {
+            val more = tasks.value.filter { it.parentId in gone && it.id !in gone }.map { it.id }
+            if (more.isEmpty()) break
+            gone += more
+        }
+        tasks.update { rows -> rows.filter { it.id !in gone } }
+        deletedRows[id] = row
+        return DeletedTaskSnapshot(listOf(JsonObject(mapOf("id" to JsonPrimitive(id)))))
+    }
+
+    override suspend fun restoreTask(snapshot: DeletedTaskSnapshot) {
+        failWith?.let { throw it }
+        snapshot.tasks.forEach { row ->
+            val id = row.getValue("id").jsonPrimitive.content
+            restoredIds += id
+            tasks.update { it + deletedRows.getValue(id) }
+        }
+    }
+
+    override suspend fun hasCalendarBlocks(taskIds: Collection<String>): Boolean {
+        blockChecks += taskIds
+        failWith?.let { throw it }
+        return taskIds.any { it in blockedTaskIds }
     }
 
     private fun replace(task: Task) = tasks.update { rows -> rows.map { if (it.id == task.id) task else it } }

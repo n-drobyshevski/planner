@@ -165,6 +165,18 @@ class MutationsTest {
     }
 
     @Test
+    fun `deleteTask snapshots the task's row, and restoring brings it back with its id`() = runTest {
+        val snapshot = tasks.deleteTask(Fixtures.TASK_ID)
+        assertEquals(1, snapshot.tasks.size)
+        assertTrue(gateway.rows(SupabaseTables.TASKS).isEmpty())
+
+        val restored = tasks.restoreDeleted(snapshot)
+        assertEquals(Fixtures.TASK_ID, restored.single().id)
+        assertEquals("Buy paint", restored.single().title)
+        assertEquals(Fixtures.taskRow(), gateway.callsOf<FakePostgrestGateway.Call.Insert>().single().rows.single())
+    }
+
+    @Test
     fun `deleteThisAndFuture caps the series one second before the occurrence`() = runTest {
         val series = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO").decodeAs(PlannerEvent.serializer())
         gateway.tables[SupabaseTables.EVENTS] = mutableListOf(Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO"))

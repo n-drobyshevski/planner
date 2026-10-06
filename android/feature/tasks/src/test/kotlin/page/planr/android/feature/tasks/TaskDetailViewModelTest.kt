@@ -12,6 +12,7 @@ import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.TaskPriority
 import page.planr.android.core.recurrence.PatchField
+import page.planr.android.feature.tasks.detail.TaskDeletions
 import page.planr.android.feature.tasks.detail.TaskDetailNotice
 import page.planr.android.feature.tasks.detail.TaskDetailViewModel
 import page.planr.android.feature.tasks.model.TaskForm
@@ -34,7 +35,7 @@ class TaskDetailViewModelTest {
         board("elsewhere", "other", position = 0.0),
     )
 
-    private fun subject(data: FakeTasksDataSource) = TaskDetailViewModel("t1", data, FixedClock)
+    private fun subject(data: FakeTasksDataSource) = TaskDetailViewModel("t1", data, FixedClock, TaskDeletions())
 
     @Test
     fun `loads the task with its collection columns, subtasks and eligible contexts`() = runTest {
@@ -54,7 +55,7 @@ class TaskDetailViewModelTest {
         assertEquals(original, state.task)
         assertTrue(state.canEdit)
         assertEquals(listOf("todo", "doing", "done"), state.boards.map { it.id })
-        assertEquals(listOf("s1", "s2"), state.subtasks.map { it.id })
+        assertEquals(listOf("s1", "s2"), state.subtasks.map { it.task.id })
         assertEquals(1, state.progress?.done)
         assertEquals(listOf(sharedHome.id, annaWork.id), state.categories.map { it.id })
         assertTrue(state.overdue)
