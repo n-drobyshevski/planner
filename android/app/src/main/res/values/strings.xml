@@ -28,7 +28,7 @@
     <string name="import_file_too_large">This file is too large to import (over 5 MB).</string>
     <string name="account_health">Sleep from Health Connect</string>
     <string name="health_title">Sleep from Health Connect</string>
-    <string name="health_body">Bring in the nights your watch or sleep app saves to Health Connect: bedtime, wake time and sleep stages show up in Insights → Sleep on the web. Your morning ratings stay yours. Only you can see this data.</string>
+    <string name="health_body">Bring in the nights your watch or sleep app saves to Health Connect: bedtime, wake time and sleep stages show up in Insights → Sleep on the web. For the last 4 nights, your sleep blocks in the calendar move to match (turn off with “Update calendar from check-ins” in the web’s sleep settings). Your morning ratings stay yours. Only you can see this data.</string>
     <string name="health_connect">Connect</string>
     <string name="health_connected">Connected.</string>
     <string name="health_sync_now">Sync now</string>

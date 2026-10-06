@@ -26,7 +26,7 @@
     <string name="import_file_too_large">Файл слишком большой для импорта (больше 5 МБ).</string>
     <string name="account_health">Сон из Health Connect</string>
     <string name="health_title">Сон из Health Connect</string>
-    <string name="health_body">Подтягивает ночи, которые часы или приложение для сна сохраняют в Health Connect: время отхода ко сну, подъёма и фазы сна появятся в «Аналитика → Сон» на сайте. Утренние оценки остаются твоими. Эти данные видишь только ты.</string>
+    <string name="health_body">Подтягивает ночи, которые часы или приложение для сна сохраняют в Health Connect: время отхода ко сну, подъёма и фазы сна появятся в «Аналитика → Сон» на сайте. За последние 4 ночи блоки сна в календаре подгоняются под них (выключается настройкой «Обновлять календарь по отметкам» в настройках сна на сайте). Утренние оценки остаются твоими. Эти данные видишь только ты.</string>
     <string name="health_connect">Подключить</string>
     <string name="health_connected">Подключено.</string>
     <string name="health_sync_now">Синхронизировать</string>

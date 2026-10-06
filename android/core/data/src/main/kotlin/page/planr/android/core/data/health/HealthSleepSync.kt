@@ -29,7 +29,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import page.planr.android.core.data.auth.AuthState
+import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.health.SleepBlockPlanner.toKotlin
+import page.planr.android.core.data.remote.SleepDeviceRow
 import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.remote.SleepRemote
 import page.planr.android.core.data.remote.SleepRemote.Companion.matches
@@ -57,7 +60,8 @@ enum class HealthSyncProblem {
 }
 
 sealed interface HealthSyncResult {
-    data class Synced(val nights: Int, val written: Int) : HealthSyncResult
+    /** [blocks]: calendar sleep blocks created or moved to match the nights. */
+    data class Synced(val nights: Int, val written: Int, val blocks: Int = 0) : HealthSyncResult
     data object NotConnected : HealthSyncResult
     data object Failed : HealthSyncResult
 }
@@ -76,6 +80,11 @@ sealed interface HealthSyncResult {
  * - **Device times win:** an imported night overwrites typed bedtime / wake,
  *   never the member's ratings or note (see [SleepRemote]). Nights deleted in
  *   Health Connect stay, since the row may hold those ratings.
+ * - **Calendar:** for the last [BLOCK_NIGHTS] nights whose times came in or
+ *   changed, the night's sleep block is snapped to them, as a check-in on the
+ *   web does (a one-off block moves, a routine gets a one-night exception, a
+ *   missing one is created), unless the member turned that off. A block moved
+ *   by hand afterwards stays put: only new device times move it again.
  * - Connecting is per device and per member: after another member signs in on
  *   this phone, nothing syncs until they connect themselves.
  */
@@ -83,6 +92,7 @@ sealed interface HealthSyncResult {
 class HealthSleepSync @Inject constructor(
     private val source: HealthSleepSource,
     private val remote: SleepRemote,
+    private val calendar: SleepBlockCalendar,
     private val session: SessionManager,
     @HealthPrefsDataStore private val store: DataStore<Preferences>,
     private val clock: Clock,
@@ -158,12 +168,15 @@ class HealthSleepSync @Inject constructor(
             val stored = remote.fetchDeviceRows(me.memberId, fromDate.toString()).associateBy { it.date }
             val changed = nights.filterNot { stored[it.date.toString()]?.matches(it) == true }
             remote.upsertNights(me.workspaceId, me.memberId, changed)
+            val recent = now.atZone(zone).toLocalDate().minusDays(BLOCK_NIGHTS - 1)
+            val newTimes = changed.filter { it.date >= recent && stored[it.date.toString()].timesDiffer(it) }
+            val blocks = snapBlocks(me, newTimes, zone)
             store.edit {
                 it[LAST_SYNC] = now.toEpochMilli()
                 it[LAST_NIGHTS] = nights.size
                 it.remove(PROBLEM)
             }
-            HealthSyncResult.Synced(nights = nights.size, written = changed.size)
+            HealthSyncResult.Synced(nights = nights.size, written = changed.size, blocks = blocks)
         } catch (e: CancellationException) {
             throw e
         } catch (_: SecurityException) {
@@ -171,6 +184,41 @@ class HealthSleepSync @Inject constructor(
         } catch (_: Exception) {
             store.edit { it[PROBLEM] = HealthSyncProblem.Failed.name }
             HealthSyncResult.Failed
+        }
+    }
+
+    /**
+     * Snaps the calendar to [nights]; returns how many blocks changed. Best
+     * effort: the nights are already saved, so a calendar failure (offline
+     * halfway, a block deleted meanwhile) never fails the sync.
+     */
+    private suspend fun snapBlocks(me: SessionInfo, nights: List<SleepNight>, zone: ZoneId): Int {
+        if (nights.isEmpty()) return 0
+        return try {
+            val prefs = remote.fetchBlockPrefs(me.memberId)
+            if (!prefs.autoAdjust) return 0
+            var changed = 0
+            for (night in nights) {
+                val window = SleepBlockPlanner.nightWindow(night.date, zone, prefs.nightWindowStartHour, prefs.nightWindowEndHour)
+                val sleep = calendar.occurrences(window, zone.id)
+                    .filter { SleepBlockPlanner.isViewerSleep(it, me.memberId, prefs.sleepCategoryId) }
+                val bed = night.bedtime.toKotlin()
+                val woke = night.woke.toKotlin()
+                when (val plan = SleepBlockPlanner.plan(bed, woke, sleep, window)) {
+                    SleepBlockPlan.Unchanged -> continue
+                    is SleepBlockPlan.Create ->
+                        calendar.create(me.workspaceId, me.memberId, plan.start, plan.end, zone.id, prefs.sleepCategoryId)
+                    is SleepBlockPlan.UpdateSingle -> calendar.move(plan.eventId, plan.start, plan.end)
+                    is SleepBlockPlan.Override ->
+                        calendar.moveOccurrence(plan.eventId, plan.occurrenceDate, plan.start, plan.end)
+                }
+                changed++
+            }
+            changed
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            0
         }
     }
 
@@ -197,6 +245,8 @@ class HealthSleepSync @Inject constructor(
         val BACKFILL_HISTORY: Duration = Duration.ofDays(90)
         val OVERLAP: Duration = Duration.ofHours(48)
         val FOREGROUND_EVERY: Duration = Duration.ofMinutes(15)
+        /** Calendar blocks follow the tracker for this many most recent nights (today included). */
+        const val BLOCK_NIGHTS = 4L
 
         internal val ENABLED = booleanPreferencesKey("enabled")
         internal val MEMBER = stringPreferencesKey("member_id")
@@ -210,3 +260,10 @@ class HealthSleepSync @Inject constructor(
                 .flowOn(Dispatchers.Main)
     }
 }
+
+/** No stored row yet, typed times, or the tracker moved the night. */
+private fun SleepDeviceRow?.timesDiffer(night: SleepNight): Boolean =
+    this == null ||
+        timesSource != "health_connect" ||
+        bedtimeAt?.epochSeconds != night.bedtime.epochSecond ||
+        wokeAt?.epochSeconds != night.woke.epochSecond

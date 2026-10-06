@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.health.SleepNight
 import page.planr.android.core.model.PostgresInstantSerializer
 
@@ -27,6 +28,15 @@ data class SleepDeviceRow(
     @SerialName("awake_min") val awakeMin: Int? = null,
 )
 
+/** The `member_sleep_prefs` columns that decide which calendar block is a night. */
+@Serializable
+internal data class SleepPrefsRow(
+    @SerialName("sleep_category_id") val sleepCategoryId: String? = null,
+    @SerialName("night_window_start_hour") val nightWindowStartHour: Int = 20,
+    @SerialName("night_window_end_hour") val nightWindowEndHour: Int = 12,
+    @SerialName("auto_adjust_sleep_on_feedback") val autoAdjust: Boolean = true,
+)
+
 /**
  * Writes Health Connect nights into `sleep_logs` (member-private under RLS),
  * the table the web's Sleep tab reads.
@@ -44,6 +54,17 @@ class SleepRemote @Inject constructor(
         columns = DEVICE_COLUMNS,
         filters = listOf(eq("member_id", memberId), gte("date", sinceDate)),
     ).decodeAll(SleepDeviceRow.serializer())
+
+    /** The member's sleep settings; the DB defaults when they never saved any (member-private). */
+    suspend fun fetchBlockPrefs(memberId: String): SleepBlockPrefs {
+        val row = gateway.select(
+            SupabaseTables.MEMBER_SLEEP_PREFS,
+            columns = "sleep_category_id,night_window_start_hour,night_window_end_hour,auto_adjust_sleep_on_feedback",
+            filters = listOf(eq("member_id", memberId)),
+            limit = 1,
+        ).firstOrNull()?.decodeAs(SleepPrefsRow.serializer()) ?: SleepPrefsRow()
+        return SleepBlockPrefs(row.sleepCategoryId, row.nightWindowStartHour, row.nightWindowEndHour, row.autoAdjust)
+    }
 
     suspend fun upsertNights(workspaceId: String, memberId: String, nights: List<SleepNight>) {
         if (nights.isEmpty()) return

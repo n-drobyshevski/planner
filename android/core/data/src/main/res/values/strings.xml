@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Title of a calendar sleep block created from a Health Connect night (the web's insights.sleep.blockTitle). -->
+    <string name="sleep_block_title">Sleep</string>
+</resources>
