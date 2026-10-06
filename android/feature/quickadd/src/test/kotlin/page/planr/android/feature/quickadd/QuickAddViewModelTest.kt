@@ -252,6 +252,39 @@ class QuickAddViewModelTest {
     }
 
     @Test
+    fun `a save in flight holds the sheet instead of asking to discard`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val data = FakeQuickAdd().apply { createGate = gate }
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task)
+        assertEquals(QuickAddDismissal.Close, vm.state.value.dismissal)
+
+        vm.setTitle("Slow network")
+        assertEquals(QuickAddDismissal.AskFirst, vm.state.value.dismissal)
+
+        vm.save()
+        // "Discard" now would still create the task, with no Undo once the sheet is gone.
+        assertEquals(QuickAddDismissal.Hold, vm.state.value.dismissal)
+
+        gate.complete(Unit)
+        assertNotNull(vm.state.value.saved)
+        assertEquals(QuickAddDismissal.Close, vm.state.value.dismissal)
+    }
+
+    @Test
+    fun `a failed save lets the sheet be dismissed again, asking first`() = runTest {
+        val data = FakeQuickAdd().apply { failWith = IllegalStateException("offline") }
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Offline")
+
+        vm.save()
+
+        assertEquals(QuickAddError.Failed, vm.state.value.error)
+        assertEquals(QuickAddDismissal.AskFirst, vm.state.value.dismissal)
+    }
+
+    @Test
     fun `a zone that arrives late moves untouched defaults but never a picked time`() = runTest {
         val gate = CompletableDeferred<Unit>()
         val data = FakeQuickAdd(zone = TimeZone.of("Asia/Tokyo")).apply { zoneGate = gate }
