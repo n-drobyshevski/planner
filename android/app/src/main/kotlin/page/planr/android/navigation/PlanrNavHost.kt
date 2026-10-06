@@ -1,31 +1,39 @@
 package page.planr.android.navigation
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import page.planr.android.account.AccountMenuButton
 import page.planr.android.feature.agenda.navigation.agendaGraph
 import page.planr.android.feature.insights.insightsScreen
 import page.planr.android.feature.quickadd.QuickAddKind
 import page.planr.android.feature.quickadd.QuickAddSheet
+import page.planr.android.feature.quickadd.QuickAddViewModel
 import page.planr.android.feature.tasks.navigateToTask
 import page.planr.android.feature.tasks.taskDetailScreen
 import page.planr.android.feature.tasks.tasksScreen
@@ -39,6 +47,8 @@ import page.planr.android.feature.quickadd.R as QuickAddR
  * signed-in back stack, so switching tabs saves and restores each tab's stack
  * against it. Losing the session (the account menu's "Sign out", or a
  * refresh token the server rejected) clears the back stack back to sign-in.
+ * What Quick add creates is confirmed in a snackbar with Undo, at the root
+ * so it outlives the sheet and shows over whichever screen is below.
  *
  * @param launchRoute a widget's requested destination, or the import review
  *   for a file opened in or shared to the app; opened once signed in,
@@ -62,10 +72,19 @@ fun PlanrNavHost(
     var quickAdd by rememberSaveable { mutableStateOf<QuickAddKind?>(null) }
     // The account menu read a picked .ics file into IcsImportRequests: review it.
     val openImport: () -> Unit = remember(navController) { { navController.open(LaunchRoute.Import) } }
+    val snackbar = remember { SnackbarHostState() }
+    // Activity-scoped (this is outside the NavHost), so the sheet's view model
+    // outlives the sheet and its Undo still runs once it has closed.
+    val quickAddViewModel: QuickAddViewModel = hiltViewModel()
+    val undoFailed = stringResource(QuickAddR.string.quickadd_undo_failed)
+    LaunchedEffect(quickAddViewModel, undoFailed) {
+        quickAddViewModel.undoFailures.collect { snackbar.showSnackbar(undoFailed) }
+    }
 
     LaunchedEffect(signedIn) {
         if (!signedIn) {
             quickAdd = null
+            snackbar.currentSnackbarData?.dismiss()
             if (navController.currentDestination?.route != PlanrRoutes.SIGN_IN) {
                 navController.navigate(PlanrRoutes.SIGN_IN) {
                     popUpTo(navController.graph.id) { inclusive = true }
@@ -86,6 +105,7 @@ fun PlanrNavHost(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             if (signedIn && currentTab != null) {
                 PlanrBottomBar(current = currentTab, onSelect = navController::selectTab)
@@ -137,12 +157,26 @@ fun PlanrNavHost(
         }
     }
 
+    // Out here, not in the sheet's block: the confirmation outlives the sheet.
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     quickAdd?.let { kind ->
-        val context = LocalContext.current
         QuickAddSheet(
             kind = kind,
             onDismiss = { quickAdd = null },
-            onSaved = { saved -> Toast.makeText(context, savedMessage(saved), Toast.LENGTH_SHORT).show() },
+            viewModel = quickAddViewModel,
+            onSaved = { saved ->
+                scope.launch {
+                    // A newer confirmation replaces the one showing rather than queueing behind it.
+                    snackbar.currentSnackbarData?.dismiss()
+                    val result = snackbar.showSnackbar(
+                        message = context.getString(addedMessage(saved.kind)),
+                        actionLabel = context.getString(QuickAddR.string.quickadd_undo),
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) quickAddViewModel.undo(saved)
+                }
+            },
         )
     }
 }
@@ -188,7 +222,7 @@ private fun NavController.open(target: LaunchRoute) {
     }
 }
 
-private fun savedMessage(kind: QuickAddKind): Int = when (kind) {
-    QuickAddKind.Task -> QuickAddR.string.quickadd_task_created
-    QuickAddKind.Event -> QuickAddR.string.quickadd_event_created
+private fun addedMessage(kind: QuickAddKind): Int = when (kind) {
+    QuickAddKind.Task -> QuickAddR.string.quickadd_task_added
+    QuickAddKind.Event -> QuickAddR.string.quickadd_event_added
 }

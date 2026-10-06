@@ -40,6 +40,12 @@ interface QuickAddDataSource {
         zone: TimeZone,
         description: String?,
     ): PlannerEvent
+
+    /** Deletes a task this sheet just created (Undo). */
+    suspend fun deleteTask(id: String)
+
+    /** Deletes an event this sheet just created (Undo). */
+    suspend fun deleteEvent(id: String)
 }
 
 /**
@@ -108,6 +114,12 @@ class RepositoryQuickAddDataSource @Inject constructor(
             ),
         )
     }
+
+    /** Through the repository, so Room and the widgets drop it too. */
+    override suspend fun deleteTask(id: String) = tasks.deleteTask(id)
+
+    /** The undo of a create: no snapshot to restore is kept. */
+    override suspend fun deleteEvent(id: String) = events.deleteEvents(listOf(id))
 
     /**
      * The first column of the default collection (`defaultTaskCollectionId` in

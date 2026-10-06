@@ -56,13 +56,16 @@ class QuickAddActivity : ComponentActivity() {
                     kind = kind,
                     shared = shared,
                     onDismiss = ::finish,
-                    onSaved = { saved -> confirm(saved) },
+                    onSaved = { saved -> confirm(saved.kind) },
                 )
             }
         }
     }
 
-    /** The web's success toast; the sheet itself is gone by the time it shows. */
+    /**
+     * The web's success toast; the sheet itself is gone by the time it shows.
+     * No Undo here: over the home screen there is no snackbar to carry one.
+     */
     private fun confirm(kind: QuickAddKind) {
         val message = when (kind) {
             QuickAddKind.Task -> R.string.quickadd_task_created

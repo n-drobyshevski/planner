@@ -7,9 +7,12 @@ import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
@@ -31,7 +34,7 @@ data class QuickAddUiState(
     val saving: Boolean = false,
     val error: QuickAddError? = null,
     /** Set once the item is created; the sheet then closes. */
-    val saved: QuickAddKind? = null,
+    val saved: QuickAddSaved? = null,
 ) {
     val tomorrow: LocalDate get() = today.plus(DatePeriod(days = 1))
 
@@ -46,7 +49,8 @@ data class QuickAddUiState(
 /**
  * Quick add: a title and the minimum to place it, created through the
  * repositories. One view model serves every opening of the sheet; [start]
- * resets it for a fresh one.
+ * resets it for a fresh one. It outlives the sheet, so the confirmation's
+ * Undo ([undo]) can still delete what was just created.
  */
 @HiltViewModel
 class QuickAddViewModel @Inject constructor(
@@ -61,6 +65,11 @@ class QuickAddViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(fresh(QuickAddKind.Task))
     val state: StateFlow<QuickAddUiState> = _state.asStateFlow()
+
+    private val _undoFailures = Channel<QuickAddSaved>(Channel.BUFFERED)
+
+    /** An [undo] that didn't go through (offline, signed out): the item is still there. */
+    val undoFailures: Flow<QuickAddSaved> = _undoFailures.receiveAsFlow()
 
     /**
      * Opens a fresh sheet for [kind], prefilled from [shared] text when given,
@@ -107,14 +116,16 @@ class QuickAddViewModel @Inject constructor(
         _state.update { it.copy(saving = true, error = null) }
         val form = current.form
         viewModelScope.launch {
+            var saved: QuickAddSaved? = null
             val error = try {
-                when (form.kind) {
-                    QuickAddKind.Task -> data.createTask(form.title, form.dueDate, form.description)
+                val id = when (form.kind) {
+                    QuickAddKind.Task -> data.createTask(form.title, form.dueDate, form.description).id
                     QuickAddKind.Event -> {
                         val (start, end) = form.eventTimes(zone)
-                        data.createEvent(form.title, start, end, form.allDay, zone, form.description)
+                        data.createEvent(form.title, start, end, form.allDay, zone, form.description).id
                     }
                 }
+                saved = QuickAddSaved(form.kind, id)
                 null
             } catch (e: CancellationException) {
                 throw e
@@ -123,8 +134,26 @@ class QuickAddViewModel @Inject constructor(
             } catch (_: Exception) {
                 QuickAddError.Failed
             }
-            _state.update {
-                it.copy(saving = false, error = error, saved = if (error == null) form.kind else null)
+            _state.update { it.copy(saving = false, error = error, saved = saved) }
+        }
+    }
+
+    /**
+     * Deletes what [saved] created, through the repositories (so the agenda,
+     * the task list and the widgets drop it too). A failure is reported on
+     * [undoFailures].
+     */
+    fun undo(saved: QuickAddSaved) {
+        viewModelScope.launch {
+            try {
+                when (saved.kind) {
+                    QuickAddKind.Task -> data.deleteTask(saved.id)
+                    QuickAddKind.Event -> data.deleteEvent(saved.id)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _undoFailures.trySend(saved)
             }
         }
     }

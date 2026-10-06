@@ -64,7 +64,8 @@ import page.planr.android.feature.quickadd.ui.TaskFields
  * @param kind what the sheet opens on; the user can still switch.
  * @param shared text shared from another app, prefilling the title and notes.
  * @param onDismiss called once the sheet is gone (cancelled, swiped away, or saved).
- * @param onSaved called with what was created, just before the sheet closes.
+ * @param onSaved called with what was created (its kind and id, for an Undo),
+ *   just before the sheet closes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +74,7 @@ fun QuickAddSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     shared: SharedText? = null,
-    onSaved: (QuickAddKind) -> Unit = {},
+    onSaved: (QuickAddSaved) -> Unit = {},
     viewModel: QuickAddViewModel = hiltViewModel(),
 ) {
     // Reset once per opening of the sheet, before its state is first read, so a

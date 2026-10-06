@@ -27,6 +27,10 @@
     <string name="quickadd_apply">Применить</string>
     <string name="quickadd_task_created">Задача создана</string>
     <string name="quickadd_event_created">Событие создано</string>
+    <string name="quickadd_task_added">Задача добавлена</string>
+    <string name="quickadd_event_added">Событие добавлено</string>
+    <string name="quickadd_undo">Отменить</string>
+    <string name="quickadd_undo_failed">Не удалось отменить. Запись осталась.</string>
     <string name="quickadd_error_title">Добавь название.</string>
     <string name="quickadd_error_end">Конец должен быть позже начала.</string>
     <string name="quickadd_error_signed_out">Сначала войди в Planr.</string>
