@@ -57,8 +57,11 @@ class OccurrenceRepository @Inject constructor(
         viewerZone: TimeZone = TimeZone.currentSystemDefault(),
     ): List<Occurrence> = occurrences(window, viewerZone).first()
 
-    /** Fetches [window] from Supabase into Room; the flows above update on their own. */
-    suspend fun refresh(window: TimeWindow) = events.refreshWindow(window)
+    /**
+     * Fetches [window] from Supabase into Room; the flows above update on
+     * their own. Skipped when the same window was just fetched, unless [force]d.
+     */
+    suspend fun refresh(window: TimeWindow, force: Boolean = false) = events.refreshWindow(window, force)
 
     private fun occurrences(window: TimeWindow, viewerZone: TimeZone): Flow<List<Occurrence>> {
         val start = window.start.toEpochMilliseconds()

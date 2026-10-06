@@ -103,9 +103,16 @@ class RealtimeSync @Inject constructor(
                     }
                 }
                 launch {
+                    // The first join's refetch may share the screens' own (opening the
+                    // app fires both). A rejoin after a drop always refetches: changes
+                    // made while the channel was down never arrive otherwise.
+                    var joined = false
                     channel.status
                         .filter { it == RealtimeChannel.Status.SUBSCRIBED }
-                        .collect { refetchQuietly() }
+                        .collect {
+                            refetchQuietly(force = joined)
+                            joined = true
+                        }
                 }
                 launch {
                     // A refreshed token must reach the open socket before the old one expires.
@@ -142,9 +149,9 @@ class RealtimeSync @Inject constructor(
             this.table = table
         }.map { table to RowChange.Delete(it.oldRecord) }
 
-    private suspend fun refetchQuietly() {
+    private suspend fun refetchQuietly(force: Boolean) {
         try {
-            syncRunner.syncVisible()
+            syncRunner.syncVisible(force)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

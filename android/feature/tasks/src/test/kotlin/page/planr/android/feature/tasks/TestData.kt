@@ -162,6 +162,7 @@ class FakeTasksDataSource(
     val setDoneCalls = mutableListOf<Pair<String, Boolean>>()
     val updates = mutableListOf<Triple<String, TaskPatch, Instant?>>()
     var refreshCount = 0
+    var forcedRefreshCount = 0
     var failWith: Exception? = null
     /** When set, setDone suspends until it completes (a write in flight). */
     var setDoneGate: CompletableDeferred<Unit>? = null
@@ -205,8 +206,9 @@ class FakeTasksDataSource(
 
     override fun observeBoards(): Flow<List<Board>> = boards.map { it }
 
-    override suspend fun refresh() {
+    override suspend fun refresh(force: Boolean) {
         refreshCount++
+        if (force) forcedRefreshCount++
         failWith?.let { throw it }
     }
 

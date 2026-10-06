@@ -35,6 +35,9 @@ class FakeInsightsDataSource(
     /** Every window passed to [refreshWindow], in call order. */
     val refreshedWindows = mutableListOf<TimeWindow>()
 
+    /** The windows of the forced [refreshWindow] calls (pull-to-refresh), in call order. */
+    val forcedWindows = mutableListOf<TimeWindow>()
+
     /** Every window passed to [observeOccurrences], in call order. */
     val observedWindows = mutableListOf<TimeWindow>()
     var referenceRefreshes = 0
@@ -58,8 +61,9 @@ class FakeInsightsDataSource(
         return occurrences.map { all -> all.filter { window.intersects(it.start, it.end) } }
     }
 
-    override suspend fun refreshWindow(window: TimeWindow) {
+    override suspend fun refreshWindow(window: TimeWindow, force: Boolean) {
         refreshedWindows += window
+        if (force) forcedWindows += window
         refreshGate?.await()
         failRefreshWith?.let { throw it }
     }

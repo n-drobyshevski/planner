@@ -200,7 +200,7 @@ class TasksViewModel @Inject constructor(
     private suspend fun runRefresh(reportFailure: Boolean) {
         if (reportFailure) refreshing.value = true
         try {
-            data.refresh()
+            data.refresh(force = reportFailure)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

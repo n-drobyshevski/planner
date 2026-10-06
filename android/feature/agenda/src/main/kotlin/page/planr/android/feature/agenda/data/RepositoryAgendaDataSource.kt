@@ -73,9 +73,13 @@ class RepositoryAgendaDataSource @Inject constructor(
         },
     )
 
-    override suspend fun refreshWorkspace() = workspace.refresh()
+    override suspend fun refreshWorkspace(force: Boolean) {
+        workspace.refresh(force)
+    }
 
-    override suspend fun refreshWindow(window: TimeWindow) = occurrences.refresh(window)
+    override suspend fun refreshWindow(window: TimeWindow, force: Boolean) {
+        occurrences.refresh(window, force)
+    }
 
     override fun observeEvent(id: String): Flow<PlannerEvent?> = events.observeEvent(id)
 

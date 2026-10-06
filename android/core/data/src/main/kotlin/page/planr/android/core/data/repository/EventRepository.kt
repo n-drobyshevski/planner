@@ -3,6 +3,7 @@ package page.planr.android.core.data.repository
 import androidx.room.withTransaction
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -11,6 +12,7 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.model.DeletedEventSnapshot
@@ -50,6 +52,7 @@ class EventRepository @Inject constructor(
     private val db: PlanrDatabase,
     private val gate: CacheGate,
     private val widgets: WidgetRefreshDispatcher,
+    private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, Clock.System),
 ) {
     private val dao get() = db.eventDao()
 
@@ -101,20 +104,27 @@ class EventRepository @Inject constructor(
      * out of the window, and nothing else is. Every page is fetched inside
      * the `fetch` lambda, before anything is applied, so a fetch that fails
      * partway writes nothing.
+     *
+     * A refresh of the same window already running is joined, and one done
+     * in the last few seconds is not repeated unless [force]d (see
+     * [RefreshCoalescer]): pull-to-refresh forces, screens opening don't.
      */
-    suspend fun refreshWindow(window: TimeWindow) {
+    suspend fun refreshWindow(window: TimeWindow, force: Boolean = false) {
         val ws = session.requireSession().workspaceId
         val start = window.start.toEpochMilliseconds()
         val end = window.end.toEpochMilliseconds()
-        gate.refresh(CacheArea.Events, fetch = { queries.fetchWindow(ws, window) }) { data ->
-            db.withTransaction {
-                val stale = dao.idsInWindow(ws, start, end)
-                val touched = (stale + data.events.map { it.id }).distinct()
-                touched.chunked(SQL_CHUNK).forEach { dao.deleteOverridesOf(it) }
-                stale.chunked(SQL_CHUNK).forEach { dao.deleteEvents(it) }
-                dao.upsertEvents(data.events.map { it.toEntity() })
-                dao.upsertOverrides(data.overrides.map { it.toEntity() })
+        coalescer.refresh(WindowKey(ws, start, end), force) {
+            gate.refresh(CacheArea.Events, fetch = { queries.fetchWindow(ws, window) }) { data ->
+                db.withTransaction {
+                    val stale = dao.idsInWindow(ws, start, end)
+                    val touched = (stale + data.events.map { it.id }).distinct()
+                    touched.chunked(SQL_CHUNK).forEach { dao.deleteOverridesOf(it) }
+                    stale.chunked(SQL_CHUNK).forEach { dao.deleteEvents(it) }
+                    dao.upsertEvents(data.events.map { it.toEntity() })
+                    dao.upsertOverrides(data.overrides.map { it.toEntity() })
+                }
             }
+            true
         }
     }
 
@@ -290,6 +300,8 @@ class EventRepository @Inject constructor(
             if (latest == null) deleteLocally(id) else storeLocally(latest)
         }
     }
+
+    private data class WindowKey(val workspaceId: String, val start: Long, val end: Long)
 
     private companion object {
         /** Stay well under SQLite's bound-variable limit in `IN (...)` lists. */

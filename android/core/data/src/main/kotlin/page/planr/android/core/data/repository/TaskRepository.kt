@@ -13,6 +13,7 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.model.DeletedTaskSnapshot
@@ -41,6 +42,7 @@ class TaskRepository @Inject constructor(
     private val gate: CacheGate,
     private val widgets: WidgetRefreshDispatcher,
     private val clock: Clock,
+    private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, clock),
 ) {
     private val dao get() = db.taskDao()
 
@@ -53,11 +55,18 @@ class TaskRepository @Inject constructor(
 
     suspend fun getTask(id: String): Task? = dao.getById(id)?.toModel()
 
-    /** Refetches all tasks (`fetchTasks`) and replaces the cached set. */
-    suspend fun refresh() {
+    /**
+     * Refetches all tasks (`fetchTasks`) and replaces the cached set. Joins a
+     * refresh already running and skips one done moments ago unless [force]d
+     * ([RefreshCoalescer]).
+     */
+    suspend fun refresh(force: Boolean = false) {
         val ws = session.requireSession().workspaceId
-        gate.refresh(CacheArea.Tasks, fetch = { queries.fetchTasks(ws) }) { rows ->
-            dao.replaceAll(ws, rows.map { it.toEntity() })
+        coalescer.refresh(ws, force) {
+            gate.refresh(CacheArea.Tasks, fetch = { queries.fetchTasks(ws) }) { rows ->
+                dao.replaceAll(ws, rows.map { it.toEntity() })
+            }
+            true
         }
     }
 

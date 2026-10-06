@@ -30,16 +30,17 @@ class SyncRunner @Inject constructor(
     /**
      * Members/categories/boards, the widgets' days (plus the visible window),
      * all tasks and the member's view settings; then re-renders widgets. Returns false when signed out.
-     * Throws on network / server errors (the worker retries).
+     * Throws on network / server errors (the worker retries). Always fetches
+     * (forced): it runs on a schedule or because someone asked for it.
      */
     suspend fun syncAll(): Boolean {
         // A worker may start the process: wait for the stored session to load.
         session.authState.first { it != AuthState.Loading }
         if (session.currentSession == null) return false
         coroutineScope {
-            launch { workspace.refresh() }
-            windowsToSync().forEach { launch { events.refreshWindow(it) } }
-            launch { tasks.refresh() }
+            launch { workspace.refresh(force = true) }
+            windowsToSync().forEach { launch { events.refreshWindow(it, force = true) } }
+            launch { tasks.refresh(force = true) }
             // Never fails the sync: a pending settings change retries next time.
             launch { appPrefs.pullQuietly() }
         }
@@ -47,13 +48,17 @@ class SyncRunner @Inject constructor(
         return true
     }
 
-    /** Refetches what's on screen (Realtime (re)connect: changes may have been missed). */
-    suspend fun syncVisible() {
+    /**
+     * Refetches what's on screen (Realtime (re)connect: changes may have been
+     * missed). Unless [force]d, joins the screens' own refreshes of the same
+     * data, or skips what they fetched moments ago.
+     */
+    suspend fun syncVisible(force: Boolean = false) {
         if (session.currentSession == null) return
         coroutineScope {
-            windowsToSync().forEach { launch { events.refreshWindow(it) } }
-            launch { tasks.refresh() }
-            launch { workspace.refresh() }
+            windowsToSync().forEach { launch { events.refreshWindow(it, force) } }
+            launch { tasks.refresh(force) }
+            launch { workspace.refresh(force) }
             launch { appPrefs.pullQuietly() }
         }
         widgets.requestRefresh()

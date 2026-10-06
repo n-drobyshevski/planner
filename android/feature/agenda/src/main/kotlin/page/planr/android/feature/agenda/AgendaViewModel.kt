@@ -214,8 +214,8 @@ class AgendaViewModel @Inject constructor(
         viewModelScope.launch {
             refreshing.value = true
             try {
-                data.refreshWorkspace()
-                data.refreshWindow(lastWindow ?: defaultWindow())
+                data.refreshWorkspace(force = true)
+                data.refreshWindow(lastWindow ?: defaultWindow(), force = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
