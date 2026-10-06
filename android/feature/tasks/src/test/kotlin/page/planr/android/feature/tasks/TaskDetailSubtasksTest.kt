@@ -20,6 +20,7 @@ import page.planr.android.feature.tasks.detail.TaskDeletions
 import page.planr.android.feature.tasks.detail.TaskDetailNotice
 import page.planr.android.feature.tasks.detail.TaskDetailViewModel
 import page.planr.android.feature.tasks.detail.deletePlan
+import page.planr.android.feature.tasks.model.depthOf
 
 /** The detail's subtasks (complete, add) and delete. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -184,6 +185,36 @@ class TaskDetailSubtasksTest {
         theirs.addSubtask()
 
         assertTrue(data.created.isEmpty())
+    }
+
+    @Test
+    fun `the deepest level offers no subtask field, and an add there isn't sent`() = runTest {
+        val data = FakeTasksDataSource(
+            tasks = listOf(parent, task("d1", parent = "t1"), task("d2", parent = "d1"), task("d3", parent = "d2")),
+        )
+        val third = subject(data, id = "d2")
+        keepCollecting(third.state)
+        assertTrue(third.state.value.canAddSubtask, "depth 2 may still have children")
+
+        val deepest = subject(data, id = "d3")
+        keepCollecting(deepest.state)
+        assertTrue(deepest.state.value.canEdit)
+        assertFalse(deepest.state.value.canAddSubtask)
+        deepest.setSubtaskTitle("Too deep")
+        assertFalse(deepest.state.value.hasDraft, "the field isn't shown, so nothing is lost")
+        deepest.addSubtask()
+
+        assertTrue(data.created.isEmpty())
+    }
+
+    @Test
+    fun `depth counts ancestors, as lib-tasks-tree depthOf`() {
+        val tasks = listOf(task("r"), task("a", parent = "r"), task("b", parent = "a"), task("orphan", parent = "gone"))
+        val byId = tasks.associateBy { it.id }
+        assertEquals(listOf(0, 1, 2, 0), tasks.map { depthOf(it, byId) })
+
+        val cycle = listOf(task("x", parent = "y"), task("y", parent = "x"))
+        assertEquals(2, depthOf(cycle[0], cycle.associateBy { it.id }), "a cycle ends the walk")
     }
 
     @Test

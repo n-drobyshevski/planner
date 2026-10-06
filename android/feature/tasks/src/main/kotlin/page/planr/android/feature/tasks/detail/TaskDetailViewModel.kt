@@ -35,9 +35,11 @@ import page.planr.android.core.model.TaskCompletion
 import page.planr.android.core.model.TaskPriority
 import page.planr.android.feature.tasks.data.TasksDataSource
 import page.planr.android.feature.tasks.model.BlockSlots
+import page.planr.android.feature.tasks.model.MAX_DEPTH
 import page.planr.android.feature.tasks.model.SubtaskProgress
 import page.planr.android.feature.tasks.model.TaskForm
 import page.planr.android.feature.tasks.model.TaskOrder
+import page.planr.android.feature.tasks.model.depthOf
 import page.planr.android.feature.tasks.model.descendantIds
 import page.planr.android.feature.tasks.model.isEmpty
 import page.planr.android.feature.tasks.model.isOverdue
@@ -80,7 +82,12 @@ data class TaskDetailUiState(
     val parent: Task? = null,
     /** Direct subtasks, in order. */
     val subtasks: List<SubtaskItem> = emptyList(),
-    /** The inline "Add a subtask" field (owner only). */
+    /**
+     * The inline "Add a subtask" field is offered: the owner's task, above
+     * the deepest level ([MAX_DEPTH]), which the database would refuse.
+     */
+    val canAddSubtask: Boolean = false,
+    /** The inline "Add a subtask" field. */
     val subtaskTitle: String = "",
     val addingSubtask: Boolean = false,
     /** Whole-subtree progress, as on the card. */
@@ -122,7 +129,7 @@ data class TaskDetailUiState(
     val holdsBack: Boolean get() = saving || deleting || blockWriting || subtaskWriting
 
     /** Something typed would be lost by leaving: an unsaved edit, or an unsent subtask title. */
-    val hasDraft: Boolean get() = dirty || (canEdit && subtaskTitle.isNotBlank())
+    val hasDraft: Boolean get() = dirty || (canAddSubtask && subtaskTitle.isNotBlank())
 }
 
 /**
@@ -243,7 +250,7 @@ class TaskDetailViewModel @AssistedInject constructor(
         val current = state.value
         val parent = current.task ?: return
         val sent = current.subtaskTitle
-        if (!current.canEdit || current.addingSubtask || current.deleting || sent.isBlank()) return
+        if (!current.canAddSubtask || current.addingSubtask || current.deleting || sent.isBlank()) return
         val draft = subtaskDraft(parent, sent, latest?.boards.orEmpty(), clock.now())
         ui.update { it.copy(addingSubtask = true) }
         viewModelScope.launch {
@@ -536,11 +543,12 @@ class TaskDetailViewModel @AssistedInject constructor(
         val stored = TaskForm.from(task)
         val form = edits ?: stored
         val byParent = snapshot.tasks.groupBy { it.parentId }
+        val canEdit = snapshot.viewerId != null && task.ownerId == snapshot.viewerId
         return TaskDetailUiState(
             loading = false,
             task = task,
             form = form,
-            canEdit = snapshot.viewerId != null && task.ownerId == snapshot.viewerId,
+            canEdit = canEdit,
             owner = snapshot.members.firstOrNull { it.id == task.ownerId },
             members = snapshot.members,
             categories = snapshot.categories.filter { it.isShared || it.ownerId == task.ownerId },
@@ -550,6 +558,7 @@ class TaskDetailViewModel @AssistedInject constructor(
                 .sortedBy { it.position },
             parent = task.parentId?.let { id -> snapshot.tasks.firstOrNull { it.id == id } },
             subtasks = subtaskItems(byParent[task.id].orEmpty(), snapshot, pending),
+            canAddSubtask = canEdit && depthOf(task, snapshot.tasks.associateBy { it.id }) < MAX_DEPTH,
             subtaskTitle = flags.subtaskTitle,
             addingSubtask = flags.addingSubtask,
             subtaskWriting = flags.addingSubtask || pending.isNotEmpty() || flags.undoing > 0,

@@ -32,6 +32,29 @@ internal fun progressDeep(rootId: String, byParent: Map<String?, List<Task>>): S
 }
 
 /**
+ * Maximum nesting depth, in edges from a root (depth 0), as `MAX_DEPTH` in
+ * lib/tasks/tree.ts: four visible levels. The DB trigger `tasks_nesting_guard`
+ * rejects anything deeper.
+ */
+internal const val MAX_DEPTH = 3
+
+/**
+ * How deep [task] sits: its ancestors' count, as `depthOf` in
+ * lib/tasks/tree.ts. A missing parent ends the walk, and a cycle can't loop.
+ */
+internal fun depthOf(task: Task, byId: Map<String, Task>): Int {
+    var depth = 0
+    var current = task.parentId
+    val seen = HashSet<String>()
+    while (current != null && seen.add(current)) {
+        val parent = byId[current] ?: break
+        depth++
+        current = parent.parentId
+    }
+    return depth
+}
+
+/**
  * Every task id in [rootId]'s subtree, excluding the root (what a delete
  * cascades to).
  */
