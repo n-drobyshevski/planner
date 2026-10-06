@@ -405,8 +405,11 @@ export function useEventMutations(workspaceId: string | undefined) {
           patch,
         }),
         t("thisEventUpdated"),
+        // Without a known prior, an undo could erase an earlier override.
         ({ prior }) =>
-          inverse(t("undoLabel.edit"), () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
+          m.canRevertOverride(prior)
+            ? inverse(t("undoLabel.edit"), () => m.revertOverride(sb, event.id, occurrenceMs, prior))
+            : null,
         () =>
           upsertOverrideInWindows(event.id, occurrenceMs, (ex) =>
             provisionalOverride(ex, event.id, occurrenceMs, "modify", patch),
@@ -449,8 +452,11 @@ export function useEventMutations(workspaceId: string | undefined) {
           type: "cancel",
         }),
         t("eventDeleted"),
+        // Without a known prior, an undo could erase an earlier override.
         ({ prior }) =>
-          inverse(t("undoLabel.delete"), () => m.revertOverride(sb, event.id, occurrenceMs, prior)),
+          m.canRevertOverride(prior)
+            ? inverse(t("undoLabel.delete"), () => m.revertOverride(sb, event.id, occurrenceMs, prior))
+            : null,
         () =>
           upsertOverrideInWindows(event.id, occurrenceMs, (ex) =>
             provisionalOverride(ex, event.id, occurrenceMs, "cancel"),
