@@ -313,6 +313,9 @@ class TaskDetailViewModel @AssistedInject constructor(
 
     fun dismissDelete() = ui.update { it.copy(confirmDelete = null) }
 
+    /** A "Deleted · Undo" cut short by a rotation: the recreated screen shows it again. */
+    fun putBackDeleted(deleted: TaskDeleted) = deletions.putBack(deleted)
+
     /** Undo from this screen's snackbar (a subtask deleted from its own detail). */
     fun undoDelete(deleted: TaskDeleted) {
         ui.update { it.copy(undoing = it.undoing + 1) }

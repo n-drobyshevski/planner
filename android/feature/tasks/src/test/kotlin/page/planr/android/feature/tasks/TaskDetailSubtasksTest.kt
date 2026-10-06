@@ -501,4 +501,22 @@ class TaskDetailSubtasksTest {
         assertEquals(listOf("s1"), onParent.map { it.taskId })
         assertNull(deletions.pending.value, "claimed")
     }
+
+    @Test
+    fun `an undo cut short by a rotation is shown again by the recreated screen`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent, task("s1", parent = "t1")))
+        val underneath = subject(data)
+        deletions.post(TaskDeleted("s1") {})
+        val shown = mutableListOf<TaskDeleted>()
+        val before = backgroundScope.launch { underneath.deletedTasks.toList(shown) }
+        runCurrent()
+        before.cancel()
+
+        underneath.putBackDeleted(shown.single())
+        backgroundScope.launch { underneath.deletedTasks.toList(shown) }
+        runCurrent()
+
+        assertEquals(listOf("s1", "s1"), shown.map { it.taskId })
+        assertNull(deletions.pending.value)
+    }
 }

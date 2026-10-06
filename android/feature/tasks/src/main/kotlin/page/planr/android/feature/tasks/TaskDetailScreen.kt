@@ -1,6 +1,7 @@
 package page.planr.android.feature.tasks
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.coroutines.cancellation.CancellationException
 import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.component.rememberPlanrHaptics
@@ -98,7 +100,7 @@ fun TaskDetailScreen(
     LaunchedEffect(state.saved, sideWriting) { if (state.saved && !sideWriting) onBack() }
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
-    DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
+    DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete, viewModel::putBackDeleted)
     BlockNoticeEffect(state.blockNotice, snackbar, viewModel)
     // Held while saving or deleting too: either closes the screen itself once
     // it lands, and a pop meanwhile would cancel the write half-way. Likewise
@@ -242,8 +244,10 @@ private fun BlockNoticeEffect(notice: BlockNotice?, snackbar: SnackbarHostState,
     val removed = stringResource(R.string.task_block_removed)
     val undo = stringResource(R.string.task_undo)
     val haptics = rememberPlanrHaptics()
+    val activity = LocalActivity.current
     LaunchedEffect(notice) {
         if (notice == null) return@LaunchedEffect
+        var recreating = false
         try {
             val result = snackbar.showSnackbar(
                 message = when (notice) {
@@ -257,9 +261,14 @@ private fun BlockNoticeEffect(notice: BlockNotice?, snackbar: SnackbarHostState,
                 haptics.tick()
                 viewModel.undoBlock(notice)
             }
+        } catch (e: CancellationException) {
+            recreating = activity?.isChangingConfigurations == true
+            throw e
         } finally {
-            // Consumed even when cancelled: coming back must not replay an old Undo.
-            viewModel.dismissBlockNotice(notice)
+            // Consumed even when cancelled: coming back must not replay an old
+            // Undo. Kept only through a recreation (a rotation): the ViewModel
+            // survives it, and the recreated screen shows the notice again.
+            if (!recreating) viewModel.dismissBlockNotice(notice)
         }
     }
 }
