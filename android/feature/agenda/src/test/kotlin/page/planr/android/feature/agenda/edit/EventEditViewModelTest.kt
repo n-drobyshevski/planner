@@ -7,6 +7,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,6 +30,7 @@ import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.model.Occurrence
 import page.planr.android.core.model.OverrideType
 import page.planr.android.core.recurrence.DefaultRecurrenceExpander
+import page.planr.android.core.recurrence.EditSemantics
 import page.planr.android.core.recurrence.Freq
 import page.planr.android.core.recurrence.PatchField
 import page.planr.android.core.recurrence.RecurrenceForm
@@ -368,6 +370,29 @@ class EventEditViewModelTest {
         assertFailsWith<IllegalStateException> { posted.single().undo!!.invoke() }
 
         assertTrue(data.calls.none { it is Call.Delete }, "the future stays in the new series")
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `an undo whose delete fails caps the original again, back to the split`() = runTest {
+        data.events.value = listOf(series)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+        data.failWhen = { if (it is Call.Delete) IllegalStateException("offline") else null }
+
+        assertFailsWith<IllegalStateException> { posted.single().undo!!.invoke() }
+
+        val (restore, recap) = data.calls.drop(1).map { assertIs<Call.Update>(it) }
+        assertEquals(PatchField.Value("FREQ=DAILY"), restore.patch.rrule)
+        val split = EditSemantics.splitThisAndFuture(series, monday, assertIs<Call.Split>(data.calls.first()).patch).original
+        assertEquals("series", recap.id)
+        assertEquals(PatchField.Value(split.rrule), recap.patch.rrule)
+        assertEquals(PatchField.Value(split.recurrenceEndsAt), recap.patch.recurrenceEndsAt)
+        assertEquals(PatchField.Value(monday - 1.seconds), recap.patch.recurrenceEndsAt)
         vm.viewModelScope.cancel()
     }
 

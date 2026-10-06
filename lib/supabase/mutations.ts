@@ -554,21 +554,32 @@ export async function splitSeries(
 }
 
 /**
- * Undo a `splitSeries`: put the original's rule back FIRST, then delete the
- * new series. If the restore fails, the new series stays and the error is
- * rethrown, so the future occurrences survive in one of the two rows.
- * (Deleting first would lose them whenever the restore then failed.)
+ * Undo a `splitSeries` made at `fromOccurrenceMs`: put the original's rule
+ * back FIRST, then delete the new series. If the restore fails, the new
+ * series stays and the error is rethrown, so the future occurrences survive
+ * in one of the two rows. (Deleting first would lose them whenever the
+ * restore then failed.) If the delete fails, both series are live and every
+ * future occurrence shows twice, so the original is capped again (best
+ * effort) — back to the split — before the error is rethrown.
  */
 export async function revertSplit(
   sb: SupabaseClient,
   original: EventRow,
   newSeriesId: string,
+  fromOccurrenceMs: number,
 ): Promise<void> {
   await updateEvent(sb, original.id, {
     rrule: original.rrule,
     recurrenceEndsAt: original.recurrenceEndsAt,
   });
-  await deleteEvent(sb, newSeriesId);
+  try {
+    await deleteEvent(sb, newSeriesId);
+  } catch (e) {
+    // The same cap the split applied to the original.
+    const { rrule, recurrenceEndsAt } = capThisAndFuture(original, fromOccurrenceMs);
+    await updateEvent(sb, original.id, { rrule, recurrenceEndsAt }).catch(() => {});
+    throw e;
+  }
 }
 
 /** "This and following": cap the series with UNTIL just before the occurrence. */
