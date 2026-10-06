@@ -35,9 +35,11 @@ import page.planr.android.core.model.TaskCompletion
 import page.planr.android.core.model.TaskPriority
 import page.planr.android.feature.tasks.data.TasksDataSource
 import page.planr.android.feature.tasks.model.BlockSlots
+import page.planr.android.feature.tasks.model.MAX_DEPTH
 import page.planr.android.feature.tasks.model.SubtaskProgress
 import page.planr.android.feature.tasks.model.TaskForm
 import page.planr.android.feature.tasks.model.TaskOrder
+import page.planr.android.feature.tasks.model.depthOf
 import page.planr.android.feature.tasks.model.descendantIds
 import page.planr.android.feature.tasks.model.isEmpty
 import page.planr.android.feature.tasks.model.isOverdue
@@ -80,7 +82,12 @@ data class TaskDetailUiState(
     val parent: Task? = null,
     /** Direct subtasks, in order. */
     val subtasks: List<SubtaskItem> = emptyList(),
-    /** The inline "Add a subtask" field (owner only). */
+    /**
+     * The inline "Add a subtask" field is offered: the owner's task, above
+     * the deepest level ([MAX_DEPTH]), which the database would refuse.
+     */
+    val canAddSubtask: Boolean = false,
+    /** The inline "Add a subtask" field. */
     val subtaskTitle: String = "",
     val addingSubtask: Boolean = false,
     /** Whole-subtree progress, as on the card. */
@@ -112,7 +119,18 @@ data class TaskDetailUiState(
      * isn't dirty, but the screen holds Back, Save and Delete until it lands.
      */
     val blockWriting: Boolean = false,
-)
+    /**
+     * A subtask is being added, checked off or put back (Undo). Its own
+     * write, like a block's: the screen holds Back and Save until it lands.
+     */
+    val subtaskWriting: Boolean = false,
+) {
+    /** A write is in flight that leaving now would cancel half-way. */
+    val holdsBack: Boolean get() = saving || deleting || blockWriting || subtaskWriting
+
+    /** Something typed would be lost by leaving: an unsaved edit, or an unsent subtask title. */
+    val hasDraft: Boolean get() = dirty || (canAddSubtask && subtaskTitle.isNotBlank())
+}
 
 /**
  * One task: its details, the editor form and the save (`updateTask` with the
@@ -232,7 +250,7 @@ class TaskDetailViewModel @AssistedInject constructor(
         val current = state.value
         val parent = current.task ?: return
         val sent = current.subtaskTitle
-        if (!current.canEdit || current.addingSubtask || current.deleting || sent.isBlank()) return
+        if (!current.canAddSubtask || current.addingSubtask || current.deleting || sent.isBlank()) return
         val draft = subtaskDraft(parent, sent, latest?.boards.orEmpty(), clock.now())
         ui.update { it.copy(addingSubtask = true) }
         viewModelScope.launch {
@@ -256,9 +274,9 @@ class TaskDetailViewModel @AssistedInject constructor(
     fun delete() {
         val current = state.value
         val task = current.task ?: return
-        // Not while a subtask is being added: the plan would miss it, and the
-        // cascade would take it with no Undo.
-        if (!current.canEdit || current.saving || current.deleting || current.addingSubtask || current.blockWriting) return
+        // Not while a subtask is being added or put back: the plan would miss
+        // it, and the cascade would take it with no Undo.
+        if (!current.canEdit || current.saving || current.deleting || current.subtaskWriting || current.blockWriting) return
         val subtree = descendantIds(task.id, latest?.tasks.orEmpty().groupBy { it.parentId })
         ui.update { it.copy(deleting = true, notice = null) }
         viewModelScope.launch {
@@ -295,8 +313,12 @@ class TaskDetailViewModel @AssistedInject constructor(
 
     fun dismissDelete() = ui.update { it.copy(confirmDelete = null) }
 
+    /** A "Deleted · Undo" cut short by a rotation: the recreated screen shows it again. */
+    fun putBackDeleted(deleted: TaskDeleted) = deletions.putBack(deleted)
+
     /** Undo from this screen's snackbar (a subtask deleted from its own detail). */
     fun undoDelete(deleted: TaskDeleted) {
+        ui.update { it.copy(undoing = it.undoing + 1) }
         viewModelScope.launch {
             try {
                 deleted.undo()
@@ -304,6 +326,8 @@ class TaskDetailViewModel @AssistedInject constructor(
                 throw e
             } catch (_: Exception) {
                 ui.update { it.copy(notice = TaskDetailNotice.Failed) }
+            } finally {
+                ui.update { it.copy(undoing = it.undoing - 1) }
             }
         }
     }
@@ -319,8 +343,8 @@ class TaskDetailViewModel @AssistedInject constructor(
         val current = state.value
         val task = current.task ?: return
         val form = current.form ?: return
-        // Not mid block write: the save closes the screen, which would cancel it.
-        if (!current.canEdit || current.saving || current.blockWriting) return
+        // Not mid block or subtask write: the save closes the screen, which would cancel it.
+        if (!current.canEdit || current.saving || current.blockWriting || current.subtaskWriting) return
         if (!form.isTitleValid) {
             ui.update { it.copy(notice = TaskDetailNotice.TitleRequired) }
             return
@@ -522,11 +546,12 @@ class TaskDetailViewModel @AssistedInject constructor(
         val stored = TaskForm.from(task)
         val form = edits ?: stored
         val byParent = snapshot.tasks.groupBy { it.parentId }
+        val canEdit = snapshot.viewerId != null && task.ownerId == snapshot.viewerId
         return TaskDetailUiState(
             loading = false,
             task = task,
             form = form,
-            canEdit = snapshot.viewerId != null && task.ownerId == snapshot.viewerId,
+            canEdit = canEdit,
             owner = snapshot.members.firstOrNull { it.id == task.ownerId },
             members = snapshot.members,
             categories = snapshot.categories.filter { it.isShared || it.ownerId == task.ownerId },
@@ -536,8 +561,10 @@ class TaskDetailViewModel @AssistedInject constructor(
                 .sortedBy { it.position },
             parent = task.parentId?.let { id -> snapshot.tasks.firstOrNull { it.id == id } },
             subtasks = subtaskItems(byParent[task.id].orEmpty(), snapshot, pending),
+            canAddSubtask = canEdit && depthOf(task, snapshot.tasks.associateBy { it.id }) < MAX_DEPTH,
             subtaskTitle = flags.subtaskTitle,
             addingSubtask = flags.addingSubtask,
+            subtaskWriting = flags.addingSubtask || pending.isNotEmpty() || flags.undoing > 0,
             progress = progressDeep(task.id, byParent),
             overdue = !form.done && isOverdue(form.dueDate, clock.today(viewerZone(viewer))),
             zone = viewerZone(viewer),
@@ -573,6 +600,8 @@ class TaskDetailViewModel @AssistedInject constructor(
         val saved: Boolean = false,
         val subtaskTitle: String = "",
         val addingSubtask: Boolean = false,
+        /** Subtask deletes being undone from this screen's snackbar. */
+        val undoing: Int = 0,
         val deleting: Boolean = false,
         val confirmDelete: DeletePlan.Confirm? = null,
         val deleted: Boolean = false,

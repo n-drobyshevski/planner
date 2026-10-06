@@ -3,6 +3,7 @@ package page.planr.android.feature.tasks
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -50,6 +51,41 @@ class TaskDeletionsTest {
 
         assertTrue(claimed.isEmpty())
         assertNull(deletions.pending.value, "dropped")
+    }
+
+    @Test
+    fun `a delete put back after a recreation is claimed again, with a fresh wait`() = runTest {
+        val clock = MovableClock()
+        val deletions = TaskDeletions(clock)
+        val deleted = TaskDeleted("a") {}
+        deletions.post(deleted)
+
+        val first = mutableListOf<TaskDeleted>()
+        val old = backgroundScope.launch { deletions.claims().toList(first) }
+        runCurrent()
+        assertEquals(listOf("a"), first.map { it.taskId })
+        assertNull(deletions.pending.value)
+
+        // Rotated mid-snackbar, near the end of the original wait.
+        old.cancel()
+        clock.now = NOW + TaskDeletions.EXPIRY + 1.seconds
+        deletions.putBack(deleted)
+
+        val again = mutableListOf<TaskDeleted>()
+        backgroundScope.launch { deletions.claims().toList(again) }
+        runCurrent()
+        assertSame(deleted, again.single())
+    }
+
+    @Test
+    fun `a newer delete waiting wins over one put back`() = runTest {
+        val deletions = TaskDeletions(MovableClock())
+        val newer = TaskDeleted("b") {}
+        deletions.post(newer)
+
+        deletions.putBack(TaskDeleted("a") {})
+
+        assertSame(newer, deletions.pending.value)
     }
 
     @Test
