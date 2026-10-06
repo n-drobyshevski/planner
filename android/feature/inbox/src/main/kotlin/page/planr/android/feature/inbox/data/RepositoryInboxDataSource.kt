@@ -85,8 +85,8 @@ class RepositoryInboxDataSource @Inject constructor(
 
     override suspend fun saveSleep(rating: SleepRating): SleepLog = sleep.save(rating)
 
-    override suspend fun createEvent(draft: PlannerEventDraft) {
-        events.createEvent(draft)
+    override suspend fun createEvent(id: String, draft: PlannerEventDraft) {
+        events.createEventOnce(id, draft)
     }
 
     override suspend fun markApproved(requestId: String) = timeslots.markApproved(requestId)

@@ -56,7 +56,11 @@ interface InboxDataSource {
 
     suspend fun saveSleep(rating: SleepRating): SleepLog
 
-    suspend fun createEvent(draft: PlannerEventDraft)
+    /**
+     * Creates [draft] as the event [id], at most once: when it already exists
+     * (an earlier attempt landed), nothing is created again.
+     */
+    suspend fun createEvent(id: String, draft: PlannerEventDraft)
 
     suspend fun markApproved(requestId: String)
 

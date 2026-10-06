@@ -51,13 +51,21 @@ class FakeInboxDataSource(zone: String = "Europe/Berlin") : InboxDataSource {
 
     val ratedEvents = mutableListOf<Pair<String, JsonObject>>()
     val ratedTasks = mutableListOf<Pair<String, JsonObject>>()
+    /** The events stored on the "server", in creation order; [createdEvents] by id. */
     val created = mutableListOf<PlannerEventDraft>()
+    val createdEvents = mutableMapOf<String, PlannerEventDraft>()
+
+    /** The id of every create asked for, repeats included. */
+    val createCalls = mutableListOf<String>()
     val approved = mutableListOf<String>()
     val declined = mutableListOf<String>()
     val savedSleep = mutableListOf<SleepRating>()
 
     var failRate: Exception? = null
     var failCreate: Exception? = null
+
+    /** Thrown after the event is stored: the insert landed, its answer didn't (a timeout). */
+    var lostCreateAnswer: Exception? = null
     var failApprove: Exception? = null
     var failDecline: Exception? = null
     var failSave: Exception? = null
@@ -124,10 +132,13 @@ class FakeInboxDataSource(zone: String = "Europe/Berlin") : InboxDataSource {
         return log
     }
 
-    override suspend fun createEvent(draft: PlannerEventDraft) {
+    override suspend fun createEvent(id: String, draft: PlannerEventDraft) {
         hold?.await()
         failCreate?.let { throw it }
-        created += draft
+        createCalls += id
+        // At most once per id, as the server's row with that id makes it.
+        if (createdEvents.putIfAbsent(id, draft) == null) created += draft
+        lostCreateAnswer?.let { throw it }
     }
 
     override suspend fun markApproved(requestId: String) {

@@ -50,7 +50,7 @@ class InboxViewModelTest {
     }
 
     private fun TestScope.viewModel(data: FakeInboxDataSource): InboxViewModel {
-        val vm = InboxViewModel(data, TestData.clock)
+        val vm = InboxViewModel(data, TestData.clock, backgroundScope)
         keepCollecting(vm.state)
         runCurrent()
         return vm
@@ -290,6 +290,73 @@ class InboxViewModelTest {
         assertEquals(1, data.created.size)
         assertEquals(listOf("r1"), data.approved)
         assertEquals(emptyList(), vm.state.value.requests)
+        vm.close()
+    }
+
+    @Test
+    fun `every attempt at an approval creates the event under the request's own id`() = runTest {
+        val data = data()
+        val vm = viewModel(data)
+
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+
+        assertEquals(listOf(InboxRules.approvedEventId("r1")), data.createCalls)
+        vm.close()
+    }
+
+    @Test
+    fun `leaving the screen mid-approval doesn't cut it between the event and the mark`() = runTest {
+        val data = data()
+        val vm = viewModel(data)
+        data.hold = CompletableDeferred()
+
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+        vm.close() // Back: the ViewModel is cleared while the write is in flight
+
+        data.hold!!.complete(Unit)
+        runCurrent()
+        assertEquals(1, data.created.size)
+        assertEquals(listOf("r1"), data.approved)
+    }
+
+    @Test
+    fun `approving again on a later visit finds the event the first visit made`() = runTest {
+        val data = data().apply { failApprove = IOException("offline") }
+        val first = viewModel(data)
+        first.approve(first.state.value.requests.single(), "Requested time")
+        runCurrent()
+        assertEquals(1, data.created.size)
+        first.close()
+
+        data.failApprove = null
+        val second = viewModel(data)
+        second.approve(second.state.value.requests.single(), "Requested time")
+        runCurrent()
+
+        assertEquals(1, data.created.size)
+        assertEquals(List(2) { InboxRules.approvedEventId("r1") }, data.createCalls)
+        assertEquals(listOf("r1"), data.approved)
+        assertEquals(emptyList(), second.state.value.requests)
+        second.close()
+    }
+
+    @Test
+    fun `an event whose insert landed but whose answer was lost isn't made twice`() = runTest {
+        val data = data().apply { lostCreateAnswer = IOException("timeout") }
+        val vm = viewModel(data)
+
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+        assertEquals(listOf("request:r1"), vm.state.value.requests.map { it.id })
+        assertEquals(InboxError.RequestFailed, vm.state.value.error)
+
+        data.lostCreateAnswer = null
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+        assertEquals(1, data.created.size)
+        assertEquals(listOf("r1"), data.approved)
         vm.close()
     }
 

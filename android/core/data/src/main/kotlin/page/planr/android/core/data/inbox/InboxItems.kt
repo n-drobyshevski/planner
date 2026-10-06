@@ -1,5 +1,6 @@
 package page.planr.android.core.data.inbox
 
+import java.util.UUID
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
@@ -240,6 +241,15 @@ object InboxRules {
         end = request.proposedEnd,
         timeZone = zone.id,
     )
+
+    /**
+     * The id of the event approving [requestId] creates: the same for every
+     * attempt, on any device or run of the app, so a retry after a lost
+     * answer, a closed screen or a killed process finds the event the first
+     * attempt made instead of creating a second one. A name-based UUID.
+     */
+    fun approvedEventId(requestId: String): String =
+        UUID.nameUUIDFromBytes("planr:timeslot-request:$requestId".toByteArray(Charsets.UTF_8)).toString()
 
     /**
      * A timed, active, non-context block that can carry a rating: sleep and

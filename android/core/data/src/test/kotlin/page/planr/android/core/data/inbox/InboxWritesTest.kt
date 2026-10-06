@@ -1,7 +1,9 @@
 package page.planr.android.core.data.inbox
 
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.serialization.json.JsonObject
@@ -55,6 +57,14 @@ class InboxWritesTest {
             ),
             draft,
         )
+    }
+
+    @Test
+    fun `the approved event's id is the request's own, the same on every attempt`() {
+        val id = InboxRules.approvedEventId("r1")
+        assertEquals(id, InboxRules.approvedEventId("r1"))
+        assertEquals(id, UUID.fromString(id).toString()) // a uuid the events.id column takes
+        assertNotEquals(id, InboxRules.approvedEventId("r2"))
     }
 
     @Test

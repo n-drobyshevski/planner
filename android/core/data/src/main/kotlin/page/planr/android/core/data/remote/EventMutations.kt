@@ -6,6 +6,7 @@ import kotlin.time.Instant
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
@@ -32,6 +33,22 @@ class EventMutations @Inject constructor(
         gateway.insert(SupabaseTables.EVENTS, listOf(EventPayloads.insertRow(draft)))
             .single()
             .decodeAs(PlannerEvent.serializer())
+
+    /**
+     * [createEvent] under a client-chosen [id], at most once: when a row with
+     * that id is already stored (an earlier attempt whose insert landed but
+     * whose answer was lost, or was cancelled after it), that row is returned
+     * and nothing is inserted. For a write that may be retried from scratch,
+     * such as approving a timeslot request.
+     */
+    suspend fun createEventOnce(id: String, draft: PlannerEventDraft): PlannerEvent {
+        gateway.select(SupabaseTables.EVENTS, filters = listOf(eq("id", id))).firstOrNull()
+            ?.let { return it.decodeAs(PlannerEvent.serializer()) }
+        val row = JsonObject(EventPayloads.insertRow(draft) + ("id" to JsonPrimitive(id)))
+        return gateway.insert(SupabaseTables.EVENTS, listOf(row))
+            .single()
+            .decodeAs(PlannerEvent.serializer())
+    }
 
     /**
      * `createEventsBulk`: many events in a few statements, one

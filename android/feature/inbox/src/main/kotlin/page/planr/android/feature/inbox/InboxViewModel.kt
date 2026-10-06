@@ -7,6 +7,8 @@ import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.inbox.InboxItem
 import page.planr.android.core.data.inbox.InboxRules
 import page.planr.android.core.data.model.SleepRatingForm
@@ -64,11 +67,19 @@ data class InboxUiState(
  * log. Resolving a row hides it at once; a write that fails brings it
  * back with a calm error. Approving creates the event at the proposed time
  * first, then marks the request approved.
+ *
+ * Those writes run in [writeScope] (the app's scope), not viewModelScope:
+ * leaving the screen right after a tap must not cut an approval between
+ * its event and its mark, which would leave the request pending to be
+ * approved again. The event's id comes from the request
+ * ([InboxRules.approvedEventId]), so approving again, here or on a later
+ * visit, finds the event already made rather than creating a second one.
  */
 @HiltViewModel
 class InboxViewModel @Inject constructor(
     private val data: InboxDataSource,
     private val clock: Clock,
+    @ApplicationScope private val writeScope: CoroutineScope,
 ) : ViewModel() {
 
     /** Rows resolved (or being resolved) here: gone from the screen before the data catches up. */
@@ -76,9 +87,6 @@ class InboxViewModel @Inject constructor(
     private val error = MutableStateFlow<InboxError?>(null)
     private val sheet = MutableStateFlow<InboxSleepSheet?>(null)
     private val refreshed = MutableStateFlow(false)
-
-    /** Requests whose event already exists: retrying a failed approval only marks them. */
-    private val eventCreated = mutableSetOf<String>()
 
     private var refreshJob: Job? = null
     private var errorTimeout: Job? = null
@@ -148,17 +156,14 @@ class InboxViewModel @Inject constructor(
     fun approve(item: InboxItem.Request, defaultTitle: String) {
         val snapshot = latest ?: return
         resolve(item.id, InboxError.RequestFailed) {
-            if (item.requestId !in eventCreated) {
-                val draft = InboxRules.approvedEvent(
-                    item,
-                    workspaceId = snapshot.viewer.workspaceId,
-                    ownerId = snapshot.viewer.memberId,
-                    defaultTitle = defaultTitle,
-                    zone = snapshot.zone,
-                )
-                data.createEvent(draft)
-                eventCreated += item.requestId
-            }
+            val draft = InboxRules.approvedEvent(
+                item,
+                workspaceId = snapshot.viewer.workspaceId,
+                ownerId = snapshot.viewer.memberId,
+                defaultTitle = defaultTitle,
+                zone = snapshot.zone,
+            )
+            data.createEvent(InboxRules.approvedEventId(item.requestId), draft)
             data.markApproved(item.requestId)
         }
     }
@@ -213,12 +218,16 @@ class InboxViewModel @Inject constructor(
         }
     }
 
-    /** Hides [id] and runs [write]; on failure the row comes back and [failure] shows. */
+    /**
+     * Hides [id] and runs [write] in [writeScope], so it finishes even when
+     * the screen is left (on the main thread, as the screen's own state
+     * changes are); on failure the row comes back and [failure] shows.
+     */
     private fun resolve(id: String, failure: InboxError, write: suspend () -> Unit) {
         if (id in hidden.value) return
         hidden.update { it + id }
         dismissError()
-        viewModelScope.launch {
+        writeScope.launch(Dispatchers.Main.immediate) {
             try {
                 write()
             } catch (e: CancellationException) {

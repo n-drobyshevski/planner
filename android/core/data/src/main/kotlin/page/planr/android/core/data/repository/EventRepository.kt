@@ -143,6 +143,10 @@ class EventRepository @Inject constructor(
     suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent =
         write({ mutations.createEvent(draft) }) { storeLocally(it) }
 
+    /** [createEvent] under [id], at most once ([EventMutations.createEventOnce]). */
+    suspend fun createEventOnce(id: String, draft: PlannerEventDraft): PlannerEvent =
+        write({ mutations.createEventOnce(id, draft) }) { storeLocally(it) }
+
     /**
      * Creates many events at once (an .ics import): one insert per 200
      * drafts, all or nothing, then one Room upsert and one widget refresh.
