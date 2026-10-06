@@ -53,6 +53,8 @@ data class PlannerEvent(
     @SerialName("created_at") val createdAt: Instant,
     @Serializable(with = PostgresInstantSerializer::class)
     @SerialName("updated_at") val updatedAt: Instant,
+    /** The member whose write last touched the row (server-stamped; never sent). */
+    @SerialName("updated_by") val updatedBy: String? = null,
 ) {
     val isRecurring: Boolean get() = rrule != null
 
