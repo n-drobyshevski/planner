@@ -8,6 +8,11 @@ plugins {
 
 android {
     namespace = "page.planr.android.feature.quickadd"
+
+    testOptions {
+        // Robolectric (the Quick Settings tile's intents) needs the merged manifest.
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -21,4 +26,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
