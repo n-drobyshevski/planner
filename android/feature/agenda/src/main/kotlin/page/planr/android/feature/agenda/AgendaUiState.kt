@@ -31,9 +31,11 @@ data class AgendaUiState(
     /** The focused period, counted in periods from today's. */
     val periodOffset: Int get() = AgendaPeriods.offsetOf(mode, today, focusDate)
 
-    /** The days of the period [offset] periods from today's. */
-    fun daysAt(offset: Int): List<LocalDate> =
-        AgendaPeriods.days(mode, AgendaPeriods.shiftedStart(mode, today, offset))
+    /** The first day of the period [offset] periods from today's (for Month, the 1st). */
+    fun periodStartAt(offset: Int): LocalDate = AgendaPeriods.shiftedStart(mode, today, offset)
+
+    /** The days of the period [offset] periods from today's (for Month, its six weeks). */
+    fun daysAt(offset: Int): List<LocalDate> = AgendaPeriods.days(mode, periodStartAt(offset))
 
     /** The focused period's days. */
     val days: List<LocalDate> get() = daysAt(periodOffset)

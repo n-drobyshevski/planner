@@ -11,6 +11,13 @@ internal object ViewKeys {
     val AGENDA_MODE = stringPreferencesKey("agenda_mode")
 
     /**
+     * Set while the agenda shows Month, which `member_app_prefs.agenda_mode`
+     * can't hold yet ([AgendaViewMode.synced]): it overrides [AGENDA_MODE]
+     * (still the synced Day / Week) on this device only.
+     */
+    val AGENDA_MONTH = booleanPreferencesKey("agenda_month")
+
+    /**
      * The wake date (yyyy-MM-dd) the morning sleep check-in was dismissed on,
      * per member. Device-only: [AppPrefsSync] never uploads it.
      */

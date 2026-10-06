@@ -74,6 +74,7 @@ import page.planr.android.feature.agenda.sleep.SleepCheckinViewModel
 import page.planr.android.feature.agenda.ui.AgendaFormats
 import page.planr.android.feature.agenda.ui.AgendaIcons
 import page.planr.android.feature.agenda.ui.LocalAgendaMetrics
+import page.planr.android.feature.agenda.ui.MonthPage
 import page.planr.android.feature.agenda.ui.PartnerToggleButton
 import page.planr.android.feature.agenda.ui.PeriodPage
 import page.planr.android.feature.agenda.ui.gridHoursAt
@@ -82,7 +83,7 @@ import page.planr.android.feature.agenda.ui.rememberAgendaMetrics
 import page.planr.android.feature.agenda.ui.scrollOffsetFor
 
 /**
- * Day / week agenda for both members: swipe or use the arrows between
+ * Day / week / month agenda for both members: swipe or use the arrows between
  * periods, Today to come back, pull down to refresh.
  *
  * @param onOpenEvent opens an occurrence's detail. The argument is the
@@ -247,6 +248,16 @@ private fun AgendaPager(
             if (pager.currentPage != target && !pager.isScrollInProgress) pager.animateScrollToPage(target)
         }
         HorizontalPager(state = pager, key = { it }, modifier = Modifier.fillMaxSize()) { page ->
+            if (state.mode == AgendaMode.Month) {
+                MonthPage(
+                    month = state.periodStartAt(page - CENTER_PAGE),
+                    schedule = state::schedule,
+                    today = state.today,
+                    formats = formats,
+                    onOpenDay = onOpenDay,
+                )
+                return@HorizontalPager
+            }
             val scroll = remember { ScrollState(scrollOffsetFor(gridHours, hourPx)) }
             LaunchedEffect(scroll) {
                 snapshotFlow { scroll.value }.collect {
@@ -283,10 +294,10 @@ private fun AgendaTopBar(
     accountAction: (@Composable () -> Unit)?,
 ) {
     val days = state.days
-    val title = if (days.size == 1) {
-        formats.dayTitle(days.single(), state.today.year)
-    } else {
-        formats.rangeTitle(days.first(), days.last())
+    val title = when (state.mode) {
+        AgendaMode.Day -> formats.dayTitle(days.single(), state.today.year)
+        AgendaMode.Week -> formats.rangeTitle(days.first(), days.last())
+        AgendaMode.Month -> formats.monthTitle(state.periodStartAt(state.periodOffset))
     }
     Column(
         modifier = Modifier
@@ -323,7 +334,13 @@ private fun AgendaTopBar(
                         icon = {},
                         label = {
                             Text(
-                                stringResource(if (mode == AgendaMode.Day) R.string.agenda_view_day else R.string.agenda_view_week),
+                                stringResource(
+                                    when (mode) {
+                                        AgendaMode.Day -> R.string.agenda_view_day
+                                        AgendaMode.Week -> R.string.agenda_view_week
+                                        AgendaMode.Month -> R.string.agenda_view_month
+                                    },
+                                ),
                                 maxLines = 1,
                             )
                         },

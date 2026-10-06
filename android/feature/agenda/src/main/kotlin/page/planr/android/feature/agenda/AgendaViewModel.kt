@@ -51,7 +51,7 @@ import page.planr.android.feature.agenda.model.scheduleDays
 import page.planr.android.feature.agenda.model.viewerZone
 
 /**
- * The day / week agenda. Reads occurrences from the local cache (kept fresh
+ * The day / week / month agenda. Reads occurrences from the local cache (kept fresh
  * by Realtime and background sync), fetches each newly shown window from
  * Supabase, and owns navigation between periods. Mode and focus survive
  * process death through [SavedStateHandle]; the mode is also saved to the
@@ -185,7 +185,7 @@ class AgendaViewModel @Inject constructor(
         focusOn(AgendaPeriods.shiftedStart(current.mode, current.today, offset), current)
     }
 
-    /** Opens [date] in the day view (from a week column header, "+N more", or a widget). */
+    /** Opens [date] in the day view (from a week column header, "+N more", a month cell, or a widget). */
     fun openDay(date: LocalDate) {
         pickMode(AgendaMode.Day)
         focusOn(date, AgendaMode.Day, state.value.today)

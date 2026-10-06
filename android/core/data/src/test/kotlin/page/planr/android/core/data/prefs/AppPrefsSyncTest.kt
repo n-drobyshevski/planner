@@ -245,6 +245,64 @@ class AppPrefsSyncTest {
     }
 
     @Test
+    fun `month stays on this device, over the synced day or week`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "week"))
+        val h = harness()
+        h.sync.pull()
+
+        h.view.setAgendaMode(AgendaViewMode.Month)
+        settle()
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        // The column only admits day / week: nothing is uploaded or left pending.
+        assertEquals(emptyList(), fake.callsOf<FakePostgrestGateway.Call.Upsert>())
+        assertNull(h.pending())
+
+        // Another setting changes elsewhere: the row's period is the same, Month stays.
+        h.sync.applyRemote(row(mode = "week", showPartner = true))
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        h.sync.pull()
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+
+        // An upload of another change carries the synced week, never "month".
+        h.view.setShowPartnerEvents(false)
+        settle()
+        assertEquals(JsonPrimitive("week"), storedRow()!!["agenda_mode"])
+
+        // Another device picks Day: this one follows.
+        h.sync.applyRemote(row(mode = "day"))
+        assertEquals(AgendaViewMode.Day, h.view.agendaMode.first())
+    }
+
+    @Test
+    fun `month on a fresh device survives a pull of the default day`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "day"))
+        val h = harness()
+        h.view.setAgendaMode(AgendaViewMode.Month)
+
+        h.sync.pull()
+
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        // Picking Week again leaves Month and syncs as before.
+        h.view.setAgendaMode(AgendaViewMode.Week)
+        settle()
+        assertEquals(AgendaViewMode.Week, h.view.agendaMode.first())
+        assertEquals(JsonPrimitive("week"), storedRow()!!["agenda_mode"])
+    }
+
+    @Test
+    fun `an account copy saying month, as the web names it, opens month here`() = runTest {
+        val h = harness()
+        h.view.setAgendaMode(AgendaViewMode.Week)
+        settle()
+
+        h.sync.applyRemote(row(mode = "month"))
+
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        assertEquals("month", AgendaViewMode.Month.wire)
+        assertEquals(AgendaViewMode.Month, AgendaViewMode.fromWire("month"))
+    }
+
+    @Test
     fun `sign-out clears the device copy`() = runTest {
         val h = harness()
         h.view.setShowPartnerEvents(false)

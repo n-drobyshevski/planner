@@ -53,6 +53,7 @@ class RepositoryAgendaDataSource @Inject constructor(
         when (it) {
             AgendaViewMode.Day -> AgendaMode.Day
             AgendaViewMode.Week -> AgendaMode.Week
+            AgendaViewMode.Month -> AgendaMode.Month
         }
     }
 
@@ -60,6 +61,7 @@ class RepositoryAgendaDataSource @Inject constructor(
         when (mode) {
             AgendaMode.Day -> AgendaViewMode.Day
             AgendaMode.Week -> AgendaViewMode.Week
+            AgendaMode.Month -> AgendaViewMode.Month
         },
     )
 

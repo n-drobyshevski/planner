@@ -41,7 +41,7 @@ interface AgendaDataSource {
 
     suspend fun setShowPartnerEvents(show: Boolean)
 
-    /** The last-used Day / Week mode (synced to the account, default Day). */
+    /** The last-used mode (Day / Week synced to the account, Month kept on the device; default Day). */
     fun observeAgendaMode(): Flow<AgendaMode>
 
     suspend fun setAgendaMode(mode: AgendaMode)

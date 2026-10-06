@@ -102,6 +102,37 @@ class AgendaViewModelTest {
     }
 
     @Test
+    fun `month mode shows the month's six weeks, swipes by months and opens a day`() = runTest {
+        val vm = viewModel()
+
+        vm.setMode(AgendaMode.Month)
+        runCurrent()
+        assertEquals(AgendaMode.Month, data.agendaMode.value)
+        val october = vm.state.value
+        assertEquals(LocalDate(2026, 10, 1), october.periodStartAt(october.periodOffset))
+        assertEquals(42, october.days.size)
+        assertEquals(LocalDate(2026, 9, 28), october.days.first())
+        assertEquals(LocalDate(2026, 11, 8), october.days.last())
+        // September's grid to November's, filled before a swipe reveals them.
+        assertEquals(Instant.parse("2026-08-30T22:00:00Z"), data.observedWindows.last().start)
+        assertEquals(Instant.parse("2026-12-06T23:00:00Z"), data.observedWindows.last().end)
+
+        vm.showPeriod(1)
+        assertEquals(1, vm.state.value.periodOffset)
+        assertEquals(LocalDate(2026, 10, 26), vm.state.value.days.first())
+        vm.previous()
+        vm.previous()
+        assertEquals(-1, vm.state.value.periodOffset)
+        assertEquals(LocalDate(2026, 9, 1), vm.state.value.focusDate)
+
+        // A day cell opens that day.
+        vm.openDay(LocalDate(2026, 9, 17))
+        assertEquals(AgendaMode.Day, vm.state.value.mode)
+        assertEquals(listOf(LocalDate(2026, 9, 17)), vm.state.value.days)
+        vm.close()
+    }
+
+    @Test
     fun `opening another day of today's week lands on that day, not today`() = runTest {
         val vm = viewModel()
         vm.setMode(AgendaMode.Week)

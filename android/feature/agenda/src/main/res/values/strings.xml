@@ -13,6 +13,7 @@
     <string name="agenda_next">Next</string>
     <string name="agenda_view_day">Day</string>
     <string name="agenda_view_week">Week</string>
+    <string name="agenda_view_month">Month</string>
     <string name="agenda_new_event">New event</string>
     <!-- Header toggle for the partner's personal events (read with its on/off state). -->
     <string name="agenda_partner_events">%1$s’s events</string>
@@ -22,6 +23,14 @@
     <!-- A count badge, "+3 more"; the web keeps it a plain string too. -->
     <string name="agenda_more_count" tools:ignore="PluralsCandidate">+%1$d more</string>
     <string name="agenda_go_to">Go to %1$s</string>
+    <!-- A month cell's overflow, "+2": the cell is too narrow for "+2 more". -->
+    <string name="agenda_month_more">+%1$d</string>
+    <!-- What TalkBack reads for a month cell: "6 October, 3 events". -->
+    <plurals name="agenda_month_day_events">
+        <item quantity="one">%1$s, %2$d event</item>
+        <item quantity="other">%1$s, %2$d events</item>
+    </plurals>
+    <string name="agenda_month_day_free">%1$s, no events</string>
     <string name="agenda_refresh_failed">Couldn\'t refresh. Showing what\'s saved on this device.</string>
 
     <!-- Event block accessibility (calendar.block) -->

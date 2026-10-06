@@ -30,6 +30,8 @@ internal class AgendaFormats(private val locale: Locale, is24Hour: Boolean) {
     private val dayMonth = formatter("dMMM")
     private val dayMonthYear = formatter("dMMMy")
     private val weekdayDayMonth = formatter("EEEdMMM")
+    private val dayMonthLong = formatter("dMMMM")
+    private val monthYear = formatter("LLLLy")
 
     fun time(instant: Instant, zone: TimeZone): String = time(instant.toLocalDateTime(zone).time)
 
@@ -45,6 +47,12 @@ internal class AgendaFormats(private val locale: Locale, is24Hour: Boolean) {
     /** "28 Sep – 4 Oct 2026". */
     fun rangeTitle(first: LocalDate, last: LocalDate): String =
         "${dayMonth.format(first.toJavaLocalDate())} – ${dayMonthYear.format(last.toJavaLocalDate())}"
+
+    /** "October 2026": the Month view's title. */
+    fun monthTitle(month: LocalDate): String = monthYear.format(month.toJavaLocalDate())
+
+    /** "6 October": a month cell, as TalkBack reads it. */
+    fun dayMonth(date: LocalDate): String = dayMonthLong.format(date.toJavaLocalDate())
 
     /** "4 Oct 2026": dates in the editor and recurrence summary. */
     fun date(date: LocalDate): String = dayMonthYear.format(date.toJavaLocalDate())

@@ -7,6 +7,7 @@
     <string name="agenda_next">Вперёд</string>
     <string name="agenda_view_day">День</string>
     <string name="agenda_view_week">Неделя</string>
+    <string name="agenda_view_month">Месяц</string>
     <string name="agenda_new_event">Новое событие</string>
     <string name="agenda_partner_events">События: %1$s</string>
     <string name="agenda_quick_add">Быстро добавить</string>
@@ -14,6 +15,14 @@
     <string name="agenda_untitled">Без названия</string>
     <string name="agenda_more_count">ещё +%1$d</string>
     <string name="agenda_go_to">Перейти к %1$s</string>
+    <string name="agenda_month_more">+%1$d</string>
+    <plurals name="agenda_month_day_events">
+        <item quantity="one">%1$s, %2$d событие</item>
+        <item quantity="few">%1$s, %2$d события</item>
+        <item quantity="many">%1$s, %2$d событий</item>
+        <item quantity="other">%1$s, %2$d события</item>
+    </plurals>
+    <string name="agenda_month_day_free">%1$s, событий нет</string>
     <string name="agenda_refresh_failed">Не удалось обновить. Показано то, что сохранено на устройстве.</string>
 
     <string name="agenda_block_time_range">с %1$s до %2$s</string>

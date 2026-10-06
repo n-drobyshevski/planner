@@ -11,11 +11,22 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 
-/** The agenda's period, as saved (`member_app_prefs.agenda_mode`). */
+/**
+ * The agenda's period, as saved (`member_app_prefs.agenda_mode`; the wire
+ * values are the web calendar's view names).
+ */
 enum class AgendaViewMode(val wire: String) {
     Day("day"),
     Week("week"),
+    Month("month"),
     ;
+
+    /**
+     * Whether the account copy can hold it: `member_app_prefs.agenda_mode`'s
+     * check constraint admits `day` and `week` only, so Month is kept on
+     * this device ([ViewKeys.AGENDA_MONTH]) until the column admits it.
+     */
+    val synced: Boolean get() = this != Month
 
     companion object {
         /** Anything unknown reads as [Day], the default. */
@@ -38,7 +49,10 @@ interface ViewPreferences {
     /** Saves [show] and re-renders the widgets with it. */
     suspend fun setShowPartnerEvents(show: Boolean)
 
-    /** The agenda's last-used period. Default [AgendaViewMode.Day]. */
+    /**
+     * The agenda's last-used period. Default [AgendaViewMode.Day]. Day and
+     * Week follow the member's account; Month is this device's ([AgendaViewMode.synced]).
+     */
     val agendaMode: Flow<AgendaViewMode>
 
     suspend fun setAgendaMode(mode: AgendaViewMode)
@@ -60,7 +74,7 @@ class DataStoreViewPreferences @Inject constructor(
         dataStore.data.map { it[ViewKeys.SHOW_PARTNER_EVENTS] ?: true }.distinctUntilChanged()
 
     override val agendaMode: Flow<AgendaViewMode> =
-        dataStore.data.map { AgendaViewMode.fromWire(it[ViewKeys.AGENDA_MODE]) }.distinctUntilChanged()
+        dataStore.data.map { agendaModeOf(it) }.distinctUntilChanged()
 
     override suspend fun setShowPartnerEvents(show: Boolean) {
         changes.localChange { dataStore.edit { it[ViewKeys.SHOW_PARTNER_EVENTS] = show } }
@@ -68,6 +82,20 @@ class DataStoreViewPreferences @Inject constructor(
     }
 
     override suspend fun setAgendaMode(mode: AgendaViewMode) {
-        changes.localChange { dataStore.edit { it[ViewKeys.AGENDA_MODE] = mode.wire } }
+        if (!mode.synced) {
+            // Nothing the account copy can take: stays on this device, over the synced mode.
+            dataStore.edit { it[ViewKeys.AGENDA_MONTH] = true }
+            return
+        }
+        changes.localChange {
+            dataStore.edit {
+                it[ViewKeys.AGENDA_MODE] = mode.wire
+                it.remove(ViewKeys.AGENDA_MONTH)
+            }
+        }
     }
 }
+
+/** The saved agenda mode: this device's Month when picked, else the synced Day / Week. */
+internal fun agendaModeOf(prefs: Preferences): AgendaViewMode =
+    if (prefs[ViewKeys.AGENDA_MONTH] == true) AgendaViewMode.Month else AgendaViewMode.fromWire(prefs[ViewKeys.AGENDA_MODE])
