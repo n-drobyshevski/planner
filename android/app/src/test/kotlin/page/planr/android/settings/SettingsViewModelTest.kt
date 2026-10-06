@@ -4,7 +4,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -160,6 +163,36 @@ class SettingsViewModelTest {
         assertEquals(SleepSettings.Ready(SleepBlockPrefs()), vm.state.value.sleep)
     }
 
+    @Test
+    fun `quick changes are sent in the order they were made, even on a scope that reorders`() = runTest {
+        // The application scope is multi-threaded: two launches may start in
+        // either order. This one runs whatever was dispatched last first.
+        val reordering = LastFirstDispatcher()
+        val vm = SettingsViewModel(data, CoroutineScope(reordering))
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
+        runCurrent()
+        val gate = CompletableDeferred<Unit>()
+        data.sleepGate = gate
+        data.memberGate = gate
+
+        vm.setNightStart(21)
+        vm.setNightStart(22)
+        vm.setNightStart(23)
+        vm.setTimezone("Asia/Tokyo")
+        vm.setTimezone("America/New_York")
+        gate.complete(Unit)
+        reordering.drain()
+        runCurrent()
+
+        assertEquals(listOf(21, 22, 23), data.sleepWrites.map { (it.nightWindowStartHour as PatchField.Value).value })
+        assertEquals(23, (vm.state.value.sleep as SleepSettings.Ready).prefs.nightWindowStartHour)
+        assertEquals(
+            listOf("Asia/Tokyo", "America/New_York"),
+            data.memberWrites.map { (it.timezone as PatchField.Value).value },
+        )
+        assertEquals("America/New_York", vm.state.value.time?.timezone)
+    }
+
     private companion object {
         const val WS = "ws-1"
         const val ANNA = "member-a"
@@ -208,6 +241,19 @@ private class FakeSettingsDataSource(members: List<Member>, categories: List<Cat
         failSleep?.let { throw it }
         sleep = patch.applyTo(sleep)
         return sleep
+    }
+}
+
+/** Holds dispatched work until [drain], then runs the newest first. */
+private class LastFirstDispatcher : CoroutineDispatcher() {
+    private val queue = ArrayDeque<Runnable>()
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        queue.addLast(block)
+    }
+
+    fun drain() {
+        while (queue.isNotEmpty()) queue.removeLast().run()
     }
 }
 

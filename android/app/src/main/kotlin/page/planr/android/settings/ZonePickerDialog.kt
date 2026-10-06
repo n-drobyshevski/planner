@@ -1,7 +1,6 @@
 package page.planr.android.settings
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -76,7 +76,7 @@ internal fun ZonePickerDialog(
                     if (shownPartners.isNotEmpty()) {
                         group(R.string.settings_time_group_workspace)
                         items(shownPartners, key = { "partner:${it.zone}" }) { partner ->
-                            ZoneRow(partner.name, zoneLabel(partner.zone), selected = false) { onPick(partner.zone) }
+                            ZoneRow(partner.name, zoneLabel(partner.zone), selected = partner.zone == current) { onPick(partner.zone) }
                         }
                     }
                     if (zones.isNotEmpty()) {
@@ -120,7 +120,8 @@ private fun ZoneRow(label: String, hint: String?, selected: Boolean, onClick: ()
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = PlanrSpacing.touchTarget)
-            .clickable(role = Role.Button, onClick = onClick),
+            // The current choice is announced as selected, not only shown in bold.
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm),
     ) {

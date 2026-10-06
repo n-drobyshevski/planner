@@ -1,6 +1,5 @@
 package page.planr.android.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -40,7 +40,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -97,26 +100,34 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 
 @Composable
 private fun SettingsContent(state: SettingsUiState, time: TimeSettings, viewModel: SettingsViewModel, modifier: Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = PlanrSpacing.xl, vertical = PlanrSpacing.sm),
-        verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xl),
-    ) {
+    Column(modifier.fillMaxSize()) {
+        // Pinned above the scroll, so a failed change at the bottom (sleep)
+        // still shows its line; read out once as it appears.
         if (state.error == SettingsError.SaveFailed) {
             Text(
                 stringResource(R.string.settings_save_failed),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PlanrSpacing.xl, vertical = PlanrSpacing.sm)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
-        TimeZoneSection(state, time, viewModel)
-        HorizontalDivider()
-        NotificationsSection(time, viewModel)
-        HorizontalDivider()
-        SleepSection(state, viewModel)
-        Spacer(Modifier.size(PlanrSpacing.xl))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = PlanrSpacing.xl, vertical = PlanrSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xl),
+        ) {
+            TimeZoneSection(state, time, viewModel)
+            HorizontalDivider()
+            NotificationsSection(time, viewModel)
+            HorizontalDivider()
+            SleepSection(state, viewModel)
+            Spacer(Modifier.size(PlanrSpacing.xl))
+        }
     }
 }
 
@@ -247,7 +258,7 @@ private fun SleepFields(prefs: SleepBlockPrefs, categories: List<Category>, view
         description = stringResource(R.string.settings_sleep_category_description),
     ) {
         val none = stringResource(R.string.settings_sleep_category_none)
-        // A category that is gone (or not the viewer's) still reads as itself until changed.
+        // One that isn't offered (gone from this device's cache, or not the viewer's) reads as "None".
         val selected = categories.firstOrNull { it.id == prefs.sleepCategoryId }?.name ?: none
         ChoiceField(
             selected = selected,
@@ -317,14 +328,14 @@ private fun Hint(text: String, modifier: Modifier = Modifier) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
 }
 
-/** A labelled switch; the whole row toggles it. */
+/** A labelled switch; the whole row toggles it and reads as one switch to TalkBack. */
 @Composable
 private fun SwitchRow(label: String, description: String?, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = PlanrSpacing.touchTarget)
-            .clickable { onCheckedChange(!checked) },
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.lg),
     ) {
@@ -332,7 +343,7 @@ private fun SwitchRow(label: String, description: String?, checked: Boolean, onC
             Text(label, style = MaterialTheme.typography.bodyLarge)
             description?.let { Hint(it) }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

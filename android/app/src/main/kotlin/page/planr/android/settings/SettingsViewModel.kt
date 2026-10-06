@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,7 +64,9 @@ data class SettingsUiState(
  * columns). A failed write rolls the control back and leaves a calm error
  * line. Writes run in the application scope, so leaving the screen right
  * after a tap doesn't cancel them, and each kind is sent one at a time, in
- * order.
+ * order: each write joins its queue on the caller's thread
+ * ([CoroutineStart.UNDISPATCHED]) before the multi-threaded application
+ * scope can reorder two quick taps.
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -156,7 +159,7 @@ class SettingsViewModel @Inject constructor(
         if (state.value.time == null) return
         memberPending.update { it + patch }
         error.value = null
-        writeScope.launch {
+        writeScope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 memberWrites.withLock { data.updateMemberPreferences(patch) }
             } catch (e: CancellationException) {
@@ -174,7 +177,7 @@ class SettingsViewModel @Inject constructor(
         if (sleepStored.value !is SleepSettings.Ready) return
         sleepPending.update { it + patch }
         error.value = null
-        writeScope.launch {
+        writeScope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 sleepWrites.withLock { sleepStored.value = SleepSettings.Ready(data.saveSleepPrefs(patch)) }
             } catch (e: CancellationException) {
