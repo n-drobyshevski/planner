@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import page.planr.android.core.model.AppLocale
 import page.planr.android.core.model.ThemePreference
 
 class AppearanceRulesTest {
@@ -30,5 +31,28 @@ class AppearanceRulesTest {
         assertTrue(AppearanceRules.shouldApplyTheme(lastApplied = null, wanted = ThemePreference.System))
         assertTrue(AppearanceRules.shouldApplyTheme(lastApplied = ThemePreference.Light, wanted = ThemePreference.Dark))
         assertFalse(AppearanceRules.shouldApplyTheme(lastApplied = ThemePreference.Dark, wanted = ThemePreference.Dark))
+    }
+
+    @Test
+    fun `member locale maps to the web's language tags`() {
+        assertEquals("en", AppearanceRules.languageTagFor(AppLocale.En))
+        assertEquals("ru", AppearanceRules.languageTagFor(AppLocale.Ru))
+    }
+
+    @Test
+    fun `a language the app already shows is left alone`() {
+        // Following an English system, region and all.
+        assertNull(AppearanceRules.localeTagToApply(AppLocale.En, appTags = emptyList(), systemTags = listOf("en-GB", "ru-RU")))
+        // Its own override already Russian, whatever the system says.
+        assertNull(AppearanceRules.localeTagToApply(AppLocale.Ru, appTags = listOf("ru"), systemTags = listOf("en-US")))
+        assertNull(AppearanceRules.localeTagToApply(AppLocale.Ru, appTags = listOf("ru-RU"), systemTags = emptyList()))
+    }
+
+    @Test
+    fun `another language is set, keeping a matching system region`() {
+        assertEquals("ru-RU", AppearanceRules.localeTagToApply(AppLocale.Ru, appTags = emptyList(), systemTags = listOf("en-GB", "ru-RU")))
+        assertEquals("en-GB", AppearanceRules.localeTagToApply(AppLocale.En, appTags = listOf("ru"), systemTags = listOf("ru-RU", "en-GB")))
+        assertEquals("ru", AppearanceRules.localeTagToApply(AppLocale.Ru, appTags = emptyList(), systemTags = listOf("de-DE")))
+        assertEquals("en", AppearanceRules.localeTagToApply(AppLocale.En, appTags = listOf("ru"), systemTags = emptyList()))
     }
 }
