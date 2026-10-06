@@ -1,7 +1,6 @@
 package page.planr.android.core.data.sync
 
 import androidx.lifecycle.Lifecycle
-import androidx.work.Data
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -36,9 +35,8 @@ class BackgroundSyncSkipTest {
     }
 
     @Test
-    fun `the sync-now request is marked requested, a request without input is not`() {
-        val input = SyncScheduler.syncNowRequest().workSpec.input
-        assertTrue(input.getBoolean(SyncScheduler.KEY_REQUESTED, false))
-        assertFalse(Data.EMPTY.getBoolean(SyncScheduler.KEY_REQUESTED, false))
+    fun `the sync-now request is marked requested, the periodic one is not`() {
+        assertTrue(SyncScheduler.syncNowRequest().workSpec.input.getBoolean(SyncScheduler.KEY_REQUESTED, false))
+        assertFalse(SyncScheduler.periodicRequest().workSpec.input.getBoolean(SyncScheduler.KEY_REQUESTED, false))
     }
 }

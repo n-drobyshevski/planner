@@ -50,10 +50,10 @@ fun interface AppPrefsChanges {
  * Network calls are serialized by [network] (a pull never reads a row older
  * than an upload that already finished); DataStore read-modify-writes by
  * [local], which is never held across the network, so a toggle never waits
- * on it. Pulls go through [coalescer]: the ones asked at once at a cold start
- * or a sign-in (the sign-in pull, the requested sync, the Realtime join)
- * share one read, and an unforced one skips a read done moments ago, unless
- * the Realtime join outdated it ([RefreshCoalescer]).
+ * on it. Pulls go through [coalescer]: the ones asked at once (the sign-in
+ * pull and a fresh sign-in's requested sync, a resume) share one read, and
+ * an unforced one skips a read done moments ago. A Realtime join outdates
+ * both, so its pull always reads anew ([RefreshCoalescer]).
  */
 @Singleton
 class AppPrefsSync @Inject constructor(

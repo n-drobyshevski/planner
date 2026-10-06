@@ -7,6 +7,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
@@ -81,9 +82,7 @@ class SyncScheduler @Inject constructor(
             // UPDATE, not KEEP: an install that scheduled the old 30-minute
             // request picks up the new period and constraints (its timing stays).
             ExistingPeriodicWorkPolicy.UPDATE,
-            PeriodicWorkRequestBuilder<SyncWorker>(PERIOD_MINUTES, TimeUnit.MINUTES)
-                .setConstraints(periodicConstraints())
-                .build(),
+            periodicRequest(),
         )
         if (syncNow) syncNow()
     }
@@ -93,13 +92,6 @@ class SyncScheduler @Inject constructor(
         work.cancelUniqueWork(PERIODIC)
         work.cancelUniqueWork(ONE_TIME)
     }
-
-    /** A sync nobody asked for waits for a network and a battery that isn't low. */
-    private fun periodicConstraints() =
-        Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .setRequiresBatteryNotLow(true)
-            .build()
 
     internal companion object {
         /**
@@ -111,6 +103,20 @@ class SyncScheduler @Inject constructor(
         const val PERIODIC = "planr-sync-periodic"
         const val ONE_TIME = "planr-sync-now"
         const val PERIOD_MINUTES = 120L
+
+        /**
+         * The two-hourly request, without [KEY_REQUESTED]: a sync nobody asked
+         * for waits for a network and a battery that isn't low.
+         */
+        fun periodicRequest(): PeriodicWorkRequest =
+            PeriodicWorkRequestBuilder<SyncWorker>(PERIOD_MINUTES, TimeUnit.MINUTES)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiresBatteryNotLow(true)
+                        .build(),
+                )
+                .build()
 
         /** The one-time [syncNow] request: on a network, marked [KEY_REQUESTED]. */
         fun syncNowRequest(): OneTimeWorkRequest =
