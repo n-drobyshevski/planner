@@ -37,6 +37,7 @@ import page.planr.android.core.data.auth.StoredSession
 import page.planr.android.core.data.auth.TestTokens
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.remote.AppPrefsRemote
 import page.planr.android.core.data.remote.EventMutations
@@ -169,6 +170,62 @@ class NoOpRefreshTest {
     }
 
     @Test
+    fun `a change a screen's refresh wrote redraws the widgets though the rejoin after it finds none`() = runTest {
+        val h = harness()
+        h.runner.syncAll()
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(1, widgetRenders, "the sync's own render covers what its refreshes requested")
+
+        // The partner moved the event while the app was closed: the agenda
+        // (a screen's refresh, not the sync's) writes the change into Room…
+        replace(SupabaseTables.EVENTS, Fixtures.eventRow(updatedAt = "2026-06-02T08:00:00.000001+00:00"))
+        assertTrue(h.events.refreshWindow(SyncWindows.aroundToday(clock), force = true))
+        // …and the Realtime join just after it refetches the same rows.
+        gate.outdateSnapshots()
+        h.runner.syncVisible()
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        assertEquals(2, widgetRenders)
+    }
+
+    @Test
+    fun `every snapshot refresh that changes the cache redraws the widgets, whoever asks`() = runTest {
+        val h = harness()
+
+        assertTrue(h.events.refreshWindow(june, force = true))
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(1, widgetRenders, "window")
+
+        assertTrue(h.tasks.refresh(force = true))
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(2, widgetRenders, "tasks")
+
+        assertTrue(h.workspace.refresh(force = true))
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(3, widgetRenders, "reference data")
+
+        gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow(id = "block", taskId = Fixtures.TASK_ID))
+        h.events.refreshTaskBlocks(Fixtures.TASK_ID)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(4, widgetRenders, "task blocks")
+
+        // Nothing differs: no redraw.
+        h.events.refreshWindow(june, force = true)
+        h.tasks.refresh(force = true)
+        h.workspace.refresh(force = true)
+        h.events.refreshTaskBlocks(Fixtures.TASK_ID)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(4, widgetRenders)
+    }
+
+    @Test
     fun `nothing to sync still re-plans reminders`() = runTest {
         harness().runner.catchUpClock()
         assertEquals(0 to 1, widgetRenders to clockBoundRenders)
@@ -214,7 +271,10 @@ class NoOpRefreshTest {
         val events = EventRepository(session, queries, EventMutations(gateway), db, gate, widgets)
         val tasks = TaskRepository(session, queries, TaskMutations(gateway), db, gate, widgets, clock)
         val workspace = WorkspaceRepository(session, queries, MemberMutations(gateway), db.workspaceDao(), gate, widgets)
-        val prefs = AppPrefsSync(MemoryDataStore(), MemoryDataStore(), AppPrefsRemote(gateway), session, widgets, backgroundScope)
+        val prefs = AppPrefsSync(
+            MemoryDataStore(), MemoryDataStore(), AppPrefsRemote(gateway), session, widgets, backgroundScope,
+            RefreshCoalescer(gate, clock),
+        )
         val runner = SyncRunner(session, workspace, events, tasks, VisibleWindowTracker(), widgets, prefs, clock)
         runCurrent() // the widget dispatcher starts listening
         return Harness(events, tasks, workspace, runner)

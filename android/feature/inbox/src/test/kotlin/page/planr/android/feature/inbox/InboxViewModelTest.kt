@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -22,6 +23,8 @@ import org.junit.Test
 import page.planr.android.core.data.inbox.InboxItem
 import page.planr.android.core.data.inbox.InboxRules
 import page.planr.android.core.data.model.SleepLog
+import page.planr.android.core.data.remote.StaleWriteException
+import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.design.component.SleepRatingDraft
 import page.planr.android.core.model.PlannerEventDraft
 
@@ -49,7 +52,7 @@ class InboxViewModelTest {
     }
 
     private fun TestScope.viewModel(data: FakeInboxDataSource): InboxViewModel {
-        val vm = InboxViewModel(data, TestData.clock)
+        val vm = InboxViewModel(data, TestData.clock, backgroundScope)
         keepCollecting(vm.state)
         runCurrent()
         return vm
@@ -122,6 +125,43 @@ class InboxViewModelTest {
     }
 
     @Test
+    fun `a rating merges into the attributes as stored when it's written, not the row's old copy`() = runTest {
+        val data = data()
+        data.occurrences.value = listOf(TestData.event("ev", attributes = JsonObject(mapOf("energy" to JsonPrimitive(2)))))
+        val vm = viewModel(data)
+        data.hold = CompletableDeferred()
+
+        vm.rate(vm.state.value.ratings.first { it is InboxItem.RateEvent }, "3")
+        runCurrent()
+        // The partner's attribute lands before the write does.
+        data.occurrences.value = listOf(
+            TestData.event("ev", attributes = JsonObject(mapOf("energy" to JsonPrimitive(2), "priority" to JsonPrimitive(1)))),
+        )
+        data.hold!!.complete(Unit)
+        runCurrent()
+
+        assertEquals(
+            JsonObject(mapOf("energy" to JsonPrimitive(2), "priority" to JsonPrimitive(1), "satisfaction" to JsonPrimitive(3))),
+            data.ratedEvents.single().second,
+        )
+        vm.close()
+    }
+
+    @Test
+    fun `a rating that a change elsewhere got ahead of comes back to rate again`() = runTest {
+        val data = data().apply { failRate = StaleWriteException(SupabaseTables.TASKS, "tk") }
+        val vm = viewModel(data)
+
+        vm.rate(vm.state.value.ratings.first { it is InboxItem.RateTask }, "2")
+        runCurrent()
+
+        assertEquals(listOf("rate-event:ev", "rate-task:tk"), vm.state.value.ratings.map { it.id })
+        assertEquals(InboxError.RateFailed, vm.state.value.error)
+        assertEquals(emptyList(), data.ratedTasks)
+        vm.close()
+    }
+
+    @Test
     fun `rating a task writes through the task path`() = runTest {
         val data = data()
         val vm = viewModel(data)
@@ -147,6 +187,59 @@ class InboxViewModelTest {
 
         data.failRate = null
         vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        assertNull(vm.state.value.error)
+        vm.close()
+    }
+
+    @Test
+    fun `the error line goes on its own after a few seconds`() = runTest {
+        val data = data().apply { failRate = IOException("offline") }
+        val vm = viewModel(data)
+
+        vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        advanceTimeBy(InboxViewModel.ERROR_VISIBLE_MS - 1)
+        runCurrent()
+        assertEquals(InboxError.RateFailed, vm.state.value.error)
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertNull(vm.state.value.error)
+        vm.close()
+    }
+
+    @Test
+    fun `a second failure shows for its own full time`() = runTest {
+        val data = data().apply { failDecline = IOException("offline") }
+        val vm = viewModel(data)
+
+        vm.decline(vm.state.value.requests.first())
+        runCurrent()
+        advanceTimeBy(InboxViewModel.ERROR_VISIBLE_MS - 1_000)
+        vm.decline(vm.state.value.requests.first())
+        runCurrent()
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertEquals(InboxError.RequestFailed, vm.state.value.error)
+        vm.close()
+    }
+
+    @Test
+    fun `tapping the error line or coming back to the screen clears it`() = runTest {
+        val data = data().apply { failRate = IOException("offline") }
+        val vm = viewModel(data)
+
+        vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        vm.dismissError()
+        runCurrent()
+        assertNull(vm.state.value.error)
+
+        vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        assertEquals(InboxError.RateFailed, vm.state.value.error)
+        vm.refresh()
         runCurrent()
         assertNull(vm.state.value.error)
         vm.close()
@@ -236,6 +329,73 @@ class InboxViewModelTest {
         assertEquals(1, data.created.size)
         assertEquals(listOf("r1"), data.approved)
         assertEquals(emptyList(), vm.state.value.requests)
+        vm.close()
+    }
+
+    @Test
+    fun `every attempt at an approval creates the event under the request's own id`() = runTest {
+        val data = data()
+        val vm = viewModel(data)
+
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+
+        assertEquals(listOf(InboxRules.approvedEventId("r1")), data.createCalls)
+        vm.close()
+    }
+
+    @Test
+    fun `leaving the screen mid-approval doesn't cut it between the event and the mark`() = runTest {
+        val data = data()
+        val vm = viewModel(data)
+        data.hold = CompletableDeferred()
+
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+        vm.close() // Back: the ViewModel is cleared while the write is in flight
+
+        data.hold!!.complete(Unit)
+        runCurrent()
+        assertEquals(1, data.created.size)
+        assertEquals(listOf("r1"), data.approved)
+    }
+
+    @Test
+    fun `approving again on a later visit finds the event the first visit made`() = runTest {
+        val data = data().apply { failApprove = IOException("offline") }
+        val first = viewModel(data)
+        first.approve(first.state.value.requests.single(), "Requested time")
+        runCurrent()
+        assertEquals(1, data.created.size)
+        first.close()
+
+        data.failApprove = null
+        val second = viewModel(data)
+        second.approve(second.state.value.requests.single(), "Requested time")
+        runCurrent()
+
+        assertEquals(1, data.created.size)
+        assertEquals(List(2) { InboxRules.approvedEventId("r1") }, data.createCalls)
+        assertEquals(listOf("r1"), data.approved)
+        assertEquals(emptyList(), second.state.value.requests)
+        second.close()
+    }
+
+    @Test
+    fun `an event whose insert landed but whose answer was lost isn't made twice`() = runTest {
+        val data = data().apply { lostCreateAnswer = IOException("timeout") }
+        val vm = viewModel(data)
+
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+        assertEquals(listOf("request:r1"), vm.state.value.requests.map { it.id })
+        assertEquals(InboxError.RequestFailed, vm.state.value.error)
+
+        data.lostCreateAnswer = null
+        vm.approve(vm.state.value.requests.single(), "Requested time")
+        runCurrent()
+        assertEquals(1, data.created.size)
+        assertEquals(listOf("r1"), data.approved)
         vm.close()
     }
 

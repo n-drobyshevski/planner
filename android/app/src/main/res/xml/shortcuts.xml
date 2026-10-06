@@ -3,7 +3,10 @@
      must name the package outright: targetPackage is the applicationId (no
      build type adds a suffix). Quick add opens on its kind through
      QuickAddActivity.EXTRA_MODE, as the Quick add widget does; Tasks opens
-     the app through the widgets' open action and route (WidgetLaunch).
+     the app through the widgets' open action and route (WidgetLaunch), by
+     way of ShortcutTrampolineActivity: the system starts a static shortcut with
+     CLEAR_TASK, which aimed at MainActivity would wipe the running app and
+     an open editor's draft.
      ShortcutsXmlTest checks these names against the code. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
@@ -45,7 +48,7 @@
         <intent
             android:action="page.planr.android.widgets.action.OPEN"
             android:targetPackage="page.planr.android"
-            android:targetClass="page.planr.android.MainActivity">
+            android:targetClass="page.planr.android.ShortcutTrampolineActivity">
             <extra
                 android:name="page.planr.android.widgets.extra.ROUTE"
                 android:value="tasks" />

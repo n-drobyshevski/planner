@@ -40,21 +40,33 @@ interface InboxDataSource {
 
     suspend fun refreshTasks()
 
-    suspend fun refreshSleep()
+    /** The viewer's recent nights; with [force] off, skipped when read moments ago. */
+    suspend fun refreshSleep(force: Boolean = true)
 
-    suspend fun refreshRequests()
+    /** The pending requests; with [force] off, skipped when read moments ago. */
+    suspend fun refreshRequests(force: Boolean = true)
 
     /** The viewer's night window (`member_sleep_prefs`), read from the server. */
     suspend fun nightWindow(): NightWindow
 
-    /** Writes [attributes] (satisfaction merged in) to the event's master row. */
-    suspend fun rateEvent(eventId: String, attributes: JsonObject)
+    /**
+     * Writes the event's master row's attributes as [rate] makes them
+     * (satisfaction merged in) from the bag Room holds, guarded by the row's
+     * `updated_at`. Throws `StaleWriteException`, with the row reloaded,
+     * when the partner changed it meanwhile, rather than overwriting their change.
+     */
+    suspend fun rateEvent(eventId: String, rate: (JsonObject) -> JsonObject)
 
-    suspend fun rateTask(taskId: String, attributes: JsonObject)
+    /** [rateEvent] for a task. */
+    suspend fun rateTask(taskId: String, rate: (JsonObject) -> JsonObject)
 
     suspend fun saveSleep(rating: SleepRating): SleepLog
 
-    suspend fun createEvent(draft: PlannerEventDraft)
+    /**
+     * Creates [draft] as the event [id], at most once: when it already exists
+     * (an earlier attempt landed), nothing is created again.
+     */
+    suspend fun createEvent(id: String, draft: PlannerEventDraft)
 
     suspend fun markApproved(requestId: String)
 

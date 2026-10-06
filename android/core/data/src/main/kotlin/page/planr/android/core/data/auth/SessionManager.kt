@@ -184,7 +184,7 @@ class SessionManager @Inject constructor(
             session.value = stored
             _authState.value = AuthState.SignedIn(info)
         } else {
-            if (stored != null) persist(null) // a half-finished sign-in
+            if (stored != null) forget() // a half-finished sign-in
             _authState.value = AuthState.SignedOut()
         }
     }
@@ -220,6 +220,17 @@ class SessionManager @Inject constructor(
         if (member == null) {
             session.value = null
             return SignInError.NoMember
+        }
+        // Whatever this device still caches belongs to whoever was signed in
+        // before: a session lost without a sign-out (an unreadable or corrupt
+        // store) never wiped it, and it may hold that member's private rows.
+        // Reads are scoped by workspace only, so the partner signing in here
+        // would see them. Still signed out, so widgets re-render as such.
+        try {
+            localData.clearAll()
+        } catch (e: Throwable) {
+            session.value = null
+            throw e
         }
         val complete = fresh.copy(memberId = member.memberId, workspaceId = member.workspaceId)
         store.writeSession(complete)
@@ -268,7 +279,7 @@ class SessionManager @Inject constructor(
      */
     private suspend fun clearSession(reason: SignOutReason) {
         session.value = null
-        persist(null)
+        forget()
         try {
             store.writePending(null)
         } catch (e: CancellationException) {
@@ -281,18 +292,34 @@ class SessionManager @Inject constructor(
     }
 
     /**
-     * Stores [value], logging rather than throwing on failure: the rotated
-     * tokens must reach [session] either way (the old refresh token is already
+     * Stores rotated tokens, logging rather than throwing on failure: they
+     * must reach [session] either way (the old refresh token is already
      * spent), and a crash here would take the whole process down. At worst the
      * next launch asks for a sign-in.
      */
-    private suspend fun persist(value: StoredSession?) {
+    private suspend fun persist(value: StoredSession) {
         try {
             store.writeSession(value)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't store the session", e)
+        }
+    }
+
+    /**
+     * Drops the stored session for good ([SessionStore.forgetSession]), or the
+     * next launch would sign the same account back in. A failure there (the
+     * disk and the Keystore both refusing) is logged: the user is signed out
+     * in memory either way, and a crash would take the process down.
+     */
+    private suspend fun forget() {
+        try {
+            store.forgetSession()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Couldn't forget the stored session", e)
         }
     }
 

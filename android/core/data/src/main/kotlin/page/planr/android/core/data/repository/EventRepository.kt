@@ -78,20 +78,27 @@ class EventRepository @Inject constructor(
      * Refetches [taskId]'s blocks and replaces what Room holds for the task,
      * so blocks deleted or unlinked elsewhere disappear too (the same exact
      * replace as [refreshWindow], over `task_id` instead of a window).
+     * Redraws the widgets when that changed the cache.
      */
     suspend fun refreshTaskBlocks(taskId: String) {
         val ws = session.requireSession().workspaceId
+        var changed = false
         gate.refresh(CacheArea.Events, fetch = { queries.fetchTaskBlocks(ws, taskId) }) { blocks ->
-            db.withTransaction {
+            changed = db.withTransaction {
+                val fetched = blocks.map { it.toEntity() }
+                val cached = dao.eventsOfTask(ws, taskId)
+                if (sameRows(cached, fetched)) return@withTransaction false
                 val kept = blocks.map { it.id }.toSet()
-                val stale = dao.idsOfTask(ws, taskId).filter { it !in kept }
+                val stale = cached.map { it.id }.filter { it !in kept }
                 stale.chunked(SQL_CHUNK).forEach { chunk ->
                     dao.deleteOverridesOf(chunk)
                     dao.deleteEvents(chunk)
                 }
-                dao.upsertEvents(blocks.map { it.toEntity() })
+                dao.upsertEvents(fetched)
+                true
             }
         }
+        if (changed) widgets.requestRefresh()
     }
 
     /**
@@ -112,7 +119,8 @@ class EventRepository @Inject constructor(
      *
      * Returns whether the cache changed: a snapshot identical to what Room
      * holds for the window is not written at all (false), nor is a skipped
-     * or dropped one.
+     * or dropped one. A change redraws the widgets, whoever asked for the
+     * refresh: the widgets only read Room when asked to.
      */
     suspend fun refreshWindow(window: TimeWindow, force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
@@ -136,12 +144,17 @@ class EventRepository @Inject constructor(
                     true
                 }
             }
+            if (changed) widgets.requestRefresh()
             changed
         }
     }
 
     suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent =
         write({ mutations.createEvent(draft) }) { storeLocally(it) }
+
+    /** [createEvent] under [id], at most once ([EventMutations.createEventOnce]). */
+    suspend fun createEventOnce(id: String, draft: PlannerEventDraft): PlannerEvent =
+        write({ mutations.createEventOnce(id, draft) }) { storeLocally(it) }
 
     /**
      * Creates many events at once (an .ics import): one insert per 200
@@ -201,6 +214,19 @@ class EventRepository @Inject constructor(
      */
     suspend fun updateEvent(id: String, patch: EventPatch, expectedUpdatedAt: Instant? = null): PlannerEvent =
         write({ reloadingOnStale(id) { mutations.updateEvent(id, patch, expectedUpdatedAt) } }) { storeLocally(it) }
+
+    /**
+     * Rewrites the master row's attributes as [change] makes them from the
+     * bag Room holds, guarded by that row's `updated_at`: a change made
+     * elsewhere meanwhile (a partner's attribute that Room hasn't caught up
+     * with) throws [StaleWriteException], with the latest row reloaded,
+     * instead of being overwritten. Throws [IllegalStateException] when the
+     * event isn't cached.
+     */
+    suspend fun updateAttributes(id: String, change: (JsonObject) -> JsonObject): PlannerEvent {
+        val current = checkNotNull(getEvent(id)) { "Event $id is not cached" }
+        return updateEvent(id, EventPatch(attributes = PatchField.Value(change(current.attributes))), current.updatedAt)
+    }
 
     /** Deletes an event / whole series; keep the snapshot to [restoreEvent] (undo). */
     suspend fun deleteEvent(id: String): DeletedEventSnapshot =

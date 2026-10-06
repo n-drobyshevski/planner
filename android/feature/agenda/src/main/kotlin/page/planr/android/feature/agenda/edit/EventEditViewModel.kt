@@ -10,6 +10,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.data.model.EventPatch
+import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Occurrence
@@ -27,6 +33,7 @@ import page.planr.android.core.model.PlannerEvent
 import page.planr.android.core.recurrence.EditSemantics
 import page.planr.android.core.recurrence.PatchField
 import page.planr.android.core.recurrence.RecurrenceExpander
+import page.planr.android.core.recurrence.SeriesEnd
 import page.planr.android.feature.agenda.EventEditTarget
 import page.planr.android.feature.agenda.R
 import page.planr.android.feature.agenda.data.AgendaDataSource
@@ -135,37 +142,70 @@ class EventEditViewModel @AssistedInject constructor(
     private suspend fun updateRecurring(form: EventForm, current: Editing, scope: RecurrenceScope) {
         val event = current.event
         val occurrenceDate = current.occurrence.occurrenceDate
-        val attributes = EventWrites.mergedAttributes(form, initialForm ?: form, event.attributes)
+        val initial = initialForm ?: form
+        val attributes = EventWrites.mergedAttributes(form, initial, event.attributes)
         when (scope) {
             RecurrenceScope.This -> {
-                // An override can't carry series-level fields: an attribute
-                // change goes to the whole series in a side patch (as on the web).
-                if (attributes != null) data.updateEvent(event.id, EventPatch(attributes = PatchField.Value(attributes)))
                 val input = EditSemantics.modifyOccurrence(event.id, occurrenceDate, EventWrites.occurrencePatch(form))
                 val prior = data.applyOverride(input)
+                // An override can't carry series-level fields (event_overrides
+                // has no attributes): an attribute change goes to the whole
+                // series in a side patch (as on the web), only once the
+                // instance's own change landed, so a failed save leaves the
+                // series untouched.
+                if (attributes != null) patchSeriesAttributes(event, occurrenceDate, prior, attributes)
+                val edits = AttributesMerge.edits(initial.attributes, form.attributes)
                 notices.post(
                     AgendaNotice(
                         UiText(R.string.agenda_toast_this_event_updated),
                         // Without a known prior, an undo could erase an earlier override.
-                        undo = suspend { data.revertOverride(event.id, occurrenceDate, prior) }
-                            .takeIf { prior.canRevert },
+                        undo = suspend {
+                            data.revertOverride(event.id, occurrenceDate, prior)
+                            if (attributes != null) undoSeriesAttributes(event.id, edits, initial.attributes)
+                        }.takeIf { prior.canRevert },
                     ),
                 )
             }
             RecurrenceScope.Following -> {
-                val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form), attributes)
+                val patch = EventWrites.occurrencePatch(form)
+                val created = data.splitSeries(event, occurrenceDate, patch, attributes)
+                // The rule the split capped the original to (the same split the write made).
+                val cap = capRecurrence(EditSemantics.splitThisAndFuture(event, occurrenceDate, patch).original)
                 notices.post(
                     AgendaNotice(UiText(R.string.agenda_toast_this_and_future_updated)) {
                         // Undo the split: restore the original rule FIRST, then drop the
                         // new series. A failed restore keeps the new series, so the
                         // future occurrences are never lost.
-                        data.updateEvent(event.id, restoreRecurrence(event))
-                        data.deleteEvent(created.id)
+                        try {
+                            data.updateEvent(event.id, restoreRecurrence(event))
+                        } catch (e: Throwable) {
+                            // The restore may have landed with only its answer lost (a
+                            // timeout, or the agenda closing mid-request): cap again so the
+                            // future doesn't show twice. The new series is untouched.
+                            withContext(NonCancellable) { runCatching { data.updateEvent(event.id, cap) } }
+                            throw e
+                        }
+                        try {
+                            data.deleteEvent(created.id)
+                        } catch (e: Throwable) {
+                            withContext(NonCancellable) {
+                                // The delete may have landed with only its answer lost, and
+                                // capping then would end the future for both members. It is
+                                // idempotent, so try it once more first.
+                                if (runCatching { data.deleteEvent(created.id) }.isFailure) {
+                                    // Both series are live, so every future occurrence shows
+                                    // twice: cap the original again (back to the split).
+                                    runCatching { data.updateEvent(event.id, cap) }
+                                    throw e
+                                }
+                            }
+                            // The second try dropped it: the undo is done.
+                            if (e is CancellationException) throw e
+                        }
                     },
                 )
             }
             RecurrenceScope.All -> {
-                val initial = initialForm ?: form
                 data.updateEvent(
                     event.id,
                     EventWrites.seriesPatch(form, initial, event, current.occurrence, allCategories),
@@ -174,6 +214,58 @@ class EventEditViewModel @AssistedInject constructor(
                 notices.post(AgendaNotice(UiText(R.string.agenda_toast_all_events_updated)))
             }
         }
+    }
+
+    /**
+     * The side patch of a "this event" save. [attributes] was merged into the
+     * bag read at load, so it is written only if the series hasn't changed
+     * since ([StaleWriteException] otherwise): the partner's newer attribute
+     * edits are never overwritten. When it fails, the override just applied
+     * is reverted (best effort) before the failure surfaces, so the save
+     * fails as a whole and saving again redoes both.
+     */
+    private suspend fun patchSeriesAttributes(
+        event: PlannerEvent,
+        occurrenceDate: Instant,
+        prior: OverridePrior,
+        attributes: JsonObject,
+    ) {
+        try {
+            data.updateEvent(event.id, attributesPatch(attributes), expectedUpdatedAt = event.updatedAt)
+        } catch (e: Exception) {
+            if (e !is CancellationException && prior.canRevert) {
+                try {
+                    data.revertOverride(event.id, occurrenceDate, prior)
+                } catch (revert: Exception) {
+                    if (revert is CancellationException) throw revert
+                    e.addSuppressed(revert)
+                }
+            }
+            throw e
+        }
+    }
+
+    /**
+     * Undo of a "this event" side patch: puts back only the keys the save
+     * edited ([edits]) to their [before] option, merged into the series' bag
+     * as it is now, and only where the series still shows what the save
+     * wrote. Whatever changed elsewhere since the save (other keys, or the
+     * same key edited again) is kept.
+     */
+    private suspend fun undoSeriesAttributes(
+        eventId: String,
+        edits: Map<AttributeKey, String?>,
+        before: Map<AttributeKey, String>,
+    ) {
+        val latest = data.getEvent(eventId) ?: return
+        val now = AttributesMerge.known(latest.attributes)
+        val inverse = edits.filter { (key, wrote) -> now[key] == wrote }.mapValues { (key, _) -> before[key] }
+        if (inverse.isEmpty()) return
+        data.updateEvent(
+            eventId,
+            attributesPatch(AttributesMerge.merge(latest.attributes, inverse)),
+            expectedUpdatedAt = latest.updatedAt,
+        )
     }
 
     /** Runs a write with the saving flag up; maps its failure to an effect. */
@@ -246,8 +338,17 @@ class EventEditViewModel @AssistedInject constructor(
     }
 }
 
+/** A patch replacing only the series' attribute bag. */
+private fun attributesPatch(attributes: JsonObject) = EventPatch(attributes = PatchField.Value(attributes))
+
 /** The patch that puts a series' recurrence back the way it was (undo of a split / cap). */
 internal fun restoreRecurrence(event: PlannerEvent) = EventPatch(
     rrule = PatchField.Value(event.rrule),
     recurrenceEndsAt = PatchField.Value(event.recurrenceEndsAt),
+)
+
+/** The patch that ends a series where a split capped it (re-applied when a split's undo stops halfway). */
+internal fun capRecurrence(end: SeriesEnd) = EventPatch(
+    rrule = PatchField.Value(end.rrule),
+    recurrenceEndsAt = PatchField.Value(end.recurrenceEndsAt),
 )

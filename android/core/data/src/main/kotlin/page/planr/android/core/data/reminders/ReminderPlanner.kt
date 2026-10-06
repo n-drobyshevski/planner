@@ -63,6 +63,13 @@ object ReminderPlanner {
     /** How far ahead reminders are armed; every sync and change re-plans. */
     val HORIZON: Duration = 24.hours
 
+    /**
+     * How soon after a plan the scheduler plans again on its own, whether
+     * or not a sync ran: offline or on a low battery nothing else moves the
+     * horizon forward. Half of it, so a late delivery still leaves a margin.
+     */
+    val REPLAN_AFTER: Duration = HORIZON / 2
+
     /** The occurrences [plan] needs: those starting up to [HORIZON] after [now]. */
     fun window(now: Instant): TimeWindow = TimeWindow(now, now + HORIZON)
 

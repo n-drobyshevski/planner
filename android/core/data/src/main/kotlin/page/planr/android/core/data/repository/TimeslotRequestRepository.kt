@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.local.CacheGate
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.model.TimeslotRequest
 import page.planr.android.core.data.model.TimeslotRequestStatus
 import page.planr.android.core.data.remote.TimeslotRequestsRemote
@@ -24,8 +26,12 @@ interface TimeslotRequestRepository {
     /** Pending requests, newest first; null until the first [refresh] for this member landed. */
     val pending: Flow<List<TimeslotRequest>?>
 
-    /** Refetches [pending]. Throws when offline. */
-    suspend fun refresh()
+    /**
+     * Refetches [pending], joining a refresh already running. Unless
+     * [force]d, also skips one done moments ago ([RefreshCoalescer]), as the
+     * account button's badge does on every return to a tab. Throws when offline.
+     */
+    suspend fun refresh(force: Boolean = true)
 
     /**
      * Marks the request approved. It leaves [pending] at once; when the
@@ -43,6 +49,8 @@ class RemoteTimeslotRequestRepository @Inject constructor(
     private val remote: TimeslotRequestsRemote,
     private val session: SessionManager,
     private val clock: Clock,
+    gate: CacheGate,
+    private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, clock),
 ) : TimeslotRequestRepository {
 
     private data class Cached(val memberId: String, val requests: List<TimeslotRequest>)
@@ -62,10 +70,13 @@ class RemoteTimeslotRequestRepository @Inject constructor(
         cached?.takeIf { member != null && it.memberId == member }?.requests?.filterNot { it.id in settled }
     }.distinctUntilChanged()
 
-    override suspend fun refresh() {
+    override suspend fun refresh(force: Boolean) {
         val me = session.currentSession ?: return
-        val requests = remote.fetchPending(me.workspaceId)
-        cache.value = Cached(me.memberId, requests.sortedByDescending { it.createdAt })
+        coalescer.refresh(me.memberId, force) {
+            val requests = remote.fetchPending(me.workspaceId)
+            cache.value = Cached(me.memberId, requests.sortedByDescending { it.createdAt })
+            true
+        }
     }
 
     override suspend fun markApproved(id: String) = resolve(id, TimeslotRequestStatus.Approved)

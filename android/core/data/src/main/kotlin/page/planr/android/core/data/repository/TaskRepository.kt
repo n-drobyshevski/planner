@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
@@ -59,7 +60,7 @@ class TaskRepository @Inject constructor(
      * Refetches all tasks (`fetchTasks`) and replaces the cached set. Joins a
      * refresh already running and skips one done moments ago unless [force]d
      * ([RefreshCoalescer]). Returns whether the cache changed (an identical
-     * snapshot is not written).
+     * snapshot is not written); a change redraws the widgets.
      */
     suspend fun refresh(force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
@@ -68,6 +69,7 @@ class TaskRepository @Inject constructor(
             gate.refresh(CacheArea.Tasks, fetch = { queries.fetchTasks(ws) }) { rows ->
                 changed = dao.replaceIfChanged(ws, rows.map { it.toEntity() })
             }
+            if (changed) widgets.requestRefresh()
             changed
         }
     }
@@ -88,6 +90,18 @@ class TaskRepository @Inject constructor(
                 throw e
             }
         }) { storeLocally(it) }
+    }
+
+    /**
+     * Rewrites the task's attributes as [change] makes them from the bag
+     * Room holds, guarded by that row's `updated_at`: a change made elsewhere
+     * meanwhile (a partner's attribute that Room hasn't caught up with)
+     * throws [StaleWriteException], with the latest row reloaded, instead of
+     * being overwritten. Throws [IllegalStateException] when the task isn't cached.
+     */
+    suspend fun updateAttributes(id: String, change: (JsonObject) -> JsonObject): Task {
+        val current = checkNotNull(getTask(id)) { "Task $id is not cached" }
+        return updateTask(id, TaskPatch(attributes = PatchField.Value(change(current.attributes))), current.updatedAt)
     }
 
     /**

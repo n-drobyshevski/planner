@@ -5,7 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** When the periodic [SyncWorker] has something to do ([backgroundSyncNeeded]). */
+/** When [SyncWorker] has something to do ([backgroundSyncNeeded]). */
 class BackgroundSyncSkipTest {
 
     @Test
@@ -25,5 +25,18 @@ class BackgroundSyncSkipTest {
             assertTrue(backgroundSyncNeeded(state, subscribed = true), "$state")
             assertTrue(backgroundSyncNeeded(state, subscribed = false), "$state")
         }
+    }
+
+    @Test
+    fun `a requested sync runs even on screen with Realtime joined`() {
+        for (state in Lifecycle.State.entries) {
+            assertTrue(backgroundSyncNeeded(state, subscribed = true, requested = true), "$state")
+        }
+    }
+
+    @Test
+    fun `the sync-now request is marked requested, the periodic one is not`() {
+        assertTrue(SyncScheduler.syncNowRequest().workSpec.input.getBoolean(SyncScheduler.KEY_REQUESTED, false))
+        assertFalse(SyncScheduler.periodicRequest().workSpec.input.getBoolean(SyncScheduler.KEY_REQUESTED, false))
     }
 }

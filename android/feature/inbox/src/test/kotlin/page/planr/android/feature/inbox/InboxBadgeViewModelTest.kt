@@ -37,6 +37,8 @@ class InboxBadgeViewModelTest {
 
         assertEquals(1, data.requestRefreshes)
         assertEquals(1, data.sleepRefreshes)
+        // Not forced: a read done moments ago (another tab's badge, the Inbox) is not repeated.
+        assertEquals(listOf(false, false), data.refreshForces)
         assertEquals(3, vm.count.value)
 
         data.markDeclined("r1")

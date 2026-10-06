@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -34,7 +35,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -105,25 +108,42 @@ fun AttributeDetails(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                val selectedText = stringResource(R.string.attributes_option_selected)
+                val notSelectedText = stringResource(R.string.attributes_option_not_selected)
                 scales.forEach { scale ->
                     val current = selected[scale.key]
+                    val label = attributeLabel(scale.key)
                     Column(verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xs)) {
                         Text(
-                            attributeLabel(scale.key),
+                            label,
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
+                        // One single-choice group per attribute: each chip is a radio
+                        // button that names its attribute ("Energy: 1 Low, selected"),
+                        // so it reads on its own when focus lands mid-row.
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm),
+                            modifier = Modifier.selectableGroup(),
+                        ) {
                             scale.options.forEach { option ->
                                 val isSelected = current == option
+                                val optionLabel = attributeOptionLabel(scale.key, option)
+                                val description = stringResource(R.string.attributes_option_a11y, label, optionLabel)
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = { onSelect(scale.key, if (isSelected) null else option) },
                                     enabled = enabled,
-                                    label = { Text(attributeOptionLabel(scale.key, option)) },
+                                    label = { Text(optionLabel) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     ),
+                                    // Outermost, so it replaces the chip's own Checkbox role.
+                                    modifier = Modifier.semantics {
+                                        role = Role.RadioButton
+                                        contentDescription = description
+                                        stateDescription = if (isSelected) selectedText else notSelectedText
+                                    },
                                 )
                             }
                         }

@@ -7,8 +7,11 @@ import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.inbox.InboxItem
 import page.planr.android.core.data.inbox.InboxRules
 import page.planr.android.core.data.model.SleepRatingForm
@@ -63,11 +67,19 @@ data class InboxUiState(
  * log. Resolving a row hides it at once; a write that fails brings it
  * back with a calm error. Approving creates the event at the proposed time
  * first, then marks the request approved.
+ *
+ * Those writes run in [writeScope] (the app's scope), not viewModelScope:
+ * leaving the screen right after a tap must not cut an approval between
+ * its event and its mark, which would leave the request pending to be
+ * approved again. The event's id comes from the request
+ * ([InboxRules.approvedEventId]), so approving again, here or on a later
+ * visit, finds the event already made rather than creating a second one.
  */
 @HiltViewModel
 class InboxViewModel @Inject constructor(
     private val data: InboxDataSource,
     private val clock: Clock,
+    @ApplicationScope private val writeScope: CoroutineScope,
 ) : ViewModel() {
 
     /** Rows resolved (or being resolved) here: gone from the screen before the data catches up. */
@@ -76,10 +88,8 @@ class InboxViewModel @Inject constructor(
     private val sheet = MutableStateFlow<InboxSleepSheet?>(null)
     private val refreshed = MutableStateFlow(false)
 
-    /** Requests whose event already exists: retrying a failed approval only marks them. */
-    private val eventCreated = mutableSetOf<String>()
-
     private var refreshJob: Job? = null
+    private var errorTimeout: Job? = null
 
     @Volatile
     private var latest: InboxSnapshot? = null
@@ -111,9 +121,11 @@ class InboxViewModel @Inject constructor(
 
     /**
      * Rereads what the rows come from: the requests, the nights, the tasks
-     * and the last few days of events. Failures keep what is shown.
+     * and the last few days of events. Failures keep what is shown. A failed
+     * write's line goes: the rows it was about are about to be reread.
      */
     fun refresh() {
+        dismissError()
         if (refreshJob?.isActive == true) return
         refreshJob = viewModelScope.launch {
             coroutineScope {
@@ -126,15 +138,19 @@ class InboxViewModel @Inject constructor(
         }
     }
 
-    /** Rates a finished event or task: satisfaction [option] ("1".."4") merged into its attributes. */
+    /**
+     * Rates a finished event or task: satisfaction [option] ("1".."4") merged
+     * into its attributes as stored, guarded against a change made meanwhile
+     * (the row comes back, reread, with [InboxError.RateFailed]).
+     */
     fun rate(item: InboxItem, option: String) {
         if (option !in InboxRules.satisfactionOptions) return
         when (item) {
             is InboxItem.RateEvent -> resolve(item.id, InboxError.RateFailed) {
-                data.rateEvent(item.eventId, InboxRules.rated(item.attributes, option))
+                data.rateEvent(item.eventId) { InboxRules.rated(it, option) }
             }
             is InboxItem.RateTask -> resolve(item.id, InboxError.RateFailed) {
-                data.rateTask(item.taskId, InboxRules.rated(item.attributes, option))
+                data.rateTask(item.taskId) { InboxRules.rated(it, option) }
             }
             else -> Unit
         }
@@ -144,17 +160,14 @@ class InboxViewModel @Inject constructor(
     fun approve(item: InboxItem.Request, defaultTitle: String) {
         val snapshot = latest ?: return
         resolve(item.id, InboxError.RequestFailed) {
-            if (item.requestId !in eventCreated) {
-                val draft = InboxRules.approvedEvent(
-                    item,
-                    workspaceId = snapshot.viewer.workspaceId,
-                    ownerId = snapshot.viewer.memberId,
-                    defaultTitle = defaultTitle,
-                    zone = snapshot.zone,
-                )
-                data.createEvent(draft)
-                eventCreated += item.requestId
-            }
+            val draft = InboxRules.approvedEvent(
+                item,
+                workspaceId = snapshot.viewer.workspaceId,
+                ownerId = snapshot.viewer.memberId,
+                defaultTitle = defaultTitle,
+                zone = snapshot.zone,
+            )
+            data.createEvent(InboxRules.approvedEventId(item.requestId), draft)
             data.markApproved(item.requestId)
         }
     }
@@ -163,7 +176,9 @@ class InboxViewModel @Inject constructor(
         resolve(item.id, InboxError.RequestFailed) { data.markDeclined(item.requestId) }
     }
 
+    /** Clears the error line (tapped, or on its own after [ERROR_VISIBLE_MS]). */
     fun dismissError() {
+        errorTimeout?.cancel()
         error.value = null
     }
 
@@ -207,20 +222,34 @@ class InboxViewModel @Inject constructor(
         }
     }
 
-    /** Hides [id] and runs [write]; on failure the row comes back and [failure] shows. */
+    /**
+     * Hides [id] and runs [write] in [writeScope], so it finishes even when
+     * the screen is left (on the main thread, as the screen's own state
+     * changes are); on failure the row comes back and [failure] shows.
+     */
     private fun resolve(id: String, failure: InboxError, write: suspend () -> Unit) {
         if (id in hidden.value) return
         hidden.update { it + id }
-        error.value = null
-        viewModelScope.launch {
+        dismissError()
+        writeScope.launch(Dispatchers.Main.immediate) {
             try {
                 write()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 hidden.update { it - id }
-                error.value = failure
+                showError(failure)
             }
+        }
+    }
+
+    /** Shows [failure] for [ERROR_VISIBLE_MS], then lets it go. */
+    private fun showError(failure: InboxError) {
+        errorTimeout?.cancel()
+        error.value = failure
+        errorTimeout = viewModelScope.launch {
+            delay(ERROR_VISIBLE_MS)
+            error.value = null
         }
     }
 
@@ -239,8 +268,11 @@ class InboxViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val STOP_TIMEOUT_MS = 5_000L
+    internal companion object {
+        private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How long a failed write's line stays before it goes on its own. */
+        const val ERROR_VISIBLE_MS = 6_000L
     }
 }
 

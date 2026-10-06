@@ -69,7 +69,7 @@ class TasksViewModel @Inject constructor(
     private val data: TasksDataSource,
     private val clock: Clock,
     @TasksCompute private val listDispatcher: CoroutineDispatcher,
-    deletions: TaskDeletions,
+    private val deletions: TaskDeletions,
 ) : ViewModel() {
 
     private val filters = MutableStateFlow(TaskFilters())
@@ -157,6 +157,9 @@ class TasksViewModel @Inject constructor(
     }
 
     /** Undo of a delete made in the detail: puts the task back as it was. */
+    /** A "Deleted · Undo" cut short by a rotation: the recreated screen shows it again. */
+    fun putBackDeleted(deleted: TaskDeleted) = deletions.putBack(deleted)
+
     fun undoDelete(deleted: TaskDeleted) {
         viewModelScope.launch {
             try {

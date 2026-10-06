@@ -20,6 +20,13 @@ interface SessionStore {
     /** null clears it. */
     suspend fun writeSession(session: StoredSession?)
 
+    /**
+     * Sign-out: the stored session must never be read back, or the next
+     * launch would sign the user in again. Unlike [writeSession], throws
+     * when that can't be guaranteed.
+     */
+    suspend fun forgetSession() = writeSession(null)
+
     suspend fun readPending(): PendingAuthorization?
 
     suspend fun writePending(pending: PendingAuthorization?)
@@ -31,10 +38,10 @@ interface SessionStore {
  * decrypts — e.g. the Keystore key was wiped — reads as absent and is removed,
  * which simply sends the user back to sign-in.
  *
- * Never throws: a store that can't be read (I/O, a Keystore failure) reads
- * as signed out, and a failed write is logged and dropped — the in-memory
- * session in [SessionManager] carries on, at worst asking for a sign-in on the
- * next launch.
+ * Never throws but from [forgetSession]: a store that can't be read (I/O, a
+ * Keystore failure) reads as signed out, and a failed write is logged and
+ * dropped — the in-memory session in [SessionManager] carries on, at worst
+ * asking for a sign-in on the next launch.
  */
 class DataStoreSessionStore @Inject constructor(
     @SessionDataStore private val dataStore: DataStore<Preferences>,
@@ -44,6 +51,23 @@ class DataStoreSessionStore @Inject constructor(
     override suspend fun readSession(): StoredSession? = read(SESSION, StoredSession.serializer())
 
     override suspend fun writeSession(session: StoredSession?) = write(SESSION, session, StoredSession.serializer())
+
+    /**
+     * Removes the session; when the disk refuses (full, an I/O error), retires
+     * the key it is encrypted with instead, so the tokens left on disk never
+     * decrypt again (and read as absent: see [read]).
+     */
+    override suspend fun forgetSession() {
+        try {
+            dataStore.edit { it.remove(SESSION) }
+            return
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't remove the stored session, retiring its key", e)
+        }
+        cipher.retireKey()
+    }
 
     override suspend fun readPending(): PendingAuthorization? = read(PENDING, PendingAuthorization.serializer())
 

@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,7 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.auth.SessionStore
 import page.planr.android.core.data.auth.StoredSession
 import page.planr.android.core.data.auth.TestTokens
+import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.model.SleepRating
 import page.planr.android.core.data.model.SleepTimes
 import page.planr.android.core.data.model.SleepTimesSource
@@ -48,9 +50,11 @@ class SleepLogRepositoryTest {
     private val oct5 = LocalDate(2026, 10, 5)
 
     /** 6 October 2026, 09:00 UTC. */
+    private var now = Instant.parse("2026-10-06T09:00:00Z")
     private val clock = object : Clock {
-        override fun now(): Instant = Instant.parse("2026-10-06T09:00:00Z")
+        override fun now(): Instant = now
     }
+    private val gate = CacheGate()
 
     private class MemoryDataStore : DataStore<Preferences> {
         private val state = MutableStateFlow(emptyPreferences())
@@ -65,7 +69,7 @@ class SleepLogRepositoryTest {
     private fun TestScope.repository(
         member: String = Fixtures.MEMBER_A,
         gateway: PostgrestGateway = fake,
-    ): RemoteSleepLogRepository = RemoteSleepLogRepository(SleepRemote(gateway), session(member), store, clock)
+    ): RemoteSleepLogRepository = RemoteSleepLogRepository(SleepRemote(gateway), session(member), store, clock, gate)
 
     /** [fake], but a range read (the refresh) answers only once [release] completes, with what was stored when it was sent. */
     private class SlowReads(private val inner: FakePostgrestGateway) : PostgrestGateway by inner {
@@ -299,5 +303,25 @@ class SleepLogRepositoryTest {
         // Asked again later: a fresh read.
         repo.refresh()
         assertEquals(2, fake.callsOf<FakePostgrestGateway.Call.Select>().size)
+    }
+
+    @Test
+    fun `an unforced refresh skips a read done moments ago`() = runTest {
+        seedDeviceNight()
+        val repo = repository()
+        fun reads() = fake.callsOf<FakePostgrestGateway.Call.Select>().size
+
+        repo.refresh()
+        repo.refresh(force = false)
+        assertEquals(1, reads())
+        assertEquals(listOf(oct5), repo.recentLogs.first()?.map { it.date })
+
+        // Forced (the Sleep tab's pull-to-refresh): always read.
+        repo.refresh()
+        assertEquals(2, reads())
+
+        now += 31.seconds
+        repo.refresh(force = false)
+        assertEquals(3, reads())
     }
 }

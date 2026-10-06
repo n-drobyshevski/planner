@@ -20,9 +20,11 @@ import kotlinx.coroutines.SupervisorJob
 import page.planr.android.core.data.appearance.AndroidAppearancePlatform
 import page.planr.android.core.data.appearance.AppearanceDataStore
 import page.planr.android.core.data.appearance.AppearancePlatform
+import page.planr.android.core.data.health.CachedMemberZone
 import page.planr.android.core.data.health.HealthConnectSleepSource
 import page.planr.android.core.data.health.HealthPrefsDataStore
 import page.planr.android.core.data.health.HealthSleepSource
+import page.planr.android.core.data.health.MemberZone
 import page.planr.android.core.data.health.RepositorySleepBlockCalendar
 import page.planr.android.core.data.health.SleepBlockCalendar
 import page.planr.android.core.data.prefs.AppPrefsChanges
@@ -31,6 +33,7 @@ import page.planr.android.core.data.prefs.DataStoreInsightsPreferences
 import page.planr.android.core.data.prefs.DataStoreViewPreferences
 import page.planr.android.core.data.prefs.InsightsPreferences
 import page.planr.android.core.data.prefs.InsightsPreferencesDataStore
+import page.planr.android.core.data.prefs.LegacyAgendaMonthMigration
 import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.prefs.ViewPreferencesDataStore
 
@@ -56,6 +59,9 @@ abstract class PreferencesModule {
     abstract fun bindHealthSleepSource(impl: HealthConnectSleepSource): HealthSleepSource
 
     @Binds
+    abstract fun bindMemberZone(impl: CachedMemberZone): MemberZone
+
+    @Binds
     abstract fun bindSleepBlockCalendar(impl: RepositorySleepBlockCalendar): SleepBlockCalendar
 
     @Binds
@@ -68,6 +74,7 @@ abstract class PreferencesModule {
         fun provideViewPreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
             PreferenceDataStoreFactory.create(
                 corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+                migrations = listOf(LegacyAgendaMonthMigration),
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 produceFile = { context.preferencesDataStoreFile("planr_view") },
             )

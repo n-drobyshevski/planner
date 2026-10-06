@@ -19,6 +19,7 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toJavaLocalTime
+import page.planr.android.core.design.format.DateTitles
 import page.planr.android.core.design.glance.PlanrGlanceColors
 import page.planr.android.core.design.theme.parseHexColor
 
@@ -40,18 +41,18 @@ internal class WidgetFormats(context: Context) {
 
     /** "Mon, 5 October"; capitalised, since Russian weekday names are lower-case. */
     fun day(value: LocalDate): String =
-        day.format(value.toJavaLocalDate()).replaceFirstChar { it.titlecase(locale) }
+        DateTitles.capitalized(day.format(value.toJavaLocalDate()), locale)
 
     /** "5 Oct". */
     fun shortDay(value: LocalDate): String = shortDay.format(value.toJavaLocalDate())
 
     /** "Mon 5" / "Пн, 5": a day heading in a week. */
     fun weekday(value: LocalDate): String =
-        weekday.format(value.toJavaLocalDate()).replaceFirstChar { it.titlecase(locale) }
+        DateTitles.capitalized(weekday.format(value.toJavaLocalDate()), locale)
 
     /** "October" / "Октябрь" (the stand-alone form, as a title). */
     fun month(value: LocalDate): String =
-        month.format(value.toJavaLocalDate()).replaceFirstChar { it.titlecase(locale) }
+        DateTitles.capitalized(month.format(value.toJavaLocalDate()), locale)
 
     /** "2026". */
     fun year(value: LocalDate): String = year.format(value.toJavaLocalDate())

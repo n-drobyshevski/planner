@@ -49,6 +49,17 @@ class TextLinksTest {
     }
 
     @Test
+    fun `year and amount ranges are not phone numbers`() {
+        assertTrue(targets("Season 2026-2027").isEmpty())
+        assertTrue(targets("Budget 1500-2000").isEmpty())
+        assertTrue(targets("Budget 1500 - 2000 EUR").isEmpty())
+        assertTrue(targets("Pages 120-4500").isEmpty())
+        // A dial prefix, parentheses or a third group still make it a number.
+        assertEquals(listOf("tel:+15002000"), targets("Call +1500-2000"))
+        assertEquals(listOf("tel:4951234567"), targets("495-123-4567"))
+    }
+
+    @Test
     fun `an upper-case scheme is lower-cased so a browser still matches it`() {
         assertEquals(listOf("https://Example.com/A"), targets("HTTPS://Example.com/A"))
     }

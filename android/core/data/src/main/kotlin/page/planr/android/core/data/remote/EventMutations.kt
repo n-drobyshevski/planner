@@ -1,11 +1,13 @@
 package page.planr.android.core.data.remote
 
+import java.util.UUID
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
@@ -27,11 +29,33 @@ class EventMutations @Inject constructor(
     private val gateway: PostgrestGateway,
 ) {
 
-    /** `createEvent`: insert and return the stored row. */
-    suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent =
-        gateway.insert(SupabaseTables.EVENTS, listOf(EventPayloads.insertRow(draft)))
+    /**
+     * `createEvent`: insert and return the stored row. Pass [id] to choose the
+     * new row's id up front, so an insert whose answer is lost can be undone.
+     */
+    suspend fun createEvent(draft: PlannerEventDraft, id: String? = null): PlannerEvent {
+        val row = EventPayloads.insertRow(draft)
+        val payload = if (id == null) row else JsonObject(row + ("id" to JsonPrimitive(id)))
+        return gateway.insert(SupabaseTables.EVENTS, listOf(payload))
             .single()
             .decodeAs(PlannerEvent.serializer())
+    }
+
+    /**
+     * [createEvent] under a client-chosen [id], at most once: when a row with
+     * that id is already stored (an earlier attempt whose insert landed but
+     * whose answer was lost, or was cancelled after it), that row is returned
+     * and nothing is inserted. For a write that may be retried from scratch,
+     * such as approving a timeslot request.
+     */
+    suspend fun createEventOnce(id: String, draft: PlannerEventDraft): PlannerEvent {
+        gateway.select(SupabaseTables.EVENTS, filters = listOf(eq("id", id))).firstOrNull()
+            ?.let { return it.decodeAs(PlannerEvent.serializer()) }
+        val row = JsonObject(EventPayloads.insertRow(draft) + ("id" to JsonPrimitive(id)))
+        return gateway.insert(SupabaseTables.EVENTS, listOf(row))
+            .single()
+            .decodeAs(PlannerEvent.serializer())
+    }
 
     /**
      * `createEventsBulk`: many events in a few statements, one
@@ -192,8 +216,15 @@ class EventMutations @Inject constructor(
      * All or nothing, in this order: a failed insert leaves the original
      * untouched, and a failed cap deletes the new series again before the
      * failure is rethrown. (Capping first would lose every future occurrence,
-     * for both members, whenever the insert failed.) A cap that finds no row
-     * (the series was deleted meanwhile) fails with [StaleWriteException].
+     * for both members, whenever the insert failed.) The new series' id is
+     * chosen here, so an insert that failed after it committed (a timeout
+     * losing its answer) is deleted again too: the uncapped original and an
+     * open-ended copy would show every future occurrence twice. A cap that
+     * finds no row (the series was deleted meanwhile) fails with
+     * [StaleWriteException].
+     *
+     * Runs to the end even when its caller is cancelled (the editor closing
+     * mid-save), so it never stops between the two writes.
      */
     suspend fun splitSeries(
         event: PlannerEvent,
@@ -201,25 +232,29 @@ class EventMutations @Inject constructor(
         patch: OccurrencePatch,
         newColor: PatchField<String?> = PatchField.Unchanged,
         newAttributes: JsonObject? = null,
-    ): SplitResult {
+    ): SplitResult = withContext(NonCancellable) {
         val split = EditSemantics.splitThisAndFuture(event, fromOccurrence, patch)
         var draft = split.newSeries
         if (newColor is PatchField.Value) draft = draft.copy(color = newColor.value)
         if (newAttributes != null) draft = draft.copy(attributes = newAttributes)
-        val created = createEvent(draft)
+        val newId = UUID.randomUUID().toString()
+        val created = try {
+            createEvent(draft, newId)
+        } catch (e: Throwable) {
+            runCatching { deleteEvents(listOf(newId)) }
+            throw e
+        }
         val capped = try {
             updateEvent(split.original.id, recurrencePatch(split.original.rrule, split.original.recurrenceEndsAt))
         } catch (e: Throwable) {
-            withContext(NonCancellable) {
-                // The cap may have landed with only its answer lost (a timeout,
-                // or the screen closing mid-request): put the original rule
-                // back before dropping the new series, or the future is gone.
-                runCatching { gateway.update(SupabaseTables.EVENTS, recurrenceRow(event), listOf(eq("id", event.id))) }
-                runCatching { deleteEvents(listOf(created.id)) }
-            }
+            // The cap may have landed with only its answer lost (a timeout):
+            // put the original rule back before dropping the new series, or
+            // the future is gone.
+            runCatching { gateway.update(SupabaseTables.EVENTS, recurrenceRow(event), listOf(eq("id", event.id))) }
+            runCatching { deleteEvents(listOf(created.id)) }
             throw e
         }
-        return SplitResult(original = capped, created = created)
+        SplitResult(original = capped, created = created)
     }
 
     private fun recurrencePatch(rrule: String?, recurrenceEndsAt: Instant?) =

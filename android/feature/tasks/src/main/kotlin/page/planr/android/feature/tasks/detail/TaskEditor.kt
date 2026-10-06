@@ -174,7 +174,7 @@ internal fun TaskEditor(
         enabled = enabled,
     )
 
-    if (state.subtasks.isNotEmpty() || state.canEdit) SubtaskList(state, viewModel, onOpenTask)
+    if (state.subtasks.isNotEmpty() || state.canAddSubtask) SubtaskList(state, viewModel, onOpenTask)
 
     if (state.blocks.isNotEmpty() || state.canSchedule) {
         TaskBlocksSection(
@@ -353,7 +353,8 @@ private fun ColorDot(hex: String) {
 /**
  * Subtasks with the subtree progress: the checkbox completes or reopens one
  * (owner only; under a sequential parent only the next one), tapping the
- * row opens it, and the owner adds one from the field at the end.
+ * row opens it, and the owner adds one from the field at the end (not on
+ * the deepest level, which can't have subtasks).
  */
 @Composable
 private fun SubtaskList(state: TaskDetailUiState, viewModel: TaskDetailViewModel, onOpenTask: (String) -> Unit) {
@@ -380,7 +381,7 @@ private fun SubtaskList(state: TaskDetailUiState, viewModel: TaskDetailViewModel
                 onOpen = { onOpenTask(item.task.id) },
             )
         }
-        if (state.canEdit) {
+        if (state.canAddSubtask) {
             AddSubtaskField(
                 value = state.subtaskTitle,
                 enabled = !state.saving && !state.deleting,

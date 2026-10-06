@@ -1,7 +1,6 @@
 package page.planr.android.core.data.prefs
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import javax.inject.Inject
@@ -20,6 +19,7 @@ import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.di.ApplicationScope
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.remote.AppPrefsRemote
 import page.planr.android.core.data.remote.AppPrefsRow
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
@@ -50,7 +50,10 @@ fun interface AppPrefsChanges {
  * Network calls are serialized by [network] (a pull never reads a row older
  * than an upload that already finished); DataStore read-modify-writes by
  * [local], which is never held across the network, so a toggle never waits
- * on it.
+ * on it. Pulls go through [coalescer]: the ones asked at once (the sign-in
+ * pull and a fresh sign-in's requested sync, a resume) share one read, and
+ * an unforced one skips a read done moments ago. A Realtime join outdates
+ * both, so its pull always reads anew ([RefreshCoalescer]).
  */
 @Singleton
 class AppPrefsSync @Inject constructor(
@@ -60,6 +63,7 @@ class AppPrefsSync @Inject constructor(
     private val session: SessionManager,
     private val widgets: WidgetRefreshDispatcher,
     @ApplicationScope private val scope: CoroutineScope,
+    private val coalescer: RefreshCoalescer,
 ) : AppPrefsChanges {
     private val network = Mutex()
     private val local = Mutex()
@@ -74,7 +78,7 @@ class AppPrefsSync @Inject constructor(
                 .map { (it as? AuthState.SignedIn)?.session?.memberId }
                 .distinctUntilChanged()
                 .filterNotNull()
-                .collect { pullQuietly() }
+                .collect { pullQuietly(force = false) }
         }
     }
 
@@ -86,19 +90,26 @@ class AppPrefsSync @Inject constructor(
         scope.launch { quietly { upload() } }
     }
 
-    /** Account → device (or the pending local change → account). Throws on network errors. */
-    suspend fun pull() = network.withLock {
-        val me = session.currentSession ?: return@withLock
+    /**
+     * Account → device (or the pending local change → account). Joins a pull
+     * of the member's row already running; unless [force]d, also skips one
+     * done moments ago. A pending local change is never joined or skipped: it
+     * uploads now. Throws on network errors.
+     */
+    suspend fun pull(force: Boolean = true) {
+        val me = session.currentSession ?: return
         if (pending() != null) {
-            uploadLocked(me)
-            return@withLock
+            upload()
+            return
         }
-        val row = remote.fetch(me.memberId)
-        if (row == null) uploadLocked(me) else applyRow(me, row)
+        coalescer.refresh(me.memberId, force) {
+            pullLocked()
+            true
+        }
     }
 
     /** [pull], swallowing failures (offline: the next sync retries). */
-    suspend fun pullQuietly() = quietly { pull() }
+    suspend fun pullQuietly(force: Boolean = true) = quietly { pull(force) }
 
     /** Device → account. Throws on network errors; the change stays pending. */
     suspend fun upload() = network.withLock {
@@ -118,6 +129,17 @@ class AppPrefsSync @Inject constructor(
         insights.edit { it.clear() }
     }
 
+    private suspend fun pullLocked() = network.withLock {
+        val me = session.currentSession ?: return@withLock
+        // Changed while this pull waited: the change goes up instead.
+        if (pending() != null) {
+            uploadLocked(me)
+            return@withLock
+        }
+        val row = remote.fetch(me.memberId)
+        if (row == null) uploadLocked(me) else applyRow(me, row)
+    }
+
     private suspend fun uploadLocked(me: SessionInfo) {
         val (row, seq) = local.withLock { snapshot(me) to pending() }
         remote.upsert(row)
@@ -135,7 +157,7 @@ class AppPrefsSync @Inject constructor(
             view.edit {
                 changed = (it[ViewKeys.SHOW_PARTNER_EVENTS] ?: true) != row.showPartnerEvents
                 it[ViewKeys.SHOW_PARTNER_EVENTS] = row.showPartnerEvents
-                applyAgendaMode(it, AgendaViewMode.fromWire(row.agendaMode))
+                it[ViewKeys.AGENDA_MODE] = AgendaViewMode.fromWire(row.agendaMode).wire
             }
             insights.edit {
                 it[InsightsKeys.hidden(me.memberId)] = row.insightsHiddenCategoryIds.toSet()
@@ -146,22 +168,6 @@ class AppPrefsSync @Inject constructor(
         if (partnerChanged) widgets.requestRefresh()
     }
 
-    /**
-     * The account's [mode] onto the device. A Month there (once the column
-     * admits it) turns this device's Month on. A Day / Week different from
-     * the one saved here means another device picked a period, which this
-     * one follows, leaving Month; the same one (any other setting changed)
-     * keeps this device's Month.
-     */
-    private fun applyAgendaMode(prefs: MutablePreferences, mode: AgendaViewMode) {
-        if (!mode.synced) {
-            prefs[ViewKeys.AGENDA_MONTH] = true
-            return
-        }
-        if (AgendaViewMode.fromWire(prefs[ViewKeys.AGENDA_MODE]) != mode) prefs.remove(ViewKeys.AGENDA_MONTH)
-        prefs[ViewKeys.AGENDA_MODE] = mode.wire
-    }
-
     private suspend fun snapshot(me: SessionInfo): AppPrefsRow {
         val v = view.data.first()
         val i = insights.data.first()
@@ -169,8 +175,7 @@ class AppPrefsSync @Inject constructor(
             memberId = me.memberId,
             workspaceId = me.workspaceId,
             showPartnerEvents = v[ViewKeys.SHOW_PARTNER_EVENTS] ?: true,
-            // The synced Day / Week, never this device's Month ([AgendaViewMode.synced]).
-            agendaMode = AgendaViewMode.fromWire(v[ViewKeys.AGENDA_MODE]).takeIf { it.synced }?.wire ?: AgendaViewMode.Day.wire,
+            agendaMode = AgendaViewMode.fromWire(v[ViewKeys.AGENDA_MODE]).wire,
             insightsHiddenCategoryIds = i[InsightsKeys.hidden(me.memberId)].orEmpty().sorted(),
             insightsIncludeInactive = i[InsightsKeys.includeInactive(me.memberId)] ?: false,
         )

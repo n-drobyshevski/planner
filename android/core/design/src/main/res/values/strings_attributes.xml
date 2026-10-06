@@ -5,6 +5,10 @@
     <string name="attributes_clear_hint">All optional — tap a selected option again to clear it.</string>
     <string name="attributes_expanded">Expanded</string>
     <string name="attributes_collapsed">Collapsed</string>
+    <!-- Spoken for an option chip: "Energy: 1 Low", then its state. -->
+    <string name="attributes_option_a11y">%1$s: %2$s</string>
+    <string name="attributes_option_selected">selected</string>
+    <string name="attributes_option_not_selected">not selected</string>
 
     <string name="attributes_energy_label">Energy</string>
     <string name="attributes_energy_description">How demanding this is.</string>

@@ -32,10 +32,14 @@ class InboxBadgeViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
-    /** Rereads the requests and nights; failures keep the count. */
+    /**
+     * Rereads the requests and nights; failures keep the count. Not forced:
+     * every tab's account button calls this on each resume, so a read done
+     * moments ago (by another tab, or the Inbox itself) is not repeated.
+     */
     fun refresh() {
-        viewModelScope.launch { quietly { data.refreshRequests() } }
-        viewModelScope.launch { quietly { data.refreshSleep() } }
+        viewModelScope.launch { quietly { data.refreshRequests(force = false) } }
+        viewModelScope.launch { quietly { data.refreshSleep(force = false) } }
     }
 
     private suspend fun quietly(block: suspend () -> Unit) {

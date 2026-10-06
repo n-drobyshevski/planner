@@ -14,8 +14,8 @@ data class TextLink(val start: Int, val end: Int, val target: String)
  * (`http(s)://…` and `www.…`), email addresses and phone numbers. Deliberately
  * conservative, since a wrong link is worse than none: a phone number needs 7
  * to 15 digits, and nothing holding a dashed date (2026-10-06, 06-10-2026,
- * also when a time follows: "2026-10-06 14:00") or a spaced amount
- * (1 500 000) is one. Earlier kinds
+ * also when a time follows: "2026-10-06 14:00"), a spaced amount
+ * (1 500 000) or a two-part range (2026-2027, 1500 - 2000) is one. Earlier kinds
  * win where they overlap, so the digits or `@` inside a URL stay part of it.
  */
 object TextLinks {
@@ -25,6 +25,8 @@ object TextLinks {
     private val DASHED_DATE = Regex("""\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2}-\d{4})\b""")
     private val WEB_SCHEME = Regex("""(?i)^https?://""")
     private val THOUSANDS = Regex("""\d{1,3}(?:[ \u00A0]\d{3})+""")
+    /** Two short numbers joined by a dash: a year or amount range, not a number to dial. */
+    private val NUMBER_RANGE = Regex("""\d{1,4}[ \u00A0]?-[ \u00A0]?\d{1,4}""")
 
     /** Trailing characters that end a sentence rather than the address. */
     private const val TRAILING = ".,;:!?'\"]}>"
@@ -47,7 +49,7 @@ object TextLinks {
             val raw = match.value.trimEnd(')', ' ', ' ', '-')
             val range = match.range.first until match.range.first + raw.length
             val digits = raw.count(Char::isDigit)
-            if (digits !in 7..15 || DASHED_DATE.containsMatchIn(raw) || THOUSANDS.matches(raw) || overlaps(range)) return@forEach
+            if (digits !in 7..15 || DASHED_DATE.containsMatchIn(raw) || THOUSANDS.matches(raw) || NUMBER_RANGE.matches(raw) || overlaps(range)) return@forEach
             val dial = (if (raw.startsWith("+")) "+" else "") + raw.filter(Char::isDigit)
             links += TextLink(range.first, range.last + 1, "tel:$dial")
         }

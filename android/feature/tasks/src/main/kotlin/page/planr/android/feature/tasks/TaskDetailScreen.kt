@@ -1,6 +1,7 @@
 package page.planr.android.feature.tasks
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.coroutines.cancellation.CancellationException
 import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.component.rememberPlanrHaptics
@@ -58,9 +60,10 @@ import page.planr.android.feature.tasks.ui.DeletedTaskEffect
  * subtasks (checked off, opened, added). Save writes only the changed fields
  * and is rejected, not merged, if the task changed elsewhere meanwhile.
  * Leaving with unsaved changes (Back or the top bar) asks to discard them
- * first; while a save or delete is in flight Back waits for it (no prompt,
- * and no pop that would cancel the write). Delete is immediate with Undo when nothing goes with the task, and
- * asks first when its subtasks or calendar blocks would. The task's calendar
+ * first, as does an unsent "Add a subtask" title; while a save, delete or
+ * subtask write is in flight Back waits for it (no prompt, and no pop that
+ * would cancel the write). Delete is immediate with Undo when nothing goes
+ * with the task, and asks first when its subtasks or calendar blocks would. The task's calendar
  * blocks are listed too; the owner adds one from a sheet and removes one,
  * each with Undo. A block write is its own: it leaves the form clean, and
  * Back, Save and Delete wait for it like they wait for a save.
@@ -86,22 +89,23 @@ fun TaskDetailScreen(
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val leave: () -> Unit = {
         when {
-            state.saving || state.deleting || state.blockWriting -> Unit
-            state.dirty -> confirmingDiscard = true
+            state.holdsBack -> Unit
+            state.hasDraft -> confirmingDiscard = true
             else -> onBack()
         }
     }
 
-    // A block Undo tapped while the save was in flight lands first: leaving would cancel it.
-    LaunchedEffect(state.saved, state.blockWriting) { if (state.saved && !state.blockWriting) onBack() }
+    // A block or subtask write started while the save was in flight lands first: leaving would cancel it.
+    val sideWriting = state.blockWriting || state.subtaskWriting
+    LaunchedEffect(state.saved, sideWriting) { if (state.saved && !sideWriting) onBack() }
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
-    DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
+    DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete, viewModel::putBackDeleted)
     BlockNoticeEffect(state.blockNotice, snackbar, viewModel)
     // Held while saving or deleting too: either closes the screen itself once
     // it lands, and a pop meanwhile would cancel the write half-way. Likewise
-    // while a calendar block is written.
-    BackHandler(enabled = state.dirty || state.saving || state.deleting || state.blockWriting, onBack = leave)
+    // while a calendar block or a subtask (add, check-off, Undo) is written.
+    BackHandler(enabled = state.hasDraft || state.holdsBack, onBack = leave)
 
     Scaffold(
         modifier = modifier,
@@ -205,7 +209,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
             .padding(horizontal = PlanrSpacing.xs, vertical = PlanrSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack, enabled = !state.saving && !state.deleting && !state.blockWriting) {
+        IconButton(onClick = onBack, enabled = !state.holdsBack) {
             Icon(painterResource(R.drawable.ic_task_back), contentDescription = stringResource(R.string.task_detail_back))
         }
         Text(
@@ -218,7 +222,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
         if (state.canEdit) {
             IconButton(
                 onClick = onDelete,
-                enabled = !state.saving && !state.deleting && !state.addingSubtask && !state.blockWriting,
+                enabled = !state.holdsBack,
             ) {
                 Icon(
                     painterResource(R.drawable.ic_task_delete),
@@ -226,7 +230,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
                     modifier = Modifier.size(20.dp),
                 )
             }
-            TextButton(onClick = onSave, enabled = state.dirty && !state.saving && !state.blockWriting) {
+            TextButton(onClick = onSave, enabled = state.dirty && !state.saving && !state.blockWriting && !state.subtaskWriting) {
                 Text(stringResource(if (state.saving) R.string.task_detail_saving else R.string.task_detail_save))
             }
         }
@@ -240,8 +244,10 @@ private fun BlockNoticeEffect(notice: BlockNotice?, snackbar: SnackbarHostState,
     val removed = stringResource(R.string.task_block_removed)
     val undo = stringResource(R.string.task_undo)
     val haptics = rememberPlanrHaptics()
+    val activity = LocalActivity.current
     LaunchedEffect(notice) {
         if (notice == null) return@LaunchedEffect
+        var recreating = false
         try {
             val result = snackbar.showSnackbar(
                 message = when (notice) {
@@ -255,9 +261,14 @@ private fun BlockNoticeEffect(notice: BlockNotice?, snackbar: SnackbarHostState,
                 haptics.tick()
                 viewModel.undoBlock(notice)
             }
+        } catch (e: CancellationException) {
+            recreating = activity?.isChangingConfigurations == true
+            throw e
         } finally {
-            // Consumed even when cancelled: coming back must not replay an old Undo.
-            viewModel.dismissBlockNotice(notice)
+            // Consumed even when cancelled: coming back must not replay an old
+            // Undo. Kept only through a recreation (a rotation): the ViewModel
+            // survives it, and the recreated screen shows the notice again.
+            if (!recreating) viewModel.dismissBlockNotice(notice)
         }
     }
 }

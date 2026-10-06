@@ -9,10 +9,8 @@ import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.inbox.NightWindow
-import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.SleepLog
 import page.planr.android.core.data.model.SleepRating
-import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.model.TimeslotRequest
 import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.OccurrenceRepository
@@ -26,7 +24,6 @@ import page.planr.android.core.model.Occurrence
 import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.model.Task
 import page.planr.android.core.model.TimeWindow
-import page.planr.android.core.recurrence.PatchField
 
 /**
  * The production [InboxDataSource]: the Room-backed events and tasks, the
@@ -68,25 +65,25 @@ class RepositoryInboxDataSource @Inject constructor(
         tasks.refresh()
     }
 
-    override suspend fun refreshSleep() = sleep.refresh()
+    override suspend fun refreshSleep(force: Boolean) = sleep.refresh(force)
 
-    override suspend fun refreshRequests() = timeslots.refresh()
+    override suspend fun refreshRequests(force: Boolean) = timeslots.refresh(force)
 
     override suspend fun nightWindow(): NightWindow =
         sleepPrefs.fetch().let { NightWindow(it.nightWindowStartHour, it.nightWindowEndHour) }
 
-    override suspend fun rateEvent(eventId: String, attributes: JsonObject) {
-        events.updateEvent(eventId, EventPatch(attributes = PatchField.Value(attributes)))
+    override suspend fun rateEvent(eventId: String, rate: (JsonObject) -> JsonObject) {
+        events.updateAttributes(eventId, rate)
     }
 
-    override suspend fun rateTask(taskId: String, attributes: JsonObject) {
-        tasks.updateTask(taskId, TaskPatch(attributes = PatchField.Value(attributes)))
+    override suspend fun rateTask(taskId: String, rate: (JsonObject) -> JsonObject) {
+        tasks.updateAttributes(taskId, rate)
     }
 
     override suspend fun saveSleep(rating: SleepRating): SleepLog = sleep.save(rating)
 
-    override suspend fun createEvent(draft: PlannerEventDraft) {
-        events.createEvent(draft)
+    override suspend fun createEvent(id: String, draft: PlannerEventDraft) {
+        events.createEventOnce(id, draft)
     }
 
     override suspend fun markApproved(requestId: String) = timeslots.markApproved(requestId)

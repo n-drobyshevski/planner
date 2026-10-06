@@ -59,7 +59,8 @@ import page.planr.android.feature.quickadd.ui.TaskFields
  * field plus the minimum to place it (a due date, or a day and times). Hosted
  * in-app and by [QuickAddActivity] for the home-screen widget. With a title
  * typed, a swipe down, a tap outside or Back asks to discard it first; Cancel
- * is the explicit way out and closes at once.
+ * is the explicit way out and closes at once. While the item is being saved
+ * the sheet stays put (Cancel is disabled too) until the save lands.
  *
  * @param kind what the sheet opens on; the user can still switch.
  * @param shared text shared from another app, prefilling the title and notes.
@@ -90,15 +91,21 @@ fun QuickAddSheet(
     // confirmValueChange again as it lands on Hidden, and must not be refused.
     var closing by remember { mutableStateOf(false) }
     // The sheet state keeps its first confirmValueChange, so it reads the guard through a State.
-    val guarded by rememberUpdatedState(state.hasDraft)
+    val dismissal by rememberUpdatedState(state.dismissal)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { value ->
-            if (value == SheetValue.Hidden && guarded && !closing) {
-                confirmingDiscard = true
-                false
-            } else {
+            if (value != SheetValue.Hidden || closing) {
                 true
+            } else {
+                when (dismissal) {
+                    QuickAddDismissal.Close -> true
+                    QuickAddDismissal.AskFirst -> {
+                        confirmingDiscard = true
+                        false
+                    }
+                    QuickAddDismissal.Hold -> false
+                }
             }
         },
     )
@@ -125,8 +132,11 @@ fun QuickAddSheet(
         // sheet's window is shown), so with a draft it takes Back first. The
         // sheet's properties can't express this: shouldDismissOnBackPress is read
         // only when its window is created, which would leave Back dead after a
-        // rotation with a draft whose title is then cleared.
-        BackHandler(enabled = state.hasDraft) { confirmingDiscard = true }
+        // rotation with a draft whose title is then cleared. While saving it
+        // swallows Back: the save closes the sheet itself once it lands.
+        BackHandler(enabled = state.dismissal != QuickAddDismissal.Close) {
+            if (state.dismissal == QuickAddDismissal.AskFirst) confirmingDiscard = true
+        }
         QuickAddContent(
             state = state,
             viewModel = viewModel,
@@ -207,7 +217,7 @@ private fun QuickAddContent(state: QuickAddUiState, viewModel: QuickAddViewModel
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm, Alignment.End),
         ) {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.quickadd_cancel)) }
+            TextButton(onClick = onCancel, enabled = enabled) { Text(stringResource(R.string.quickadd_cancel)) }
             Button(onClick = viewModel::save, enabled = enabled) {
                 Text(stringResource(if (state.saving) R.string.quickadd_adding else R.string.quickadd_add))
             }

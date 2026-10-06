@@ -44,6 +44,29 @@ data class QuickAddUiState(
      * defaults, and a saved item is no longer a draft.
      */
     val hasDraft: Boolean get() = saved == null && (form.title.isNotBlank() || form.notes.isNotBlank())
+
+    /** What a swipe, a tap outside, Back or Cancel does to the sheet now. */
+    val dismissal: QuickAddDismissal
+        get() = when {
+            saving -> QuickAddDismissal.Hold
+            hasDraft -> QuickAddDismissal.AskFirst
+            else -> QuickAddDismissal.Close
+        }
+}
+
+enum class QuickAddDismissal {
+    /** Nothing to lose: the sheet closes. */
+    Close,
+
+    /** A draft would be dropped: "Discard changes?" first. */
+    AskFirst,
+
+    /**
+     * A save is in flight: the sheet stays put until it lands. Closing now
+     * would still create the item, with no "Added · Undo" once the sheet is
+     * gone (or cancel it half-way, in the widget's activity).
+     */
+    Hold,
 }
 
 /**
@@ -129,7 +152,15 @@ class QuickAddViewModel @Inject constructor(
                         data.createEvent(form.title, start, end, form.allDay, zone, form.description).id
                     }
                 }
-                saved = QuickAddSaved(form.kind, id)
+                // A preference that can't be read keeps the confirmation.
+                val confirm = try {
+                    data.showSuccessToasts()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    true
+                }
+                saved = QuickAddSaved(form.kind, id, confirm)
                 null
             } catch (e: CancellationException) {
                 throw e

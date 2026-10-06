@@ -32,7 +32,21 @@ class TaskDeletions @Inject constructor(private val clock: Clock) {
     /** The latest delete no screen has shown yet. */
     val pending: StateFlow<TaskDeleted?> = _pending.asStateFlow()
 
+    @Synchronized
     fun post(deleted: TaskDeleted) {
+        posted = deleted to clock.now()
+        _pending.value = deleted
+    }
+
+    /**
+     * Hands back a claimed delete whose snackbar was cut short by the activity
+     * being recreated (a rotation), so the recreated screen claims and shows it
+     * again with a fresh wait. A newer delete already waiting wins: only the
+     * latest is kept.
+     */
+    @Synchronized
+    fun putBack(deleted: TaskDeleted) {
+        if (_pending.value != null) return
         posted = deleted to clock.now()
         _pending.value = deleted
     }

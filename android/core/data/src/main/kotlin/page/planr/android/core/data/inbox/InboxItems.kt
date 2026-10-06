@@ -1,5 +1,6 @@
 package page.planr.android.core.data.inbox
 
+import java.util.UUID
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
@@ -44,7 +45,10 @@ sealed interface InboxItem {
         override val sortAt: Instant,
         val eventId: String,
         val title: String,
-        /** The event's current attribute bag; the rating merges into it. */
+        /**
+         * The event's attribute bag as derived. The rating merges into the
+         * bag stored when it is written, guarded by `updated_at`, not this copy.
+         */
         val attributes: JsonObject,
     ) : InboxItem {
         override val severity: InboxSeverity get() = InboxSeverity.Info
@@ -240,6 +244,15 @@ object InboxRules {
         end = request.proposedEnd,
         timeZone = zone.id,
     )
+
+    /**
+     * The id of the event approving [requestId] creates: the same for every
+     * attempt, on any device or run of the app, so a retry after a lost
+     * answer, a closed screen or a killed process finds the event the first
+     * attempt made instead of creating a second one. A name-based UUID.
+     */
+    fun approvedEventId(requestId: String): String =
+        UUID.nameUUIDFromBytes("planr:timeslot-request:$requestId".toByteArray(Charsets.UTF_8)).toString()
 
     /**
      * A timed, active, non-context block that can carry a rating: sleep and

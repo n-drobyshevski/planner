@@ -41,13 +41,17 @@ class SyncRunner @Inject constructor(
         // A worker may start the process: wait for the stored session to load.
         session.authState.first { it != AuthState.Loading }
         if (session.currentSession == null) return false
-        val changed = coroutineScope {
-            // Never fails the sync: a pending settings change retries next time
-            // (and re-renders the widgets itself when it changes what they show).
-            launch { appPrefs.pullQuietly() }
-            refreshAll(force = true)
+        // Each refresh that changes the cache requests a redraw: one render,
+        // awaited (a worker's process may end right after), covers them all.
+        widgets.holding {
+            val changed = coroutineScope {
+                // Never fails the sync: a pending settings change retries next time
+                // (and re-renders the widgets itself when it changes what they show).
+                launch { appPrefs.pullQuietly() }
+                refreshAll(force = true)
+            }
+            if (changed) widgets.refreshNow() else widgets.refreshClockBound()
         }
-        if (changed) widgets.refreshNow() else widgets.refreshClockBound()
         return true
     }
 
@@ -56,14 +60,16 @@ class SyncRunner @Inject constructor(
      * missed). Joins the same refreshes already running, or skips those done
      * moments ago, unless they began before the join outdated them
      * ([page.planr.android.core.data.local.CacheGate.outdateSnapshots]).
+     * A refresh that changed the cache redraws the widgets itself, whoever
+     * led it (a screen opening may have written the change just before).
      */
     suspend fun syncVisible() {
         if (session.currentSession == null) return
         val changed = coroutineScope {
-            launch { appPrefs.pullQuietly() }
+            launch { appPrefs.pullQuietly(force = false) }
             refreshAll(force = false)
         }
-        if (changed) widgets.requestRefresh() else widgets.refreshClockBound()
+        if (!changed) widgets.refreshClockBound()
     }
 
     /**

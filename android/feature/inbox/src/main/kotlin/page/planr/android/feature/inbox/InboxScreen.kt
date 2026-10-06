@@ -105,6 +105,7 @@ fun InboxScreen(onBack: () -> Unit, viewModel: InboxViewModel = hiltViewModel())
                 onApprove = { viewModel.approve(it, defaultTitle) },
                 onDecline = viewModel::decline,
                 onOpenNight = viewModel::openNight,
+                onDismissError = viewModel::dismissError,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -136,10 +137,12 @@ private fun InboxContent(
     onApprove: (InboxItem.Request) -> Unit,
     onDecline: (InboxItem.Request) -> Unit,
     onOpenNight: (InboxItem.LogSleep) -> Unit,
+    onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxSize()) {
-        // Pinned above the list, read out once as it appears.
+        // Pinned above the list, read out once as it appears; a tap clears it
+        // (it also goes on its own after a few seconds).
         state.error?.let { error ->
             Text(
                 stringResource(
@@ -152,6 +155,7 @@ private fun InboxContent(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable(onClickLabel = stringResource(R.string.inbox_error_dismiss), onClick = onDismissError)
                     .padding(horizontal = PlanrSpacing.xl, vertical = PlanrSpacing.sm)
                     .semantics { liveRegion = LiveRegionMode.Polite },
             )
