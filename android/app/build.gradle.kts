@@ -87,6 +87,14 @@ base {
     archivesName = "planr-$appVersionName-$appVersionCode"
 }
 
+// kotlin-reflect reaches the APK only through postgrest-kt, which needs it
+// just for typed property filters (`Model::field`); Planr filters by column
+// name and decodes JsonObject. Left out of both app variants, so a debug
+// build would surface any use first; R8 reports no missing classes without it.
+configurations.matching { it.name == "debugRuntimeClasspath" || it.name == "releaseRuntimeClasspath" }.configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+}
+
 dependencies {
     implementation(projects.core.design)
     implementation(projects.core.data)
