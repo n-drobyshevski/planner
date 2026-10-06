@@ -22,6 +22,7 @@ import page.planr.android.core.data.auth.NotSignedInException
 import page.planr.android.feature.quickadd.data.QuickAddDataSource
 import page.planr.android.feature.quickadd.model.QuickAddError
 import page.planr.android.feature.quickadd.model.QuickAddForm
+import page.planr.android.feature.quickadd.model.SharedText
 
 data class QuickAddUiState(
     val form: QuickAddForm,
@@ -35,11 +36,11 @@ data class QuickAddUiState(
     val tomorrow: LocalDate get() = today.plus(DatePeriod(days = 1))
 
     /**
-     * Something typed that closing the sheet would drop, so a swipe, a tap
-     * outside or Back asks first. The day and times alone are defaults, and a
-     * saved item is no longer a draft.
+     * Something typed (or shared) that closing the sheet would drop, so a
+     * swipe, a tap outside or Back asks first. The day and times alone are
+     * defaults, and a saved item is no longer a draft.
      */
-    val hasDraft: Boolean get() = saved == null && form.title.isNotBlank()
+    val hasDraft: Boolean get() = saved == null && (form.title.isNotBlank() || form.notes.isNotBlank())
 }
 
 /**
@@ -61,10 +62,15 @@ class QuickAddViewModel @Inject constructor(
     private val _state = MutableStateFlow(fresh(QuickAddKind.Task))
     val state: StateFlow<QuickAddUiState> = _state.asStateFlow()
 
-    /** Opens a fresh sheet for [kind] and resolves the viewer's zone (the member's, else the device's). */
-    fun start(kind: QuickAddKind) {
+    /**
+     * Opens a fresh sheet for [kind], prefilled from [shared] text when given,
+     * and resolves the viewer's zone (the member's, else the device's).
+     */
+    fun start(kind: QuickAddKind, shared: SharedText? = null) {
         whenEdited = false
-        _state.value = fresh(kind)
+        _state.value = fresh(kind).let { state ->
+            if (shared == null) state else state.copy(form = state.form.copy(title = shared.title, notes = shared.notes))
+        }
         zoneJob?.cancel()
         zoneJob = viewModelScope.launch {
             val resolved = runCatching { data.viewerZone() }.getOrNull() ?: return@launch
@@ -78,6 +84,8 @@ class QuickAddViewModel @Inject constructor(
     fun setKind(kind: QuickAddKind) = edit { it.copy(kind = kind) }
 
     fun setTitle(title: String) = edit { it.copy(title = title) }
+
+    fun setNotes(notes: String) = edit { it.copy(notes = notes) }
 
     fun setDueDate(date: LocalDate?) = edit(timing = true) { it.copy(dueDate = date) }
 
@@ -101,10 +109,10 @@ class QuickAddViewModel @Inject constructor(
         viewModelScope.launch {
             val error = try {
                 when (form.kind) {
-                    QuickAddKind.Task -> data.createTask(form.title, form.dueDate)
+                    QuickAddKind.Task -> data.createTask(form.title, form.dueDate, form.description)
                     QuickAddKind.Event -> {
                         val (start, end) = form.eventTimes(zone)
-                        data.createEvent(form.title, start, end, form.allDay, zone)
+                        data.createEvent(form.title, start, end, form.allDay, zone, form.description)
                     }
                 }
                 null
@@ -135,7 +143,7 @@ class QuickAddViewModel @Inject constructor(
         )
     }
 
-    /** Re-derives the default day and times in the newly known zone, keeping title and kind. */
+    /** Re-derives the default day and times in the newly known zone, keeping title, notes and kind. */
     private fun refreshTimes(form: QuickAddForm): QuickAddForm {
         val defaults = QuickAddForm.initial(form.kind, clock.now(), zone)
         return form.copy(date = defaults.date, startTime = defaults.startTime, endTime = defaults.endTime)

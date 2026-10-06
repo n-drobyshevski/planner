@@ -14,5 +14,19 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Planr.QuickAdd"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- Text or a link shared from another app opens Quick add on a task,
+             prefilled. Only text/plain: a calendar file (text/calendar) still
+             goes to the app's .ics import. -->
+        <activity-alias
+            android:name=".ShareToQuickAddActivity"
+            android:exported="true"
+            android:targetActivity=".QuickAddActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

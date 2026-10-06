@@ -4,24 +4,33 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import page.planr.android.core.design.theme.PlanrSpacing
@@ -78,6 +87,42 @@ internal fun EventFields(state: QuickAddUiState, enabled: Boolean, viewModel: Qu
             }
         }
     }
+}
+
+/**
+ * Optional notes: an "Add notes" link until there are some (shared text
+ * arrives with them), then a multi-line field that stays open even if
+ * cleared, so it doesn't vanish mid-edit.
+ */
+@Composable
+internal fun NotesField(notes: String, enabled: Boolean, onChange: (String) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(notes.isNotEmpty()) }
+    if (!open && notes.isEmpty()) {
+        TextButton(
+            onClick = { open = true },
+            enabled = enabled,
+            contentPadding = PaddingValues(horizontal = PlanrSpacing.sm),
+        ) {
+            Text(stringResource(R.string.quickadd_add_notes))
+        }
+        return
+    }
+    // Focus only when the user asked for the field, not when shared text opened it.
+    val focus = remember { FocusRequester() }
+    val asked = rememberSaveable { notes.isEmpty() }
+    LaunchedEffect(Unit) { if (asked) focus.requestFocus() }
+    OutlinedTextField(
+        value = notes,
+        onValueChange = onChange,
+        enabled = enabled,
+        label = { Text(stringResource(R.string.quickadd_notes)) },
+        minLines = 2,
+        maxLines = 6,
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focus),
+    )
 }
 
 @Composable

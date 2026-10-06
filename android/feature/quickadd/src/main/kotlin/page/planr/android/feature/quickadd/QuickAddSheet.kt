@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +49,8 @@ import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTheme
 import page.planr.android.feature.quickadd.model.QuickAddError
+import page.planr.android.feature.quickadd.model.SharedText
+import page.planr.android.feature.quickadd.ui.NotesField
 import page.planr.android.feature.quickadd.ui.EventFields
 import page.planr.android.feature.quickadd.ui.TaskFields
 
@@ -58,6 +62,7 @@ import page.planr.android.feature.quickadd.ui.TaskFields
  * is the explicit way out and closes at once.
  *
  * @param kind what the sheet opens on; the user can still switch.
+ * @param shared text shared from another app, prefilling the title and notes.
  * @param onDismiss called once the sheet is gone (cancelled, swiped away, or saved).
  * @param onSaved called with what was created, just before the sheet closes.
  */
@@ -67,6 +72,7 @@ fun QuickAddSheet(
     kind: QuickAddKind,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    shared: SharedText? = null,
     onSaved: (QuickAddKind) -> Unit = {},
     viewModel: QuickAddViewModel = hiltViewModel(),
 ) {
@@ -74,7 +80,7 @@ fun QuickAddSheet(
     // previous opening's "saved" can't close this one. Restored (not re-run)
     // after rotation or process death, which keeps the draft.
     rememberSaveable {
-        viewModel.start(kind)
+        viewModel.start(kind, shared)
         true
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -148,6 +154,8 @@ private fun QuickAddContent(state: QuickAddUiState, viewModel: QuickAddViewModel
         modifier = Modifier
             .fillMaxWidth()
             .imePadding()
+            // Shared notes can make the sheet taller than a small screen with the keyboard up.
+            .verticalScroll(rememberScrollState())
             .padding(start = PlanrSpacing.xl, end = PlanrSpacing.xl, bottom = PlanrSpacing.xl),
         verticalArrangement = Arrangement.spacedBy(PlanrSpacing.lg),
     ) {
@@ -182,6 +190,8 @@ private fun QuickAddContent(state: QuickAddUiState, viewModel: QuickAddViewModel
             QuickAddKind.Task -> TaskFields(state, enabled, viewModel)
             QuickAddKind.Event -> EventFields(state, enabled, viewModel)
         }
+
+        NotesField(form.notes, enabled, viewModel::setNotes)
 
         state.error?.let { error ->
             Text(

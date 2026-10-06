@@ -9,6 +9,8 @@
     <string name="quickadd_title_label">Название</string>
     <string name="quickadd_title_task_placeholder">Что нужно сделать?</string>
     <string name="quickadd_title_event_placeholder">Добавь название</string>
+    <string name="quickadd_notes">Заметки</string>
+    <string name="quickadd_add_notes">Добавить заметки</string>
     <string name="quickadd_due">Срок</string>
     <string name="quickadd_no_due">Без срока</string>
     <string name="quickadd_date">Дата</string>

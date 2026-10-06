@@ -18,6 +18,7 @@ import page.planr.android.core.model.PlannerEvent
 import page.planr.android.core.model.Task
 import page.planr.android.feature.quickadd.data.QuickAddDataSource
 import page.planr.android.feature.quickadd.model.QuickAddError
+import page.planr.android.feature.quickadd.model.SharedText
 
 class QuickAddViewModelTest {
     @get:Rule val main = MainDispatcherRule()
@@ -31,6 +32,8 @@ class QuickAddViewModelTest {
     private class FakeQuickAdd(var zone: TimeZone = TimeZone.of("Europe/Berlin")) : QuickAddDataSource {
         val tasks = mutableListOf<Pair<String, LocalDate?>>()
         val events = mutableListOf<List<Any>>()
+        /** The description of every create, task or event, in order. */
+        val descriptions = mutableListOf<String?>()
         var failWith: Exception? = null
         var zoneGate: CompletableDeferred<Unit>? = null
 
@@ -39,15 +42,24 @@ class QuickAddViewModelTest {
             return zone
         }
 
-        override suspend fun createTask(title: String, dueDate: LocalDate?): Task {
+        override suspend fun createTask(title: String, dueDate: LocalDate?, description: String?): Task {
             failWith?.let { throw it }
             tasks += title to dueDate
+            descriptions += description
             return Task(id = "t", workspaceId = "ws", ownerId = "me", title = title, createdAt = Instant.DISTANT_PAST, updatedAt = Instant.DISTANT_PAST)
         }
 
-        override suspend fun createEvent(title: String, start: Instant, end: Instant, allDay: Boolean, zone: TimeZone): PlannerEvent {
+        override suspend fun createEvent(
+            title: String,
+            start: Instant,
+            end: Instant,
+            allDay: Boolean,
+            zone: TimeZone,
+            description: String?,
+        ): PlannerEvent {
             failWith?.let { throw it }
             events += listOf(title, start, end, allDay, zone.id)
+            descriptions += description
             return PlannerEvent(
                 id = "e",
                 workspaceId = "ws",
@@ -209,5 +221,46 @@ class QuickAddViewModelTest {
 
         assertEquals(LocalTime(7, 0), vm.state.value.form.startTime)
         assertEquals(LocalDate(2026, 10, 4), vm.state.value.today)
+    }
+
+    @Test
+    fun `shared text prefills a task whose notes reach the save`() = runTest {
+        val data = FakeQuickAdd()
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Task, SharedText(title = "Read this", notes = "Read this\nhttps://example.com/post"))
+
+        assertEquals("Read this", vm.state.value.form.title)
+        vm.save()
+
+        assertEquals(listOf<Pair<String, LocalDate?>>("Read this" to null), data.tasks)
+        assertEquals(listOf<String?>("Read this\nhttps://example.com/post"), data.descriptions)
+    }
+
+    @Test
+    fun `typed notes are saved trimmed with an event, and blank notes as none`() = runTest {
+        val data = FakeQuickAdd()
+        val vm = QuickAddViewModel(data, clock)
+        vm.start(QuickAddKind.Event)
+        vm.setTitle("Dinner")
+        vm.setNotes("  Table for two  \n")
+        vm.save()
+
+        vm.start(QuickAddKind.Task)
+        vm.setTitle("Stamps")
+        vm.setNotes("   ")
+        vm.save()
+
+        assertEquals(listOf<String?>("Table for two", null), data.descriptions)
+    }
+
+    @Test
+    fun `notes alone are a draft worth asking about`() = runTest {
+        val vm = QuickAddViewModel(FakeQuickAdd(), clock)
+        vm.start(QuickAddKind.Task)
+        vm.setNotes("Bring the receipt")
+        assertTrue(vm.state.value.hasDraft)
+
+        vm.start(QuickAddKind.Task, SharedText(title = "", notes = "shared"))
+        assertTrue(vm.state.value.hasDraft, "shared text is a draft before any typing")
     }
 }
