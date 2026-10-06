@@ -4,11 +4,15 @@ import javax.inject.Inject
 import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.health.SleepNight
+import page.planr.android.core.data.model.SleepLog
+import page.planr.android.core.data.model.SleepTimes
+import page.planr.android.core.data.model.SleepTimesSource
 import page.planr.android.core.model.PostgresInstantSerializer
 
 /** The columns of a `sleep_logs` row the device owns (times, stages, source). */
@@ -27,6 +31,40 @@ data class SleepDeviceRow(
     @SerialName("rem_min") val remMin: Int? = null,
     @SerialName("awake_min") val awakeMin: Int? = null,
 )
+
+/** A whole `sleep_logs` row as the Sleep tab and the check-in read it (mappers.ts `mapSleepLog`). */
+@Serializable
+internal data class SleepLogRow(
+    val date: String,
+    @Serializable(with = PostgresInstantSerializer::class)
+    @SerialName("bedtime_at") val bedtimeAt: Instant? = null,
+    @Serializable(with = PostgresInstantSerializer::class)
+    @SerialName("woke_at") val wokeAt: Instant? = null,
+    @SerialName("times_source") val timesSource: String? = null,
+    val quality: Int? = null,
+    val fatigue: Int? = null,
+    val note: String? = null,
+    @SerialName("asleep_min") val asleepMin: Int? = null,
+    @SerialName("deep_min") val deepMin: Int? = null,
+    @SerialName("light_min") val lightMin: Int? = null,
+    @SerialName("rem_min") val remMin: Int? = null,
+    @SerialName("awake_min") val awakeMin: Int? = null,
+) {
+    fun toModel(): SleepLog = SleepLog(
+        date = LocalDate.parse(date.take(10)),
+        bedtimeAt = bedtimeAt,
+        wokeAt = wokeAt,
+        timesSource = SleepTimesSource.fromWire(timesSource),
+        quality = quality,
+        fatigue = fatigue,
+        note = note,
+        asleepMin = asleepMin,
+        deepMin = deepMin,
+        lightMin = lightMin,
+        remMin = remMin,
+        awakeMin = awakeMin,
+    )
+}
 
 /** The `member_sleep_prefs` columns that decide which calendar block is a night. */
 @Serializable
@@ -55,6 +93,43 @@ class SleepRemote @Inject constructor(
         filters = listOf(eq("member_id", memberId), gte("date", sinceDate)),
     ).decodeAll(SleepDeviceRow.serializer())
 
+    /** The member's nights from [sinceDate] (yyyy-MM-dd) on, newest first. */
+    suspend fun fetchLogs(memberId: String, sinceDate: String): List<SleepLog> = gateway.select(
+        SupabaseTables.SLEEP_LOGS,
+        columns = LOG_COLUMNS,
+        filters = listOf(eq("member_id", memberId), gte("date", sinceDate)),
+        order = listOf(RowOrder("date", ascending = false)),
+    ).decodeAll(SleepLogRow.serializer()).map { it.toModel() }
+
+    /** The member's night that woke on [date], if any. */
+    suspend fun fetchLog(memberId: String, date: LocalDate): SleepLog? = gateway.select(
+        SupabaseTables.SLEEP_LOGS,
+        columns = LOG_COLUMNS,
+        filters = listOf(eq("member_id", memberId), eq("date", date.toString())),
+        limit = 1,
+    ).firstOrNull()?.decodeAs(SleepLogRow.serializer())?.toModel()
+
+    /**
+     * Saves the member's ratings and note on [date] (mappers.ts
+     * `sleepLogInputToRow`). Only workspace / member / date and the three
+     * rating columns are sent, plus bedtime, wake and `times_source = manual`
+     * when [times] is given, so a night's device times and stages stay
+     * untouched. Callers pass [times] through `keepDeviceTimes` first.
+     */
+    suspend fun upsertRating(
+        workspaceId: String,
+        memberId: String,
+        date: LocalDate,
+        quality: Int?,
+        fatigue: Int?,
+        note: String?,
+        times: SleepTimes? = null,
+    ): SleepLog? = gateway.upsert(
+        SupabaseTables.SLEEP_LOGS,
+        listOf(ratingPayload(workspaceId, memberId, date, quality, fatigue, note, times)),
+        onConflict = "member_id,date",
+    ).firstOrNull()?.decodeAs(SleepLogRow.serializer())?.toModel()
+
     /** The member's sleep settings; the DB defaults when they never saved any (member-private). */
     suspend fun fetchBlockPrefs(memberId: String): SleepBlockPrefs {
         val row = gateway.select(
@@ -76,6 +151,9 @@ class SleepRemote @Inject constructor(
     }
 
     internal companion object {
+        const val LOG_COLUMNS =
+            "date,bedtime_at,woke_at,times_source,quality,fatigue,note,asleep_min,deep_min,light_min,rem_min,awake_min"
+
         const val DEVICE_COLUMNS =
             "date,bedtime_at,woke_at,times_source,external_id,asleep_min,deep_min,light_min,rem_min,awake_min"
 
@@ -93,6 +171,28 @@ class SleepRemote @Inject constructor(
             put("light_min", night.lightMin)
             put("rem_min", night.remMin)
             put("awake_min", night.awakeMin)
+        }
+
+        fun ratingPayload(
+            workspaceId: String,
+            memberId: String,
+            date: LocalDate,
+            quality: Int?,
+            fatigue: Int?,
+            note: String?,
+            times: SleepTimes?,
+        ): JsonObject = buildJsonObject {
+            put("workspace_id", workspaceId)
+            put("member_id", memberId)
+            put("date", date.toString())
+            put("quality", quality)
+            put("fatigue", fatigue)
+            put("note", note)
+            if (times != null) {
+                put("bedtime_at", times.bedtimeAt?.let(PostgresTime::toIso))
+                put("woke_at", times.wokeAt?.let(PostgresTime::toIso))
+                put("times_source", SleepTimesSource.Manual.wire)
+            }
         }
 
         /** True when the stored row already says what [night] says (to the second). */
