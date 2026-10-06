@@ -19,6 +19,7 @@ import page.planr.android.core.data.model.TimeslotRequest
 import page.planr.android.core.model.EventKind
 import page.planr.android.core.model.EventStatus
 import page.planr.android.core.model.Occurrence
+import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.model.Task
 import page.planr.android.core.model.TimeWindow
 
@@ -207,6 +208,38 @@ object InboxRules {
             .sortedWith(compareBy<InboxItem> { it.severity.ordinal }.thenByDescending { it.sortAt })
             .take(INBOX_CAP)
     }
+
+    /** The satisfaction options the rating rows offer, "1".."4" (`ATTRIBUTE_META` satisfaction). */
+    val satisfactionOptions: List<String> get() = AttributeKey.Satisfaction.options
+
+    /**
+     * [attributes] with satisfaction set to [option], every other key (known
+     * or not) kept: what a rating row writes (inbox-shell.tsx `setAttribute`).
+     */
+    fun rated(attributes: JsonObject, option: String): JsonObject =
+        AttributesMerge.merge(attributes, mapOf(AttributeKey.Satisfaction to option))
+
+    /**
+     * The event approving [request] creates (inbox-shell.tsx `onApprove`):
+     * owned by the approving member at the proposed time, titled with the
+     * requester's name ([defaultTitle] when anonymous), the message as its
+     * description.
+     */
+    fun approvedEvent(
+        request: InboxItem.Request,
+        workspaceId: String,
+        ownerId: String,
+        defaultTitle: String,
+        zone: TimeZone,
+    ): PlannerEventDraft = PlannerEventDraft(
+        workspaceId = workspaceId,
+        ownerId = ownerId,
+        title = request.requesterName?.trim()?.takeIf { it.isNotEmpty() } ?: defaultTitle,
+        description = request.message,
+        start = request.proposedStart,
+        end = request.proposedEnd,
+        timeZone = zone.id,
+    )
 
     /**
      * A timed, active, non-context block that can carry a rating: sleep and
