@@ -8,17 +8,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.DeletedTaskSnapshot
 import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.Board
 import page.planr.android.core.model.Category
+import page.planr.android.core.model.EventKind
+import page.planr.android.core.model.EventStatus
 import page.planr.android.core.model.Member
+import page.planr.android.core.model.Occurrence
+import page.planr.android.core.model.PlannerEvent
+import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.model.Task
+import page.planr.android.core.model.TimeWindow
 import page.planr.android.core.recurrence.PatchField
 import page.planr.android.feature.tasks.data.TasksDataSource
 
@@ -72,6 +80,55 @@ fun task(
     updatedAt = Instant.parse("2026-09-02T00:00:00Z"),
 )
 
+/** A calendar occurrence, Anna's and timed unless told otherwise. */
+fun occurrence(
+    id: String,
+    start: Instant,
+    end: Instant,
+    owner: String = ANNA,
+    shared: Boolean = false,
+    allDay: Boolean = false,
+    status: EventStatus = EventStatus.Confirmed,
+    kind: EventKind = EventKind.Event,
+): Occurrence = Occurrence(
+    key = id,
+    eventId = id,
+    occurrenceDate = start,
+    start = start,
+    end = end,
+    allDay = allDay,
+    inactive = false,
+    status = status,
+    title = id,
+    description = null,
+    location = null,
+    categoryId = null,
+    color = null,
+    kind = kind,
+    ownerId = owner,
+    isPrivate = false,
+    isShared = shared,
+    hiddenFromPublic = false,
+    taskId = null,
+    attributes = JsonObject(emptyMap()),
+    isRecurring = false,
+    isException = false,
+)
+
+/** A calendar block of [taskId] (a plain event when null). */
+fun blockEvent(id: String, taskId: String?, start: Instant, end: Instant, owner: String = ANNA) = PlannerEvent(
+    id = id,
+    workspaceId = WS,
+    ownerId = owner,
+    title = "Block $id",
+    start = start,
+    end = end,
+    timeZone = "UTC",
+    taskId = taskId,
+    createdAt = NOW,
+    updatedAt = NOW,
+)
+
 /** A collection with an open and a done column, so its tasks can be checked off. */
 const val COL = "col"
 
@@ -122,6 +179,21 @@ class FakeTasksDataSource(
     var blockedTaskIds: Set<String> = emptySet()
     val blockChecks = mutableListOf<Collection<String>>()
     private val deletedRows = mutableMapOf<String, Task>()
+
+    /** Every cached event linked to a task (observeTaskBlocks filters by task). */
+    val events = MutableStateFlow<List<PlannerEvent>>(emptyList())
+    /** What the occurrence cache holds; reads return those overlapping the window. */
+    var calendar: List<Occurrence> = emptyList()
+    val occurrenceReads = mutableListOf<Pair<TimeWindow, TimeZone>>()
+    var blockRefreshes = 0
+    val createdEvents = mutableListOf<PlannerEventDraft>()
+    val deletedEventIds = mutableListOf<String>()
+    val restoredEventIds = mutableListOf<String>()
+    /** When set, createEvent / deleteEvent / restoreEvent suspend until it completes. */
+    var eventGate: CompletableDeferred<Unit>? = null
+    /** When set, the occurrence read suspends until it completes. */
+    var occurrenceGate: CompletableDeferred<Unit>? = null
+    private val deletedEvents = mutableMapOf<String, PlannerEvent>()
 
     override val currentMemberId: Flow<String?> = this.viewer
 
@@ -221,6 +293,50 @@ class FakeTasksDataSource(
         blockChecks += taskIds
         failWith?.let { throw it }
         return taskIds.any { it in blockedTaskIds }
+    }
+
+    override fun observeTaskBlocks(taskId: String): Flow<List<PlannerEvent>> =
+        events.map { rows -> rows.filter { it.taskId == taskId }.sortedBy { it.start } }
+
+    override suspend fun refreshTaskBlocks(taskId: String) {
+        blockRefreshes++
+        failWith?.let { throw it }
+    }
+
+    override suspend fun occurrences(window: TimeWindow, zone: TimeZone): List<Occurrence> {
+        occurrenceReads += window to zone
+        occurrenceGate?.await()
+        failWith?.let { throw it }
+        return calendar.filter { window.intersects(it.start, it.end) }
+    }
+
+    override suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent {
+        createdEvents += draft
+        eventGate?.await()
+        failWith?.let { throw it }
+        val event = blockEvent("ev-${createdEvents.size}", draft.taskId, draft.start, draft.end, draft.ownerId)
+        events.update { it + event }
+        return event
+    }
+
+    override suspend fun deleteEvent(id: String): DeletedEventSnapshot {
+        deletedEventIds += id
+        eventGate?.await()
+        failWith?.let { throw it }
+        val row = events.value.first { it.id == id }
+        events.update { rows -> rows.filter { it.id != id } }
+        deletedEvents[id] = row
+        return DeletedEventSnapshot(listOf(JsonObject(mapOf("id" to JsonPrimitive(id)))), emptyList())
+    }
+
+    override suspend fun restoreEvent(snapshot: DeletedEventSnapshot) {
+        eventGate?.await()
+        failWith?.let { throw it }
+        snapshot.events.forEach { row ->
+            val id = row.getValue("id").jsonPrimitive.content
+            restoredEventIds += id
+            events.update { it + deletedEvents.getValue(id) }
+        }
     }
 
     private fun replace(task: Task) = tasks.update { rows -> rows.map { if (it.id == task.id) task else it } }

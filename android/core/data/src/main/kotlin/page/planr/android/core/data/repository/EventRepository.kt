@@ -61,6 +61,36 @@ class EventRepository @Inject constructor(
     suspend fun getEvent(id: String): PlannerEvent? = dao.getById(id)?.toModel()
 
     /**
+     * [taskId]'s calendar blocks as Room holds them, by start. Call
+     * [refreshTaskBlocks] first: the windows the agenda syncs need not cover
+     * them all.
+     */
+    fun observeTaskBlocks(taskId: String): Flow<List<PlannerEvent>> =
+        session.inWorkspace(emptyList()) { ws ->
+            dao.observeOfTask(ws, taskId).map { rows -> rows.map { it.toModel() } }
+        }
+
+    /**
+     * Refetches [taskId]'s blocks and replaces what Room holds for the task,
+     * so blocks deleted or unlinked elsewhere disappear too (the same exact
+     * replace as [refreshWindow], over `task_id` instead of a window).
+     */
+    suspend fun refreshTaskBlocks(taskId: String) {
+        val ws = session.requireSession().workspaceId
+        gate.refresh(CacheArea.Events, fetch = { queries.fetchTaskBlocks(ws, taskId) }) { blocks ->
+            db.withTransaction {
+                val kept = blocks.map { it.id }.toSet()
+                val stale = dao.idsOfTask(ws, taskId).filter { it !in kept }
+                stale.chunked(SQL_CHUNK).forEach { chunk ->
+                    dao.deleteOverridesOf(chunk)
+                    dao.deleteEvents(chunk)
+                }
+                dao.upsertEvents(blocks.map { it.toEntity() })
+            }
+        }
+    }
+
+    /**
      * Refetches [window] (`fetchWindow`) and replaces what Room holds for it,
      * so rows deleted elsewhere disappear too.
      *

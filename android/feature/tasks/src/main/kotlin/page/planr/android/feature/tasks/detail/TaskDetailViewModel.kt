@@ -8,6 +8,8 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,16 +19,22 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
 import page.planr.android.core.data.attributes.AttributeKey
 import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.Board
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
+import page.planr.android.core.model.PlannerEvent
 import page.planr.android.core.model.Task
 import page.planr.android.core.model.TaskCompletion
 import page.planr.android.core.model.TaskPriority
 import page.planr.android.feature.tasks.data.TasksDataSource
+import page.planr.android.feature.tasks.model.BlockSlots
 import page.planr.android.feature.tasks.model.SubtaskProgress
 import page.planr.android.feature.tasks.model.TaskForm
 import page.planr.android.feature.tasks.model.TaskOrder
@@ -89,11 +97,27 @@ data class TaskDetailUiState(
     /** Set after a delete; the screen navigates back. */
     val deleted: Boolean = false,
     val notice: TaskDetailNotice? = null,
+    /** The zone the member's calendar is read and written in. */
+    val zone: TimeZone = TimeZone.UTC,
+    /** The task's calendar blocks: upcoming first, then past. */
+    val blocks: List<TaskBlockItem> = emptyList(),
+    /** "Add to calendar" is offered (owner only, like every other write here). */
+    val canSchedule: Boolean = false,
+    /** The open "Add to calendar" sheet. */
+    val blockSheet: BlockSheetState? = null,
+    /** The latest block write, for the snackbar's Undo. */
+    val blockNotice: BlockNotice? = null,
+    /**
+     * A block is being created, removed or put back. Its own write: the form
+     * isn't dirty, but the screen holds Back, Save and Delete until it lands.
+     */
+    val blockWriting: Boolean = false,
 )
 
 /**
  * One task: its details, the editor form and the save (`updateTask` with the
- * stale-write guard), its subtasks (complete / reopen, add) and delete.
+ * stale-write guard), its subtasks (complete / reopen, add), its calendar
+ * blocks (add, remove, with Undo) and delete.
  */
 @HiltViewModel(assistedFactory = TaskDetailViewModel.Factory::class)
 class TaskDetailViewModel @AssistedInject constructor(
@@ -115,6 +139,11 @@ class TaskDetailViewModel @AssistedInject constructor(
     /** Optimistic subtask completion by id while a write is in flight. */
     private val pending = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 
+    private val blockUi = MutableStateFlow(BlockFlags())
+
+    /** The running "next free slot" lookup for the sheet. */
+    private var suggestion: Job? = null
+
     private val workspace = combine(
         data.observeTasks(),
         data.observeMembers(),
@@ -127,11 +156,26 @@ class TaskDetailViewModel @AssistedInject constructor(
     @Volatile
     private var latest: Snapshot? = null
 
+    private val blockRows = combine(data.observeTaskBlocks(taskId), blockUi, ::Pair)
+
     val state: StateFlow<TaskDetailUiState> =
-        combine(workspace, edits, ui, pending) { snapshot, edits, flags, pending ->
+        combine(workspace, edits, ui, pending, blockRows) { snapshot, edits, flags, pending, (blocks, blockFlags) ->
             latest = snapshot
-            render(snapshot, edits, flags, pending)
+            render(snapshot, edits, flags, pending).withBlocks(snapshot, blocks, blockFlags)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), TaskDetailUiState())
+
+    init {
+        // The cache only holds the windows the agenda synced; fetch the rest.
+        // Offline, the cached blocks are what there is.
+        viewModelScope.launch {
+            try {
+                data.refreshTaskBlocks(taskId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     /** Tasks deleted from another detail (a subtask's), for this screen's "Deleted · Undo". */
     val deletedTasks: Flow<TaskDeleted> = deletions.claims(except = taskId)
@@ -214,7 +258,7 @@ class TaskDetailViewModel @AssistedInject constructor(
         val task = current.task ?: return
         // Not while a subtask is being added: the plan would miss it, and the
         // cascade would take it with no Undo.
-        if (!current.canEdit || current.saving || current.deleting || current.addingSubtask) return
+        if (!current.canEdit || current.saving || current.deleting || current.addingSubtask || current.blockWriting) return
         val subtree = descendantIds(task.id, latest?.tasks.orEmpty().groupBy { it.parentId })
         ui.update { it.copy(deleting = true, notice = null) }
         viewModelScope.launch {
@@ -275,7 +319,8 @@ class TaskDetailViewModel @AssistedInject constructor(
         val current = state.value
         val task = current.task ?: return
         val form = current.form ?: return
-        if (!current.canEdit || current.saving) return
+        // Not mid block write: the save closes the screen, which would cancel it.
+        if (!current.canEdit || current.saving || current.blockWriting) return
         if (!form.isTitleValid) {
             ui.update { it.copy(notice = TaskDetailNotice.TitleRequired) }
             return
@@ -301,6 +346,156 @@ class TaskDetailViewModel @AssistedInject constructor(
                 ui.update { it.copy(saving = false, notice = TaskDetailNotice.Failed) }
             }
         }
+    }
+
+    /**
+     * "Add to calendar": the sheet opens on the task's due date while it is
+     * ahead (else today), half an hour, starting at the next full hour until
+     * the first free slot that day is found in the cache.
+     */
+    fun openBlockSheet() {
+        val current = state.value
+        if (current.task == null || !current.canSchedule || current.saving || current.deleting) return
+        if (current.blockSheet != null) return
+        val now = clock.now()
+        val date = BlockSlots.defaultDate(current.form?.dueDate, now, current.zone)
+        val sheet = BlockSheetState(date, BlockSlots.nextFullHour(now, current.zone), BlockSlots.DEFAULT_MINUTES)
+        blockUi.update { it.copy(sheet = sheet) }
+        suggestStart(current.zone)
+    }
+
+    fun setBlockDate(date: LocalDate) = editSheet(suggest = true) { it.copy(date = date) }
+
+    fun setBlockMinutes(minutes: Int) = editSheet(suggest = true) { it.copy(minutes = minutes) }
+
+    fun setBlockStart(time: LocalTime) = editSheet(suggest = false) { it.copy(start = time, startPicked = true) }
+
+    fun dismissBlockSheet() {
+        if (blockUi.value.sheet?.saving == true) return
+        suggestion?.cancel()
+        blockUi.update { it.copy(sheet = null) }
+    }
+
+    /** The sheet's Add: creates the block as its own write; the form stays as it is. */
+    fun createBlock() {
+        val current = state.value
+        val task = current.task ?: return
+        // The flags, not the rendered state: a second tap may come before the state catches up.
+        val sheet = blockUi.value.sheet ?: return
+        val viewerId = latest?.viewerId ?: return
+        if (!current.canSchedule || sheet.saving || current.saving || current.deleting) return
+        val start = sheet.date.atTime(sheet.start).toInstant(current.zone)
+        val draft = blockDraft(task, viewerId, start, sheet.minutes, current.zone)
+        suggestion?.cancel()
+        blockUi.update { it.copy(sheet = sheet.copy(saving = true)) }
+        viewModelScope.launch {
+            try {
+                val created = data.createEvent(draft)
+                blockUi.update { it.copy(sheet = null, notice = BlockNotice.Added(created.id)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                blockUi.update { it.copy(sheet = it.sheet?.copy(saving = false)) }
+                ui.update { it.copy(notice = TaskDetailNotice.Failed) }
+            }
+        }
+    }
+
+    /** Takes one of the viewer's blocks off the calendar, with Undo. */
+    fun removeBlock(eventId: String) {
+        val current = state.value
+        val item = current.blocks.firstOrNull { it.event.id == eventId } ?: return
+        if (!item.canRemove || item.pending || eventId in blockUi.value.writing || current.saving || current.deleting) return
+        blockWrite(eventId) {
+            val snapshot = data.deleteEvent(eventId)
+            blockUi.update { it.copy(notice = BlockNotice.Removed(eventId, snapshot)) }
+        }
+    }
+
+    /**
+     * The snackbar's Undo: deletes a block just added, or puts back one just
+     * removed. Not while the task is being deleted: its blocks go with it.
+     */
+    fun undoBlock(notice: BlockNotice) {
+        dismissBlockNotice(notice)
+        if (state.value.deleting) return
+        when (notice) {
+            is BlockNotice.Added -> blockWrite(notice.eventId) { data.deleteEvent(notice.eventId) }
+            is BlockNotice.Removed -> blockWrite(notice.eventId) { data.restoreEvent(notice.snapshot) }
+        }
+    }
+
+    /** Clears [shown] once the screen has consumed it; a newer notice is kept. */
+    fun dismissBlockNotice(shown: BlockNotice) =
+        blockUi.update { if (it.notice == shown) it.copy(notice = null) else it }
+
+    /** Runs a removal or an Undo for [eventId], marking it pending meanwhile. */
+    private fun blockWrite(eventId: String, write: suspend () -> Unit) {
+        blockUi.update { it.copy(writing = it.writing + eventId) }
+        viewModelScope.launch {
+            try {
+                write()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                ui.update { it.copy(notice = TaskDetailNotice.Failed) }
+            } finally {
+                blockUi.update { it.copy(writing = it.writing - eventId) }
+            }
+        }
+    }
+
+    private fun editSheet(suggest: Boolean, change: (BlockSheetState) -> BlockSheetState) {
+        val sheet = blockUi.value.sheet ?: return
+        if (sheet.saving) return
+        blockUi.update { it.copy(sheet = it.sheet?.let(change)) }
+        if (suggest) suggestStart(state.value.zone)
+    }
+
+    /**
+     * Moves the sheet's start to the first free slot of its day for its
+     * duration, read from the occurrence cache, unless the user has picked a
+     * start. A failed read keeps the start it has.
+     */
+    private fun suggestStart(zone: TimeZone) {
+        val sheet = blockUi.value.sheet ?: return
+        if (sheet.startPicked) return
+        val viewerId = latest?.viewerId
+        suggestion?.cancel()
+        suggestion = viewModelScope.launch {
+            val start = try {
+                val occurrences = data.occurrences(BlockSlots.dayWindow(sheet.date, zone), zone)
+                BlockSlots.defaultStart(sheet.date, zone, sheet.minutes.minutes, occurrences, viewerId, clock.now())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                return@launch
+            }
+            blockUi.update { flags ->
+                val open = flags.sheet
+                // Only for the day and duration it was asked for, and never over the user's pick.
+                if (open == null || open.startPicked || open.saving || open.date != sheet.date || open.minutes != sheet.minutes) {
+                    flags
+                } else {
+                    flags.copy(sheet = open.copy(start = start))
+                }
+            }
+        }
+    }
+
+    private fun TaskDetailUiState.withBlocks(
+        snapshot: Snapshot,
+        events: List<PlannerEvent>,
+        flags: BlockFlags,
+    ): TaskDetailUiState {
+        if (task == null) return this
+        return copy(
+            blocks = blockItems(events, clock.now(), snapshot.viewerId, flags.writing),
+            canSchedule = canEdit,
+            blockSheet = flags.sheet,
+            blockNotice = flags.notice,
+            blockWriting = flags.sheet?.saving == true || flags.writing.isNotEmpty(),
+        )
     }
 
     private fun edit(change: (TaskForm) -> TaskForm) {
@@ -345,6 +540,7 @@ class TaskDetailViewModel @AssistedInject constructor(
             addingSubtask = flags.addingSubtask,
             progress = progressDeep(task.id, byParent),
             overdue = !form.done && isOverdue(form.dueDate, clock.today(viewerZone(viewer))),
+            zone = viewerZone(viewer),
             dirty = form != stored,
             saving = flags.saving,
             saved = flags.saved,
@@ -381,6 +577,13 @@ class TaskDetailViewModel @AssistedInject constructor(
         val confirmDelete: DeletePlan.Confirm? = null,
         val deleted: Boolean = false,
         val notice: TaskDetailNotice? = null,
+    )
+
+    private data class BlockFlags(
+        val sheet: BlockSheetState? = null,
+        /** Event ids with a removal or an Undo in flight. */
+        val writing: Set<String> = emptySet(),
+        val notice: BlockNotice? = null,
     )
 
     private data class Snapshot(

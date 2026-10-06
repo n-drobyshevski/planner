@@ -114,4 +114,25 @@
     <string name="task_delete_cancel">Отмена</string>
     <string name="task_date_pick">Выбрать</string>
     <string name="task_date_cancel">Отмена</string>
+
+    <!-- Calendar blocks (the web's "Add to calendar" dialog) -->
+    <string name="task_blocks_title">В календаре</string>
+    <string name="task_block_range">%1$s · %2$s–%3$s</string>
+    <string name="task_block_open">Открыть событие</string>
+    <string name="task_block_remove">Убрать из календаря</string>
+    <string name="task_block_added">Добавлено в календарь</string>
+    <string name="task_block_removed">Убрано из календаря</string>
+    <string name="task_schedule_title">Добавить в календарь</string>
+    <string name="task_schedule_date">Дата</string>
+    <string name="task_schedule_start">Начало</string>
+    <string name="task_schedule_duration">Длительность</string>
+    <string name="task_schedule_15min">15 мин</string>
+    <string name="task_schedule_30min">30 мин</string>
+    <string name="task_schedule_45min">45 мин</string>
+    <string name="task_schedule_1hour">1 час</string>
+    <string name="task_schedule_1and_half_hours">1,5 часа</string>
+    <string name="task_schedule_2hours">2 часа</string>
+    <string name="task_schedule_add">Добавить в календарь</string>
+    <string name="task_schedule_adding">Добавление…</string>
+    <string name="task_schedule_cancel">Отмена</string>
 </resources>

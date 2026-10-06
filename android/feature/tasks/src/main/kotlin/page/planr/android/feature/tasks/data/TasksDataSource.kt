@@ -7,17 +7,25 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.TimeZone
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.DeletedTaskSnapshot
 import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
+import page.planr.android.core.data.repository.EventRepository
+import page.planr.android.core.data.repository.OccurrenceRepository
 import page.planr.android.core.data.repository.TaskRepository
 import page.planr.android.core.data.repository.WorkspaceRepository
 import page.planr.android.core.model.Board
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
+import page.planr.android.core.model.Occurrence
+import page.planr.android.core.model.PlannerEvent
+import page.planr.android.core.model.PlannerEventDraft
 import page.planr.android.core.model.Task
+import page.planr.android.core.model.TimeWindow
 
 /**
  * What the tasks screens read and write. A seam over the :core:data
@@ -55,6 +63,23 @@ interface TasksDataSource {
 
     /** Whether calendar blocks are linked to any of [taskIds] (asks the server). */
     suspend fun hasCalendarBlocks(taskIds: Collection<String>): Boolean
+
+    /** [taskId]'s calendar blocks as cached, by start; follows creates and deletes. */
+    fun observeTaskBlocks(taskId: String): Flow<List<PlannerEvent>>
+
+    /** Fetches [taskId]'s blocks into the cache (past ones and any date). */
+    suspend fun refreshTaskBlocks(taskId: String)
+
+    /** The cached occurrences in [window], in [zone]; no network. */
+    suspend fun occurrences(window: TimeWindow, zone: TimeZone): List<Occurrence>
+
+    /** Creates an event (a task block). */
+    suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent
+
+    /** Deletes an event; the snapshot is for [restoreEvent] (Undo). */
+    suspend fun deleteEvent(id: String): DeletedEventSnapshot
+
+    suspend fun restoreEvent(snapshot: DeletedEventSnapshot)
 }
 
 /** The production [TasksDataSource]: Room-backed repositories plus the session. */
@@ -62,6 +87,8 @@ class RepositoryTasksDataSource @Inject constructor(
     private val session: SessionManager,
     private val tasks: TaskRepository,
     private val workspace: WorkspaceRepository,
+    private val events: EventRepository,
+    private val calendar: OccurrenceRepository,
 ) : TasksDataSource {
 
     override val currentMemberId: Flow<String?> =
@@ -94,4 +121,17 @@ class RepositoryTasksDataSource @Inject constructor(
     override suspend fun restoreTask(snapshot: DeletedTaskSnapshot) = tasks.restoreTask(snapshot)
 
     override suspend fun hasCalendarBlocks(taskIds: Collection<String>): Boolean = tasks.hasCalendarBlocks(taskIds)
+
+    override fun observeTaskBlocks(taskId: String): Flow<List<PlannerEvent>> = events.observeTaskBlocks(taskId)
+
+    override suspend fun refreshTaskBlocks(taskId: String) = events.refreshTaskBlocks(taskId)
+
+    override suspend fun occurrences(window: TimeWindow, zone: TimeZone): List<Occurrence> =
+        calendar.snapshot(window, zone)
+
+    override suspend fun createEvent(draft: PlannerEventDraft): PlannerEvent = events.createEvent(draft)
+
+    override suspend fun deleteEvent(id: String): DeletedEventSnapshot = events.deleteEvent(id)
+
+    override suspend fun restoreEvent(snapshot: DeletedEventSnapshot) = events.restoreEvent(snapshot)
 }

@@ -5,14 +5,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toJavaLocalTime
 import kotlinx.datetime.toLocalDateTime
 import page.planr.android.core.design.theme.PlanrTokens
 import page.planr.android.core.design.theme.parseHexColor
@@ -25,6 +28,19 @@ internal fun formatDayMonth(date: LocalDate, locale: Locale): String {
     val pattern = DateFormat.getBestDateTimePattern(locale, "dMMM")
     return DateTimeFormatter.ofPattern(pattern, locale).format(date.toJavaLocalDate())
 }
+
+/** "Tue, Oct 6" / "вт, 6 окт." — a block's day. */
+internal fun formatWeekdayDayMonth(date: LocalDate, locale: Locale): String {
+    val pattern = DateFormat.getBestDateTimePattern(locale, "EEEdMMM")
+    return DateTimeFormatter.ofPattern(pattern, locale).format(date.toJavaLocalDate())
+}
+
+/** "14:30" or "2:30 PM", following the device's 12/24-hour setting. */
+internal fun formatTime(time: LocalTime, is24Hour: Boolean, locale: Locale): String =
+    DateTimeFormatter.ofPattern(if (is24Hour) "HH:mm" else "h:mm a", locale).format(time.toJavaLocalTime())
+
+@Composable
+internal fun is24HourClock(): Boolean = DateFormat.is24HourFormat(LocalContext.current)
 
 /** The locale the UI renders in (the app follows the device language). */
 @Composable
