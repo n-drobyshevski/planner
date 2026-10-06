@@ -105,6 +105,17 @@
             </intent-filter>
         </activity>
 
+        <!-- The Tasks launcher shortcut's hop to MainActivity. A static
+             shortcut is started with CLEAR_TASK; its own empty affinity keeps
+             that from clearing the app's task (and an open editor's draft). -->
+        <activity
+            android:name=".ShortcutTrampolineActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <!-- What Planr does with Health Connect data: Health Connect links
              here from its permission screen (Android 13 and older)… -->
         <activity

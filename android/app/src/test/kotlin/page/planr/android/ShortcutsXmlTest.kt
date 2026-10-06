@@ -5,6 +5,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import org.w3c.dom.Element
 import page.planr.android.feature.quickadd.QuickAddActivity
 import page.planr.android.feature.quickadd.QuickAddKind
@@ -57,11 +58,26 @@ class ShortcutsXmlTest {
     }
 
     @Test
-    fun `tasks opens the app on the tasks tab`() {
+    fun `tasks opens the app on the tasks tab, through the trampoline`() {
         val intent = assertNotNull(intents["tasks"])
-        assertEquals(MainActivity::class.java.name, intent.attr("targetClass"))
+        // Never MainActivity itself: a static shortcut starts with CLEAR_TASK, which would wipe the running app.
+        assertEquals(ShortcutTrampolineActivity::class.java.name, intent.attr("targetClass"))
         assertEquals(WidgetLaunch.ACTION_OPEN, intent.attr("action"))
         val route = intent.extras()[WidgetLaunch.EXTRA_ROUTE]
         assertEquals(LaunchRoute.Tab(TopLevelTab.Tasks), LaunchRoute.parse(route))
+    }
+
+    @Test
+    fun `the trampoline runs in its own task, so the shortcut's clear can't reach the app's`() {
+        val factory = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+        val doc = factory.newDocumentBuilder().parse(File("src/main/AndroidManifest.xml"))
+        val activities = doc.getElementsByTagName("activity")
+        val trampoline = (0 until activities.length).map { activities.item(it) as Element }
+            .single { it.attr("name") == ".ShortcutTrampolineActivity" }
+        assertEquals("", trampoline.attr("taskAffinity"))
+        assertTrue(trampoline.hasAttributeNS(android, "taskAffinity"))
+        assertEquals("false", trampoline.attr("exported"))
+        assertEquals("true", trampoline.attr("noHistory"))
+        assertEquals("true", trampoline.attr("excludeFromRecents"))
     }
 }
