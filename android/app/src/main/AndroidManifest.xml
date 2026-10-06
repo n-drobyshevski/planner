@@ -41,6 +41,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Launcher shortcuts: New task, New event, Tasks. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
 
             <!-- OAuth sign-in returns here: an App Link verified by
                  https://auth.planr.page/.well-known/assetlinks.json. Its own
