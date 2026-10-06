@@ -132,7 +132,13 @@ fun EventDetailScreen(
     LaunchedEffect(viewModel) { viewModel.closed.collect { onBack() } }
     val snackbar = remember { SnackbarHostState() }
     val haptics = rememberPlanrHaptics()
-    LaunchedEffect(viewModel) { viewModel.failed.collect { haptics.reject() } }
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.failed.collect { message ->
+            haptics.reject()
+            snackbar.showSnackbar(message.resolve(context))
+        }
+    }
 
     val detail = (state as? EventDetailUiState.Ready)?.detail
     Scaffold(
