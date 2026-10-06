@@ -13,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -80,12 +79,15 @@ fun QuickAddSheet(
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
+    // Set once the sheet is on its way out (Cancel, Discard, saved): hide() asks
+    // confirmValueChange again as it lands on Hidden, and must not be refused.
+    var closing by remember { mutableStateOf(false) }
     // The sheet state keeps its first confirmValueChange, so it reads the guard through a State.
     val guarded by rememberUpdatedState(state.hasDraft)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { value ->
-            if (value == SheetValue.Hidden && guarded) {
+            if (value == SheetValue.Hidden && guarded && !closing) {
                 confirmingDiscard = true
                 false
             } else {
@@ -94,7 +96,10 @@ fun QuickAddSheet(
         },
     )
     val scope = rememberCoroutineScope()
-    val close: () -> Unit = { scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() } }
+    val close: () -> Unit = {
+        closing = true
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    }
 
     LaunchedEffect(state.saved) {
         val saved = state.saved ?: return@LaunchedEffect
@@ -107,10 +112,13 @@ fun QuickAddSheet(
         sheetState = sheetState,
         modifier = modifier,
         containerColor = PlanrTheme.colors.card,
-        // The sheet's own Back hides it without asking confirmValueChange; with a
-        // draft, Back goes to the handler below instead.
-        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !state.hasDraft),
     ) {
+        // The sheet's own Back hides it without asking confirmValueChange. This
+        // handler is registered after that one (the content composes once the
+        // sheet's window is shown), so with a draft it takes Back first. The
+        // sheet's properties can't express this: shouldDismissOnBackPress is read
+        // only when its window is created, which would leave Back dead after a
+        // rotation with a draft whose title is then cleared.
         BackHandler(enabled = state.hasDraft) { confirmingDiscard = true }
         QuickAddContent(
             state = state,
