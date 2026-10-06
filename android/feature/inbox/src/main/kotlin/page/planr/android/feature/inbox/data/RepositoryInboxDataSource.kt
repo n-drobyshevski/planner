@@ -60,9 +60,13 @@ class RepositoryInboxDataSource @Inject constructor(
 
     override val requests: Flow<List<TimeslotRequest>?> = timeslots.pending
 
-    override suspend fun refreshWindow(window: TimeWindow) = occurrences.refresh(window)
+    override suspend fun refreshWindow(window: TimeWindow) {
+        occurrences.refresh(window)
+    }
 
-    override suspend fun refreshTasks() = tasks.refresh()
+    override suspend fun refreshTasks() {
+        tasks.refresh()
+    }
 
     override suspend fun refreshSleep() = sleep.refresh()
 
