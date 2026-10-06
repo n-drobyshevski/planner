@@ -60,7 +60,7 @@ class SyncRunner @Inject constructor(
     suspend fun syncVisible() {
         if (session.currentSession == null) return
         val changed = coroutineScope {
-            launch { appPrefs.pullQuietly() }
+            launch { appPrefs.pullQuietly(force = false) }
             refreshAll(force = false)
         }
         if (changed) widgets.requestRefresh() else widgets.refreshClockBound()

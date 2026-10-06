@@ -19,7 +19,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.model.EventPatch
+import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Occurrence
@@ -138,17 +140,22 @@ class EventEditViewModel @AssistedInject constructor(
         val attributes = EventWrites.mergedAttributes(form, initialForm ?: form, event.attributes)
         when (scope) {
             RecurrenceScope.This -> {
-                // An override can't carry series-level fields: an attribute
-                // change goes to the whole series in a side patch (as on the web).
-                if (attributes != null) data.updateEvent(event.id, EventPatch(attributes = PatchField.Value(attributes)))
                 val input = EditSemantics.modifyOccurrence(event.id, occurrenceDate, EventWrites.occurrencePatch(form))
                 val prior = data.applyOverride(input)
+                // An override can't carry series-level fields (event_overrides
+                // has no attributes): an attribute change goes to the whole
+                // series in a side patch (as on the web), only once the
+                // instance's own change landed, so a failed save leaves the
+                // series untouched.
+                if (attributes != null) patchSeriesAttributes(event, occurrenceDate, prior, attributes)
                 notices.post(
                     AgendaNotice(
                         UiText(R.string.agenda_toast_this_event_updated),
                         // Without a known prior, an undo could erase an earlier override.
-                        undo = suspend { data.revertOverride(event.id, occurrenceDate, prior) }
-                            .takeIf { prior.canRevert },
+                        undo = suspend {
+                            data.revertOverride(event.id, occurrenceDate, prior)
+                            if (attributes != null) data.updateEvent(event.id, attributesPatch(event.attributes))
+                        }.takeIf { prior.canRevert },
                     ),
                 )
             }
@@ -173,6 +180,32 @@ class EventEditViewModel @AssistedInject constructor(
                 )
                 notices.post(AgendaNotice(UiText(R.string.agenda_toast_all_events_updated)))
             }
+        }
+    }
+
+    /**
+     * The side patch of a "this event" save. When it fails, the override just
+     * applied is reverted (best effort) before the failure surfaces, so the
+     * save fails as a whole and saving again redoes both.
+     */
+    private suspend fun patchSeriesAttributes(
+        event: PlannerEvent,
+        occurrenceDate: Instant,
+        prior: OverridePrior,
+        attributes: JsonObject,
+    ) {
+        try {
+            data.updateEvent(event.id, attributesPatch(attributes))
+        } catch (e: Exception) {
+            if (e !is CancellationException && prior.canRevert) {
+                try {
+                    data.revertOverride(event.id, occurrenceDate, prior)
+                } catch (revert: Exception) {
+                    if (revert is CancellationException) throw revert
+                    e.addSuppressed(revert)
+                }
+            }
+            throw e
         }
     }
 
@@ -245,6 +278,9 @@ class EventEditViewModel @AssistedInject constructor(
         }
     }
 }
+
+/** A patch replacing only the series' attribute bag. */
+private fun attributesPatch(attributes: JsonObject) = EventPatch(attributes = PatchField.Value(attributes))
 
 /** The patch that puts a series' recurrence back the way it was (undo of a split / cap). */
 internal fun restoreRecurrence(event: PlannerEvent) = EventPatch(

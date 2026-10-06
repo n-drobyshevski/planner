@@ -100,8 +100,11 @@ class HealthSleepSyncTest {
         var blocks = listOf<Occurrence>()
         var offline = false
         val actions = mutableListOf<String>()
+        /** The zone each read was made in. */
+        val zones = mutableListOf<String>()
         override suspend fun occurrences(window: TimeWindow, zoneId: String): List<Occurrence> {
             if (offline) throw IOException("offline")
+            zones += zoneId
             return blocks.filter { window.intersects(it.start, it.end) }
         }
         override suspend fun create(workspaceId: String, ownerId: String, start: Instant, end: Instant, zoneId: String, sleepCategoryId: String?) {
@@ -119,8 +122,11 @@ class HealthSleepSyncTest {
     private val source = FakeSource()
     private val store = MemoryDataStore()
 
+    /** The member's `members.timezone`; null: none set, so the device's [zone]. */
+    private var profileZone: String? = null
+
     private fun TestScope.sync(member: String = Fixtures.MEMBER_A): HealthSleepSync =
-        HealthSleepSync(source, SleepRemote(gateway), calendar, session(member), store, clock, backgroundScope)
+        HealthSleepSync(source, SleepRemote(gateway), calendar, { profileZone }, session(member), store, clock, backgroundScope)
             .also { it.zone = { zone } }
 
     private fun TestScope.session(member: String): SessionManager {
@@ -523,5 +529,31 @@ class HealthSleepSyncTest {
         assertEquals(HealthSyncResult.Synced(nights = 1, written = 0, blocks = 1), sync.sync())
         assertEquals(listOf("create 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z inactive"), calendar.actions)
         assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `nights and blocks follow the member's profile zone over the device's`() = runTest {
+        // 00:30 on the 6th in Berlin (the device), still 23:30 on the 5th in London (the profile).
+        now = LocalDate.of(2026, 10, 5).atTime(22, 30).toInstant(ZoneOffset.UTC)
+        source.sessions = listOf(night(2), night(5))
+        profileZone = "Europe/London"
+
+        val result = sync().connect()
+
+        // The 2nd is among London's last four nights (2nd to 5th), not Berlin's (3rd to 6th).
+        assertEquals(HealthSyncResult.Synced(nights = 2, written = 2, blocks = 2), result)
+        assertEquals(setOf("Europe/London"), calendar.zones.toSet())
+    }
+
+    @Test
+    fun `without a usable profile zone the device's is used`() = runTest {
+        now = LocalDate.of(2026, 10, 5).atTime(22, 30).toInstant(ZoneOffset.UTC)
+        source.sessions = listOf(night(2), night(5))
+        profileZone = "Not/A_Zone"
+
+        val result = sync().connect()
+
+        assertEquals(HealthSyncResult.Synced(nights = 2, written = 2, blocks = 1), result)
+        assertEquals(setOf(zone.id), calendar.zones.toSet())
     }
 }

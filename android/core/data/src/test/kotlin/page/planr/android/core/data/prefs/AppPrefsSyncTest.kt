@@ -11,12 +11,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -31,10 +34,14 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.auth.SessionStore
 import page.planr.android.core.data.auth.StoredSession
 import page.planr.android.core.data.auth.TestTokens
+import page.planr.android.core.data.local.CacheGate
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.remote.AppPrefsRemote
 import page.planr.android.core.data.remote.FakePostgrestGateway
 import page.planr.android.core.data.remote.Fixtures
 import page.planr.android.core.data.remote.PostgrestGateway
+import page.planr.android.core.data.remote.RowFilter
+import page.planr.android.core.data.remote.RowOrder
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 import page.planr.android.core.data.sync.WidgetRefresher
@@ -46,13 +53,33 @@ class AppPrefsSyncTest {
     private var offline = false
     private var widgetRefreshes = 0
 
+    /** While set, every read waits for it (a pull in flight). */
+    private var readGate: CompletableDeferred<Unit>? = null
+
     /** [fake], failing every upsert while [offline]. */
     private val gateway = object : PostgrestGateway by fake {
         override suspend fun upsert(table: String, rows: List<JsonObject>, onConflict: String): List<JsonObject> {
             if (offline) throw IOException("offline")
             return fake.upsert(table, rows, onConflict)
         }
+
+        override suspend fun select(
+            table: String,
+            columns: String,
+            filters: List<RowFilter>,
+            order: List<RowOrder>,
+            limit: Long?,
+        ): List<JsonObject> {
+            readGate?.await()
+            return fake.select(table, columns, filters, order, limit)
+        }
     }
+
+    private var now = Instant.parse("2026-10-06T09:00:00Z")
+    private val clock = object : Clock {
+        override fun now(): Instant = now
+    }
+    private val gate = CacheGate()
 
     private val me = Fixtures.MEMBER_A
     private val partner = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -71,7 +98,10 @@ class AppPrefsSyncTest {
             Provider { setOf(object : WidgetRefresher { override suspend fun refreshWidgets() { widgetRefreshes++ } }) },
             backgroundScope,
         )
-        val sync = AppPrefsSync(viewStore, insightsStore, AppPrefsRemote(gateway), session(), widgets, backgroundScope)
+        val sync = AppPrefsSync(
+            viewStore, insightsStore, AppPrefsRemote(gateway), session(), widgets, backgroundScope,
+            RefreshCoalescer(gate, clock),
+        )
         return Harness(
             sync = sync,
             view = DataStoreViewPreferences(viewStore, widgets, sync),
@@ -246,48 +276,26 @@ class AppPrefsSyncTest {
     }
 
     @Test
-    fun `month stays on this device, over the synced day or week`() = runTest {
+    fun `month syncs through the account like day and week`() = runTest {
         fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "week"))
         val h = harness()
         h.sync.pull()
 
         h.view.setAgendaMode(AgendaViewMode.Month)
-        settle()
         assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
-        // The column only admits day / week: nothing is uploaded or left pending.
-        assertEquals(emptyList(), fake.callsOf<FakePostgrestGateway.Call.Upsert>())
+        settle()
+        assertEquals(JsonPrimitive("month"), storedRow()!!["agenda_mode"])
         assertNull(h.pending())
 
-        // Another setting changes elsewhere: the row's period is the same, Month stays.
-        h.sync.applyRemote(row(mode = "week", showPartner = true))
-        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        // A pull of the account copy keeps it; another setting changing elsewhere does too.
         h.sync.pull()
         assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
-
-        // An upload of another change carries the synced week, never "month".
-        h.view.setShowPartnerEvents(false)
-        settle()
-        assertEquals(JsonPrimitive("week"), storedRow()!!["agenda_mode"])
+        h.sync.applyRemote(row(mode = "month", showPartner = true))
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
 
         // Another device picks Day: this one follows.
         h.sync.applyRemote(row(mode = "day"))
         assertEquals(AgendaViewMode.Day, h.view.agendaMode.first())
-    }
-
-    @Test
-    fun `month on a fresh device survives a pull of the default day`() = runTest {
-        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "day"))
-        val h = harness()
-        h.view.setAgendaMode(AgendaViewMode.Month)
-
-        h.sync.pull()
-
-        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
-        // Picking Week again leaves Month and syncs as before.
-        h.view.setAgendaMode(AgendaViewMode.Week)
-        settle()
-        assertEquals(AgendaViewMode.Week, h.view.agendaMode.first())
-        assertEquals(JsonPrimitive("week"), storedRow()!!["agenda_mode"])
     }
 
     @Test
@@ -301,6 +309,50 @@ class AppPrefsSyncTest {
         assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
         assertEquals("month", AgendaViewMode.Month.wire)
         assertEquals(AgendaViewMode.Month, AgendaViewMode.fromWire("month"))
+    }
+
+    @Test
+    fun `an older version's device-only month is folded into the synced mode and uploaded`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "week", showPartner = false))
+        val h = harness()
+        // As an older version left it: the synced Week, this device's Month over it.
+        h.viewStore.updateData {
+            it.toMutablePreferences().apply {
+                set(ViewKeys.AGENDA_MODE, "week")
+                set(ViewKeys.SHOW_PARTNER_EVENTS, false)
+                set(ViewKeys.LEGACY_AGENDA_MONTH, true)
+            }
+        }
+        assertEquals(true, LegacyAgendaMonthMigration.shouldMigrate(h.viewStore.data.first()))
+
+        h.viewStore.updateData { LegacyAgendaMonthMigration.migrate(it) }
+
+        val migrated = h.viewStore.data.first()
+        assertNull(migrated[ViewKeys.LEGACY_AGENDA_MONTH])
+        assertEquals(false, LegacyAgendaMonthMigration.shouldMigrate(migrated))
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        // Pending, so the account's older Week doesn't win: the pull uploads Month.
+        h.sync.pull()
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        assertEquals(JsonPrimitive("month"), storedRow()!!["agenda_mode"])
+        assertNull(h.pending())
+    }
+
+    @Test
+    fun `a cleared legacy month key is just removed`() = runTest {
+        val h = harness()
+        h.viewStore.updateData {
+            it.toMutablePreferences().apply {
+                set(ViewKeys.AGENDA_MODE, "day")
+                set(ViewKeys.LEGACY_AGENDA_MONTH, false)
+            }
+        }
+
+        h.viewStore.updateData { LegacyAgendaMonthMigration.migrate(it) }
+
+        assertNull(h.viewStore.data.first()[ViewKeys.LEGACY_AGENDA_MONTH])
+        assertEquals(AgendaViewMode.Day, h.view.agendaMode.first())
+        assertNull(h.pending())
     }
 
     @Test
@@ -360,5 +412,67 @@ class AppPrefsSyncTest {
         assertEquals(true, h.view.showPartnerEvents.first())
         assertEquals(InsightsFilterPrefs(), h.insights.filters(me).first())
         assertNull(h.pending())
+    }
+
+    private fun reads() = fake.callsOf<FakePostgrestGateway.Call.Select>().size
+
+    @Test
+    fun `pulls asked at once share one read`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "week"))
+        val h = harness()
+        val release = CompletableDeferred<Unit>()
+        readGate = release
+
+        // The sign-in pull and the requested sync's, at once.
+        backgroundScope.launch { h.sync.pullQuietly(force = false) }
+        backgroundScope.launch { h.sync.pullQuietly() }
+        runCurrent()
+        release.complete(Unit)
+        runCurrent()
+
+        assertEquals(1, reads())
+        assertEquals(AgendaViewMode.Week, h.view.agendaMode.first())
+    }
+
+    @Test
+    fun `an unforced pull skips a read done moments ago, unless the realtime join outdated it`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row())
+        val h = harness()
+
+        h.sync.pull(force = false)
+        h.sync.pull(force = false)
+        assertEquals(1, reads())
+
+        // The periodic sync forces.
+        h.sync.pull()
+        assertEquals(2, reads())
+
+        // The Realtime join: changes committed before it never arrive over the channel.
+        gate.outdateSnapshots()
+        h.sync.pull(force = false)
+        assertEquals(3, reads())
+
+        now += 31.seconds
+        h.sync.pull(force = false)
+        assertEquals(4, reads())
+    }
+
+    @Test
+    fun `a pending change is uploaded by a pull even moments after the last`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(showPartner = true))
+        val h = harness()
+        h.sync.pull(force = false)
+        offline = true
+        h.view.setShowPartnerEvents(false)
+        settle()
+        assertEquals(1L, h.pending())
+
+        offline = false
+        h.sync.pull(force = false)
+
+        assertNull(h.pending())
+        assertEquals(JsonPrimitive(false), storedRow()!!["show_partner_events"])
+        assertEquals(false, h.view.showPartnerEvents.first())
+        assertEquals(1, reads())
     }
 }

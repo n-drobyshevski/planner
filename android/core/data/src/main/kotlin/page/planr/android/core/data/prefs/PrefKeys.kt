@@ -11,11 +11,11 @@ internal object ViewKeys {
     val AGENDA_MODE = stringPreferencesKey("agenda_mode")
 
     /**
-     * Set while the agenda shows Month, which `member_app_prefs.agenda_mode`
-     * can't hold yet ([AgendaViewMode.synced]): it overrides [AGENDA_MODE]
-     * (still the synced Day / Week) on this device only.
+     * Older versions' device-only Month, set over a synced Day / Week while
+     * `member_app_prefs.agenda_mode` couldn't hold `month`. Only read to fold
+     * it into [AGENDA_MODE] ([LegacyAgendaMonthMigration]), then removed.
      */
-    val AGENDA_MONTH = booleanPreferencesKey("agenda_month")
+    val LEGACY_AGENDA_MONTH = booleanPreferencesKey("agenda_month")
 
     /**
      * The agenda's calendar filter beyond the partner toggle: the viewer's

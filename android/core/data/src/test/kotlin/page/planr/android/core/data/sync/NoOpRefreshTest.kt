@@ -37,6 +37,7 @@ import page.planr.android.core.data.auth.StoredSession
 import page.planr.android.core.data.auth.TestTokens
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.remote.AppPrefsRemote
 import page.planr.android.core.data.remote.EventMutations
@@ -214,7 +215,10 @@ class NoOpRefreshTest {
         val events = EventRepository(session, queries, EventMutations(gateway), db, gate, widgets)
         val tasks = TaskRepository(session, queries, TaskMutations(gateway), db, gate, widgets, clock)
         val workspace = WorkspaceRepository(session, queries, MemberMutations(gateway), db.workspaceDao(), gate, widgets)
-        val prefs = AppPrefsSync(MemoryDataStore(), MemoryDataStore(), AppPrefsRemote(gateway), session, widgets, backgroundScope)
+        val prefs = AppPrefsSync(
+            MemoryDataStore(), MemoryDataStore(), AppPrefsRemote(gateway), session, widgets, backgroundScope,
+            RefreshCoalescer(gate, clock),
+        )
         val runner = SyncRunner(session, workspace, events, tasks, VisibleWindowTracker(), widgets, prefs, clock)
         runCurrent() // the widget dispatcher starts listening
         return Harness(events, tasks, workspace, runner)

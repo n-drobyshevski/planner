@@ -24,6 +24,8 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.local.CacheGate
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.model.SleepLog
 import page.planr.android.core.data.model.SleepRating
 import page.planr.android.core.data.model.keepDeviceTimes
@@ -43,8 +45,13 @@ interface SleepLogRepository {
      */
     val recentLogs: Flow<List<SleepLog>?>
 
-    /** Refetches [recentLogs]. Throws when offline. */
-    suspend fun refresh()
+    /**
+     * Refetches [recentLogs], joining a refresh already running (the agenda's
+     * start and its ON_RESUME, or two screens, ask at once). Unless [force]d,
+     * also skips one done moments ago ([RefreshCoalescer]), as the account
+     * button's badge does on every return to a tab. Throws when offline.
+     */
+    suspend fun refresh(force: Boolean = true)
 
     /**
      * Saves a check-in on [SleepRating.date] and returns the night as stored.
@@ -76,6 +83,8 @@ class RemoteSleepLogRepository @Inject constructor(
     private val session: SessionManager,
     @ViewPreferencesDataStore private val store: DataStore<Preferences>,
     private val clock: Clock,
+    gate: CacheGate,
+    private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, clock),
 ) : SleepLogRepository {
 
     private data class Cached(val memberId: String, val logs: List<SleepLog>)
@@ -89,10 +98,6 @@ class RemoteSleepLogRepository @Inject constructor(
      */
     private val io = Mutex()
 
-    /** Reads finished so far; a caller that waited out another read skips its own. */
-    @Volatile
-    private var reads = 0L
-
     private val memberId: Flow<String?> =
         session.authState.map { (it as? AuthState.SignedIn)?.session?.memberId }.distinctUntilChanged()
 
@@ -100,17 +105,16 @@ class RemoteSleepLogRepository @Inject constructor(
         cached?.takeIf { member != null && it.memberId == member }?.logs
     }.distinctUntilChanged()
 
-    override suspend fun refresh() {
+    override suspend fun refresh(force: Boolean) {
         val me = session.currentSession ?: return
-        val seen = reads
-        io.withLock {
-            // The agenda's start and its ON_RESUME (or two screens) ask at once: one read serves both.
-            if (reads != seen && cache.value?.memberId == me.memberId) return
-            // A day of slack either side of any zone; the UI picks its own nights.
-            val since = clock.now().toLocalDateTime(TimeZone.UTC).date.minus(DatePeriod(days = SleepLogRepository.RECENT_DAYS + 1))
-            val logs = remote.fetchLogs(me.memberId, since.toString())
-            cache.value = Cached(me.memberId, logs.sortedByDescending { it.date })
-            reads++
+        coalescer.refresh(me.memberId, force) {
+            io.withLock {
+                // A day of slack either side of any zone; the UI picks its own nights.
+                val since = clock.now().toLocalDateTime(TimeZone.UTC).date.minus(DatePeriod(days = SleepLogRepository.RECENT_DAYS + 1))
+                val logs = remote.fetchLogs(me.memberId, since.toString())
+                cache.value = Cached(me.memberId, logs.sortedByDescending { it.date })
+            }
+            true
         }
     }
 

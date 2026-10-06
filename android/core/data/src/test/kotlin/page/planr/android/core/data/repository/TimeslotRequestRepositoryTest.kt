@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -24,6 +25,7 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.auth.SessionStore
 import page.planr.android.core.data.auth.StoredSession
 import page.planr.android.core.data.auth.TestTokens
+import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.model.TimeslotRequestStatus
 import page.planr.android.core.data.remote.FakePostgrestGateway
 import page.planr.android.core.data.remote.Fixtures
@@ -37,9 +39,11 @@ import page.planr.android.core.data.remote.TimeslotRequestsRemote
 class TimeslotRequestRepositoryTest {
     private val fake = FakePostgrestGateway()
 
+    private var now = Instant.parse("2026-10-06T09:00:00Z")
     private val clock = object : Clock {
-        override fun now(): Instant = Instant.parse("2026-10-06T09:00:00Z")
+        override fun now(): Instant = now
     }
+    private val gate = CacheGate()
 
     private fun requestRow(id: String, created: String, status: String = "pending", name: String? = "Jordan") = Fixtures.row(
         """
@@ -60,7 +64,7 @@ class TimeslotRequestRepositoryTest {
     }
 
     private fun TestScope.repository(gateway: PostgrestGateway = fake): RemoteTimeslotRequestRepository =
-        RemoteTimeslotRequestRepository(TimeslotRequestsRemote(gateway), session(), clock)
+        RemoteTimeslotRequestRepository(TimeslotRequestsRemote(gateway), session(), clock, gate)
 
     private fun TestScope.session(): SessionManager {
         val stored = object : SessionStore {
@@ -157,5 +161,29 @@ class TimeslotRequestRepositoryTest {
         assertFailsWith<IOException> { repo.markDeclined("r-new") }
 
         assertEquals(listOf("r-new", "r-old"), repo.pending.first()!!.map { it.id })
+    }
+
+    @Test
+    fun `an unforced refresh skips a read done moments ago`() = runTest {
+        seed()
+        val repo = repository()
+        fun reads() = fake.callsOf<FakePostgrestGateway.Call.Select>().size
+
+        repo.refresh()
+        repo.refresh(force = false)
+        assertEquals(1, reads())
+
+        // Forced (the Inbox opening): always read.
+        repo.refresh()
+        assertEquals(2, reads())
+
+        now += 31.seconds
+        repo.refresh(force = false)
+        assertEquals(3, reads())
+
+        // A sign-out wipe makes the last read stale at once.
+        gate.wipe { }
+        repo.refresh(force = false)
+        assertEquals(4, reads())
     }
 }

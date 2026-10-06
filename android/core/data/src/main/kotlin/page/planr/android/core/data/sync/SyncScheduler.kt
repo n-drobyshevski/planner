@@ -5,9 +5,12 @@ import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -65,13 +68,12 @@ class SyncScheduler @Inject constructor(
         }
     }
 
-    /** Runs a sync now (e.g. pull-to-refresh fallback, or right after sign-in). */
+    /**
+     * Runs a sync now (e.g. pull-to-refresh fallback, or right after sign-in),
+     * even with the app on screen and Realtime joined ([KEY_REQUESTED]).
+     */
     fun syncNow() {
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            ONE_TIME,
-            ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(networkConstraint()).build(),
-        )
+        WorkManager.getInstance(context).enqueueUniqueWork(ONE_TIME, ExistingWorkPolicy.REPLACE, syncNowRequest())
     }
 
     private fun schedule(syncNow: Boolean) {
@@ -80,9 +82,7 @@ class SyncScheduler @Inject constructor(
             // UPDATE, not KEEP: an install that scheduled the old 30-minute
             // request picks up the new period and constraints (its timing stays).
             ExistingPeriodicWorkPolicy.UPDATE,
-            PeriodicWorkRequestBuilder<SyncWorker>(PERIOD_MINUTES, TimeUnit.MINUTES)
-                .setConstraints(periodicConstraints())
-                .build(),
+            periodicRequest(),
         )
         if (syncNow) syncNow()
     }
@@ -93,19 +93,36 @@ class SyncScheduler @Inject constructor(
         work.cancelUniqueWork(ONE_TIME)
     }
 
-    private fun networkConstraint() =
-        Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+    internal companion object {
+        /**
+         * Input of a [syncNow] request: [SyncWorker] runs it even while the
+         * app is on screen with Realtime joined, which only skips the periodic one.
+         */
+        const val KEY_REQUESTED = "requested"
 
-    /** A sync nobody asked for waits for a network and a battery that isn't low. */
-    private fun periodicConstraints() =
-        Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .setRequiresBatteryNotLow(true)
-            .build()
-
-    private companion object {
         const val PERIODIC = "planr-sync-periodic"
         const val ONE_TIME = "planr-sync-now"
         const val PERIOD_MINUTES = 120L
+
+        /**
+         * The two-hourly request, without [KEY_REQUESTED]: a sync nobody asked
+         * for waits for a network and a battery that isn't low.
+         */
+        fun periodicRequest(): PeriodicWorkRequest =
+            PeriodicWorkRequestBuilder<SyncWorker>(PERIOD_MINUTES, TimeUnit.MINUTES)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiresBatteryNotLow(true)
+                        .build(),
+                )
+                .build()
+
+        /** The one-time [syncNow] request: on a network, marked [KEY_REQUESTED]. */
+        fun syncNowRequest(): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setInputData(workDataOf(KEY_REQUESTED to true))
+                .build()
     }
 }

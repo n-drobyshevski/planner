@@ -16,7 +16,7 @@ class FakeSleepLogRepository(var stored: List<SleepLog> = emptyList()) : SleepLo
     var refreshes = 0
     var failSave: Exception? = null
 
-    override suspend fun refresh() {
+    override suspend fun refresh(force: Boolean) {
         refreshes++
         recentLogs.value = stored.sortedByDescending { it.date }
     }
