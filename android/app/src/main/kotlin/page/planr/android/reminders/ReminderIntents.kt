@@ -9,12 +9,14 @@ import page.planr.android.core.data.reminders.ReminderAlarm
  * The broadcasts behind a reminder, all explicit to [ReminderReceiver]. The
  * three actions keep three separate PendingIntents per reminder id (the
  * planned alarm, its snooze and the Snooze button), so cancelling one never
- * cancels another. The alarm travels in extras.
+ * cancels another. The alarm travels in extras. [ACTION_REPLAN] carries none:
+ * it is the scheduler's own re-plan alarm, one per app.
  */
 internal object ReminderIntents {
     const val ACTION_REMIND = "page.planr.android.reminders.action.REMIND"
     const val ACTION_SNOOZED = "page.planr.android.reminders.action.SNOOZED"
     const val ACTION_SNOOZE = "page.planr.android.reminders.action.SNOOZE"
+    const val ACTION_REPLAN = "page.planr.android.reminders.action.REPLAN"
 
     private const val EXTRA_ID = "id"
     private const val EXTRA_KEY = "key"

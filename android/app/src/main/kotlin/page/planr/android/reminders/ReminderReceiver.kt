@@ -40,14 +40,15 @@ interface ReminderEntryPoint {
  * A reminder alarm went off, or its Snooze button was tapped. Before
  * showing anything it asks the scheduler whether the event is still there
  * and still the member's to be reminded of (signed out, deleted, cancelled
- * or moved since: nothing shows), and shows it as it is now.
+ * or moved since: nothing shows), and shows it as it is now. The
+ * scheduler's own re-plan alarm lands here too, and just re-plans.
  */
 class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         if (action !in HANDLED) return
-        val alarm = ReminderIntents.alarmOf(intent) ?: return
+        val alarm = if (action == ReminderIntents.ACTION_REPLAN) null else ReminderIntents.alarmOf(intent) ?: return
         val entry = ReminderEntryPoint.from(context)
         val pending = goAsync()
         entry.applicationScope().launch {
@@ -55,7 +56,9 @@ class ReminderReceiver : BroadcastReceiver() {
                 withTimeoutOrNull(RECEIVER_BUDGET) {
                     val scheduler = entry.reminderScheduler()
                     val notifier = entry.reminderNotifier()
-                    if (action == ReminderIntents.ACTION_SNOOZE) {
+                    if (alarm == null) {
+                        scheduler.replan()
+                    } else if (action == ReminderIntents.ACTION_SNOOZE) {
                         notifier.dismiss(alarm.id)
                         scheduler.snooze(alarm)
                     } else {
@@ -74,7 +77,12 @@ class ReminderReceiver : BroadcastReceiver() {
     }
 
     private companion object {
-        val HANDLED = setOf(ReminderIntents.ACTION_REMIND, ReminderIntents.ACTION_SNOOZED, ReminderIntents.ACTION_SNOOZE)
+        val HANDLED = setOf(
+            ReminderIntents.ACTION_REMIND,
+            ReminderIntents.ACTION_SNOOZED,
+            ReminderIntents.ACTION_SNOOZE,
+            ReminderIntents.ACTION_REPLAN,
+        )
 
         /** goAsync() allows ~10 s before the broadcast is considered stuck. */
         val RECEIVER_BUDGET = 8.seconds
@@ -86,7 +94,9 @@ class ReminderReceiver : BroadcastReceiver() {
 /**
  * Re-arms reminders when the system may have dropped or skewed them: a
  * reboot or app update clears alarms, a clock or zone change moves "now"
- * and the times shown, and exact-alarm access may have changed. Exported
+ * and the times shown, and exact-alarm access may have changed. Every
+ * alarm is set again, not just the changed ones: alarms armed inexact
+ * while exact access was missing only become exact when re-set. Exported
  * only so the system can deliver these broadcasts.
  */
 class ReminderRescheduleReceiver : BroadcastReceiver() {
@@ -97,7 +107,7 @@ class ReminderRescheduleReceiver : BroadcastReceiver() {
         val pending = goAsync()
         entry.applicationScope().launch {
             try {
-                withTimeoutOrNull(RECEIVER_BUDGET) { entry.reminderScheduler().replan() }
+                withTimeoutOrNull(RECEIVER_BUDGET) { entry.reminderScheduler().replan(rearmAll = true) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

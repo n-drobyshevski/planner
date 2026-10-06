@@ -11,6 +11,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
+import kotlin.time.Instant
 import page.planr.android.core.data.reminders.AlarmPort
 import page.planr.android.core.data.reminders.ReminderAlarm
 
@@ -57,6 +58,29 @@ class AndroidAlarmPort @Inject constructor(
         intent.cancel()
     }
 
+    override fun setReplan(at: Instant) {
+        val manager = alarms ?: return
+        val intent = PendingIntent.getBroadcast(
+            context,
+            REPLAN_REQUEST,
+            ReminderIntents.broadcast(context, ReminderIntents.ACTION_REPLAN),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        // Inexact is enough (it only moves the horizon on) and needs no exact-alarm access.
+        manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilliseconds(), intent)
+    }
+
+    override fun cancelReplan() {
+        val intent = PendingIntent.getBroadcast(
+            context,
+            REPLAN_REQUEST,
+            ReminderIntents.broadcast(context, ReminderIntents.ACTION_REPLAN),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE,
+        ) ?: return
+        alarms?.cancel(intent)
+        intent.cancel()
+    }
+
     override fun dismissShown() {
         val notifications = context.getSystemService(NotificationManager::class.java) ?: return
         notifications.activeNotifications
@@ -65,6 +89,11 @@ class AndroidAlarmPort @Inject constructor(
     }
 
     private fun action(snoozed: Boolean) = if (snoozed) ReminderIntents.ACTION_SNOOZED else ReminderIntents.ACTION_REMIND
+
+    private companion object {
+        /** Its own action already keeps it apart from every reminder's PendingIntent. */
+        const val REPLAN_REQUEST = 0
+    }
 }
 
 @Module

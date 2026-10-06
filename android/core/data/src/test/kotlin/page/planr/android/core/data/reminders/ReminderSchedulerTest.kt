@@ -50,6 +50,25 @@ class ReminderSchedulerTest {
     }
 
     @Test
+    fun `a forced re-plan re-arms unchanged alarms and snoozes in the same process`() = runTest {
+        source.occurrences = listOf(standup, lunch)
+        val scheduler = scheduler()
+        scheduler.replan()
+        scheduler.snooze(alarms.armed.getValue(id(standup)))
+        val before = alarms.sets
+
+        scheduler.replan()
+        assertEquals(before, alarms.sets, "a plain re-plan sets nothing unchanged")
+
+        // Exact-alarm access granted: what was armed inexact must be set again.
+        scheduler.replan(rearmAll = true)
+        assertEquals(before + 3, alarms.sets)
+        assertEquals(setOf(id(standup), id(lunch)), alarms.armed.keys)
+        assertEquals(listOf(id(standup)), alarms.snoozed.keys.toList())
+        assertEquals(emptyList(), alarms.cancelled)
+    }
+
+    @Test
     fun `a new process re-arms what the last one armed, since a reboot clears alarms`() = runTest {
         source.occurrences = listOf(standup)
         scheduler().replan()
@@ -58,6 +77,46 @@ class ReminderSchedulerTest {
         scheduler().replan()
 
         assertEquals(listOf("standup"), alarms.armed.values.map { it.key })
+    }
+
+    @Test
+    fun `each plan arms the next one, so the horizon moves on without a sync`() = runTest {
+        // Tomorrow 14:00 is past today's horizon; offline, only the re-plan alarm reaches it.
+        val tomorrow = occurrence("tomorrow", "2026-10-07T12:00:00Z", "2026-10-07T13:00:00Z")
+        source.occurrences = listOf(lunch, tomorrow)
+        val scheduler = scheduler()
+
+        scheduler.replan()
+        assertEquals(listOf("lunch"), alarms.armed.values.map { it.key })
+        assertEquals(clock.now + ReminderPlanner.REPLAN_AFTER, alarms.replanAt)
+
+        clock.now = alarms.replanAt!! // the re-plan alarm went off, no network since
+        scheduler.replan()
+
+        assertEquals(listOf("tomorrow"), store.scheduled().map { it.key })
+        assertEquals(Instant.parse("2026-10-07T11:50:00Z"), alarms.armed.getValue(id(tomorrow)).triggerAt)
+        assertEquals(Instant.parse("2026-10-07T08:00:00Z"), alarms.replanAt)
+    }
+
+    @Test
+    fun `no re-plan alarm while reminders are off or no one is signed in`() = runTest {
+        val scheduler = scheduler()
+        scheduler.replan()
+        assertNotNull(alarms.replanAt)
+
+        scheduler.setLead(ReminderLead.Off)
+        assertNull(alarms.replanAt, "off")
+
+        scheduler.setLead(ReminderLead.Ten)
+        assertNotNull(alarms.replanAt)
+        source.viewer = null
+        scheduler.replan()
+        assertNull(alarms.replanAt, "signed out")
+
+        source.viewer = ReminderViewer(ANNA, TimeZone.of("Europe/Berlin"), sleepCategoryId = null)
+        scheduler.replan()
+        scheduler.clearLocal()
+        assertNull(alarms.replanAt, "sign-out wipe")
     }
 
     @Test
@@ -287,6 +346,9 @@ class FakeAlarmPort : AlarmPort {
     var sets = 0
     var dismissed = false
 
+    /** When the scheduler's own re-plan alarm goes off; null when none is armed. */
+    var replanAt: Instant? = null
+
     override fun set(alarm: ReminderAlarm, snoozed: Boolean) {
         if (snoozed) this.snoozed[alarm.id] = alarm else armed[alarm.id] = alarm
         sets++
@@ -299,6 +361,14 @@ class FakeAlarmPort : AlarmPort {
             armed.remove(id)
             cancelled += id
         }
+    }
+
+    override fun setReplan(at: Instant) {
+        replanAt = at
+    }
+
+    override fun cancelReplan() {
+        replanAt = null
     }
 
     override fun dismissShown() {
