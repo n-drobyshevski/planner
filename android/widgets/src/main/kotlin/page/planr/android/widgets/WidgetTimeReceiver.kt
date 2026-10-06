@@ -30,8 +30,12 @@ class WidgetTimeReceiver : BroadcastReceiver() {
                 }
             } finally {
                 // Always re-arm: the alarm is one-shot, and a zone change moves midnight.
-                DayRollover.sync(app)
-                pending.finish()
+                // A failed re-arm is logged by the scope; the broadcast still finishes.
+                try {
+                    DayRollover.sync(app)
+                } finally {
+                    pending.finish()
+                }
             }
         }
     }
