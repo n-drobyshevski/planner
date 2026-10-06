@@ -19,6 +19,7 @@ import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.di.ApplicationScope
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.remote.AppPrefsRemote
 import page.planr.android.core.data.remote.AppPrefsRow
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
@@ -49,7 +50,10 @@ fun interface AppPrefsChanges {
  * Network calls are serialized by [network] (a pull never reads a row older
  * than an upload that already finished); DataStore read-modify-writes by
  * [local], which is never held across the network, so a toggle never waits
- * on it.
+ * on it. Pulls go through [coalescer]: the ones asked at once at a cold start
+ * or a sign-in (the sign-in pull, the requested sync, the Realtime join)
+ * share one read, and an unforced one skips a read done moments ago, unless
+ * the Realtime join outdated it ([RefreshCoalescer]).
  */
 @Singleton
 class AppPrefsSync @Inject constructor(
@@ -59,6 +63,7 @@ class AppPrefsSync @Inject constructor(
     private val session: SessionManager,
     private val widgets: WidgetRefreshDispatcher,
     @ApplicationScope private val scope: CoroutineScope,
+    private val coalescer: RefreshCoalescer,
 ) : AppPrefsChanges {
     private val network = Mutex()
     private val local = Mutex()
@@ -73,7 +78,7 @@ class AppPrefsSync @Inject constructor(
                 .map { (it as? AuthState.SignedIn)?.session?.memberId }
                 .distinctUntilChanged()
                 .filterNotNull()
-                .collect { pullQuietly() }
+                .collect { pullQuietly(force = false) }
         }
     }
 
@@ -85,19 +90,26 @@ class AppPrefsSync @Inject constructor(
         scope.launch { quietly { upload() } }
     }
 
-    /** Account → device (or the pending local change → account). Throws on network errors. */
-    suspend fun pull() = network.withLock {
-        val me = session.currentSession ?: return@withLock
+    /**
+     * Account → device (or the pending local change → account). Joins a pull
+     * of the member's row already running; unless [force]d, also skips one
+     * done moments ago. A pending local change is never joined or skipped: it
+     * uploads now. Throws on network errors.
+     */
+    suspend fun pull(force: Boolean = true) {
+        val me = session.currentSession ?: return
         if (pending() != null) {
-            uploadLocked(me)
-            return@withLock
+            upload()
+            return
         }
-        val row = remote.fetch(me.memberId)
-        if (row == null) uploadLocked(me) else applyRow(me, row)
+        coalescer.refresh(me.memberId, force) {
+            pullLocked()
+            true
+        }
     }
 
     /** [pull], swallowing failures (offline: the next sync retries). */
-    suspend fun pullQuietly() = quietly { pull() }
+    suspend fun pullQuietly(force: Boolean = true) = quietly { pull(force) }
 
     /** Device → account. Throws on network errors; the change stays pending. */
     suspend fun upload() = network.withLock {
@@ -115,6 +127,17 @@ class AppPrefsSync @Inject constructor(
     suspend fun clearLocal() = local.withLock {
         view.edit { it.clear() }
         insights.edit { it.clear() }
+    }
+
+    private suspend fun pullLocked() = network.withLock {
+        val me = session.currentSession ?: return@withLock
+        // Changed while this pull waited: the change goes up instead.
+        if (pending() != null) {
+            uploadLocked(me)
+            return@withLock
+        }
+        val row = remote.fetch(me.memberId)
+        if (row == null) uploadLocked(me) else applyRow(me, row)
     }
 
     private suspend fun uploadLocked(me: SessionInfo) {

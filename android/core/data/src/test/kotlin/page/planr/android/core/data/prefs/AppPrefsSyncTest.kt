@@ -11,12 +11,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -31,10 +34,14 @@ import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.auth.SessionStore
 import page.planr.android.core.data.auth.StoredSession
 import page.planr.android.core.data.auth.TestTokens
+import page.planr.android.core.data.local.CacheGate
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.remote.AppPrefsRemote
 import page.planr.android.core.data.remote.FakePostgrestGateway
 import page.planr.android.core.data.remote.Fixtures
 import page.planr.android.core.data.remote.PostgrestGateway
+import page.planr.android.core.data.remote.RowFilter
+import page.planr.android.core.data.remote.RowOrder
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 import page.planr.android.core.data.sync.WidgetRefresher
@@ -46,13 +53,33 @@ class AppPrefsSyncTest {
     private var offline = false
     private var widgetRefreshes = 0
 
+    /** While set, every read waits for it (a pull in flight). */
+    private var readGate: CompletableDeferred<Unit>? = null
+
     /** [fake], failing every upsert while [offline]. */
     private val gateway = object : PostgrestGateway by fake {
         override suspend fun upsert(table: String, rows: List<JsonObject>, onConflict: String): List<JsonObject> {
             if (offline) throw IOException("offline")
             return fake.upsert(table, rows, onConflict)
         }
+
+        override suspend fun select(
+            table: String,
+            columns: String,
+            filters: List<RowFilter>,
+            order: List<RowOrder>,
+            limit: Long?,
+        ): List<JsonObject> {
+            readGate?.await()
+            return fake.select(table, columns, filters, order, limit)
+        }
     }
+
+    private var now = Instant.parse("2026-10-06T09:00:00Z")
+    private val clock = object : Clock {
+        override fun now(): Instant = now
+    }
+    private val gate = CacheGate()
 
     private val me = Fixtures.MEMBER_A
     private val partner = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -71,7 +98,10 @@ class AppPrefsSyncTest {
             Provider { setOf(object : WidgetRefresher { override suspend fun refreshWidgets() { widgetRefreshes++ } }) },
             backgroundScope,
         )
-        val sync = AppPrefsSync(viewStore, insightsStore, AppPrefsRemote(gateway), session(), widgets, backgroundScope)
+        val sync = AppPrefsSync(
+            viewStore, insightsStore, AppPrefsRemote(gateway), session(), widgets, backgroundScope,
+            RefreshCoalescer(gate, clock),
+        )
         return Harness(
             sync = sync,
             view = DataStoreViewPreferences(viewStore, widgets, sync),
@@ -382,5 +412,67 @@ class AppPrefsSyncTest {
         assertEquals(true, h.view.showPartnerEvents.first())
         assertEquals(InsightsFilterPrefs(), h.insights.filters(me).first())
         assertNull(h.pending())
+    }
+
+    private fun reads() = fake.callsOf<FakePostgrestGateway.Call.Select>().size
+
+    @Test
+    fun `pulls asked at once share one read`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "week"))
+        val h = harness()
+        val release = CompletableDeferred<Unit>()
+        readGate = release
+
+        // The sign-in pull and the requested sync's, at once.
+        backgroundScope.launch { h.sync.pullQuietly(force = false) }
+        backgroundScope.launch { h.sync.pullQuietly() }
+        runCurrent()
+        release.complete(Unit)
+        runCurrent()
+
+        assertEquals(1, reads())
+        assertEquals(AgendaViewMode.Week, h.view.agendaMode.first())
+    }
+
+    @Test
+    fun `an unforced pull skips a read done moments ago, unless the realtime join outdated it`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row())
+        val h = harness()
+
+        h.sync.pull(force = false)
+        h.sync.pull(force = false)
+        assertEquals(1, reads())
+
+        // The periodic sync forces.
+        h.sync.pull()
+        assertEquals(2, reads())
+
+        // The Realtime join: changes committed before it never arrive over the channel.
+        gate.outdateSnapshots()
+        h.sync.pull(force = false)
+        assertEquals(3, reads())
+
+        now += 31.seconds
+        h.sync.pull(force = false)
+        assertEquals(4, reads())
+    }
+
+    @Test
+    fun `a pending change is uploaded by a pull even moments after the last`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(showPartner = true))
+        val h = harness()
+        h.sync.pull(force = false)
+        offline = true
+        h.view.setShowPartnerEvents(false)
+        settle()
+        assertEquals(1L, h.pending())
+
+        offline = false
+        h.sync.pull(force = false)
+
+        assertNull(h.pending())
+        assertEquals(JsonPrimitive(false), storedRow()!!["show_partner_events"])
+        assertEquals(false, h.view.showPartnerEvents.first())
+        assertEquals(1, reads())
     }
 }
