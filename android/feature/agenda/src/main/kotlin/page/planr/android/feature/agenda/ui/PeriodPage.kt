@@ -9,13 +9,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -45,14 +46,7 @@ import page.planr.android.core.design.theme.PlanrTheme
 import page.planr.android.feature.agenda.R
 import page.planr.android.feature.agenda.model.AgendaBlock
 import page.planr.android.feature.agenda.model.DaySchedule
-import page.planr.android.feature.agenda.model.MIN_BLOCK_MINUTES
 import page.planr.android.feature.agenda.model.PositionedBlock
-
-/** Height of one hour in the grid. */
-internal val HourHeight = 52.dp
-
-/** Width of the hour-label gutter. */
-internal val GutterWidth = 44.dp
 
 /**
  * One period of the agenda (a day, or a week of 7 columns): week day
@@ -75,6 +69,7 @@ internal fun PeriodPage(
 ) {
     val week = days.size > 1
     val schedules = days.map(schedule)
+    val gutterWidth = LocalAgendaMetrics.current.gutterWidth
     Column(modifier.fillMaxSize()) {
         if (week) DayHeaders(days, today, formats, onOpenDay)
         AllDayRow(schedules, week, today, formats, onOpenBlock, onOpenDay)
@@ -83,7 +78,7 @@ internal fun PeriodPage(
                 text = stringResource(R.string.agenda_empty_title),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = GutterWidth + PlanrSpacing.sm, bottom = PlanrSpacing.xs),
+                modifier = Modifier.padding(start = gutterWidth + PlanrSpacing.sm, bottom = PlanrSpacing.xs),
             )
         }
         HorizontalDivider(color = PlanrTheme.colors.hairline)
@@ -112,8 +107,9 @@ internal fun PeriodPage(
 
 @Composable
 private fun DayHeaders(days: List<LocalDate>, today: LocalDate, formats: AgendaFormats, onOpenDay: (LocalDate) -> Unit) {
+    val metrics = LocalAgendaMetrics.current
     Row(Modifier.fillMaxWidth().padding(vertical = PlanrSpacing.xs)) {
-        Box(Modifier.width(GutterWidth))
+        Box(Modifier.width(metrics.gutterWidth))
         days.forEach { date ->
             val isToday = date == today
             val label = stringResource(R.string.agenda_go_to, formats.dayTitle(date, today.year))
@@ -134,8 +130,10 @@ private fun DayHeaders(days: List<LocalDate>, today: LocalDate, formats: AgendaF
                 )
                 Box(
                     contentAlignment = Alignment.Center,
+                    // Square, but never wider than a narrow week column.
                     modifier = Modifier
-                        .size(26.dp)
+                        .sizeIn(maxWidth = metrics.dateCircle, maxHeight = metrics.dateCircle)
+                        .aspectRatio(1f)
                         .clip(CircleShape)
                         .background(if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background),
                 ) {
@@ -162,6 +160,7 @@ private fun AllDayRow(
 ) {
     if (schedules.all { it.allDay.isEmpty() }) return
     val visible = if (week) 2 else 3
+    val gutterWidth = LocalAgendaMetrics.current.gutterWidth
     Row(Modifier.fillMaxWidth().padding(bottom = PlanrSpacing.xs)) {
         Text(
             text = stringResource(R.string.agenda_all_day_header),
@@ -169,7 +168,7 @@ private fun AllDayRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.End,
             maxLines = 2,
-            modifier = Modifier.width(GutterWidth).padding(end = PlanrSpacing.xs, top = 4.dp),
+            modifier = Modifier.width(gutterWidth).padding(end = PlanrSpacing.xs, top = 4.dp),
         )
         schedules.forEach { day ->
             if (week) {
@@ -213,7 +212,8 @@ private fun AllDayRow(
 
 @Composable
 private fun HourGutter(formats: AgendaFormats) {
-    Box(Modifier.width(GutterWidth).height(HourHeight * 24)) {
+    val metrics = LocalAgendaMetrics.current
+    Box(Modifier.width(metrics.gutterWidth).height(metrics.hourHeight * 24)) {
         for (hour in 1 until 24) {
             Text(
                 text = formats.hourLabel(hour),
@@ -222,8 +222,9 @@ private fun HourGutter(formats: AgendaFormats) {
                 textAlign = TextAlign.End,
                 maxLines = 1,
                 modifier = Modifier
-                    .width(GutterWidth)
-                    .offset(y = HourHeight * hour - 7.dp)
+                    .width(metrics.gutterWidth)
+                    // Centered on the hour line.
+                    .offset(y = metrics.hourHeight * hour - metrics.timeLine / 2)
                     .padding(end = PlanrSpacing.sm),
             )
         }
@@ -243,11 +244,12 @@ private fun DayColumn(
     modifier: Modifier = Modifier,
 ) {
     val lineColor = MaterialTheme.colorScheme.outlineVariant
+    val metrics = LocalAgendaMetrics.current
     BoxWithConstraints(
         modifier = modifier
-            .height(HourHeight * 24)
+            .height(metrics.hourHeight * 24)
             .drawBehind {
-                val hour = HourHeight.toPx()
+                val hour = metrics.hourHeight.toPx()
                 for (h in 1 until 24) {
                     drawLine(lineColor, Offset(0f, h * hour), Offset(size.width, h * hour), strokeWidth = 1f)
                 }
@@ -257,11 +259,8 @@ private fun DayColumn(
                 if (onCreateAt == null) {
                     Modifier
                 } else {
-                    Modifier.pointerInput(day.date) {
-                        detectTapGestures { offset ->
-                            val minute = (offset.y / HourHeight.toPx() * 60).toInt()
-                            onCreateAt((minute / 30 * 30).coerceIn(0, 23 * 60 + 30))
-                        }
+                    Modifier.pointerInput(day.date, metrics.hourHeight) {
+                        detectTapGestures { offset -> onCreateAt(slotMinuteAt(offset.y, metrics.hourHeight.toPx())) }
                     }
                 },
             ),
@@ -271,29 +270,29 @@ private fun DayColumn(
             ContextBackdrop(
                 block = ctx.block,
                 showLabel = !compact,
-                modifier = Modifier.place(ctx, width, gap = 0.dp),
+                modifier = Modifier.place(ctx, metrics, width, gap = 0.dp),
             )
         }
         day.timed.forEach { positioned ->
             TimedEventBlock(
                 block = positioned.block,
                 zone = zone,
-                height = blockHeight(positioned),
+                height = metrics.blockHeight(positioned),
                 compact = compact,
                 formats = formats,
                 onClick = { onOpenBlock(positioned.block) },
-                modifier = Modifier.place(positioned, width, gap = if (compact) 1.dp else 2.dp),
+                modifier = Modifier.place(positioned, metrics, width, gap = if (compact) 1.dp else 2.dp),
             )
         }
-        if (isToday) NowLine(now, zone)
+        if (isToday) NowLine(now, zone, metrics)
     }
 }
 
 /** The current-time line (the web's `NowLine`, in the destructive red). */
 @Composable
-private fun NowLine(now: Instant, zone: TimeZone) {
+private fun NowLine(now: Instant, zone: TimeZone, metrics: AgendaMetrics) {
     val local = now.toLocalDateTime(zone)
-    val y = HourHeight * ((local.hour * 60 + local.minute) / 60f)
+    val y = metrics.offsetOf((local.hour * 60 + local.minute).toFloat())
     val color = MaterialTheme.colorScheme.error
     Box(
         Modifier
@@ -308,20 +307,14 @@ private fun NowLine(now: Instant, zone: TimeZone) {
     )
 }
 
-private fun blockHeight(p: PositionedBlock): Dp =
-    HourHeight * (maxOf(p.endMinute - p.startMinute, MIN_BLOCK_MINUTES) / 60f) - 1.dp
-
 /** Positions a laid-out block inside its day column of width [columnWidth]. */
-private fun Modifier.place(p: PositionedBlock, columnWidth: Dp, gap: Dp): Modifier {
+private fun Modifier.place(p: PositionedBlock, metrics: AgendaMetrics, columnWidth: Dp, gap: Dp): Modifier {
     val laneWidth = columnWidth / p.lanes
     return this
-        .offset(x = laneWidth * p.lane + gap / 2, y = HourHeight * (p.startMinute / 60f))
+        .offset(x = laneWidth * p.lane + gap / 2, y = metrics.offsetOf(p.startMinute.toFloat()))
         .width((laneWidth - gap).coerceAtLeast(1.dp))
-        .height(blockHeight(p))
+        .height(metrics.blockHeight(p))
 }
-
-/** Scroll offset (px) that puts [hour] near the top of the grid. */
-internal fun scrollOffsetFor(hour: Int, hourHeightPx: Float): Int = (hour.coerceIn(0, 23) * hourHeightPx).toInt()
 
 /** "+N more" under the visible all-day chips; nothing when none are hidden. */
 @Composable
