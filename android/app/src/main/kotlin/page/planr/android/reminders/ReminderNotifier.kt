@@ -49,8 +49,13 @@ internal sealed interface StartsIn {
 class ReminderNotifier @Inject constructor(@ApplicationContext private val context: Context) {
     private val manager get() = NotificationManagerCompat.from(context)
 
-    /** False while the app may not post (notifications blocked, or not yet allowed on Android 13+). */
-    fun canPost(): Boolean = manager.areNotificationsEnabled()
+    /**
+     * False while reminders can't show: the app's notifications blocked (or
+     * not yet allowed on Android 13+), or just the reminders channel turned off.
+     */
+    fun canPost(): Boolean =
+        manager.areNotificationsEnabled() &&
+            manager.getNotificationChannelCompat(CHANNEL_ID)?.importance != NotificationManagerCompat.IMPORTANCE_NONE
 
     /** Creates (or renames, after a language change) the channel; safe to call any time. */
     fun ensureChannel() {

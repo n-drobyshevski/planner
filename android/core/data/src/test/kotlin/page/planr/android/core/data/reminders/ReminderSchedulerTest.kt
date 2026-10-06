@@ -213,6 +213,36 @@ class ReminderSchedulerTest {
     }
 
     @Test
+    fun `a planned alarm delivered long after the start shows nothing, a snooze shows while the event runs`() = runTest {
+        source.occurrences = listOf(standup) // 08:30–09:00
+        val scheduler = scheduler()
+        scheduler.replan()
+        val armed = alarms.armed.getValue(id(standup))
+
+        // Held back by Doze, or fired at once by the clock jumping ahead.
+        clock.now = Instant.parse("2026-10-06T08:44:00Z")
+        assertNotNull(scheduler.due(armed, snoozed = false), "within the slack")
+        clock.now = Instant.parse("2026-10-06T08:46:00Z")
+        assertNull(scheduler.due(armed, snoozed = false), "stale")
+        assertNotNull(scheduler.due(armed, snoozed = true), "asked for")
+    }
+
+    @Test
+    fun `a sleep category from Settings is remembered and re-plans at once`() = runTest {
+        val night = standup.copy(categoryId = "cat-sleep")
+        source.occurrences = listOf(night, lunch)
+        val scheduler = scheduler()
+        scheduler.replan()
+        assertEquals(2, alarms.armed.size)
+
+        scheduler.sleepCategoryChanged(ANNA, "cat-sleep")
+
+        assertEquals(listOf<String?>("cat-sleep"), source.rememberedSleep)
+        assertEquals(listOf(id(lunch)), alarms.armed.keys.toList())
+        assertEquals(listOf(id(night)), alarms.cancelled)
+    }
+
+    @Test
     fun `the diff sets new and changed alarms and cancels only future ones no longer planned`() {
         val now = Instant.parse("2026-10-06T08:00:00Z")
         val a = alarm(1, now + 5.minutes)

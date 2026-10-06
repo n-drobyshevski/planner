@@ -8,11 +8,15 @@ import dagger.hilt.components.SingletonComponent
 import java.time.ZoneId
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.model.MemberPreferencesPatch
 import page.planr.android.core.data.model.SleepPrefsPatch
@@ -61,6 +65,7 @@ class RepositorySettingsDataSource @Inject constructor(
     private val sleep: SleepPrefsRepository,
     private val reminders: ReminderScheduler,
     private val notifier: ReminderNotifier,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : SettingsDataSource {
     override val currentMemberId: Flow<String?> =
         session.authState.map { (it as? AuthState.SignedIn)?.session?.memberId }.distinctUntilChanged()
@@ -90,14 +95,20 @@ class RepositorySettingsDataSource @Inject constructor(
 
     override val canRequestNotifications: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
-    private suspend fun sleepCategoryKnown(prefs: SleepBlockPrefs) {
+    /**
+     * Off the caller: the sleep section never waits on the re-plan (another
+     * one may hold it on the network), nor cancels it by leaving the screen.
+     */
+    private fun sleepCategoryKnown(prefs: SleepBlockPrefs) {
         val me = session.currentSession ?: return
-        try {
-            reminders.sleepCategoryChanged(me.memberId, prefs.sleepCategoryId)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // Reminders catch up on the next re-plan; the sleep settings themselves loaded or saved.
+        appScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                reminders.sleepCategoryChanged(me.memberId, prefs.sleepCategoryId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Reminders catch up on the next re-plan; the sleep settings themselves loaded or saved.
+            }
         }
     }
 }

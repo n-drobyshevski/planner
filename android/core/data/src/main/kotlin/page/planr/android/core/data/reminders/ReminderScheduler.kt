@@ -162,7 +162,8 @@ class ReminderScheduler @Inject constructor(
      * An alarm went off: the reminder to show for it, with the event's
      * current title and times, or null when there is nothing to show any
      * more (signed out, reminders off, the event deleted, cancelled, moved
-     * or no longer the viewer's, or already over).
+     * or no longer the viewer's, already over, or — for a planned alarm —
+     * started more than [DELIVERY_SLACK] ago).
      */
     suspend fun due(alarm: ReminderAlarm, snoozed: Boolean): ReminderAlarm? {
         if (snoozed) forgetSnooze(alarm.id)
@@ -176,7 +177,10 @@ class ReminderScheduler @Inject constructor(
             it.key == alarm.key && it.start == alarm.occurrenceStart
         } ?: return null
         if (!ReminderPlanner.isRemindable(occurrence, viewer.memberId, viewer.sleepCategoryId)) return null
-        if (now >= maxOf(occurrence.end, occurrence.start + DELIVERY_SLACK)) return null
+        // A planned reminder held back past its slack (or fired all at once by the clock
+        // jumping ahead) is stale; a snooze the member asked for shows while the event runs.
+        val showUntil = if (snoozed) maxOf(occurrence.end, occurrence.start + DELIVERY_SLACK) else occurrence.start + DELIVERY_SLACK
+        if (now >= showUntil) return null
         return ReminderPlanner.alarmFor(occurrence, lead.duration, viewer.zone, source::formatTime)
             .copy(triggerAt = alarm.triggerAt)
     }
