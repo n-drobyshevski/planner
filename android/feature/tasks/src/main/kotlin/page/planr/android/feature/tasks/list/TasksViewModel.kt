@@ -6,10 +6,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -54,12 +57,19 @@ data class TasksUiState(
     val notice: TasksNotice? = null,
 )
 
-/** The tasks list: Room-backed rows, filters, and the checkbox (`setDone`). */
+/**
+ * The tasks list: Room-backed rows, filters, and the checkbox (`setDone`).
+ * The list is built on [listDispatcher] (Dispatchers.Default; a test
+ * dispatcher in tests), never on the main thread.
+ */
 @HiltViewModel
-class TasksViewModel @Inject constructor(
+class TasksViewModel internal constructor(
     private val data: TasksDataSource,
     private val clock: Clock,
+    private val listDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
+
+    @Inject constructor(data: TasksDataSource, clock: Clock) : this(data, clock, Dispatchers.Default)
 
     private val filters = MutableStateFlow(TaskFilters())
     /** Optimistic completion by task id while a write is in flight. */
@@ -75,7 +85,8 @@ class TasksViewModel @Inject constructor(
         data.currentMemberId,
     ) { tasks, members, categories, boards, viewerId -> Snapshot(tasks, members, categories, boards, viewerId) }
 
-    /** The latest rows, for actions that need the full [Task]. */
+    /** The latest rows, for actions that need the full [Task]. Written on [listDispatcher]. */
+    @Volatile
     private var latest: Snapshot? = null
 
     val state: StateFlow<TasksUiState> =
@@ -101,7 +112,8 @@ class TasksViewModel @Inject constructor(
                 pendingIds = pending.keys,
                 notice = notice,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), TasksUiState())
+        }.flowOn(listDispatcher)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), TasksUiState())
 
     init {
         // Room already has the last sync; this just tops it up quietly.

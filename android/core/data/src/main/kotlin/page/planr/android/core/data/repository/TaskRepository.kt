@@ -5,7 +5,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.local.CacheArea
@@ -41,9 +43,10 @@ class TaskRepository @Inject constructor(
 ) {
     private val dao get() = db.taskDao()
 
-    /** Every visible task (top-level and subtasks), ordered by position. */
+    /** Every visible task (top-level and subtasks), ordered by position. Decoded off the main thread. */
     fun observeTasks(): Flow<List<Task>> =
         session.inWorkspace(emptyList()) { ws -> dao.observeAll(ws).map { rows -> rows.map { it.toModel() } } }
+            .flowOn(Dispatchers.Default)
 
     fun observeTask(id: String): Flow<Task?> = dao.observeById(id).map { it?.toModel() }
 

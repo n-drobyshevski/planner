@@ -22,7 +22,7 @@ class TasksViewModelTest {
     @Test
     fun `renders grouped rows and quietly refreshes on open`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(task("a", collection = COL, due = TODAY), task("b", collection = COL)))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         val state = vm.state.value
@@ -37,7 +37,7 @@ class TasksViewModelTest {
     @Test
     fun `filters narrow the list and clear back to the defaults`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(task("mine", collection = COL), task("partner", collection = COL, owner = BORIS), task("done", collection = COL, done = true)))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         vm.setScope(TaskScope.Partner)
@@ -52,7 +52,7 @@ class TasksViewModelTest {
     @Test
     fun `the checkbox completes through setDone and offers undo`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(task("a", collection = COL)))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         vm.toggleDone("a")
@@ -70,7 +70,7 @@ class TasksViewModelTest {
     @Test
     fun `a done task reopens`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(task("a", collection = COL, done = true)))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         vm.toggleDone("a")
@@ -82,7 +82,7 @@ class TasksViewModelTest {
     @Test
     fun `only the owner can complete`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(task("theirs", collection = COL, owner = BORIS, assignee = ANNA)))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         vm.toggleDone("theirs")
@@ -94,7 +94,7 @@ class TasksViewModelTest {
     fun `a task with no board to move to can't be checked off`() = runTest {
         // No collection (e.g. created over MCP): the DB trigger would undo a bare completed_at.
         val data = FakeTasksDataSource(tasks = listOf(task("loose")))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         assertFalse(vm.state.value.groups.single().items.single().canToggleDone)
@@ -105,7 +105,7 @@ class TasksViewModelTest {
     @Test
     fun `a consumed notice is not shown again`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(task("a", collection = COL), task("b", collection = COL)))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         vm.toggleDone("a")
@@ -121,7 +121,7 @@ class TasksViewModelTest {
     fun `a write in flight shows checked and blocks a second toggle`() = runTest {
         val gate = CompletableDeferred<Unit>()
         val data = FakeTasksDataSource(tasks = listOf(task("a", collection = COL))).apply { setDoneGate = gate }
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         vm.toggleDone("a")
@@ -138,7 +138,7 @@ class TasksViewModelTest {
     @Test
     fun `stale and failed writes surface as notices`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(task("a", collection = COL), task("b", collection = COL)))
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         data.failWith = StaleWriteException("tasks", "a")
@@ -157,7 +157,7 @@ class TasksViewModelTest {
     @Test
     fun `pull to refresh reports a failure`() = runTest {
         val data = FakeTasksDataSource()
-        val vm = TasksViewModel(data, FixedClock)
+        val vm = TasksViewModel(data, FixedClock, main.dispatcher)
         keepCollecting(vm.state)
 
         data.failWith = IllegalStateException("offline")
