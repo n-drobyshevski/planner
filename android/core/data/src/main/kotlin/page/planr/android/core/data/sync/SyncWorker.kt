@@ -30,7 +30,7 @@ class SyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result = try {
         val process = ProcessLifecycleOwner.get().lifecycle.currentStateFlow.value
-        if (backgroundSyncNeeded(process, realtime.subscribed.value)) runner.syncAll()
+        if (backgroundSyncNeeded(process, realtime.subscribed.value)) runner.syncAll() else runner.catchUpClock()
         Result.success()
     } catch (e: CancellationException) {
         throw e

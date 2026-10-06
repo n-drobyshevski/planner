@@ -289,6 +289,14 @@ widgets.
   has an unfiltered DELETE binding. Changes go into Room.
   Every (re)join refetches the visible window, tasks and reference data, in
   case something was missed while disconnected.
+- **Coalesced refreshes.** `EventRepository` (per window), `TaskRepository`
+  and `WorkspaceRepository` refresh through a `RefreshCoalescer`: a caller
+  joins a refresh of the same data already running, and one that succeeded
+  less than 30 s ago is not repeated unless forced (pull-to-refresh, the
+  periodic or requested sync, a Realtime rejoin after a drop). A sign-out
+  wipe makes it stale at once. A snapshot identical to the cache is not
+  written; the refresh reports `changed = false` and `SyncRunner` then skips
+  the widgets, re-planning only reminders (their plan rolls with the clock).
 - **Periodic, while signed in.** `SyncScheduler` keeps a two-hourly periodic
   `SyncWorker` (network required, not on a low battery), plus one immediate
   run after a fresh sign-in. It cancels both on sign-out. The worker syncs the

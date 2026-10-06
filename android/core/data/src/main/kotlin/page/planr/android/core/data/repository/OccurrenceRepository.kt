@@ -60,6 +60,7 @@ class OccurrenceRepository @Inject constructor(
     /**
      * Fetches [window] from Supabase into Room; the flows above update on
      * their own. Skipped when the same window was just fetched, unless [force]d.
+     * Returns whether the cache changed.
      */
     suspend fun refresh(window: TimeWindow, force: Boolean = false) = events.refreshWindow(window, force)
 

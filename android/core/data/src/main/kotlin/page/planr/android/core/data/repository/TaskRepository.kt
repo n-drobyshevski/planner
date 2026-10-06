@@ -58,15 +58,17 @@ class TaskRepository @Inject constructor(
     /**
      * Refetches all tasks (`fetchTasks`) and replaces the cached set. Joins a
      * refresh already running and skips one done moments ago unless [force]d
-     * ([RefreshCoalescer]).
+     * ([RefreshCoalescer]). Returns whether the cache changed (an identical
+     * snapshot is not written).
      */
-    suspend fun refresh(force: Boolean = false) {
+    suspend fun refresh(force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
-        coalescer.refresh(ws, force) {
+        return coalescer.refresh(ws, force) {
+            var changed = false
             gate.refresh(CacheArea.Tasks, fetch = { queries.fetchTasks(ws) }) { rows ->
-                dao.replaceAll(ws, rows.map { it.toEntity() })
+                changed = dao.replaceIfChanged(ws, rows.map { it.toEntity() })
             }
-            true
+            changed
         }
     }
 

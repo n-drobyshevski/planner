@@ -64,20 +64,22 @@ class WorkspaceRepository @Inject constructor(
     /**
      * Refetches the bundle (`fetchWorkspaceBundle`) and replaces the cached
      * copy. Joins a refresh already running and skips one done moments ago
-     * unless [force]d ([RefreshCoalescer]).
+     * unless [force]d ([RefreshCoalescer]). Returns whether the cache changed
+     * (an identical snapshot is not written).
      */
-    suspend fun refresh(force: Boolean = false) {
+    suspend fun refresh(force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
-        coalescer.refresh(ws, force) {
+        return coalescer.refresh(ws, force) {
+            var changed = false
             gate.refresh(CacheArea.Workspace, fetch = { queries.fetchWorkspaceBundle() }) { bundle ->
-                dao.replaceAll(
+                changed = dao.replaceIfChanged(
                     workspaceId = ws,
                     members = bundle.members.map { it.toEntity() },
                     categories = bundle.categories.map { it.toEntity() },
                     boards = bundle.boards.map { it.toEntity() },
                 )
             }
-            true
+            changed
         }
     }
 }

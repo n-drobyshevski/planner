@@ -13,6 +13,7 @@ import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
 import page.planr.android.core.data.local.RefreshCoalescer
+import page.planr.android.core.data.local.dao.sameRows
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.model.DeletedEventSnapshot
@@ -108,23 +109,34 @@ class EventRepository @Inject constructor(
      * A refresh of the same window already running is joined, and one done
      * in the last few seconds is not repeated unless [force]d (see
      * [RefreshCoalescer]): pull-to-refresh forces, screens opening don't.
+     *
+     * Returns whether the cache changed: a snapshot identical to what Room
+     * holds for the window is not written at all (false), nor is a skipped
+     * or dropped one.
      */
-    suspend fun refreshWindow(window: TimeWindow, force: Boolean = false) {
+    suspend fun refreshWindow(window: TimeWindow, force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
         val start = window.start.toEpochMilliseconds()
         val end = window.end.toEpochMilliseconds()
-        coalescer.refresh(WindowKey(ws, start, end), force) {
+        return coalescer.refresh(WindowKey(ws, start, end), force) {
+            var changed = false
             gate.refresh(CacheArea.Events, fetch = { queries.fetchWindow(ws, window) }) { data ->
-                db.withTransaction {
+                changed = db.withTransaction {
+                    val events = data.events.map { it.toEntity() }
+                    val overrides = data.overrides.map { it.toEntity() }
+                    val same = sameRows(dao.eventsInWindow(ws, start, end), events) &&
+                        sameRows(dao.overridesInWindow(ws, start, end), overrides)
+                    if (same) return@withTransaction false
                     val stale = dao.idsInWindow(ws, start, end)
                     val touched = (stale + data.events.map { it.id }).distinct()
                     touched.chunked(SQL_CHUNK).forEach { dao.deleteOverridesOf(it) }
                     stale.chunked(SQL_CHUNK).forEach { dao.deleteEvents(it) }
-                    dao.upsertEvents(data.events.map { it.toEntity() })
-                    dao.upsertOverrides(data.overrides.map { it.toEntity() })
+                    dao.upsertEvents(events)
+                    dao.upsertOverrides(overrides)
+                    true
                 }
             }
-            true
+            changed
         }
     }
 

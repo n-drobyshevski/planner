@@ -3,6 +3,8 @@ package page.planr.android.core.data.sync
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Clock
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -29,7 +31,9 @@ class SyncRunner @Inject constructor(
 
     /**
      * Members/categories/boards, the widgets' days (plus the visible window),
-     * all tasks and the member's view settings; then re-renders widgets. Returns false when signed out.
+     * all tasks and the member's view settings; then re-renders widgets
+     * (only those that [follow the clock][WidgetRefresher.followsClock] when
+     * nothing changed). Returns false when signed out.
      * Throws on network / server errors (the worker retries). Always fetches
      * (forced): it runs on a schedule or because someone asked for it.
      */
@@ -37,14 +41,13 @@ class SyncRunner @Inject constructor(
         // A worker may start the process: wait for the stored session to load.
         session.authState.first { it != AuthState.Loading }
         if (session.currentSession == null) return false
-        coroutineScope {
-            launch { workspace.refresh(force = true) }
-            windowsToSync().forEach { launch { events.refreshWindow(it, force = true) } }
-            launch { tasks.refresh(force = true) }
-            // Never fails the sync: a pending settings change retries next time.
+        val changed = coroutineScope {
+            // Never fails the sync: a pending settings change retries next time
+            // (and re-renders the widgets itself when it changes what they show).
             launch { appPrefs.pullQuietly() }
+            refreshAll(force = true)
         }
-        widgets.refreshNow()
+        if (changed) widgets.refreshNow() else widgets.refreshClockBound()
         return true
     }
 
@@ -55,13 +58,26 @@ class SyncRunner @Inject constructor(
      */
     suspend fun syncVisible(force: Boolean = false) {
         if (session.currentSession == null) return
-        coroutineScope {
-            windowsToSync().forEach { launch { events.refreshWindow(it, force) } }
-            launch { tasks.refresh(force) }
-            launch { workspace.refresh(force) }
+        val changed = coroutineScope {
             launch { appPrefs.pullQuietly() }
+            refreshAll(force)
         }
-        widgets.requestRefresh()
+        if (changed) widgets.requestRefresh() else widgets.refreshClockBound()
+    }
+
+    /**
+     * Nothing to fetch (the app is open with Realtime joined, see
+     * [SyncWorker]): only what moves with the clock is brought up to date.
+     */
+    suspend fun catchUpClock() {
+        widgets.refreshClockBound()
+    }
+
+    /** Workspace, windows and tasks in parallel; whether any of them changed the cache. */
+    private suspend fun refreshAll(force: Boolean): Boolean = coroutineScope {
+        val windows = windowsToSync().map { async { events.refreshWindow(it, force) } }
+        val rest = listOf(async { workspace.refresh(force) }, async { tasks.refresh(force) })
+        (windows + rest).awaitAll().any { it }
     }
 
     /** The widgets' days ([SyncWindows.aroundToday]) and the agenda's window when it lies elsewhere. */
