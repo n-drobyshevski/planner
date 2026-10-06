@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import page.planr.android.R
 import page.planr.android.core.design.theme.PlanrSpacing
+import java.time.ZoneId
 
 /**
  * A searchable list of time zones (the web's zone combobox): "Use device
@@ -50,7 +51,10 @@ internal fun ZonePickerDialog(
     onDismiss: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val all = remember { ZoneChoices.all() }
+    val ids = remember { ZoneId.getAvailableZoneIds() }
+    val all = remember(ids) { ZoneChoices.all(ids) }
+    // A saved legacy alias ("Asia/Calcutta") is shown selected as its primary id.
+    val selected = remember(current, ids) { current?.let { ZoneChoices.displayed(it, ids) } }
     val zones = remember(query, deviceZone) { ZoneChoices.filter(all, deviceZone, query) }
     val shownPartners = remember(query, partners) { ZoneChoices.partners(partners, query) }
     val deviceLabel = stringResource(R.string.settings_time_device)
@@ -76,13 +80,13 @@ internal fun ZonePickerDialog(
                     if (shownPartners.isNotEmpty()) {
                         group(R.string.settings_time_group_workspace)
                         items(shownPartners, key = { "partner:${it.zone}" }) { partner ->
-                            ZoneRow(partner.name, zoneLabel(partner.zone), selected = partner.zone == current) { onPick(partner.zone) }
+                            ZoneRow(partner.name, zoneLabel(partner.zone), selected = selected != null && ZoneChoices.displayed(partner.zone, ids) == selected) { onPick(partner.zone) }
                         }
                     }
                     if (zones.isNotEmpty()) {
                         group(R.string.settings_time_group_all)
                         items(zones, key = { it }) { zone ->
-                            ZoneRow(zoneLabel(zone), hint = null, selected = zone == current) { onPick(zone) }
+                            ZoneRow(zoneLabel(zone), hint = null, selected = zone == selected) { onPick(zone) }
                         }
                     }
                     if (!showDevice && shownPartners.isEmpty() && zones.isEmpty()) {
