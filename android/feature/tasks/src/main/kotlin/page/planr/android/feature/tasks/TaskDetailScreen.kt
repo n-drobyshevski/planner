@@ -92,7 +92,8 @@ fun TaskDetailScreen(
         }
     }
 
-    LaunchedEffect(state.saved) { if (state.saved) onBack() }
+    // A block Undo tapped while the save was in flight lands first: leaving would cancel it.
+    LaunchedEffect(state.saved, state.blockWriting) { if (state.saved && !state.blockWriting) onBack() }
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
     DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)

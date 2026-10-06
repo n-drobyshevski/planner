@@ -7,6 +7,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
@@ -89,6 +90,22 @@ class TaskDetailBlocksTest {
         val sheet = assertNotNull(vm.state.value.blockSheet)
         assertEquals(TODAY, sheet.date)
         assertEquals(LocalTime(10, 45), sheet.start)
+    }
+
+    @Test
+    fun `late in the evening the sheet opens on tomorrow, not on today's past midnight`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(original.copy(dueDate = LocalDate(2026, 10, 1))))
+        val late = object : Clock {
+            override fun now() = at("2026-10-04T23:20:00Z")
+        }
+        val vm = TaskDetailViewModel("t1", data, late, TaskDeletions(late))
+        keepCollecting(vm.state)
+
+        vm.openBlockSheet()
+
+        val sheet = assertNotNull(vm.state.value.blockSheet)
+        assertEquals(LocalDate(2026, 10, 5), sheet.date)
+        assertEquals(LocalTime(8, 0), sheet.start)
     }
 
     @Test
@@ -270,6 +287,26 @@ class TaskDetailBlocksTest {
         assertEquals(listOf("b1"), data.restoredEventIds)
         assertEquals(listOf("b1"), vm.state.value.blocks.map { it.event.id })
         assertNull(vm.state.value.blockNotice)
+    }
+
+    @Test
+    fun `undo is ignored while the task is being deleted`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(original))
+        data.events.value = listOf(blockEvent("b1", "t1", at("2026-10-05T09:00:00Z"), at("2026-10-05T10:00:00Z")))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        vm.removeBlock("b1")
+        val notice = assertNotNull(vm.state.value.blockNotice)
+        val gate = CompletableDeferred<Unit>()
+        data.deleteGate = gate
+
+        vm.delete()
+        assertTrue(vm.state.value.deleting)
+        vm.undoBlock(notice)
+
+        assertTrue(data.restoredEventIds.isEmpty())
+        assertFalse(vm.state.value.blockWriting)
+        gate.complete(Unit)
     }
 
     @Test

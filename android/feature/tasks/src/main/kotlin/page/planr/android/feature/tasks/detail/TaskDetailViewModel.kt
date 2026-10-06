@@ -23,7 +23,6 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
 import page.planr.android.core.data.attributes.AttributeKey
 import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.data.remote.StaleWriteException
@@ -359,7 +358,7 @@ class TaskDetailViewModel @AssistedInject constructor(
         if (current.task == null || !current.canSchedule || current.saving || current.deleting) return
         if (current.blockSheet != null) return
         val now = clock.now()
-        val date = BlockSlots.defaultDate(current.form?.dueDate, now.toLocalDateTime(current.zone).date)
+        val date = BlockSlots.defaultDate(current.form?.dueDate, now, current.zone)
         val sheet = BlockSheetState(date, BlockSlots.nextFullHour(now, current.zone), BlockSlots.DEFAULT_MINUTES)
         blockUi.update { it.copy(sheet = sheet) }
         suggestStart(current.zone)
@@ -381,7 +380,8 @@ class TaskDetailViewModel @AssistedInject constructor(
     fun createBlock() {
         val current = state.value
         val task = current.task ?: return
-        val sheet = current.blockSheet ?: return
+        // The flags, not the rendered state: a second tap may come before the state catches up.
+        val sheet = blockUi.value.sheet ?: return
         val viewerId = latest?.viewerId ?: return
         if (!current.canSchedule || sheet.saving || current.saving || current.deleting) return
         val start = sheet.date.atTime(sheet.start).toInstant(current.zone)
@@ -405,16 +405,20 @@ class TaskDetailViewModel @AssistedInject constructor(
     fun removeBlock(eventId: String) {
         val current = state.value
         val item = current.blocks.firstOrNull { it.event.id == eventId } ?: return
-        if (!item.canRemove || item.pending || current.saving || current.deleting) return
+        if (!item.canRemove || item.pending || eventId in blockUi.value.writing || current.saving || current.deleting) return
         blockWrite(eventId) {
             val snapshot = data.deleteEvent(eventId)
             blockUi.update { it.copy(notice = BlockNotice.Removed(eventId, snapshot)) }
         }
     }
 
-    /** The snackbar's Undo: deletes a block just added, or puts back one just removed. */
+    /**
+     * The snackbar's Undo: deletes a block just added, or puts back one just
+     * removed. Not while the task is being deleted: its blocks go with it.
+     */
     fun undoBlock(notice: BlockNotice) {
         dismissBlockNotice(notice)
+        if (state.value.deleting) return
         when (notice) {
             is BlockNotice.Added -> blockWrite(notice.eventId) { data.deleteEvent(notice.eventId) }
             is BlockNotice.Removed -> blockWrite(notice.eventId) { data.restoreEvent(notice.snapshot) }

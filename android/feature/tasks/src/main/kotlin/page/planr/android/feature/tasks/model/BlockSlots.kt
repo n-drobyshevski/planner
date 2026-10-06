@@ -36,9 +36,16 @@ object BlockSlots {
     /** Proposed starts sit on the quarter hour. */
     val STEP: Duration = 15.minutes
 
-    /** The task's due date when it is still ahead, else today. */
-    fun defaultDate(dueDate: LocalDate?, today: LocalDate): LocalDate =
-        if (dueDate != null && dueDate > today) dueDate else today
+    /**
+     * The task's due date when it is still ahead, else today. Past 23:00 the
+     * next full hour ([nextFullHour], the fallback start) is tomorrow's, so
+     * "today" is tomorrow then: midnight on today's date has gone.
+     */
+    fun defaultDate(dueDate: LocalDate?, now: Instant, zone: TimeZone): LocalDate {
+        val local = now.toLocalDateTime(zone)
+        val earliest = if (local.hour == 23) local.date.plus(DatePeriod(days = 1)) else local.date
+        return if (dueDate != null && dueDate > earliest) dueDate else earliest
+    }
 
     /** The local day [date] spans in [zone], for reading the occurrence cache. */
     fun dayWindow(date: LocalDate, zone: TimeZone): TimeWindow =

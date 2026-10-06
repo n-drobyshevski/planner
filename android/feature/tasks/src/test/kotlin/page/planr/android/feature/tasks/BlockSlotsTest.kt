@@ -178,10 +178,23 @@ class BlockSlotsTest {
     @Test
     fun `default date is the due date only while it is ahead`() {
         val today = LocalDate(2026, 10, 6)
-        assertEquals(today, BlockSlots.defaultDate(null, today))
-        assertEquals(today, BlockSlots.defaultDate(LocalDate(2026, 10, 1), today))
-        assertEquals(today, BlockSlots.defaultDate(today, today))
-        assertEquals(LocalDate(2026, 10, 9), BlockSlots.defaultDate(LocalDate(2026, 10, 9), today))
+        val now = at("14:20")
+        assertEquals(today, BlockSlots.defaultDate(null, now, utc))
+        assertEquals(today, BlockSlots.defaultDate(LocalDate(2026, 10, 1), now, utc))
+        assertEquals(today, BlockSlots.defaultDate(today, now, utc))
+        assertEquals(LocalDate(2026, 10, 9), BlockSlots.defaultDate(LocalDate(2026, 10, 9), now, utc))
+    }
+
+    @Test
+    fun `past 23_00 the default date is tomorrow, so the fallback start isn't this morning's midnight`() {
+        val tomorrow = LocalDate(2026, 10, 7)
+        assertEquals(day, BlockSlots.defaultDate(null, at("22:59"), utc))
+        assertEquals(tomorrow, BlockSlots.defaultDate(null, at("23:00"), utc))
+        assertEquals(tomorrow, BlockSlots.defaultDate(day, at("23:10"), utc))
+        assertEquals(LocalDate(2026, 10, 9), BlockSlots.defaultDate(LocalDate(2026, 10, 9), at("23:10"), utc))
+        // Local time decides: 21:30 UTC is already 23:30 in Berlin.
+        val berlin = TimeZone.of("Europe/Berlin")
+        assertEquals(tomorrow, BlockSlots.defaultDate(null, at("21:30"), berlin))
     }
 
     @Test
