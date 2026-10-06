@@ -20,6 +20,9 @@ import page.planr.android.core.data.di.ApplicationScope
  * ```
  * @Binds @IntoSet abstract fun bind(impl: GlanceWidgetRefresher): WidgetRefresher
  * ```
+ *
+ * Anything else that shows the cache outside the app joins the same set:
+ * event reminders re-plan here (`ReminderRefresher`).
  */
 interface WidgetRefresher {
     suspend fun refreshWidgets()

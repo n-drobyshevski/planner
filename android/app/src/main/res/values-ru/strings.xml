@@ -53,6 +53,18 @@
     <string name="settings_notifications_title">Уведомления</string>
     <string name="settings_success_toasts">Показывать уведомления об успехе</string>
     <string name="settings_success_toasts_description">Краткие подтверждения после действия (например, «Событие обновлено»). Выключи, чтобы заглушить их — ошибки и всё, что можно отменить, показываются всегда.</string>
+    <string name="settings_reminders_title">Напоминания</string>
+    <string name="settings_reminders_description">Тихое уведомление перед твоими и общими событиями со временем. Настраивается только для этого телефона.</string>
+    <string name="settings_reminders_lead">Напоминать</string>
+    <string name="settings_reminders_off">Не напоминать</string>
+    <plurals name="settings_reminders_minutes_before">
+        <item quantity="one">За %d минуту</item>
+        <item quantity="few">За %d минуты</item>
+        <item quantity="many">За %d минут</item>
+        <item quantity="other">За %d минуты</item>
+    </plurals>
+    <string name="settings_reminders_blocked">Уведомления для Planr заблокированы, поэтому напоминания не появятся. Их можно разрешить в настройках системы.</string>
+    <string name="settings_reminders_open_settings">Открыть настройки уведомлений</string>
     <string name="settings_sleep_title">Сон</string>
     <string name="settings_sleep_description">Какие блоки календаря считаются твоими ночами и двигают ли их отметки сна. Видно только тебе.</string>
     <string name="settings_sleep_unavailable">Не удалось загрузить настройки сна.</string>
@@ -89,4 +101,10 @@
     <string name="health_rationale_title">Как Planr использует данные о сне</string>
     <string name="health_rationale_body">Planr читает из Health Connect сеансы сна: время отхода ко сну и подъёма и длительность каждой фазы сна. Для каждой ночи он сохраняет одну запись в твоём аккаунте Planr, чтобы её показала аналитика сна на сайте.\n\nЭти данные видишь только ты: партнёр в Planr их не видит, они никому не передаются и никогда не отправляются в AI-модель. Planr только читает и ничего не записывает в Health Connect.\n\nЧтобы остановить, нажми «Отключить» в Planr (меню аккаунта → Сон из Health Connect) или убери доступ Planr в Health Connect. Уже подтянутые ночи остаются в аккаунте, пока ты не удалишь их на сайте.</string>
     <string name="health_rationale_close">Закрыть</string>
+    <string name="reminders_channel_name">Напоминания о событиях</string>
+    <string name="reminders_channel_description">Короткое напоминание перед началом события, как задано в настройках.</string>
+    <string name="reminders_text_in">%1$s · через %2$d мин</string>
+    <string name="reminders_text_now">%1$s · сейчас</string>
+    <string name="reminders_text_started">%1$s · началось %2$d мин назад</string>
+    <string name="reminders_snooze">Отложить на 10 мин</string>
 </resources>

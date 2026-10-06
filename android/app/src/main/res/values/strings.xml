@@ -58,6 +58,16 @@
     <string name="settings_notifications_title">Notifications</string>
     <string name="settings_success_toasts">Show success notifications</string>
     <string name="settings_success_toasts_description">Brief confirmations after an action (like “Event updated”). Turn off to mute them — errors and anything you can undo always show.</string>
+    <string name="settings_reminders_title">Reminders</string>
+    <string name="settings_reminders_description">A quiet notification before your own and shared timed events. Set for this phone only.</string>
+    <string name="settings_reminders_lead">Remind me</string>
+    <string name="settings_reminders_off">Off</string>
+    <plurals name="settings_reminders_minutes_before">
+        <item quantity="one">%d minute before</item>
+        <item quantity="other">%d minutes before</item>
+    </plurals>
+    <string name="settings_reminders_blocked">Notifications are blocked for Planr, so reminders can’t show. You can allow them in the system settings.</string>
+    <string name="settings_reminders_open_settings">Open notification settings</string>
     <string name="settings_sleep_title">Sleep</string>
     <string name="settings_sleep_description">Which calendar blocks count as your nights, and whether sleep check-ins move them. Private to you.</string>
     <string name="settings_sleep_unavailable">Couldn\'t load your sleep settings.</string>
@@ -93,4 +103,10 @@
     <string name="health_rationale_title">How Planr uses your sleep data</string>
     <string name="health_rationale_body">Planr reads your sleep sessions from Health Connect: when you went to bed, when you woke up, and the time spent in each sleep stage. It saves one entry per night to your Planr account so the Sleep insights on the web can show them.\n\nThis data is private to you: your partner in Planr can\'t see it, it isn\'t shared with anyone else, and it is never sent to an AI model. Planr only reads; it never writes to Health Connect.\n\nTo stop, choose Disconnect in Planr (account menu → Sleep from Health Connect) or remove Planr\'s access in Health Connect. Nights already brought in stay in your account until you delete them on the web.</string>
     <string name="health_rationale_close">Close</string>
+    <string name="reminders_channel_name">Event reminders</string>
+    <string name="reminders_channel_description">A short note before your events start, as set in Settings.</string>
+    <string name="reminders_text_in">%1$s · in %2$d min</string>
+    <string name="reminders_text_now">%1$s · now</string>
+    <string name="reminders_text_started">%1$s · started %2$d min ago</string>
+    <string name="reminders_snooze">Snooze 10 min</string>
 </resources>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher icon's monochrome mark (ic_launcher_foreground), cropped to
+     its safe zone for the status bar: the system tints it, only alpha counts. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="54"
+    android:viewportHeight="54">
+    <group
+        android:translateX="-27"
+        android:translateY="-27">
+        <!-- page -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4"
+            android:strokeLineJoin="round"
+            android:pathData="M40,36H68A6,6 0,0 1,74 42V70A6,6 0,0 1,68 76H40A6,6 0,0 1,34 70V42A6,6 0,0 1,40 36Z" />
+        <!-- header rule -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4"
+            android:pathData="M34,48H74" />
+        <!-- binding rings -->
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:pathData="M45,31V40M63,31V40" />
+        <!-- the two of you -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M46,62m-4.5,0a4.5,4.5 0,1 0,9 0a4.5,4.5 0,1 0,-9 0M62,62m-4.5,0a4.5,4.5 0,1 0,9 0a4.5,4.5 0,1 0,-9 0" />
+    </group>
+</vector>
