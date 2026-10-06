@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
+import page.planr.android.core.model.CalendarFilter
 
 /**
  * The agenda's period, as saved (`member_app_prefs.agenda_mode`; the wire
@@ -56,6 +57,25 @@ interface ViewPreferences {
     val agendaMode: Flow<AgendaViewMode>
 
     suspend fun setAgendaMode(mode: AgendaViewMode)
+
+    /**
+     * The agenda's calendar filter (the web sidebar's layers and contexts):
+     * [showPartnerEvents], plus the viewer's own calendar and the hidden
+     * contexts. Those two stay on this device ([ViewKeys.CALENDAR_OWN_HIDDEN]).
+     */
+    val calendarFilter: Flow<CalendarFilter>
+
+    /** Hides or shows the viewer's own personal events in the agenda (joint ones always show). */
+    suspend fun setOwnCalendarHidden(hidden: Boolean)
+
+    /**
+     * Hides or shows one context in the agenda, read and written in one step
+     * so quick taps on several never undo each other.
+     */
+    suspend fun setCalendarCategoryHidden(id: String, hidden: Boolean)
+
+    /** Replaces the contexts hidden from the agenda (category ids; empty shows all). */
+    suspend fun setHiddenCalendarCategories(ids: Set<String>)
 }
 
 /** The plain (unencrypted) view-preferences DataStore. */
@@ -76,9 +96,33 @@ class DataStoreViewPreferences @Inject constructor(
     override val agendaMode: Flow<AgendaViewMode> =
         dataStore.data.map { agendaModeOf(it) }.distinctUntilChanged()
 
+    override val calendarFilter: Flow<CalendarFilter> = dataStore.data.map {
+        CalendarFilter(
+            showPartner = it[ViewKeys.SHOW_PARTNER_EVENTS] ?: true,
+            ownHidden = it[ViewKeys.CALENDAR_OWN_HIDDEN] ?: false,
+            hiddenCategoryIds = it[ViewKeys.CALENDAR_HIDDEN_CATEGORIES].orEmpty(),
+        )
+    }.distinctUntilChanged()
+
     override suspend fun setShowPartnerEvents(show: Boolean) {
         changes.localChange { dataStore.edit { it[ViewKeys.SHOW_PARTNER_EVENTS] = show } }
         widgets.requestRefresh()
+    }
+
+    // Device-only, so straight to the file: there is nothing to upload.
+    override suspend fun setOwnCalendarHidden(hidden: Boolean) {
+        dataStore.edit { it[ViewKeys.CALENDAR_OWN_HIDDEN] = hidden }
+    }
+
+    override suspend fun setCalendarCategoryHidden(id: String, hidden: Boolean) {
+        dataStore.edit {
+            val current = it[ViewKeys.CALENDAR_HIDDEN_CATEGORIES].orEmpty()
+            it[ViewKeys.CALENDAR_HIDDEN_CATEGORIES] = if (hidden) current + id else current - id
+        }
+    }
+
+    override suspend fun setHiddenCalendarCategories(ids: Set<String>) {
+        dataStore.edit { it[ViewKeys.CALENDAR_HIDDEN_CATEGORIES] = ids }
     }
 
     override suspend fun setAgendaMode(mode: AgendaViewMode) {

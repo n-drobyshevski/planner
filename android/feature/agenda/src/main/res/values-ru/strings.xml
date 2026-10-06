@@ -23,6 +23,16 @@
         <item quantity="other">%1$s, %2$d события</item>
     </plurals>
     <string name="agenda_month_day_free">%1$s, событий нет</string>
+
+    <string name="agenda_filters">Фильтры</string>
+    <string name="agenda_filters_hidden">Фильтры, часть событий скрыта</string>
+    <string name="agenda_filters_description">Показать или скрыть календари и контексты.</string>
+    <string name="agenda_filters_my_calendar">Мой календарь</string>
+    <string name="agenda_filters_other_calendars">Другие календари</string>
+    <string name="agenda_filters_contexts">Контексты</string>
+    <string name="agenda_filters_show_all">Показать все</string>
+    <string name="agenda_filters_no_contexts">Пока нет контекстов</string>
+    <string name="agenda_filters_shared_context">Общий контекст — оба участвуют и могут редактировать</string>
     <string name="agenda_refresh_failed">Не удалось обновить. Показано то, что сохранено на устройстве.</string>
 
     <string name="agenda_block_time_range">с %1$s до %2$s</string>

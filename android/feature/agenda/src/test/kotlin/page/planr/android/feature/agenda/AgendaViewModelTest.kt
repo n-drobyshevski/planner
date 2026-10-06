@@ -241,6 +241,73 @@ class AgendaViewModelTest {
     }
 
     @Test
+    fun `the filter sheet hides my calendar and contexts, and says when something is hidden`() = runTest {
+        data.events.value = listOf(
+            Fixtures.event(id = "mine", owner = Fixtures.ANNA, start = "2026-10-04T08:00:00Z", end = "2026-10-04T09:00:00Z"),
+            Fixtures.event(
+                id = "work",
+                owner = Fixtures.ANNA,
+                categoryId = Fixtures.work.id,
+                start = "2026-10-04T09:00:00Z",
+                end = "2026-10-04T10:00:00Z",
+            ),
+            Fixtures.event(id = "theirs", owner = Fixtures.BORIS, start = "2026-10-04T10:00:00Z", end = "2026-10-04T11:00:00Z"),
+            // In the shared Home context: joint.
+            Fixtures.event(
+                id = "home",
+                owner = Fixtures.BORIS,
+                categoryId = Fixtures.home.id,
+                start = "2026-10-04T12:00:00Z",
+                end = "2026-10-04T13:00:00Z",
+            ),
+        )
+        val vm = viewModel()
+        fun shown() = vm.state.value.schedule(sunday).timed.map { it.block.eventId }.toSet()
+
+        val filters = vm.state.value.filters
+        assertEquals(CalendarLayer(name = "Anna", color = "#c0492a", isMemberA = true, shown = true), filters.own)
+        assertEquals(
+            listOf(
+                ContextFilter(id = "cat-work", name = "Work", color = "#0369a1", shared = false, shown = true),
+                ContextFilter(id = "cat-home", name = "Home", color = "#15803d", shared = true, shown = true),
+            ),
+            filters.contexts,
+        )
+        assertFalse(filters.narrowed)
+
+        // My calendar off: joint and the partner's still show.
+        vm.setOwnCalendarShown(false)
+        runCurrent()
+        assertEquals(true, data.ownCalendarHidden.value)
+        assertEquals(setOf("theirs", "home"), shown())
+        assertTrue(vm.state.value.filters.narrowed)
+        vm.setOwnCalendarShown(true)
+
+        // A hidden context hides joint items in it too.
+        vm.setContextShown(Fixtures.home.id, shown = false)
+        vm.setContextShown(Fixtures.work.id, shown = false)
+        runCurrent()
+        assertEquals(setOf("mine", "theirs"), shown())
+        assertEquals(listOf(false, false), vm.state.value.filters.contexts.map { it.shown })
+        assertTrue(vm.state.value.filters.narrowed)
+
+        vm.setContextShown(Fixtures.work.id, shown = true)
+        runCurrent()
+        assertEquals(setOf(Fixtures.home.id), data.hiddenCategories.value)
+
+        vm.showAllContexts()
+        runCurrent()
+        assertEquals(setOf("mine", "work", "theirs", "home"), shown())
+        assertFalse(vm.state.value.filters.narrowed)
+
+        // Hiding the partner isn't "narrowed": the header toggle shows it already.
+        vm.setShowPartnerEvents(false)
+        runCurrent()
+        assertFalse(vm.state.value.filters.narrowed)
+        vm.close()
+    }
+
+    @Test
     fun `no partner toggle without exactly one other member`() = runTest {
         data.members.value = listOf(Fixtures.anna)
         val vm = viewModel()

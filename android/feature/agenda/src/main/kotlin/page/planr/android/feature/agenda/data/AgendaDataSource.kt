@@ -8,6 +8,7 @@ import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
+import page.planr.android.core.model.CalendarFilter
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.Member
@@ -36,10 +37,22 @@ interface AgendaDataSource {
     /** Expanded occurrences overlapping [window]; collecting marks it as on screen. */
     fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>>
 
-    /** Whether the partner's personal events show (synced to the account, default on). */
-    fun observeShowPartnerEvents(): Flow<Boolean>
+    /**
+     * What the calendar shows: whether the partner's personal events do
+     * (synced to the account, default on), the viewer's own calendar and the
+     * hidden contexts (kept on this device).
+     */
+    fun observeCalendarFilter(): Flow<CalendarFilter>
 
     suspend fun setShowPartnerEvents(show: Boolean)
+
+    suspend fun setOwnCalendarHidden(hidden: Boolean)
+
+    /** Hides or shows one context (category id), in one read-and-write step. */
+    suspend fun setCategoryHidden(id: String, hidden: Boolean)
+
+    /** Shows every context again. */
+    suspend fun showAllCategories()
 
     /** The last-used mode (Day / Week synced to the account, Month kept on the device; default Day). */
     fun observeAgendaMode(): Flow<AgendaMode>

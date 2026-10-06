@@ -38,6 +38,7 @@ import page.planr.android.core.data.remote.PostgrestGateway
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 import page.planr.android.core.data.sync.WidgetRefresher
+import page.planr.android.core.model.CalendarFilter
 
 /** [AppPrefsSync] over a fake PostgREST and in-memory Preferences stores. */
 class AppPrefsSyncTest {
@@ -300,6 +301,51 @@ class AppPrefsSyncTest {
         assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
         assertEquals("month", AgendaViewMode.Month.wire)
         assertEquals(AgendaViewMode.Month, AgendaViewMode.fromWire("month"))
+    }
+
+    @Test
+    fun `the calendar filter keeps its layers and contexts on this device, the partner synced`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(showPartner = true))
+        val h = harness()
+        h.sync.pull()
+
+        h.view.setOwnCalendarHidden(true)
+        h.view.setCalendarCategoryHidden("cat-work", hidden = true)
+        h.view.setCalendarCategoryHidden("cat-home", hidden = true)
+        h.view.setCalendarCategoryHidden("cat-gym", hidden = true)
+        h.view.setCalendarCategoryHidden("cat-gym", hidden = false)
+        settle()
+        assertEquals(
+            CalendarFilter(showPartner = true, ownHidden = true, hiddenCategoryIds = setOf("cat-work", "cat-home")),
+            h.view.calendarFilter.first(),
+        )
+        // No column holds them: nothing uploaded, nothing pending.
+        assertEquals(emptyList(), fake.callsOf<FakePostgrestGateway.Call.Upsert>())
+        assertNull(h.pending())
+
+        // The account copy changes the partner toggle and leaves the rest alone.
+        h.sync.applyRemote(row(showPartner = false))
+        assertEquals(
+            CalendarFilter(showPartner = false, ownHidden = true, hiddenCategoryIds = setOf("cat-work", "cat-home")),
+            h.view.calendarFilter.first(),
+        )
+
+        // An upload of another change carries exactly the row's columns, as before.
+        h.view.setAgendaMode(AgendaViewMode.Day)
+        settle()
+        assertEquals(
+            setOf(
+                "member_id", "workspace_id", "show_partner_events", "agenda_mode",
+                "insights_hidden_category_ids", "insights_include_inactive",
+            ),
+            fake.callsOf<FakePostgrestGateway.Call.Upsert>().single().rows.single().keys,
+        )
+
+        // "Show all" empties the set; sign-out forgets the rest.
+        h.view.setHiddenCalendarCategories(emptySet())
+        assertEquals(emptySet(), h.view.calendarFilter.first().hiddenCategoryIds)
+        h.sync.clearLocal()
+        assertEquals(CalendarFilter(), h.view.calendarFilter.first())
     }
 
     @Test

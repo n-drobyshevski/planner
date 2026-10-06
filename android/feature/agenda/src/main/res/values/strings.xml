@@ -31,6 +31,18 @@
         <item quantity="other">%1$s, %2$d events</item>
     </plurals>
     <string name="agenda_month_day_free">%1$s, no events</string>
+
+    <!-- Calendar filters (calendar.toolbar.filters / calendar.sidebar) -->
+    <string name="agenda_filters">Filters</string>
+    <!-- The filter button while a calendar or context is hidden. -->
+    <string name="agenda_filters_hidden">Filters, some events hidden</string>
+    <string name="agenda_filters_description">Show or hide calendars and contexts.</string>
+    <string name="agenda_filters_my_calendar">My calendar</string>
+    <string name="agenda_filters_other_calendars">Other calendars</string>
+    <string name="agenda_filters_contexts">Contexts</string>
+    <string name="agenda_filters_show_all">Show all</string>
+    <string name="agenda_filters_no_contexts">No contexts yet</string>
+    <string name="agenda_filters_shared_context">Shared context — both attend and can edit</string>
     <string name="agenda_refresh_failed">Couldn\'t refresh. Showing what\'s saved on this device.</string>
 
     <!-- Event block accessibility (calendar.block) -->

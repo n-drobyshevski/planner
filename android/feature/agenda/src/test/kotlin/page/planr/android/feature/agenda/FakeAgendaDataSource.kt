@@ -12,6 +12,7 @@ import page.planr.android.core.data.auth.SessionInfo
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
+import page.planr.android.core.model.CalendarFilter
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.Member
@@ -38,6 +39,8 @@ class FakeAgendaDataSource(
     val events = MutableStateFlow<List<PlannerEvent>>(emptyList())
     val overrides = MutableStateFlow<List<EventOverride>>(emptyList())
     val showPartnerEvents = MutableStateFlow(true)
+    val ownCalendarHidden = MutableStateFlow(false)
+    val hiddenCategories = MutableStateFlow(emptySet<String>())
     val agendaMode = MutableStateFlow(AgendaMode.Day)
 
     val observedWindows = mutableListOf<TimeWindow>()
@@ -88,10 +91,23 @@ class FakeAgendaDataSource(
         agendaMode.value = mode
     }
 
-    override fun observeShowPartnerEvents(): Flow<Boolean> = showPartnerEvents
+    override fun observeCalendarFilter(): Flow<CalendarFilter> =
+        combine(showPartnerEvents, ownCalendarHidden, hiddenCategories, ::CalendarFilter)
 
     override suspend fun setShowPartnerEvents(show: Boolean) {
         showPartnerEvents.value = show
+    }
+
+    override suspend fun setOwnCalendarHidden(hidden: Boolean) {
+        ownCalendarHidden.value = hidden
+    }
+
+    override suspend fun setCategoryHidden(id: String, hidden: Boolean) {
+        hiddenCategories.value = if (hidden) hiddenCategories.value + id else hiddenCategories.value - id
+    }
+
+    override suspend fun showAllCategories() {
+        hiddenCategories.value = emptySet()
     }
 
     override fun observeCategories(): Flow<List<Category>> = categories
