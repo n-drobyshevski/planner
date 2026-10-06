@@ -33,6 +33,13 @@ data class QuickAddUiState(
     val saved: QuickAddKind? = null,
 ) {
     val tomorrow: LocalDate get() = today.plus(DatePeriod(days = 1))
+
+    /**
+     * Something typed that closing the sheet would drop, so a swipe, a tap
+     * outside or Back asks first. The day and times alone are defaults, and a
+     * saved item is no longer a draft.
+     */
+    val hasDraft: Boolean get() = saved == null && form.title.isNotBlank()
 }
 
 /**

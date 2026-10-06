@@ -81,7 +81,7 @@ class EventEditViewModel @AssistedInject constructor(
     fun update(transform: (EventForm) -> EventForm) {
         _state.update { s ->
             val form = s.form?.let(transform) ?: return@update s
-            s.copy(form = form, error = s.error?.let { form.validate() })
+            s.copy(form = form, dirty = form != initialForm, error = s.error?.let { form.validate() })
         }
     }
 
@@ -224,6 +224,7 @@ class EventEditViewModel @AssistedInject constructor(
                 form = form,
                 categories = usable + current,
                 isRecurringEdit = editing?.event?.isRecurring == true,
+                dirty = false,
                 error = null,
             )
         }

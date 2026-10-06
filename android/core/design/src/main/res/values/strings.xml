@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared by every editor that can be left with unsaved changes. -->
+<resources>
+    <string name="discard_changes_title">Discard changes?</string>
+    <string name="discard_changes_confirm">Discard</string>
+    <string name="discard_changes_keep">Keep editing</string>
+</resources>

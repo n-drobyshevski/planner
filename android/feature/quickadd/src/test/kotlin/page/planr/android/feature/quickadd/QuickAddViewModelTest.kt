@@ -2,6 +2,7 @@ package page.planr.android.feature.quickadd
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -170,6 +171,23 @@ class QuickAddViewModelTest {
         assertNull(vm.state.value.saved)
         assertEquals("", vm.state.value.form.title)
         assertEquals(QuickAddKind.Event, vm.state.value.form.kind)
+    }
+
+    @Test
+    fun `only a typed title is a draft worth asking about`() = runTest {
+        val vm = QuickAddViewModel(FakeQuickAdd(), clock)
+        vm.start(QuickAddKind.Event)
+        assertFalse(vm.state.value.hasDraft)
+
+        vm.setDate(LocalDate(2026, 10, 9))
+        vm.setTitle("   ")
+        assertFalse(vm.state.value.hasDraft, "defaults and blanks close without asking")
+
+        vm.setTitle("Dinner")
+        assertTrue(vm.state.value.hasDraft)
+
+        vm.save()
+        assertFalse(vm.state.value.hasDraft, "a saved item is no longer a draft")
     }
 
     @Test

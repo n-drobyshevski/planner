@@ -133,6 +133,20 @@ class TaskDetailViewModelTest {
     }
 
     @Test
+    fun `an edit undone by hand leaves nothing to discard`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(original))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+
+        vm.setTitle("Book train")
+        assertTrue(vm.state.value.dirty)
+        vm.setTitle("Book flights")
+
+        // The back guard and Save follow `dirty`: nothing actually changed.
+        assertFalse(vm.state.value.dirty)
+    }
+
+    @Test
     fun `a blank title is refused before any write`() = runTest {
         val data = FakeTasksDataSource(tasks = listOf(original))
         val vm = subject(data)

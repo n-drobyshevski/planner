@@ -153,6 +153,46 @@ class EventEditViewModelTest {
     }
 
     @Test
+    fun `the form is dirty only while it differs from how it loaded`() = runTest {
+        data.events.value = listOf(Fixtures.event(id = "one", title = "Standup"))
+        val (vm, _) = viewModel(EventEditTarget.Existing("one"))
+        assertFalse(vm.state.value.dirty)
+
+        vm.update { it.copy(title = "Retro") }
+        assertTrue(vm.state.value.dirty)
+
+        vm.update { it.copy(title = "Standup") }
+        assertFalse(vm.state.value.dirty, "an edit undone by hand leaves nothing to discard")
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a new event is dirty once something is typed`() = runTest {
+        val (vm, _) = viewModel(EventEditTarget.New())
+        assertFalse(vm.state.value.dirty)
+
+        vm.update { it.copy(title = "Dinner") }
+        assertTrue(vm.state.value.dirty)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `reloading after a stale write starts clean`() = runTest {
+        data.events.value = listOf(Fixtures.event(id = "one", title = "Standup"))
+        val (vm, _) = viewModel(EventEditTarget.Existing("one"))
+        vm.update { it.copy(title = "Mine") }
+        data.failNext = StaleWriteException(SupabaseTables.EVENTS, "one")
+        vm.save()
+        runCurrent()
+        assertTrue(vm.state.value.dirty, "a failed save keeps the edits")
+
+        vm.reloadLatest()
+        runCurrent()
+        assertFalse(vm.state.value.dirty)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun `a stale write keeps the form and offers a reload`() = runTest {
         data.events.value = listOf(Fixtures.event(id = "one", title = "Standup"))
         val (vm, effects) = viewModel(EventEditTarget.Existing("one"))
