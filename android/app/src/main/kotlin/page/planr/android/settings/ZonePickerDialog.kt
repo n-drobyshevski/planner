@@ -55,10 +55,13 @@ internal fun ZonePickerDialog(
     val all = remember(ids) { ZoneChoices.all(ids) }
     // A saved legacy alias ("Asia/Calcutta") is shown selected as its primary id.
     val selected = remember(current, ids) { current?.let { ZoneChoices.displayed(it, ids) } }
-    val zones = remember(query, deviceZone) { ZoneChoices.filter(all, deviceZone, query) }
+    // The device may report an alias too ("Europe/Kiev"): it leads the list as its primary id.
+    val device = remember(deviceZone, ids) { ZoneChoices.displayed(deviceZone, ids) }
+    val zones = remember(query, device) { ZoneChoices.filter(all, device, query) }
     val shownPartners = remember(query, partners) { ZoneChoices.partners(partners, query) }
     val deviceLabel = stringResource(R.string.settings_time_device)
-    val showDevice = allowDevice && (ZoneChoices.matches(deviceZone, query) || deviceLabel.contains(query.trim(), ignoreCase = true))
+    val showDevice = allowDevice &&
+        (ZoneChoices.matches(deviceZone, query) || ZoneChoices.matches(device, query) || deviceLabel.contains(query.trim(), ignoreCase = true))
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp) {
             Column(Modifier.padding(PlanrSpacing.xl)) {
@@ -74,13 +77,14 @@ internal fun ZonePickerDialog(
                     if (showDevice) {
                         group(R.string.settings_time_group_default)
                         item(key = "device") {
-                            ZoneRow(deviceLabel, zoneLabel(deviceZone), selected = current == null) { onPick(null) }
+                            ZoneRow(deviceLabel, zoneLabel(device), selected = current == null) { onPick(null) }
                         }
                     }
                     if (shownPartners.isNotEmpty()) {
                         group(R.string.settings_time_group_workspace)
                         items(shownPartners, key = { "partner:${it.zone}" }) { partner ->
-                            ZoneRow(partner.name, zoneLabel(partner.zone), selected = selected != null && ZoneChoices.displayed(partner.zone, ids) == selected) { onPick(partner.zone) }
+                            val shown = ZoneChoices.displayed(partner.zone, ids)
+                            ZoneRow(partner.name, zoneLabel(shown), selected = shown == selected) { onPick(partner.zone) }
                         }
                     }
                     if (zones.isNotEmpty()) {

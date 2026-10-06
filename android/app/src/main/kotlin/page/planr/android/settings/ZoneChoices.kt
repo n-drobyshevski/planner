@@ -26,14 +26,15 @@ object ZoneChoices {
         (ids.map { primary(it, ids, canonical) }.filter(::isRegion) + UTC).distinct().sorted()
 
     /**
-     * How a saved [zone] appears in [all]: a legacy alias ("Asia/Calcutta",
-     * "US/Eastern") reads, and is selected, as its primary id.
+     * How a saved (or the device's) [zone] appears in [all]: a legacy alias
+     * ("Asia/Calcutta", "US/Eastern") reads, and is selected, as its primary
+     * id; "Etc/UTC" and its aliases as UTC.
      */
     fun displayed(
         zone: String,
         ids: Set<String> = ZoneId.getAvailableZoneIds(),
         canonical: (String) -> String? = ::icuCanonical,
-    ): String = if (zone == UTC) zone else primary(zone, ids, canonical)
+    ): String = primary(zone, ids, canonical).let { if (it == ETC_UTC) UTC else it }
 
     /**
      * [all] for [query] (matched against the id and its readable label,
@@ -59,10 +60,12 @@ object ZoneChoices {
      * The primary IANA id for [id]. ICU's canonical ids are CLDR's, which keep
      * a zone's first name across IANA renames ("Asia/Calcutta"), so those move
      * to the current name when the phone knows it. An id [canonical] doesn't
-     * know stays as it is.
+     * know, or whose canonical id the phone's java.time can't load, stays as
+     * it is (so every choice is one [ZoneId.of] accepts).
      */
     private fun primary(id: String, ids: Set<String>, canonical: (String) -> String?): String {
-        val cldr = canonical(id) ?: return id
+        if (id == UTC) return id
+        val cldr = canonical(id)?.takeIf { it in ids } ?: return id
         val iana = IANA_RENAMES[cldr]
         return if (iana != null && iana in ids) iana else cldr
     }
@@ -74,6 +77,7 @@ object ZoneChoices {
         runCatching { IcuTimeZone.getCanonicalID(id) }.getOrNull()
 
     private const val UTC = "UTC"
+    private const val ETC_UTC = "Etc/UTC"
 
     /** CLDR canonical ids that IANA has since renamed (CLDR keeps the first name). */
     private val IANA_RENAMES = mapOf(

@@ -59,6 +59,27 @@ class ZoneChoicesTest {
     }
 
     @Test
+    fun `a saved UTC alias is shown as UTC`() {
+        assertEquals("UTC", ZoneChoices.displayed("Etc/UTC", phoneIds, icu::get))
+    }
+
+    @Test
+    fun `a canonical id the phone can't load is never offered`() {
+        val canonical = mapOf("Asia/Kolkata" to "Asia/Calcutta", "Europe/Berlin" to "Europe/Berlin")
+        val ids = setOf("Asia/Kolkata", "Europe/Berlin")
+        // ICU's "Asia/Calcutta" isn't one of the phone's ids: the phone's own id stays.
+        assertEquals(listOf("Asia/Kolkata", "Europe/Berlin", "UTC"), ZoneChoices.all(ids, canonical::get))
+        assertEquals("Asia/Kolkata", ZoneChoices.displayed("Asia/Kolkata", ids, canonical::get))
+    }
+
+    @Test
+    fun `a device zone reported as an alias still leads the list`() {
+        val zones = ZoneChoices.all(phoneIds, icu::get)
+        val device = ZoneChoices.displayed("Europe/Kiev", phoneIds, icu::get)
+        assertEquals("Europe/Kyiv", ZoneChoices.filter(zones, device, query = "").first())
+    }
+
+    @Test
     fun `the device zone leads the list`() {
         assertEquals("Asia/Tokyo", ZoneChoices.filter(all, deviceZone = "Asia/Tokyo", query = "").first())
         assertEquals(all.size, ZoneChoices.filter(all, deviceZone = "Asia/Tokyo", query = "").size)
