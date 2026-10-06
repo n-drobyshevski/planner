@@ -1,13 +1,27 @@
 package page.planr.android.core.design.component
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SheetValue
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.w3c.dom.Element
 
+@OptIn(ExperimentalMaterial3Api::class)
 class SleepRatingSheetTest {
+
+    @Test
+    fun `the sheet can't be hidden while a save is in flight`() {
+        // Hiding first and asking the caller to close second would leave an
+        // invisible sheet over the screen, and a failed save unseen.
+        assertFalse(sleepSheetMayMoveTo(SheetValue.Hidden, saving = true))
+        assertTrue(sleepSheetMayMoveTo(SheetValue.Expanded, saving = true))
+        assertTrue(sleepSheetMayMoveTo(SheetValue.Hidden, saving = false))
+        assertTrue(sleepSheetMayMoveTo(SheetValue.Expanded, saving = false))
+    }
 
     @Test
     fun `anchor words drop the level number, in either language`() {

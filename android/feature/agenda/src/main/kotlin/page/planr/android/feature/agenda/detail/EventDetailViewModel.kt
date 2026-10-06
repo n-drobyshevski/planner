@@ -68,10 +68,14 @@ class EventDetailViewModel @AssistedInject constructor(
     /** Emits when the screen should close (after a delete). */
     val closed: Flow<Unit> = _closed.receiveAsFlow()
 
-    private val _failed = Channel<Unit>(Channel.CONFLATED)
+    private val _failed = Channel<UiText>(Channel.CONFLATED)
 
-    /** Emits when a delete didn't go through (the agenda gets the message). */
-    val failed: Flow<Unit> = _failed.receiveAsFlow()
+    /**
+     * Emits the message when a delete didn't go through. The screen stays open
+     * and shows it itself: the agenda underneath isn't started, so a notice
+     * posted there would only surface later, out of context.
+     */
+    val failed: Flow<UiText> = _failed.receiveAsFlow()
 
     private val _deleting = MutableStateFlow(false)
     val deleting: StateFlow<Boolean> = _deleting.asStateFlow()
@@ -138,8 +142,7 @@ class EventDetailViewModel @AssistedInject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                notices.post(AgendaNotice(UiText(R.string.agenda_something_went_wrong), failedWrite = true))
-                _failed.send(Unit)
+                _failed.send(UiText(R.string.agenda_something_went_wrong))
             } finally {
                 _deleting.value = false
             }

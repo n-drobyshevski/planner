@@ -52,14 +52,14 @@ class EventDetailViewModelTest {
         val vm: EventDetailViewModel,
         val closed: List<Unit>,
         val posted: List<AgendaNotice>,
-        val failed: List<Unit>,
+        val failed: List<UiText>,
     )
 
     private fun TestScope.open(ref: String): Harness {
         val vm = EventDetailViewModel(ref, data, DefaultRecurrenceExpander, notices)
         val closed = mutableListOf<Unit>()
         val posted = mutableListOf<AgendaNotice>()
-        val failed = mutableListOf<Unit>()
+        val failed = mutableListOf<UiText>()
         backgroundScope.launch { vm.state.collect {} }
         backgroundScope.launch { vm.closed.toList(closed) }
         backgroundScope.launch { vm.failed.toList(failed) }
@@ -222,9 +222,8 @@ class EventDetailViewModelTest {
         runCurrent()
 
         assertTrue(h.closed.isEmpty())
-        assertEquals(1, h.failed.size)
-        assertEquals(UiText(R.string.agenda_something_went_wrong), h.posted.single().message)
-        assertTrue(h.posted.single().failedWrite, "a failure shows even with success toasts off")
+        assertEquals(listOf(UiText(R.string.agenda_something_went_wrong)), h.failed)
+        assertTrue(h.posted.isEmpty(), "the open detail screen shows it; the agenda below must not replay it later")
         assertFalse(h.vm.deleting.value)
         h.vm.viewModelScope.cancel()
     }

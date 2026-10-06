@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +38,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -98,6 +100,10 @@ data class SleepRatingDraft(
  * @param nightLabel the wake date as text ("Tue, 6 Oct").
  * @param fromHealthConnect the times came from the member's tracker.
  * @param error a failed save, shown above the button (the sheet stays open to retry).
+ *
+ * While [saving], Back, a scrim tap or a swipe down can't hide the sheet:
+ * callers keep it composed until the save settles, so a hidden-but-composed
+ * sheet would block the screen below and swallow a failed save's [error].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,9 +117,13 @@ fun SleepRatingSheet(
     onDismiss: () -> Unit,
     error: String? = null,
 ) {
+    val currentSaving by rememberUpdatedState(saving)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { sleepSheetMayMoveTo(it, saving = currentSaving) },
+        ),
         containerColor = PlanrTheme.colors.card,
     ) {
         Column(
@@ -211,6 +221,11 @@ fun SleepRatingSheet(
         }
     }
 }
+
+/** Whether the rating sheet may settle at [target]: anything but hidden while a save is in flight. */
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun sleepSheetMayMoveTo(target: SheetValue, saving: Boolean): Boolean =
+    target != SheetValue.Hidden || !saving
 
 @Composable
 private fun FieldBlock(label: String, content: @Composable () -> Unit) {
