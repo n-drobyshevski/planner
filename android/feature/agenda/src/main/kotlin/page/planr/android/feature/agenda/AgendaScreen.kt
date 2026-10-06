@@ -27,12 +27,15 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -63,10 +66,12 @@ import page.planr.android.feature.agenda.model.AgendaNotice
 import page.planr.android.feature.agenda.model.UiText
 import page.planr.android.feature.agenda.ui.AgendaFormats
 import page.planr.android.feature.agenda.ui.AgendaIcons
+import page.planr.android.feature.agenda.ui.LocalAgendaMetrics
 import page.planr.android.feature.agenda.ui.PartnerToggleButton
-import page.planr.android.feature.agenda.ui.HourHeight
 import page.planr.android.feature.agenda.ui.PeriodPage
+import page.planr.android.feature.agenda.ui.gridHoursAt
 import page.planr.android.feature.agenda.ui.rememberAgendaFormats
+import page.planr.android.feature.agenda.ui.rememberAgendaMetrics
 import page.planr.android.feature.agenda.ui.scrollOffsetFor
 
 /**
@@ -124,48 +129,50 @@ fun AgendaScreen(
     }
 
     val formats = rememberAgendaFormats()
-    Scaffold(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = {
-            if (onQuickAdd != null && state.canCreate) {
-                PlanrFloatingButton(onClick = onQuickAdd) {
-                    Icon(AgendaIcons.Plus, contentDescription = stringResource(R.string.agenda_quick_add))
+    CompositionLocalProvider(LocalAgendaMetrics provides rememberAgendaMetrics()) {
+        Scaffold(
+            modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.background,
+            snackbarHost = { SnackbarHost(snackbar) },
+            floatingActionButton = {
+                if (onQuickAdd != null && state.canCreate) {
+                    PlanrFloatingButton(onClick = onQuickAdd) {
+                        Icon(AgendaIcons.Plus, contentDescription = stringResource(R.string.agenda_quick_add))
+                    }
                 }
+            },
+            topBar = {
+                AgendaTopBar(
+                    state = state,
+                    formats = formats,
+                    onPrevious = viewModel::previous,
+                    onNext = viewModel::next,
+                    onToday = viewModel::goToToday,
+                    onMode = viewModel::setMode,
+                    onShowPartner = viewModel::setShowPartnerEvents,
+                    onNew = if (state.canCreate) ({ create(null) }) else null,
+                    accountAction = accountAction,
+                )
+            },
+        ) { padding ->
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize().padding(padding),
+            ) {
+                AgendaPager(
+                    state = state,
+                    formats = formats,
+                    onSettled = viewModel::showPeriod,
+                    onOpenEvent = onOpenEvent,
+                    onOpenDay = viewModel::openDay,
+                    onCreateAt = if (state.canCreate) {
+                        { date, minute -> create(date.atTime(LocalTime(minute / 60, minute % 60)).toInstant(state.zone)) }
+                    } else {
+                        null
+                    },
+                )
             }
-        },
-        topBar = {
-            AgendaTopBar(
-                state = state,
-                formats = formats,
-                onPrevious = viewModel::previous,
-                onNext = viewModel::next,
-                onToday = viewModel::goToToday,
-                onMode = viewModel::setMode,
-                onShowPartner = viewModel::setShowPartnerEvents,
-                onNew = if (state.canCreate) ({ create(null) }) else null,
-                accountAction = accountAction,
-            )
-        },
-    ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::refresh,
-            modifier = Modifier.fillMaxSize().padding(padding),
-        ) {
-            AgendaPager(
-                state = state,
-                formats = formats,
-                onSettled = viewModel::showPeriod,
-                onOpenEvent = onOpenEvent,
-                onOpenDay = viewModel::openDay,
-                onCreateAt = if (state.canCreate) {
-                    { date, minute -> create(date.atTime(LocalTime(minute / 60, minute % 60)).toInstant(state.zone)) }
-                } else {
-                    null
-                },
-            )
         }
     }
 }
@@ -184,11 +191,14 @@ private fun AgendaPager(
     onOpenDay: (LocalDate) -> Unit,
     onCreateAt: ((LocalDate, Int) -> Unit)?,
 ) {
-    val hourPx = with(LocalDensity.current) { HourHeight.toPx() }
-    // Start near the current hour on today, else at 07:00.
-    var gridScroll by rememberSaveable {
+    val hourPx = with(LocalDensity.current) { LocalAgendaMetrics.current.hourHeight.toPx() }
+    val currentHourPx by rememberUpdatedState(hourPx)
+    // Start near the current hour on today, else at 07:00. Kept in hours, not
+    // pixels: a font-size change recreates the screen with a taller or shorter
+    // hour, and the same pixel offset would land on a different time.
+    var gridHours by rememberSaveable {
         val hour = state.now.toLocalDateTime(state.zone).hour - 1
-        mutableIntStateOf(scrollOffsetFor(if (state.periodOffset == 0) maxOf(hour, 0) else 7, hourPx))
+        mutableFloatStateOf((if (state.periodOffset == 0) maxOf(hour, 0) else 7).toFloat())
     }
     key(state.mode) {
         val pager = rememberPagerState(initialPage = CENTER_PAGE + state.periodOffset) { PAGE_COUNT }
@@ -200,9 +210,11 @@ private fun AgendaPager(
             if (pager.currentPage != target && !pager.isScrollInProgress) pager.animateScrollToPage(target)
         }
         HorizontalPager(state = pager, key = { it }, modifier = Modifier.fillMaxSize()) { page ->
-            val scroll = remember { ScrollState(gridScroll) }
+            val scroll = remember { ScrollState(scrollOffsetFor(gridHours, hourPx)) }
             LaunchedEffect(scroll) {
-                snapshotFlow { scroll.value }.collect { if (page == pager.settledPage) gridScroll = it }
+                snapshotFlow { scroll.value }.collect {
+                    if (page == pager.settledPage) gridHours = gridHoursAt(it, currentHourPx)
+                }
             }
             PeriodPage(
                 days = state.daysAt(page - CENTER_PAGE),
