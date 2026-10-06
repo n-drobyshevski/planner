@@ -93,7 +93,8 @@ internal fun TaskEditor(
             modifier = Modifier
                 .heightIn(min = 48.dp)
                 .clip(MaterialTheme.shapes.small)
-                .clickable(onClickLabel = openParent) { onOpenTask(parent.id) },
+                // Not mid-write: the save or delete closes this screen once it lands.
+                .clickable(enabled = !state.saving && !state.deleting, onClickLabel = openParent) { onOpenTask(parent.id) },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm),
         ) {
@@ -349,6 +350,7 @@ private fun SubtaskList(state: TaskDetailUiState, viewModel: TaskDetailViewModel
         state.subtasks.forEach { item ->
             SubtaskRow(
                 item = item,
+                canOpen = !state.saving && !state.deleting,
                 onToggle = { viewModel.toggleSubtask(item.task.id) },
                 onOpen = { onOpenTask(item.task.id) },
             )
@@ -356,7 +358,7 @@ private fun SubtaskList(state: TaskDetailUiState, viewModel: TaskDetailViewModel
         if (state.canEdit) {
             AddSubtaskField(
                 value = state.subtaskTitle,
-                enabled = !state.saving,
+                enabled = !state.saving && !state.deleting,
                 adding = state.addingSubtask,
                 onValueChange = viewModel::setSubtaskTitle,
                 onAdd = viewModel::addSubtask,
@@ -366,7 +368,7 @@ private fun SubtaskList(state: TaskDetailUiState, viewModel: TaskDetailViewModel
 }
 
 @Composable
-private fun SubtaskRow(item: SubtaskItem, onToggle: () -> Unit, onOpen: () -> Unit) {
+private fun SubtaskRow(item: SubtaskItem, canOpen: Boolean, onToggle: () -> Unit, onOpen: () -> Unit) {
     val haptics = rememberPlanrHaptics()
     val openLabel = stringResource(R.string.task_subtask_open)
     val toggleLabel = stringResource(if (item.done) R.string.task_card_mark_not_done else R.string.task_card_mark_done)
@@ -375,7 +377,7 @@ private fun SubtaskRow(item: SubtaskItem, onToggle: () -> Unit, onOpen: () -> Un
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clip(MaterialTheme.shapes.small)
-            .clickable(onClickLabel = openLabel, onClick = onOpen),
+            .clickable(enabled = canOpen, onClickLabel = openLabel, onClick = onOpen),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(

@@ -54,8 +54,8 @@ import page.planr.android.feature.tasks.ui.DeletedTaskEffect
  * subtasks (checked off, opened, added). Save writes only the changed fields
  * and is rejected, not merged, if the task changed elsewhere meanwhile.
  * Leaving with unsaved changes (Back or the top bar) asks to discard them
- * first; while a save is in flight Back waits for it (no prompt, and no pop
- * that would cancel the write). Delete is immediate with Undo when nothing goes with the task, and
+ * first; while a save or delete is in flight Back waits for it (no prompt,
+ * and no pop that would cancel the write). Delete is immediate with Undo when nothing goes with the task, and
  * asks first when its subtasks or calendar blocks would.
  *
  * @param onOpenTask opens another task's detail (a subtask, or the parent).
@@ -77,7 +77,7 @@ fun TaskDetailScreen(
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val leave: () -> Unit = {
         when {
-            state.saving -> Unit
+            state.saving || state.deleting -> Unit
             state.dirty -> confirmingDiscard = true
             else -> onBack()
         }
@@ -87,8 +87,9 @@ fun TaskDetailScreen(
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
     DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
-    // Held while saving too: the save closes the screen itself once it lands.
-    BackHandler(enabled = state.dirty || state.saving, onBack = leave)
+    // Held while saving or deleting too: either closes the screen itself once
+    // it lands, and a pop meanwhile would cancel the write half-way.
+    BackHandler(enabled = state.dirty || state.saving || state.deleting, onBack = leave)
 
     Scaffold(
         modifier = modifier,
@@ -180,7 +181,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
             .padding(horizontal = PlanrSpacing.xs, vertical = PlanrSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack, enabled = !state.saving) {
+        IconButton(onClick = onBack, enabled = !state.saving && !state.deleting) {
             Icon(painterResource(R.drawable.ic_task_back), contentDescription = stringResource(R.string.task_detail_back))
         }
         Text(
@@ -191,7 +192,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
                 .semantics { heading() },
         )
         if (state.canEdit) {
-            IconButton(onClick = onDelete, enabled = !state.saving && !state.deleting) {
+            IconButton(onClick = onDelete, enabled = !state.saving && !state.deleting && !state.addingSubtask) {
                 Icon(
                     painterResource(R.drawable.ic_task_delete),
                     contentDescription = stringResource(R.string.task_delete),

@@ -145,7 +145,17 @@ fun PlanrNavHost(
             )
             taskDetailScreen(
                 onBack = { navController.popBackStack() },
-                onOpenTask = { id -> navController.navigateToTask(id) },
+                onOpenTask = { id ->
+                    // The parent's detail is right underneath (its subtask was opened
+                    // from it): go back to it rather than stacking a second copy, and
+                    // through Back, so this detail's discard guard still decides.
+                    val dispatcher = backDispatcher
+                    when {
+                        !navController.isTaskBelow(id) -> navController.navigateToTask(id)
+                        dispatcher != null -> dispatcher.onBackPressed()
+                        else -> navController.popBackStack()
+                    }
+                },
             )
             insightsScreen(
                 onOpenDay = { date ->
@@ -178,6 +188,12 @@ private fun NavController.selectTab(tab: TopLevelTab) {
         launchSingleTop = true
         restoreState = true
     }
+}
+
+/** Whether the entry under the current one is [taskId]'s detail. */
+private fun NavController.isTaskBelow(taskId: String): Boolean {
+    val below = previousBackStackEntry ?: return false
+    return below.destination.route == PlanrRoutes.TASK && below.arguments?.getString(PlanrRoutes.ARG_ID) == taskId
 }
 
 /** Whether [route] is on the back stack. */

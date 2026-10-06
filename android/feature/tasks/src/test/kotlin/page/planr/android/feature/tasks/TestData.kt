@@ -110,6 +110,10 @@ class FakeTasksDataSource(
     var setDoneGate: CompletableDeferred<Unit>? = null
     /** When set, updateTask suspends until it completes (a save in flight). */
     var updateGate: CompletableDeferred<Unit>? = null
+    /** When set, createTask suspends until it completes (an add in flight). */
+    var createGate: CompletableDeferred<Unit>? = null
+    /** When set, deleteTask suspends until it completes (a delete in flight). */
+    var deleteGate: CompletableDeferred<Unit>? = null
 
     val created = mutableListOf<TaskDraft>()
     val deletedIds = mutableListOf<String>()
@@ -166,6 +170,7 @@ class FakeTasksDataSource(
 
     override suspend fun createTask(draft: TaskDraft): Task {
         created += draft
+        createGate?.await()
         failWith?.let { throw it }
         val task = Task(
             id = "new-${created.size}",
@@ -188,6 +193,7 @@ class FakeTasksDataSource(
 
     override suspend fun deleteTask(id: String): DeletedTaskSnapshot {
         deletedIds += id
+        deleteGate?.await()
         failWith?.let { throw it }
         val row = tasks.value.first { it.id == id }
         val gone = HashSet<String>().apply { add(id) }

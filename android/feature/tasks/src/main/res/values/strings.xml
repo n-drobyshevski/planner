@@ -100,8 +100,8 @@
         <item quantity="other">Its %1$d subtasks go with it. This can’t be undone.</item>
     </plurals>
     <plurals name="task_delete_body_subtasks_blocks">
-        <item quantity="one">Its %1$d subtask and the blocks it placed on the calendar go with it. This can’t be undone.</item>
-        <item quantity="other">Its %1$d subtasks and the blocks they placed on the calendar go with it. This can’t be undone.</item>
+        <item quantity="one">Its %1$d subtask and the linked blocks on the calendar go with it. This can’t be undone.</item>
+        <item quantity="other">Its %1$d subtasks and the linked blocks on the calendar go with it. This can’t be undone.</item>
     </plurals>
     <string name="task_delete_body_blocks">The blocks it placed on the calendar go with it. This can’t be undone.</string>
     <string name="task_delete_confirm">Delete</string>

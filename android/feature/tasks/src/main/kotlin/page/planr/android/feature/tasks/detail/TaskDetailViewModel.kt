@@ -182,7 +182,7 @@ class TaskDetailViewModel @AssistedInject constructor(
         val current = state.value
         val parent = current.task ?: return
         val sent = current.subtaskTitle
-        if (!current.canEdit || current.addingSubtask || sent.isBlank()) return
+        if (!current.canEdit || current.addingSubtask || current.deleting || sent.isBlank()) return
         val draft = subtaskDraft(parent, sent, latest?.boards.orEmpty(), clock.now())
         ui.update { it.copy(addingSubtask = true) }
         viewModelScope.launch {
@@ -206,7 +206,9 @@ class TaskDetailViewModel @AssistedInject constructor(
     fun delete() {
         val current = state.value
         val task = current.task ?: return
-        if (!current.canEdit || current.saving || current.deleting) return
+        // Not while a subtask is being added: the plan would miss it, and the
+        // cascade would take it with no Undo.
+        if (!current.canEdit || current.saving || current.deleting || current.addingSubtask) return
         val subtree = descendantIds(task.id, latest?.tasks.orEmpty().groupBy { it.parentId })
         ui.update { it.copy(deleting = true, notice = null) }
         viewModelScope.launch {

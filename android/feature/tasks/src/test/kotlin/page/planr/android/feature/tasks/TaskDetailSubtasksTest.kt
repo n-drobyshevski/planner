@@ -229,6 +229,55 @@ class TaskDetailSubtasksTest {
     }
 
     @Test
+    fun `a delete in flight holds the screen until it lands`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        val gate = CompletableDeferred<Unit>()
+        data.deleteGate = gate
+
+        vm.delete()
+
+        // The screen holds Back on `deleting`: a pop now would cancel the write half-way.
+        assertTrue(vm.state.value.deleting)
+        assertFalse(vm.state.value.deleted)
+        vm.delete()
+        assertEquals(listOf("t1"), data.deletedIds, "a second tap is ignored")
+
+        gate.complete(Unit)
+        assertFalse(vm.state.value.deleting)
+        assertTrue(vm.state.value.deleted)
+    }
+
+    @Test
+    fun `no delete while a subtask is being added, nor an add while deleting`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(parent))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        val createGate = CompletableDeferred<Unit>()
+        data.createGate = createGate
+
+        vm.setSubtaskTitle("Pack bags")
+        vm.addSubtask()
+        assertTrue(vm.state.value.addingSubtask)
+        vm.delete()
+        assertTrue(data.blockChecks.isEmpty(), "the plan would miss the new subtask")
+
+        createGate.complete(Unit)
+        val deleteGate = CompletableDeferred<Unit>()
+        data.deleteGate = deleteGate
+        data.blockedTaskIds = emptySet()
+        vm.delete()
+        assertEquals(DeletePlan.Confirm(1, withBlocks = false), vm.state.value.confirmDelete)
+        vm.confirmDelete()
+        assertTrue(vm.state.value.deleting)
+        vm.setSubtaskTitle("One more")
+        vm.addSubtask()
+        assertEquals(1, data.created.size)
+        deleteGate.complete(Unit)
+    }
+
+    @Test
     fun `a task with subtasks asks first, naming the whole subtree, and has no undo`() = runTest {
         val data = FakeTasksDataSource(
             tasks = listOf(parent, task("s1", parent = "t1"), task("s2", parent = "t1"), task("s1a", parent = "s1")),
