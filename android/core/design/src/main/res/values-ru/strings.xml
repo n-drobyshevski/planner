@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared by every editor that can be left with unsaved changes. -->
+<resources>
+    <string name="discard_changes_title">Отменить изменения?</string>
+    <string name="discard_changes_confirm">Не сохранять</string>
+    <string name="discard_changes_keep">Продолжить</string>
+</resources>

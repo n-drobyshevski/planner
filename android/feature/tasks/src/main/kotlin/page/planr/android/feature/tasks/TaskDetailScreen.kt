@@ -1,5 +1,6 @@
 package page.planr.android.feature.tasks
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +20,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -28,6 +32,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.feature.tasks.detail.TaskDetailNotice
@@ -39,7 +44,8 @@ import page.planr.android.feature.tasks.detail.TaskEditor
  * One task: its fields as an editor for the owner (title, notes, status, due,
  * priority, assignee, context) or read-only for the partner, plus its
  * subtasks (read-only on mobile). Save writes only the changed fields and is
- * rejected, not merged, if the task changed elsewhere meanwhile.
+ * rejected, not merged, if the task changed elsewhere meanwhile. Leaving with
+ * unsaved changes (Back or the top bar) asks to discard them first.
  */
 @Composable
 fun TaskDetailScreen(
@@ -54,13 +60,23 @@ fun TaskDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
+    var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
+    val leave: () -> Unit = {
+        if (state.dirty) {
+            confirmingDiscard = true
+        } else {
+            onBack()
+        }
+    }
+
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
+    BackHandler(enabled = state.dirty) { confirmingDiscard = true }
 
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = { DetailTopBar(state, onBack, viewModel::save) },
+        topBar = { DetailTopBar(state, leave, viewModel::save) },
     ) { padding ->
         val form = state.form
         when {
@@ -87,6 +103,16 @@ fun TaskDetailScreen(
             }
         }
     }
+
+    if (confirmingDiscard) {
+        DiscardChangesDialog(
+            onDiscard = {
+                confirmingDiscard = false
+                onBack()
+            },
+            onKeepEditing = { confirmingDiscard = false },
+        )
+    }
 }
 
 @Composable
@@ -108,7 +134,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
                 .semantics { heading() },
         )
         if (state.canEdit) {
-            TextButton(onClick = onSave, enabled = !state.saving) {
+            TextButton(onClick = onSave, enabled = state.dirty && !state.saving) {
                 Text(stringResource(if (state.saving) R.string.task_detail_saving else R.string.task_detail_save))
             }
         }

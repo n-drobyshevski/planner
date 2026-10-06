@@ -2,6 +2,7 @@ package page.planr.android.feature.agenda.edit
 
 import androidx.lifecycle.viewModelScope
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -152,6 +153,46 @@ class EventEditViewModelTest {
     }
 
     @Test
+    fun `the form is dirty only while it differs from how it loaded`() = runTest {
+        data.events.value = listOf(Fixtures.event(id = "one", title = "Standup"))
+        val (vm, _) = viewModel(EventEditTarget.Existing("one"))
+        assertFalse(vm.state.value.dirty)
+
+        vm.update { it.copy(title = "Retro") }
+        assertTrue(vm.state.value.dirty)
+
+        vm.update { it.copy(title = "Standup") }
+        assertFalse(vm.state.value.dirty, "an edit undone by hand leaves nothing to discard")
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a new event is dirty once something is typed`() = runTest {
+        val (vm, _) = viewModel(EventEditTarget.New())
+        assertFalse(vm.state.value.dirty)
+
+        vm.update { it.copy(title = "Dinner") }
+        assertTrue(vm.state.value.dirty)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `reloading after a stale write starts clean`() = runTest {
+        data.events.value = listOf(Fixtures.event(id = "one", title = "Standup"))
+        val (vm, _) = viewModel(EventEditTarget.Existing("one"))
+        vm.update { it.copy(title = "Mine") }
+        data.failNext = StaleWriteException(SupabaseTables.EVENTS, "one")
+        vm.save()
+        runCurrent()
+        assertTrue(vm.state.value.dirty, "a failed save keeps the edits")
+
+        vm.reloadLatest()
+        runCurrent()
+        assertFalse(vm.state.value.dirty)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun `a stale write keeps the form and offers a reload`() = runTest {
         data.events.value = listOf(Fixtures.event(id = "one", title = "Standup"))
         val (vm, effects) = viewModel(EventEditTarget.Existing("one"))
@@ -260,6 +301,45 @@ class EventEditViewModelTest {
         val split = assertIs<Call.Split>(data.calls.single())
         assertEquals(monday, split.from)
         assertEquals("Planning", split.patch.title)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `undoing this and following restores the rule before dropping the new series`() = runTest {
+        data.events.value = listOf(series)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+        val created = "split-1"
+
+        posted.single().undo!!.invoke()
+
+        val (restore, delete) = data.calls.drop(1)
+        val update = assertIs<Call.Update>(restore)
+        assertEquals("series", update.id)
+        assertEquals(PatchField.Value("FREQ=DAILY"), update.patch.rrule)
+        assertEquals(PatchField.Value(null), update.patch.recurrenceEndsAt)
+        assertEquals(Call.Delete(created), delete)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a failed restore keeps the new series`() = runTest {
+        data.events.value = listOf(series)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+        data.failNext = IllegalStateException("offline")
+
+        assertFailsWith<IllegalStateException> { posted.single().undo!!.invoke() }
+
+        assertTrue(data.calls.none { it is Call.Delete }, "the future stays in the new series")
         vm.viewModelScope.cancel()
     }
 

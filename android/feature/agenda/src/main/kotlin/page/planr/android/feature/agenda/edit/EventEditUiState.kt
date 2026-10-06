@@ -13,6 +13,8 @@ data class EventEditUiState(
     val isRecurringEdit: Boolean = false,
     val askScope: Boolean = false,
     val saving: Boolean = false,
+    /** The form differs from how it was loaded: Save is offered and leaving asks to discard. */
+    val dirty: Boolean = false,
     /** Shown once a save was attempted with invalid input. */
     val error: EventFormError? = null,
 ) {

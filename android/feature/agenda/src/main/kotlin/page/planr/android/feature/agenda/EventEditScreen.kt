@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTokens
@@ -80,7 +81,8 @@ import page.planr.android.feature.agenda.ui.rememberAgendaFormats
  * to the member's), context, sharing, repeat, place and notes. Saving an
  * instance of a series asks "this / this and following / all events" first.
  * A conflicting edit made elsewhere surfaces as a calm snackbar offering to
- * reload; the form is never discarded on failure.
+ * reload; the form is never discarded on failure. Leaving with unsaved
+ * changes (Back or Close) asks to discard them first.
  *
  * @param onDone called after a successful save.
  * @param onClose called when the editor is closed without saving.
@@ -97,11 +99,20 @@ fun EventEditScreen(
     onClose: () -> Unit = onDone,
     viewModelKey: String? = null,
 ) {
-    BackHandler(enabled = viewModelKey != null, onBack = onClose)
     val viewModel = hiltViewModel<EventEditViewModel, EventEditViewModel.Factory>(key = viewModelKey) {
         it.create(target)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
+    val close: () -> Unit = {
+        if (state.dirty) {
+            confirmingDiscard = true
+        } else {
+            onClose()
+        }
+    }
+    // An in-place editor always takes over Back; a route only while there is something to lose.
+    BackHandler(enabled = viewModelKey != null || state.dirty, onBack = close)
     val snackbar = remember { SnackbarHostState() }
     val staleText = stringResource(R.string.agenda_stale_event)
     val reloadText = stringResource(R.string.agenda_stale_reload)
@@ -129,7 +140,7 @@ fun EventEditScreen(
                     Text(stringResource(if (state.isNew) R.string.agenda_editor_new_event else R.string.agenda_editor_edit_event))
                 },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
+                    IconButton(onClick = close) {
                         Icon(AgendaIcons.Close, contentDescription = stringResource(R.string.agenda_close))
                     }
                 },
@@ -137,7 +148,7 @@ fun EventEditScreen(
                     if (state.phase == EventEditUiState.Phase.Ready) {
                         Button(
                             onClick = viewModel::save,
-                            enabled = !state.saving,
+                            enabled = state.dirty && !state.saving,
                             modifier = Modifier.padding(end = PlanrSpacing.sm),
                         ) {
                             Text(stringResource(if (state.saving) R.string.agenda_saving else R.string.agenda_save))
@@ -169,6 +180,15 @@ fun EventEditScreen(
 
     if (state.askScope) {
         RecurrenceScopeDialog(delete = false, onChoose = viewModel::chooseScope, onDismiss = viewModel::dismissScope)
+    }
+    if (confirmingDiscard) {
+        DiscardChangesDialog(
+            onDiscard = {
+                confirmingDiscard = false
+                onClose()
+            },
+            onKeepEditing = { confirmingDiscard = false },
+        )
     }
 }
 

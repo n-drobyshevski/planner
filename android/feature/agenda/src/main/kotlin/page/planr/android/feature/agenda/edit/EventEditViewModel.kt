@@ -81,7 +81,7 @@ class EventEditViewModel @AssistedInject constructor(
     fun update(transform: (EventForm) -> EventForm) {
         _state.update { s ->
             val form = s.form?.let(transform) ?: return@update s
-            s.copy(form = form, error = s.error?.let { form.validate() })
+            s.copy(form = form, dirty = form != initialForm, error = s.error?.let { form.validate() })
         }
     }
 
@@ -152,9 +152,11 @@ class EventEditViewModel @AssistedInject constructor(
                 val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form))
                 notices.post(
                     AgendaNotice(UiText(R.string.agenda_toast_this_and_future_updated)) {
-                        // Undo the split: drop the new series, restore the original rule.
-                        data.deleteEvent(created.id)
+                        // Undo the split: restore the original rule FIRST, then drop the
+                        // new series. A failed restore keeps the new series, so the
+                        // future occurrences are never lost.
                         data.updateEvent(event.id, restoreRecurrence(event))
+                        data.deleteEvent(created.id)
                     },
                 )
             }
@@ -222,6 +224,7 @@ class EventEditViewModel @AssistedInject constructor(
                 form = form,
                 categories = usable + current,
                 isRecurringEdit = editing?.event?.isRecurring == true,
+                dirty = false,
                 error = null,
             )
         }
