@@ -289,11 +289,14 @@ widgets.
   has an unfiltered DELETE binding. Changes go into Room.
   Every (re)join refetches the visible window, tasks and reference data, in
   case something was missed while disconnected.
-- **Periodic, while signed in.** `SyncScheduler` keeps a 30-minute periodic
-  `SyncWorker` (network required), plus one immediate run after a fresh
-  sign-in. It cancels both on sign-out. The worker syncs the days the widgets
-  can show (today ±7 days and this month's whole weeks, `SyncWindows`),
-  tasks and reference data.
+- **Periodic, while signed in.** `SyncScheduler` keeps a two-hourly periodic
+  `SyncWorker` (network required, not on a low battery), plus one immediate
+  run after a fresh sign-in. It cancels both on sign-out. The worker syncs the
+  days the widgets can show (today ±7 days and this month's whole weeks,
+  `SyncWindows`), tasks and reference data. It does nothing while the app is
+  in the foreground with the Realtime channel joined (`RealtimeSync.subscribed`):
+  the cache is live then. Two hours is enough: reminders are planned a day
+  ahead and the widgets turn the day over with their own midnight alarm.
 - **Start-up.** `PlanrApplication.onCreate` starts both through
   `DataInitializer`.
 - **Workers.** WorkManager is configured by `PlanrApplication` with

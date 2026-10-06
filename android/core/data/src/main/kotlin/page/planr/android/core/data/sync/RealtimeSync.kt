@@ -19,6 +19,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -66,6 +69,13 @@ class RealtimeSync @Inject constructor(
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private var started = false
+    private val _subscribed = MutableStateFlow(false)
+
+    /**
+     * Whether the channel is joined right now, so the cache is being kept
+     * live (the periodic sync has nothing to add then; see [SyncWorker]).
+     */
+    val subscribed: StateFlow<Boolean> = _subscribed.asStateFlow()
 
     /** Call once from Application.onCreate. */
     fun start() {
@@ -103,6 +113,9 @@ class RealtimeSync @Inject constructor(
                     }
                 }
                 launch {
+                    channel.status.collect { _subscribed.value = it == RealtimeChannel.Status.SUBSCRIBED }
+                }
+                launch {
                     // The first join's refetch may share the screens' own (opening the
                     // app fires both). A rejoin after a drop always refetches: changes
                     // made while the channel was down never arrive otherwise.
@@ -124,6 +137,7 @@ class RealtimeSync @Inject constructor(
                 awaitCancellation()
             }
         } finally {
+            _subscribed.value = false
             withContext(NonCancellable) { runCatching { supabase.realtime.removeChannel(channel) } }
         }
     }
