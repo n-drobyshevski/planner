@@ -246,48 +246,26 @@ class AppPrefsSyncTest {
     }
 
     @Test
-    fun `month stays on this device, over the synced day or week`() = runTest {
+    fun `month syncs through the account like day and week`() = runTest {
         fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "week"))
         val h = harness()
         h.sync.pull()
 
         h.view.setAgendaMode(AgendaViewMode.Month)
-        settle()
         assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
-        // The column only admits day / week: nothing is uploaded or left pending.
-        assertEquals(emptyList(), fake.callsOf<FakePostgrestGateway.Call.Upsert>())
+        settle()
+        assertEquals(JsonPrimitive("month"), storedRow()!!["agenda_mode"])
         assertNull(h.pending())
 
-        // Another setting changes elsewhere: the row's period is the same, Month stays.
-        h.sync.applyRemote(row(mode = "week", showPartner = true))
-        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        // A pull of the account copy keeps it; another setting changing elsewhere does too.
         h.sync.pull()
         assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
-
-        // An upload of another change carries the synced week, never "month".
-        h.view.setShowPartnerEvents(false)
-        settle()
-        assertEquals(JsonPrimitive("week"), storedRow()!!["agenda_mode"])
+        h.sync.applyRemote(row(mode = "month", showPartner = true))
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
 
         // Another device picks Day: this one follows.
         h.sync.applyRemote(row(mode = "day"))
         assertEquals(AgendaViewMode.Day, h.view.agendaMode.first())
-    }
-
-    @Test
-    fun `month on a fresh device survives a pull of the default day`() = runTest {
-        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "day"))
-        val h = harness()
-        h.view.setAgendaMode(AgendaViewMode.Month)
-
-        h.sync.pull()
-
-        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
-        // Picking Week again leaves Month and syncs as before.
-        h.view.setAgendaMode(AgendaViewMode.Week)
-        settle()
-        assertEquals(AgendaViewMode.Week, h.view.agendaMode.first())
-        assertEquals(JsonPrimitive("week"), storedRow()!!["agenda_mode"])
     }
 
     @Test
@@ -301,6 +279,50 @@ class AppPrefsSyncTest {
         assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
         assertEquals("month", AgendaViewMode.Month.wire)
         assertEquals(AgendaViewMode.Month, AgendaViewMode.fromWire("month"))
+    }
+
+    @Test
+    fun `an older version's device-only month is folded into the synced mode and uploaded`() = runTest {
+        fake.seed(SupabaseTables.MEMBER_APP_PREFS, row(mode = "week", showPartner = false))
+        val h = harness()
+        // As an older version left it: the synced Week, this device's Month over it.
+        h.viewStore.updateData {
+            it.toMutablePreferences().apply {
+                set(ViewKeys.AGENDA_MODE, "week")
+                set(ViewKeys.SHOW_PARTNER_EVENTS, false)
+                set(ViewKeys.LEGACY_AGENDA_MONTH, true)
+            }
+        }
+        assertEquals(true, LegacyAgendaMonthMigration.shouldMigrate(h.viewStore.data.first()))
+
+        h.viewStore.updateData { LegacyAgendaMonthMigration.migrate(it) }
+
+        val migrated = h.viewStore.data.first()
+        assertNull(migrated[ViewKeys.LEGACY_AGENDA_MONTH])
+        assertEquals(false, LegacyAgendaMonthMigration.shouldMigrate(migrated))
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        // Pending, so the account's older Week doesn't win: the pull uploads Month.
+        h.sync.pull()
+        assertEquals(AgendaViewMode.Month, h.view.agendaMode.first())
+        assertEquals(JsonPrimitive("month"), storedRow()!!["agenda_mode"])
+        assertNull(h.pending())
+    }
+
+    @Test
+    fun `a cleared legacy month key is just removed`() = runTest {
+        val h = harness()
+        h.viewStore.updateData {
+            it.toMutablePreferences().apply {
+                set(ViewKeys.AGENDA_MODE, "day")
+                set(ViewKeys.LEGACY_AGENDA_MONTH, false)
+            }
+        }
+
+        h.viewStore.updateData { LegacyAgendaMonthMigration.migrate(it) }
+
+        assertNull(h.viewStore.data.first()[ViewKeys.LEGACY_AGENDA_MONTH])
+        assertEquals(AgendaViewMode.Day, h.view.agendaMode.first())
+        assertNull(h.pending())
     }
 
     @Test

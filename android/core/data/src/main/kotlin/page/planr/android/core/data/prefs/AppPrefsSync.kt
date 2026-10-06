@@ -1,7 +1,6 @@
 package page.planr.android.core.data.prefs
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import javax.inject.Inject
@@ -135,7 +134,7 @@ class AppPrefsSync @Inject constructor(
             view.edit {
                 changed = (it[ViewKeys.SHOW_PARTNER_EVENTS] ?: true) != row.showPartnerEvents
                 it[ViewKeys.SHOW_PARTNER_EVENTS] = row.showPartnerEvents
-                applyAgendaMode(it, AgendaViewMode.fromWire(row.agendaMode))
+                it[ViewKeys.AGENDA_MODE] = AgendaViewMode.fromWire(row.agendaMode).wire
             }
             insights.edit {
                 it[InsightsKeys.hidden(me.memberId)] = row.insightsHiddenCategoryIds.toSet()
@@ -146,22 +145,6 @@ class AppPrefsSync @Inject constructor(
         if (partnerChanged) widgets.requestRefresh()
     }
 
-    /**
-     * The account's [mode] onto the device. A Month there (once the column
-     * admits it) turns this device's Month on. A Day / Week different from
-     * the one saved here means another device picked a period, which this
-     * one follows, leaving Month; the same one (any other setting changed)
-     * keeps this device's Month.
-     */
-    private fun applyAgendaMode(prefs: MutablePreferences, mode: AgendaViewMode) {
-        if (!mode.synced) {
-            prefs[ViewKeys.AGENDA_MONTH] = true
-            return
-        }
-        if (AgendaViewMode.fromWire(prefs[ViewKeys.AGENDA_MODE]) != mode) prefs.remove(ViewKeys.AGENDA_MONTH)
-        prefs[ViewKeys.AGENDA_MODE] = mode.wire
-    }
-
     private suspend fun snapshot(me: SessionInfo): AppPrefsRow {
         val v = view.data.first()
         val i = insights.data.first()
@@ -169,8 +152,7 @@ class AppPrefsSync @Inject constructor(
             memberId = me.memberId,
             workspaceId = me.workspaceId,
             showPartnerEvents = v[ViewKeys.SHOW_PARTNER_EVENTS] ?: true,
-            // The synced Day / Week, never this device's Month ([AgendaViewMode.synced]).
-            agendaMode = AgendaViewMode.fromWire(v[ViewKeys.AGENDA_MODE]).takeIf { it.synced }?.wire ?: AgendaViewMode.Day.wire,
+            agendaMode = AgendaViewMode.fromWire(v[ViewKeys.AGENDA_MODE]).wire,
             insightsHiddenCategoryIds = i[InsightsKeys.hidden(me.memberId)].orEmpty().sorted(),
             insightsIncludeInactive = i[InsightsKeys.includeInactive(me.memberId)] ?: false,
         )

@@ -1,5 +1,6 @@
 package page.planr.android.core.data.prefs
 
+import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -22,13 +23,6 @@ enum class AgendaViewMode(val wire: String) {
     Month("month"),
     ;
 
-    /**
-     * Whether the account copy can hold it: `member_app_prefs.agenda_mode`'s
-     * check constraint admits `day` and `week` only, so Month is kept on
-     * this device ([ViewKeys.AGENDA_MONTH]) until the column admits it.
-     */
-    val synced: Boolean get() = this != Month
-
     companion object {
         /** Anything unknown reads as [Day], the default. */
         fun fromWire(value: String?): AgendaViewMode = entries.firstOrNull { it.wire == value } ?: Day
@@ -50,10 +44,7 @@ interface ViewPreferences {
     /** Saves [show] and re-renders the widgets with it. */
     suspend fun setShowPartnerEvents(show: Boolean)
 
-    /**
-     * The agenda's last-used period. Default [AgendaViewMode.Day]. Day and
-     * Week follow the member's account; Month is this device's ([AgendaViewMode.synced]).
-     */
+    /** The agenda's last-used period, following the member's account. Default [AgendaViewMode.Day]. */
     val agendaMode: Flow<AgendaViewMode>
 
     suspend fun setAgendaMode(mode: AgendaViewMode)
@@ -94,7 +85,7 @@ class DataStoreViewPreferences @Inject constructor(
         dataStore.data.map { it[ViewKeys.SHOW_PARTNER_EVENTS] ?: true }.distinctUntilChanged()
 
     override val agendaMode: Flow<AgendaViewMode> =
-        dataStore.data.map { agendaModeOf(it) }.distinctUntilChanged()
+        dataStore.data.map { AgendaViewMode.fromWire(it[ViewKeys.AGENDA_MODE]) }.distinctUntilChanged()
 
     override val calendarFilter: Flow<CalendarFilter> = dataStore.data.map {
         CalendarFilter(
@@ -126,20 +117,31 @@ class DataStoreViewPreferences @Inject constructor(
     }
 
     override suspend fun setAgendaMode(mode: AgendaViewMode) {
-        if (!mode.synced) {
-            // Nothing the account copy can take: stays on this device, over the synced mode.
-            dataStore.edit { it[ViewKeys.AGENDA_MONTH] = true }
-            return
-        }
-        changes.localChange {
-            dataStore.edit {
-                it[ViewKeys.AGENDA_MODE] = mode.wire
-                it.remove(ViewKeys.AGENDA_MONTH)
-            }
-        }
+        changes.localChange { dataStore.edit { it[ViewKeys.AGENDA_MODE] = mode.wire } }
     }
 }
 
-/** The saved agenda mode: this device's Month when picked, else the synced Day / Week. */
-internal fun agendaModeOf(prefs: Preferences): AgendaViewMode =
-    if (prefs[ViewKeys.AGENDA_MONTH] == true) AgendaViewMode.Month else AgendaViewMode.fromWire(prefs[ViewKeys.AGENDA_MODE])
+/**
+ * Folds the device-only Month of older versions ([ViewKeys.LEGACY_AGENDA_MONTH],
+ * kept while `member_app_prefs.agenda_mode` only took `day` / `week`) into
+ * [ViewKeys.AGENDA_MODE], once, before anything reads the store. It was this
+ * device's latest pick (another device's Day / Week cleared it), so it is
+ * marked pending ([ViewKeys.SYNC_PENDING]): the next pull uploads it rather
+ * than letting the account's older period overwrite it.
+ */
+internal object LegacyAgendaMonthMigration : DataMigration<Preferences> {
+    override suspend fun shouldMigrate(currentData: Preferences): Boolean =
+        ViewKeys.LEGACY_AGENDA_MONTH in currentData
+
+    override suspend fun migrate(currentData: Preferences): Preferences =
+        currentData.toMutablePreferences().apply {
+            val month = get(ViewKeys.LEGACY_AGENDA_MONTH) == true
+            remove(ViewKeys.LEGACY_AGENDA_MONTH)
+            if (month) {
+                set(ViewKeys.AGENDA_MODE, AgendaViewMode.Month.wire)
+                set(ViewKeys.SYNC_PENDING, (get(ViewKeys.SYNC_PENDING) ?: 0L) + 1)
+            }
+        }.toPreferences()
+
+    override suspend fun cleanUp() = Unit
+}

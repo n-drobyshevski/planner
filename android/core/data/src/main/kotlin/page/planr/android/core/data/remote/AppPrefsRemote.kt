@@ -19,7 +19,7 @@ data class AppPrefsRow(
     @SerialName("member_id") val memberId: String,
     @SerialName("workspace_id") val workspaceId: String,
     @SerialName("show_partner_events") val showPartnerEvents: Boolean = true,
-    /** `day` or `week`. */
+    /** `day`, `week` or `month` ([page.planr.android.core.data.prefs.AgendaViewMode]). */
     @SerialName("agenda_mode") val agendaMode: String = "day",
     @SerialName("insights_hidden_category_ids") val insightsHiddenCategoryIds: List<String> = emptyList(),
     @SerialName("insights_include_inactive") val insightsIncludeInactive: Boolean = false,

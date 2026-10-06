@@ -31,6 +31,7 @@ import page.planr.android.core.data.prefs.DataStoreInsightsPreferences
 import page.planr.android.core.data.prefs.DataStoreViewPreferences
 import page.planr.android.core.data.prefs.InsightsPreferences
 import page.planr.android.core.data.prefs.InsightsPreferencesDataStore
+import page.planr.android.core.data.prefs.LegacyAgendaMonthMigration
 import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.prefs.ViewPreferencesDataStore
 
@@ -68,6 +69,7 @@ abstract class PreferencesModule {
         fun provideViewPreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
             PreferenceDataStoreFactory.create(
                 corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+                migrations = listOf(LegacyAgendaMonthMigration),
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 produceFile = { context.preferencesDataStoreFile("planr_view") },
             )
