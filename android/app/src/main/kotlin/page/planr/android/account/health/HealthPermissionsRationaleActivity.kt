@@ -1,8 +1,8 @@
 package page.planr.android.account.health
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,7 +34,7 @@ import page.planr.android.core.design.theme.PlanrTheme
  * usage settings; it refuses to grant access to an app without it.
  */
 @AndroidEntryPoint
-class HealthPermissionsRationaleActivity : ComponentActivity() {
+class HealthPermissionsRationaleActivity : AppCompatActivity() {
 
     @Inject
     lateinit var themeMode: ThemeModeStore

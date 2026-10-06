@@ -26,6 +26,9 @@ ktor = "3.2.2"
 
 compose-bom = "2025.09.01"
 activity-compose = "1.10.1"
+# Per-app language below Android 13 (AppCompatDelegate.setApplicationLocales);
+# 1.8.0 needs only compileSdk 34.
+appcompat = "1.8.0"
 core-ktx = "1.16.0"
 lifecycle = "2.9.4"
 navigation = "2.9.5"
@@ -63,6 +66,7 @@ ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 # AndroidX core
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }

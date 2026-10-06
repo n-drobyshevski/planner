@@ -54,6 +54,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.datastore.preferences)
+    // The member's language below Android 13 (appearance/AppearancePlatform).
+    implementation(libs.androidx.appcompat)
     // Health Connect: reads sleep sessions for sleep_logs (health/).
     api(libs.androidx.health.connect)
     implementation(libs.androidx.work.runtime.ktx)

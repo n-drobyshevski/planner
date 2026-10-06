@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,7 +31,7 @@ import page.planr.android.feature.quickadd.model.SharedText
  * text goes on to the app's .ics import instead.
  */
 @AndroidEntryPoint
-class QuickAddActivity : ComponentActivity() {
+class QuickAddActivity : AppCompatActivity() {
 
     @Inject
     lateinit var themeMode: ThemeModeStore
@@ -76,7 +76,8 @@ class QuickAddActivity : ComponentActivity() {
             QuickAddKind.Task -> R.string.quickadd_task_created
             QuickAddKind.Event -> R.string.quickadd_event_created
         }
-        Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
+        // Resolved here: below Android 13 only the activity carries the member's language.
+        Toast.makeText(applicationContext, getString(message), Toast.LENGTH_SHORT).show()
     }
 
     /** Hands an iCalendar to the app's import (MainActivity takes `text/calendar` SENDs). */

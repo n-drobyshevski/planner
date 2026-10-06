@@ -14,6 +14,8 @@ dependencies {
     implementation(projects.core.design)
     implementation(projects.core.data)
     implementation(libs.androidx.activity.compose)
+    // AppCompatActivity: the member's language below Android 13.
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

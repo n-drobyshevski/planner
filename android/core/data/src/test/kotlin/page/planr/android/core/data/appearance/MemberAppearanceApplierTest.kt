@@ -41,22 +41,27 @@ class MemberAppearanceApplierTest {
         val nightModes = mutableListOf<ThemePreference>()
         /** false: below API 31. */
         override var keepsNightMode = false
-        /** null: no per-app language (below API 33). */
-        var appTags: List<String>? = emptyList()
+        var appTags: List<String> = emptyList()
         var systemTags = listOf("en-GB")
         val localesSet = mutableListOf<String>()
+        var followedSystem = 0
 
         override fun setNightMode(preference: ThemePreference) {
             nightModes += preference
         }
 
-        override fun appLocales(): List<String>? = appTags
+        override fun appLocales(): List<String> = appTags
 
         override fun systemLocales(): List<String> = systemTags
 
         override fun setAppLocale(tag: String) {
             localesSet += tag
             appTags = listOf(tag)
+        }
+
+        override fun followSystemLocale() {
+            followedSystem++
+            appTags = emptyList()
         }
     }
 
@@ -256,12 +261,25 @@ class MemberAppearanceApplierTest {
     }
 
     @Test
-    fun `without per-app languages the system language stays`() = runTest {
-        platform.appTags = null
+    fun `a member on the system's language confirms following it`() = runTest {
+        // Below Android 13 an override stored earlier (Russian) may not have
+        // been read yet, so the app reads as following the system: say so.
+        applier(store())
+        member.value = me(locale = AppLocale.En)
+        runCurrent()
+
+        assertEquals(1, platform.followedSystem)
+        assertEquals(emptyList(), platform.localesSet)
+    }
+
+    @Test
+    fun `an override that already shows the member's language is kept`() = runTest {
+        platform.appTags = listOf("ru")
         applier(store())
         member.value = me(locale = AppLocale.Ru)
         runCurrent()
 
+        assertEquals(0, platform.followedSystem)
         assertEquals(emptyList(), platform.localesSet)
     }
 }
