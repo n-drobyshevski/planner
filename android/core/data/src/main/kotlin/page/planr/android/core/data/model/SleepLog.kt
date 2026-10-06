@@ -80,7 +80,8 @@ data class SleepTimes(val bedtimeAt: Instant?, val wokeAt: Instant?) {
 /**
  * What a check-in saves. [times] null keeps the stored times (and their
  * source); otherwise they are written as typed, unless [keepDeviceTimes]
- * drops them first.
+ * drops them first. With [timesEdited] false the member left the prefilled
+ * times alone: they are written only for a night that has no row yet.
  */
 data class SleepRating(
     val date: LocalDate,
@@ -88,7 +89,12 @@ data class SleepRating(
     val fatigue: Int?,
     val note: String?,
     val times: SleepTimes? = null,
-)
+    val timesEdited: Boolean = true,
+) {
+    /** The times to send given the night as stored now. */
+    fun timesFor(existing: SleepLog?): SleepTimes? =
+        if (!timesEdited && existing != null) null else keepDeviceTimes(times, existing)
+}
 
 /**
  * Drops [times] that would only echo the device's (device-times.ts
@@ -135,9 +141,9 @@ object SleepRatings {
     }
 
     /**
-     * The sheet's values as a [SleepRating]. Times are sent for a night with
-     * no row yet (a manual check-in) or when the member touched a time
-     * ([timesEdited]); otherwise the stored ones stay. A blank note is none.
+     * The sheet's values as a [SleepRating]. Untouched times ([timesEdited]
+     * false) are kept on a stored night and written for a new one (a manual
+     * check-in); see [SleepRating.timesFor]. A blank note is none.
      */
     fun rating(
         date: LocalDate,
@@ -147,21 +153,55 @@ object SleepRatings {
         quality: Int?,
         fatigue: Int?,
         note: String,
-        existing: SleepLog?,
         zone: TimeZone,
-    ): SleepRating {
-        val times = if (existing == null || timesEdited) SleepTimes.fromWallClock(date, bedtime, wake, zone) else null
-        return SleepRating(
-            date = date,
-            quality = quality,
-            fatigue = fatigue,
-            note = note.trim().takeIf { it.isNotEmpty() }?.take(NOTE_MAX),
-            times = times,
-        )
-    }
+    ): SleepRating = SleepRating(
+        date = date,
+        quality = quality,
+        fatigue = fatigue,
+        note = note.trim().takeIf { it.isNotEmpty() }?.take(NOTE_MAX),
+        times = SleepTimes.fromWallClock(date, bedtime, wake, zone),
+        timesEdited = timesEdited,
+    )
 
     /** The note's limit, as on the web (maxLength 200). */
     const val NOTE_MAX = 200
 
     private fun LocalTime.atMinute(): LocalTime = LocalTime(hour, minute)
+}
+
+/**
+ * One night open in the rating sheet: what it shows (prefilled times, the
+ * night's ratings and note so far) and what saving it sends.
+ */
+data class SleepRatingForm(
+    val date: LocalDate,
+    val bedtime: LocalTime,
+    val wake: LocalTime,
+    val quality: Int? = null,
+    val fatigue: Int? = null,
+    val note: String = "",
+    /** the member picked a time in the sheet */
+    val timesEdited: Boolean = false,
+    /** the night's stored times came from Health Connect */
+    val fromHealthConnect: Boolean = false,
+) {
+    fun toRating(zone: TimeZone): SleepRating =
+        SleepRatings.rating(date, bedtime, wake, timesEdited, quality, fatigue, note, zone)
+
+    companion object {
+        /** [date]'s night as [logs] have it, its times prefilled per [SleepRatings.prefill]. */
+        fun open(date: LocalDate, logs: List<SleepLog>, zone: TimeZone): SleepRatingForm {
+            val log = logs.firstOrNull { it.date == date }
+            val (bed, wake) = SleepRatings.prefill(date, logs, zone)
+            return SleepRatingForm(
+                date = date,
+                bedtime = bed,
+                wake = wake,
+                quality = log?.quality,
+                fatigue = log?.fatigue,
+                note = log?.note.orEmpty(),
+                fromHealthConnect = log?.fromHealthConnect == true,
+            )
+        }
+    }
 }

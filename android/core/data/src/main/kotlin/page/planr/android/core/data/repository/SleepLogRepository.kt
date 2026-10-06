@@ -46,8 +46,10 @@ interface SleepLogRepository {
 
     /**
      * Saves a check-in on [SleepRating.date] and returns the night as stored.
-     * Times that would only echo a Health Connect night's are dropped
-     * ([keepDeviceTimes]), so the device's times and stages stay.
+     * Against the row as stored now, untouched times on an existing night and
+     * times that would only echo a Health Connect night's are dropped
+     * ([SleepRating.timesFor], [keepDeviceTimes]), so the device's times and
+     * stages stay.
      */
     suspend fun save(rating: SleepRating): SleepLog
 
@@ -104,7 +106,7 @@ class RemoteSleepLogRepository @Inject constructor(
             quality = rating.quality,
             fatigue = rating.fatigue,
             note = rating.note,
-            times = keepDeviceTimes(rating.times, existing),
+            times = rating.timesFor(existing),
         ) ?: throw SleepLogNotSavedException()
         cache.update { cached ->
             if (cached == null || cached.memberId != me.memberId) {

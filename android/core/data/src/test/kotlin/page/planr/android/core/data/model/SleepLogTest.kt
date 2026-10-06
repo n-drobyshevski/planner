@@ -78,24 +78,42 @@ class SleepLogTest {
 
     @Test
     fun `untouched times are kept on a stored night and sent for a new one`() {
-        val kept = SleepRatings.rating(
-            oct5, LocalTime(23, 40), LocalTime(7, 10), timesEdited = false,
-            quality = 5, fatigue = null, note = "  ", existing = device, zone = berlin,
-        )
-        assertNull(kept.times)
-        assertNull(kept.note)
-
-        val fresh = SleepRatings.rating(
+        val untouched = SleepRatings.rating(
             oct5, LocalTime(23, 0), LocalTime(7, 0), timesEdited = false,
-            quality = null, fatigue = 4, note = " ok ", existing = null, zone = berlin,
+            quality = 5, fatigue = null, note = "  ", zone = berlin,
         )
-        assertEquals(Instant.parse("2026-10-04T21:00:00Z"), fresh.times?.bedtimeAt)
-        assertEquals("ok", fresh.note)
+        assertNull(untouched.note)
+        assertNull(untouched.timesFor(device))
+        assertNull(untouched.timesFor(device.copy(timesSource = SleepTimesSource.Manual)))
+        assertEquals(Instant.parse("2026-10-04T21:00:00Z"), untouched.timesFor(null)?.bedtimeAt)
 
         val edited = SleepRatings.rating(
             oct5, LocalTime(22, 0), LocalTime(7, 10), timesEdited = true,
-            quality = 5, fatigue = null, note = "", existing = device, zone = berlin,
+            quality = 5, fatigue = null, note = " ok ", zone = berlin,
         )
-        assertEquals(Instant.parse("2026-10-04T20:00:00Z"), edited.times?.bedtimeAt)
+        assertEquals("ok", edited.note)
+        assertEquals(Instant.parse("2026-10-04T20:00:00Z"), edited.timesFor(device)?.bedtimeAt)
+        // Edited back to the device's own minute: still an echo.
+        val echo = edited.copy(times = SleepTimes.fromWallClock(oct5, LocalTime(23, 40), LocalTime(7, 10), berlin))
+        assertNull(echo.timesFor(device))
+    }
+
+    @Test
+    fun `a form opens on the night's own values and saves them back`() {
+        val rated = device.copy(quality = 6, note = "slept well")
+        val form = SleepRatingForm.open(oct5, listOf(rated), berlin)
+        assertEquals(
+            SleepRatingForm(oct5, LocalTime(23, 40), LocalTime(7, 10), quality = 6, note = "slept well", fromHealthConnect = true),
+            form,
+        )
+        // Saved untouched, the device's times stay.
+        val rating = form.copy(fatigue = 3).toRating(berlin)
+        assertEquals(3, rating.fatigue)
+        assertNull(rating.timesFor(rated))
+
+        val next = SleepRatingForm.open(LocalDate(2026, 10, 6), listOf(rated), berlin)
+        assertNull(next.quality)
+        assertFalse(next.fromHealthConnect)
+        assertEquals(LocalTime(23, 40), next.bedtime)
     }
 }

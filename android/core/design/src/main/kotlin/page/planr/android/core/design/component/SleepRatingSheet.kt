@@ -97,6 +97,7 @@ data class SleepRatingDraft(
  *
  * @param nightLabel the wake date as text ("Tue, 6 Oct").
  * @param fromHealthConnect the times came from the member's tracker.
+ * @param error a failed save, shown above the button (the sheet stays open to retry).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,6 +109,7 @@ fun SleepRatingSheet(
     onChange: (SleepRatingDraft) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
+    error: String? = null,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -189,6 +191,14 @@ fun SleepRatingSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            if (error != null) {
+                Text(
+                    error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
             Button(
                 onClick = onSave,
                 enabled = !saving,

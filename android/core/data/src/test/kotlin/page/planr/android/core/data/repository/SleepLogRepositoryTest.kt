@@ -177,10 +177,22 @@ class SleepLogRepositoryTest {
     }
 
     @Test
+    fun `untouched default times never replace a night synced meanwhile`() = runTest {
+        // The sheet opened before the sync landed, prefilled with 23:00 / 07:00.
+        seedDeviceNight()
+        val defaults = SleepTimes(Instant.parse("2026-10-04T21:00:00Z"), Instant.parse("2026-10-05T05:00:00Z"))
+
+        repository().save(SleepRating(oct5, quality = 5, fatigue = null, note = null, times = defaults, timesEdited = false))
+
+        assertEquals(ratingKeys, upsert().rows.single().keys)
+        assertEquals(JsonPrimitive("health_connect"), fake.rows(SupabaseTables.SLEEP_LOGS).single()["times_source"])
+    }
+
+    @Test
     fun `a manual check-in on a night with no row sends its times`() = runTest {
         val times = SleepTimes(Instant.parse("2026-10-04T21:00:00Z"), Instant.parse("2026-10-05T05:00:00Z"))
 
-        val saved = repository().save(SleepRating(oct5, quality = 3, fatigue = 6, note = "late dinner", times = times))
+        val saved = repository().save(SleepRating(oct5, quality = 3, fatigue = 6, note = "late dinner", times = times, timesEdited = false))
 
         val row = upsert().rows.single()
         assertEquals(JsonPrimitive("2026-10-04T21:00:00.000Z"), row["bedtime_at"])
