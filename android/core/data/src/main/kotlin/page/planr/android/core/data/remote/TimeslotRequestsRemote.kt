@@ -62,13 +62,18 @@ class TimeslotRequestsRemote @Inject constructor(
     ).decodeAll(TimeslotRequestRow.serializer()).map { it.toModel() }
 
     /**
-     * Marks [id] [status] (approved or declined) and stamps `resolved_at`.
-     * Like the web, a request that matched nothing (resolved elsewhere) is
-     * not an error: it is no longer pending either way.
+     * Marks [id] [status] (approved or declined) and stamps `resolved_at`,
+     * only while it is still pending: a request already resolved elsewhere
+     * (on the web, or auto-declined) keeps its outcome. Like the web, one
+     * that matched nothing is not an error: it is no longer pending either way.
      */
     suspend fun resolve(id: String, status: TimeslotRequestStatus, resolvedAt: Instant) {
         require(status != TimeslotRequestStatus.Pending) { "A request resolves to approved or declined" }
-        gateway.update(SupabaseTables.TIMESLOT_REQUESTS, resolvePayload(status, resolvedAt), listOf(eq("id", id)))
+        gateway.update(
+            SupabaseTables.TIMESLOT_REQUESTS,
+            resolvePayload(status, resolvedAt),
+            listOf(eq("id", id), eq("status", TimeslotRequestStatus.Pending.wire)),
+        )
     }
 
     internal companion object {

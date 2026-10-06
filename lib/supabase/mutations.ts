@@ -98,13 +98,19 @@ function guardUpdatedAt<Q extends { gte: (c: string, v: string) => Q; lt: (c: st
   return q.gte("updated_at", toIso(expectedUpdatedAt)).lt("updated_at", toIso(expectedUpdatedAt + 1));
 }
 
+/**
+ * Insert an event and return the stored row. Pass `id` to choose the new
+ * row's id up front, so an insert whose answer is lost can still be undone.
+ */
 export async function createEvent(
   sb: SupabaseClient,
   input: EventInput,
+  id?: string,
 ): Promise<EventRow> {
+  const row = eventInputToRow(input);
   const { data, error } = await sb
     .from("events")
-    .insert(eventInputToRow(input))
+    .insert(id === undefined ? row : { ...row, id })
     .select()
     .single();
   if (error) throw error;
@@ -499,8 +505,11 @@ export async function updateAll(
  * All or nothing, in this order: a failed insert leaves the original
  * untouched, and a failed cap deletes the new series again before the error
  * is rethrown. (Capping first would lose every future occurrence, for both
- * members, whenever the insert failed.) A cap that finds no row (the series
- * was deleted meanwhile) fails with StaleWriteError.
+ * members, whenever the insert failed.) The new series' id is chosen here,
+ * so an insert that fails after it committed (its answer lost to the
+ * network) is deleted again too: otherwise the uncapped original and the
+ * open-ended copy would show every future occurrence twice. A cap that
+ * finds no row (the series was deleted meanwhile) fails with StaleWriteError.
  */
 export async function splitSeries(
   sb: SupabaseClient,
@@ -534,7 +543,14 @@ export async function splitSeries(
     taskId: newSeries.taskId,
     attributes: newAttributes !== undefined ? newAttributes : newSeries.attributes,
   };
-  const created = await createEvent(sb, input);
+  const newId = crypto.randomUUID();
+  let created: EventRow;
+  try {
+    created = await createEvent(sb, input, newId);
+  } catch (e) {
+    await deleteEvent(sb, newId).catch(() => {});
+    throw e;
+  }
   try {
     await updateEvent(sb, original.id, {
       rrule: original.rrule,

@@ -34,7 +34,16 @@ class TokenStoreTest {
     private fun newKey() = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
 
     private var key = newKey()
-    private val cipher = AesGcmTokenCipher { key }
+
+    /** Retiring the key: the Keystore deletes it, and the next use creates a new one. */
+    private var retirements = 0
+    private val cipher = AesGcmTokenCipher(
+        key = { key },
+        retire = {
+            retirements++
+            key = newKey()
+        },
+    )
 
     private val session = StoredSession(
         accessToken = "access-SECRET",
@@ -117,6 +126,50 @@ class TokenStoreTest {
         store.writeSession(session)
         store.writePending(null)
         assertNull(store.readSession())
+    }
+
+    @Test
+    fun `forgetting removes the session and keeps the key`() = runTest {
+        val store = store()
+        store.writeSession(session)
+
+        store.forgetSession()
+
+        assertNull(store.readSession())
+        assertEquals(0, retirements)
+    }
+
+    @Test
+    fun `a session the disk won't let go of is made unreadable instead`() = runTest {
+        val disk = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
+            produceFile = { File(dir, "session.preferences_pb") },
+        )
+        DataStoreSessionStore(disk, cipher).writeSession(session)
+        // The disk filled up since: reads still work, writes fail.
+        val full = object : DataStore<Preferences> by disk {
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                throw IOException("disk full")
+        }
+        val store = DataStoreSessionStore(full, cipher)
+
+        store.forgetSession()
+
+        assertEquals(1, retirements)
+        // The next launch reads no session: it doesn't sign the account back in.
+        assertNull(store.readSession())
+    }
+
+    @Test
+    fun `forgetting throws when neither the disk nor the key gives way`() = runTest {
+        val store = DataStoreSessionStore(
+            BrokenDataStore(),
+            object : TokenCipher by cipher {
+                override fun retireKey() = throw KeyStoreException("locked")
+            },
+        )
+
+        assertFailsWith<KeyStoreException> { store.forgetSession() }
     }
 
     @Test

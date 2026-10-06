@@ -30,6 +30,12 @@ class SessionManagerTest {
         var pending: PendingAuthorization? = null
         /** A broken disk or Keystore: every read / write throws. */
         var broken = false
+        /** The disk refuses to remove the session, but its key can be retired (see DataStoreSessionStore). */
+        var forgetsByRetiringKey = false
+        var retiredKey = false
+        override suspend fun forgetSession() {
+            if (forgetsByRetiringKey) retiredKey = true else writeSession(null)
+        }
         override suspend fun readSession(): StoredSession? {
             if (broken) throw IOException("unreadable")
             return session
@@ -164,6 +170,26 @@ class SessionManagerTest {
             SignInError.Denied,
             manager.completeSignIn("$callback?error=access_denied&state=${stateOf(url)}"),
         )
+    }
+
+    @Test
+    fun `a sign-in wipes what a session lost without a sign-out left cached`() = runTest {
+        // The previous member's session file was unreadable: no sign-out ran.
+        store.session = signedInSession(3600)
+        store.broken = true
+        val manager = manager()
+        assertEquals(AuthState.SignedOut(), manager.authState.value)
+        assertEquals(0, cleared)
+        store.broken = false
+
+        member = MemberRef("m2", "ws1") // the partner signs in on this device
+        val url = manager.beginSignIn()
+        assertNull(manager.completeSignIn("$callback?code=x&state=${stateOf(url)}"))
+
+        assertEquals(1, cleared)
+        // Wiped before the new member is signed in (widgets re-render signed out).
+        assertEquals(AuthState.SignedOut(), stateWhenCleared)
+        assertEquals(AuthState.SignedIn(SessionInfo("user-1", "m2", "ws1")), manager.authState.value)
     }
 
     @Test
@@ -314,6 +340,31 @@ class SessionManagerTest {
         assertNull(manager.accessToken())
         assertEquals(1, cleared)
         assertEquals(listOf(token), tokens.revoked)
+    }
+
+    @Test
+    fun `sign-out makes sure the stored session can't sign the account back in`() = runTest {
+        store.session = signedInSession(3600)
+        store.forgetsByRetiringKey = true
+        val manager = manager()
+
+        manager.signOut()
+
+        assertEquals(true, store.retiredKey)
+        assertEquals(AuthState.SignedOut(SignOutReason.UserRequested), manager.authState.value)
+    }
+
+    @Test
+    fun `a sign-out whose store can't forget still signs out and wipes the cache`() = runTest {
+        store.session = signedInSession(3600)
+        val manager = manager()
+        store.broken = true
+
+        manager.signOut()
+
+        assertEquals(AuthState.SignedOut(SignOutReason.UserRequested), manager.authState.value)
+        assertNull(manager.accessToken())
+        assertEquals(1, cleared)
     }
 
     private companion object {

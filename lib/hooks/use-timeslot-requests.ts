@@ -32,7 +32,9 @@ export function useTimeslotRequests(workspaceId: string | undefined): {
       const { error } = await createClient()
         .from("timeslot_requests")
         .update({ status, resolved_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", id)
+        // Only while pending: one resolved elsewhere keeps its outcome.
+        .eq("status", "pending");
       if (error) {
         if (prev) qc.setQueryData(key, prev);
         toast.error(error.message || "Couldn't update the request.");

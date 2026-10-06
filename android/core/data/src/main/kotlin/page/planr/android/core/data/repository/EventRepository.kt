@@ -78,20 +78,27 @@ class EventRepository @Inject constructor(
      * Refetches [taskId]'s blocks and replaces what Room holds for the task,
      * so blocks deleted or unlinked elsewhere disappear too (the same exact
      * replace as [refreshWindow], over `task_id` instead of a window).
+     * Redraws the widgets when that changed the cache.
      */
     suspend fun refreshTaskBlocks(taskId: String) {
         val ws = session.requireSession().workspaceId
+        var changed = false
         gate.refresh(CacheArea.Events, fetch = { queries.fetchTaskBlocks(ws, taskId) }) { blocks ->
-            db.withTransaction {
+            changed = db.withTransaction {
+                val fetched = blocks.map { it.toEntity() }
+                val cached = dao.eventsOfTask(ws, taskId)
+                if (sameRows(cached, fetched)) return@withTransaction false
                 val kept = blocks.map { it.id }.toSet()
-                val stale = dao.idsOfTask(ws, taskId).filter { it !in kept }
+                val stale = cached.map { it.id }.filter { it !in kept }
                 stale.chunked(SQL_CHUNK).forEach { chunk ->
                     dao.deleteOverridesOf(chunk)
                     dao.deleteEvents(chunk)
                 }
-                dao.upsertEvents(blocks.map { it.toEntity() })
+                dao.upsertEvents(fetched)
+                true
             }
         }
+        if (changed) widgets.requestRefresh()
     }
 
     /**
@@ -112,7 +119,8 @@ class EventRepository @Inject constructor(
      *
      * Returns whether the cache changed: a snapshot identical to what Room
      * holds for the window is not written at all (false), nor is a skipped
-     * or dropped one.
+     * or dropped one. A change redraws the widgets, whoever asked for the
+     * refresh: the widgets only read Room when asked to.
      */
     suspend fun refreshWindow(window: TimeWindow, force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
@@ -136,6 +144,7 @@ class EventRepository @Inject constructor(
                     true
                 }
             }
+            if (changed) widgets.requestRefresh()
             changed
         }
     }

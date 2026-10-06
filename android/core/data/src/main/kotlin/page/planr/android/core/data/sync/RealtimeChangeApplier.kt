@@ -127,7 +127,11 @@ class RealtimeChangeApplier @Inject constructor(
          * True when an incoming row is older than the cached one: an
          * out-of-order echo that would revert a newer change. The same
          * `updated_at` applies (a repeat is harmless), and so does a row
-         * when either time is unknown.
+         * when either time is unknown. Sound because the server's
+         * `set_updated_at()` makes a row's `updated_at` grow in commit order
+         * (migration `20261008000000_monotonic_updated_at`): a plain `now()`
+         * is the transaction's start, so of two saves racing on one row the
+         * one committed last could carry the older time and be skipped here.
          */
         internal fun isOutdated(incoming: Instant?, cached: Instant?): Boolean =
             incoming != null && cached != null && incoming < cached
