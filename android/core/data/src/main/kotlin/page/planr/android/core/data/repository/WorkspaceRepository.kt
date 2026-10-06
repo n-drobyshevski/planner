@@ -65,7 +65,7 @@ class WorkspaceRepository @Inject constructor(
      * Refetches the bundle (`fetchWorkspaceBundle`) and replaces the cached
      * copy. Joins a refresh already running and skips one done moments ago
      * unless [force]d ([RefreshCoalescer]). Returns whether the cache changed
-     * (an identical snapshot is not written).
+     * (an identical snapshot is not written); a change redraws the widgets.
      */
     suspend fun refresh(force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
@@ -79,6 +79,7 @@ class WorkspaceRepository @Inject constructor(
                     boards = bundle.boards.map { it.toEntity() },
                 )
             }
+            if (changed) widgets.requestRefresh()
             changed
         }
     }

@@ -59,7 +59,7 @@ class TaskRepository @Inject constructor(
      * Refetches all tasks (`fetchTasks`) and replaces the cached set. Joins a
      * refresh already running and skips one done moments ago unless [force]d
      * ([RefreshCoalescer]). Returns whether the cache changed (an identical
-     * snapshot is not written).
+     * snapshot is not written); a change redraws the widgets.
      */
     suspend fun refresh(force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
@@ -68,6 +68,7 @@ class TaskRepository @Inject constructor(
             gate.refresh(CacheArea.Tasks, fetch = { queries.fetchTasks(ws) }) { rows ->
                 changed = dao.replaceIfChanged(ws, rows.map { it.toEntity() })
             }
+            if (changed) widgets.requestRefresh()
             changed
         }
     }
