@@ -67,6 +67,11 @@ android {
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
+            // Drops resources R8 left unreferenced. Everything Planr loads is
+            // referenced statically (R.drawable in code, the manifest's icons,
+            // shortcuts.xml, the widgets' info XML and preview layouts), so
+            // nothing needs a res/raw/keep.xml.
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
