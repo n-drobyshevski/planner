@@ -16,8 +16,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +43,8 @@ import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
+import page.planr.android.feature.tasks.detail.BlockNotice
+import page.planr.android.feature.tasks.detail.BlockSheet
 import page.planr.android.feature.tasks.detail.DeletePlan
 import page.planr.android.feature.tasks.detail.TaskDetailNotice
 import page.planr.android.feature.tasks.detail.TaskDetailUiState
@@ -56,9 +60,13 @@ import page.planr.android.feature.tasks.ui.DeletedTaskEffect
  * Leaving with unsaved changes (Back or the top bar) asks to discard them
  * first; while a save or delete is in flight Back waits for it (no prompt,
  * and no pop that would cancel the write). Delete is immediate with Undo when nothing goes with the task, and
- * asks first when its subtasks or calendar blocks would.
+ * asks first when its subtasks or calendar blocks would. The task's calendar
+ * blocks are listed too; the owner adds one from a sheet and removes one,
+ * each with Undo. A block write is its own: it leaves the form clean, and
+ * Back, Save and Delete wait for it like they wait for a save.
  *
  * @param onOpenTask opens another task's detail (a subtask, or the parent).
+ * @param onOpenEvent opens a calendar block's event detail.
  */
 @Composable
 fun TaskDetailScreen(
@@ -66,6 +74,7 @@ fun TaskDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenTask: (taskId: String) -> Unit = {},
+    onOpenEvent: (eventId: String) -> Unit = {},
     viewModel: TaskDetailViewModel = hiltViewModel<TaskDetailViewModel, TaskDetailViewModel.Factory>(
         key = taskId,
         creationCallback = { factory -> factory.create(taskId) },
@@ -77,7 +86,7 @@ fun TaskDetailScreen(
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val leave: () -> Unit = {
         when {
-            state.saving || state.deleting -> Unit
+            state.saving || state.deleting || state.blockWriting -> Unit
             state.dirty -> confirmingDiscard = true
             else -> onBack()
         }
@@ -87,9 +96,11 @@ fun TaskDetailScreen(
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
     DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
+    BlockNoticeEffect(state.blockNotice, snackbar, viewModel)
     // Held while saving or deleting too: either closes the screen itself once
-    // it lands, and a pop meanwhile would cancel the write half-way.
-    BackHandler(enabled = state.dirty || state.saving || state.deleting, onBack = leave)
+    // it lands, and a pop meanwhile would cancel the write half-way. Likewise
+    // while a calendar block is written.
+    BackHandler(enabled = state.dirty || state.saving || state.deleting || state.blockWriting, onBack = leave)
 
     Scaffold(
         modifier = modifier,
@@ -118,6 +129,7 @@ fun TaskDetailScreen(
                     form = form,
                     viewModel = viewModel,
                     onOpenTask = onOpenTask,
+                    onOpenEvent = onOpenEvent,
                 )
             }
         }
@@ -130,6 +142,17 @@ fun TaskDetailScreen(
                 onBack()
             },
             onKeepEditing = { confirmingDiscard = false },
+        )
+    }
+    state.blockSheet?.let { sheet ->
+        BlockSheet(
+            taskTitle = state.task?.title.orEmpty(),
+            sheet = sheet,
+            onDateChange = viewModel::setBlockDate,
+            onStartChange = viewModel::setBlockStart,
+            onMinutesChange = viewModel::setBlockMinutes,
+            onAdd = viewModel::createBlock,
+            onDismiss = viewModel::dismissBlockSheet,
         )
     }
     state.confirmDelete?.let { plan ->
@@ -181,7 +204,7 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
             .padding(horizontal = PlanrSpacing.xs, vertical = PlanrSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack, enabled = !state.saving && !state.deleting) {
+        IconButton(onClick = onBack, enabled = !state.saving && !state.deleting && !state.blockWriting) {
             Icon(painterResource(R.drawable.ic_task_back), contentDescription = stringResource(R.string.task_detail_back))
         }
         Text(
@@ -192,16 +215,48 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
                 .semantics { heading() },
         )
         if (state.canEdit) {
-            IconButton(onClick = onDelete, enabled = !state.saving && !state.deleting && !state.addingSubtask) {
+            IconButton(
+                onClick = onDelete,
+                enabled = !state.saving && !state.deleting && !state.addingSubtask && !state.blockWriting,
+            ) {
                 Icon(
                     painterResource(R.drawable.ic_task_delete),
                     contentDescription = stringResource(R.string.task_delete),
                     modifier = Modifier.size(20.dp),
                 )
             }
-            TextButton(onClick = onSave, enabled = state.dirty && !state.saving) {
+            TextButton(onClick = onSave, enabled = state.dirty && !state.saving && !state.blockWriting) {
                 Text(stringResource(if (state.saving) R.string.task_detail_saving else R.string.task_detail_save))
             }
+        }
+    }
+}
+
+/** "Added to calendar · Undo" / "Removed from calendar · Undo" after a block write. */
+@Composable
+private fun BlockNoticeEffect(notice: BlockNotice?, snackbar: SnackbarHostState, viewModel: TaskDetailViewModel) {
+    val added = stringResource(R.string.task_block_added)
+    val removed = stringResource(R.string.task_block_removed)
+    val undo = stringResource(R.string.task_undo)
+    val haptics = rememberPlanrHaptics()
+    LaunchedEffect(notice) {
+        if (notice == null) return@LaunchedEffect
+        try {
+            val result = snackbar.showSnackbar(
+                message = when (notice) {
+                    is BlockNotice.Added -> added
+                    is BlockNotice.Removed -> removed
+                },
+                actionLabel = undo,
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                haptics.tick()
+                viewModel.undoBlock(notice)
+            }
+        } finally {
+            // Consumed even when cancelled: coming back must not replay an old Undo.
+            viewModel.dismissBlockNotice(notice)
         }
     }
 }

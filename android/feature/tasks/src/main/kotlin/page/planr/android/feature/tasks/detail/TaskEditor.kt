@@ -71,8 +71,10 @@ import page.planr.android.feature.tasks.ui.toPickerMillis
 
 /**
  * The task fields (with the optional optimization details), editable for the
- * owner and disabled (read-only) for the partner, then the subtasks. [onOpenTask] opens another task's detail (a
- * subtask, or the parent from the "Subtask of" line).
+ * owner and disabled (read-only) for the partner, then the subtasks and the
+ * task's calendar blocks. [onOpenTask] opens another task's detail (a
+ * subtask, or the parent from the "Subtask of" line); [onOpenEvent] opens a
+ * block's event.
  */
 @Composable
 internal fun TaskEditor(
@@ -80,6 +82,7 @@ internal fun TaskEditor(
     form: TaskForm,
     viewModel: TaskDetailViewModel,
     onOpenTask: (taskId: String) -> Unit,
+    onOpenEvent: (eventId: String) -> Unit,
 ) {
     val enabled = state.canEdit && !state.saving
 
@@ -172,6 +175,15 @@ internal fun TaskEditor(
     )
 
     if (state.subtasks.isNotEmpty() || state.canEdit) SubtaskList(state, viewModel, onOpenTask)
+
+    if (state.blocks.isNotEmpty() || state.canSchedule) {
+        TaskBlocksSection(
+            state = state,
+            onOpenEvent = onOpenEvent,
+            onRemove = viewModel::removeBlock,
+            onAdd = viewModel::openBlockSheet,
+        )
+    }
 }
 
 /** The known attributes, as the shared details editor shows them. */

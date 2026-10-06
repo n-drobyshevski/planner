@@ -181,6 +181,7 @@ fun PlanrNavHost(
                         else -> navController.popBackStack()
                     }
                 },
+                onOpenEvent = { id -> navController.navigate(PlanrRoutes.event(id)) },
             )
             insightsScreen(
                 onOpenDay = { date ->
