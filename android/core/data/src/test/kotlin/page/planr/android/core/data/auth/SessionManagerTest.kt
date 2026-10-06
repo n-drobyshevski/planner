@@ -30,6 +30,12 @@ class SessionManagerTest {
         var pending: PendingAuthorization? = null
         /** A broken disk or Keystore: every read / write throws. */
         var broken = false
+        /** The disk refuses to remove the session, but its key can be retired (see DataStoreSessionStore). */
+        var forgetsByRetiringKey = false
+        var retiredKey = false
+        override suspend fun forgetSession() {
+            if (forgetsByRetiringKey) retiredKey = true else writeSession(null)
+        }
         override suspend fun readSession(): StoredSession? {
             if (broken) throw IOException("unreadable")
             return session
@@ -334,6 +340,31 @@ class SessionManagerTest {
         assertNull(manager.accessToken())
         assertEquals(1, cleared)
         assertEquals(listOf(token), tokens.revoked)
+    }
+
+    @Test
+    fun `sign-out makes sure the stored session can't sign the account back in`() = runTest {
+        store.session = signedInSession(3600)
+        store.forgetsByRetiringKey = true
+        val manager = manager()
+
+        manager.signOut()
+
+        assertEquals(true, store.retiredKey)
+        assertEquals(AuthState.SignedOut(SignOutReason.UserRequested), manager.authState.value)
+    }
+
+    @Test
+    fun `a sign-out whose store can't forget still signs out and wipes the cache`() = runTest {
+        store.session = signedInSession(3600)
+        val manager = manager()
+        store.broken = true
+
+        manager.signOut()
+
+        assertEquals(AuthState.SignedOut(SignOutReason.UserRequested), manager.authState.value)
+        assertNull(manager.accessToken())
+        assertEquals(1, cleared)
     }
 
     private companion object {

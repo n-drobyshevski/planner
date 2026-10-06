@@ -58,7 +58,7 @@ abstract class AuthModule {
     companion object {
         @Provides
         @Singleton
-        fun provideTokenCipher(): TokenCipher = AesGcmTokenCipher(KeystoreSessionKey::getOrCreate)
+        fun provideTokenCipher(): TokenCipher = AesGcmTokenCipher(KeystoreSessionKey::getOrCreate, KeystoreSessionKey::delete)
 
         @Provides
         @Singleton
