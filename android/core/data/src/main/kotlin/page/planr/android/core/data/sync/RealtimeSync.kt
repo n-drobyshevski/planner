@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.BufferOverflow
@@ -31,12 +32,11 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
@@ -70,10 +70,9 @@ import page.planr.android.core.data.remote.SupabaseTables
  * on [rowGone].
  *
  * Every change is written to Room (the screens and widgets follow from
- * there). Each time the main channel (re)joins, the visible window, tasks
- * and reference data are refetched: changes may have been missed while it
- * was down or the app was in the background. So are they when the sync
- * channel rejoins on its own (see [syncRejoinsAlone]).
+ * there). Each time the channels (re)join, the visible window, tasks and
+ * reference data are refetched: changes may have been missed while either
+ * was down or the app was in the background (see [refetchOnJoin]).
  */
 @Singleton
 class RealtimeSync @Inject constructor(
@@ -90,12 +89,11 @@ class RealtimeSync @Inject constructor(
     private val _subscribed = MutableStateFlow(false)
 
     /**
-     * Whether the main channel is joined right now, so the cache is being
-     * kept live (the periodic sync has nothing to add then; see
-     * [SyncWorker]). The sync channel is left out on purpose: should it fail
-     * to join (a server without the broadcast migration), the main channel
-     * still keeps everything but deletes live, and the periodic sync must
-     * not stop because of it.
+     * Whether both channels are joined right now, so the cache is being kept
+     * live (the periodic sync has nothing to add then; see [SyncWorker]).
+     * Without the sync channel deletes would not arrive, so should it fail
+     * to join (a server without the broadcast migration, say), the periodic
+     * sync keeps running and catches them up.
      */
     val subscribed: StateFlow<Boolean> = _subscribed.asStateFlow()
 
@@ -152,28 +150,21 @@ class RealtimeSync @Inject constructor(
                         if (change is RowChange.Upsert) runCatching { appPrefs.applyRemote(change.record) }
                     }
                 }
+                val mainJoined = channel.status.map { it.isJoined() }
+                val syncJoined = sync.status.map { it.isJoined() }
                 launch {
-                    channel.status.collect { _subscribed.value = it == RealtimeChannel.Status.SUBSCRIBED }
+                    combine(mainJoined, syncJoined) { mainUp, syncUp -> mainUp && syncUp }
+                        .collect { _subscribed.value = it }
                 }
                 launch {
-                    // Changes committed before the channel was subscribed never arrive
-                    // over it, so a snapshot begun before then (a screen's own refresh
+                    // Changes committed before the channels were subscribed never arrive
+                    // over them, so a snapshot begun before then (a screen's own refresh
                     // on opening the app) can't stand in for this refetch. Screens
                     // refreshing after it join it instead.
-                    channel.status
-                        .filter { it == RealtimeChannel.Status.SUBSCRIBED }
-                        .collect {
-                            cacheGate.outdateSnapshots()
-                            refetchQuietly()
-                        }
-                }
-                launch {
-                    // Deletes sent while only the sync channel was down never arrive either.
-                    syncRejoinsAlone(channel.status.map { it.isJoined() }, sync.status.map { it.isJoined() })
-                        .collect {
-                            cacheGate.outdateSnapshots()
-                            refetchQuietly()
-                        }
+                    refetchOnJoin(mainJoined, syncJoined, SYNC_JOIN_GRACE).collect {
+                        cacheGate.outdateSnapshots()
+                        refetchQuietly()
+                    }
                 }
                 launch {
                     // A refreshed token must reach the open socket before the old one expires.
@@ -241,41 +232,52 @@ class RealtimeSync @Inject constructor(
 
         /** [rowGone] events kept for a slow collector (a burst: a task subtree or a whole collection). */
         const val ROW_GONE_BUFFER = 64
+
+        /** How long the main channel's join waits for the sync channel's before refetching anyway. */
+        val SYNC_JOIN_GRACE = 5.seconds
     }
 }
 
 /**
- * Emits each time the sync channel joins again while the main channel was
- * joined all along: the main channel's own (re)join refetches everything,
- * but deletes sent while only the sync channel was down would otherwise be
- * missed until the next one. The first join emits nothing (the main
- * channel's join covers it), and nor does a rejoin after the main channel
- * itself rejoined in the meantime.
+ * Emits when a refetch should run: once both channels are joined after the
+ * main one (re)joined, so a single refetch covers the gap of each (a delete
+ * sent before the sync channel joined never arrives over it, however soon
+ * after the main channel's join that was), and whenever the sync channel
+ * (re)joins on its own while the main one stays joined. Should the sync
+ * channel not join within [grace] of the main one, it emits anyway: the main
+ * channel's changes must not wait on it.
  */
-internal fun syncRejoinsAlone(mainJoined: Flow<Boolean>, syncJoined: Flow<Boolean>): Flow<Unit> = flow {
-    var mainUp = false
-    var mainJoins = 0
-    var syncUp = false
-    // mainJoins when the sync channel dropped; null while it is up or before its first join.
-    var droppedAt: Int? = null
-    merge(
-        mainJoined.distinctUntilChanged().map { true to it },
-        syncJoined.distinctUntilChanged().map { false to it },
-    ).collect { (isMain, up) ->
-        if (isMain) {
-            mainUp = up
-            if (up) mainJoins++
-        } else {
-            if (up && mainUp && droppedAt == mainJoins) emit(Unit)
-            if (up) {
-                droppedAt = null
-            } else if (syncUp) {
-                droppedAt = mainJoins
+internal fun refetchOnJoin(mainJoined: Flow<Boolean>, syncJoined: Flow<Boolean>, grace: Duration): Flow<Unit> =
+    channelFlow {
+        var mainUp = false
+        var syncUp = false
+        var waiting: Job? = null
+        merge(
+            mainJoined.distinctUntilChanged().map { true to it },
+            syncJoined.distinctUntilChanged().map { false to it },
+        ).collect { (isMain, up) ->
+            if (isMain) {
+                mainUp = up
+                waiting?.cancel()
+                waiting = null
+                if (up && syncUp) {
+                    send(Unit)
+                } else if (up) {
+                    waiting = launch {
+                        delay(grace)
+                        send(Unit)
+                    }
+                }
+            } else {
+                syncUp = up
+                if (up && mainUp) {
+                    waiting?.cancel()
+                    waiting = null
+                    send(Unit)
+                }
             }
-            syncUp = up
         }
     }
-}
 
 /**
  * The workspace whose channel should be open, or null for none: the
