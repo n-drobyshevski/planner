@@ -8,6 +8,7 @@
     <string name="insights_tab_trends">Trends</string>
     <string name="insights_tab_patterns">Patterns</string>
     <string name="insights_tab_tasks">Tasks</string>
+    <string name="insights_tab_sleep">Sleep</string>
 
     <string name="insights_period_label">Period</string>
     <string name="insights_period_this_week">This week</string>

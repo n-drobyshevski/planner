@@ -11,6 +11,12 @@ internal object ViewKeys {
     val AGENDA_MODE = stringPreferencesKey("agenda_mode")
 
     /**
+     * The wake date (yyyy-MM-dd) the morning sleep check-in was dismissed on,
+     * per member. Device-only: [AppPrefsSync] never uploads it.
+     */
+    fun sleepCheckinDismissed(memberId: String) = stringPreferencesKey("sleep_checkin_dismissed:$memberId")
+
+    /**
      * Bumped on every local settings change, removed once an upload of that
      * change (or a later one) succeeded: while it's set, the account copy is
      * behind and must not overwrite the device.

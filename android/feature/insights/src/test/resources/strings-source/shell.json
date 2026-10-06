@@ -37,6 +37,13 @@
       }
     },
     {
+      "web": "insights:tabs.sleep",
+      "sha": "9c5afca1c3126d7f",
+      "android": {
+        "insights_tab_sleep": 0
+      }
+    },
+    {
       "web": "insights:period.label",
       "sha": "92e355504ea295a1",
       "android": {

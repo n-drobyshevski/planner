@@ -490,6 +490,7 @@ class InsightsViewModel @Inject constructor(
         InsightsTab.Trends -> TabContent.Trends(models.trends(inputs))
         InsightsTab.Patterns -> TabContent.Patterns(models.patterns(inputs))
         InsightsTab.Tasks -> TabContent.Tasks(models.tasks(inputs))
+        InsightsTab.Sleep -> TabContent.Sleep
     }
 
     /**

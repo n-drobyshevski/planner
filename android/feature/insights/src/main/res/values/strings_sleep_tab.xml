@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Insights Sleep tab (SleepTab.kt). Stage copy from messages/en/sleep.json
+     (stages.*); not part of the strings-source manifests, which cover the
+     strings_insights_* files only. -->
+<resources>
+    <string name="sleep_tab_lede">Your last 14 nights. Only you can see them.</string>
+    <string name="sleep_tab_empty">No nights yet. Connect Health Connect from the account menu, or answer the morning check-in on the calendar.</string>
+    <!-- Bedtime to wake: "23:40–07:10". -->
+    <string name="sleep_tab_times">%1$s–%2$s</string>
+    <string name="sleep_tab_in_bed">%1$s in bed</string>
+    <string name="sleep_tab_asleep">%1$s asleep</string>
+    <string name="sleep_tab_not_rated">Not rated</string>
+    <string name="sleep_tab_rate">Rate or edit this night</string>
+    <string name="sleep_tab_stage_deep">Deep</string>
+    <string name="sleep_tab_stage_light">Light</string>
+    <string name="sleep_tab_stage_rem">REM</string>
+    <string name="sleep_tab_stage_awake">Awake</string>
+    <string name="sleep_tab_sr_deep">deep %1$s</string>
+    <string name="sleep_tab_sr_light">light %1$s</string>
+    <string name="sleep_tab_sr_rem">REM %1$s</string>
+    <string name="sleep_tab_sr_awake">awake %1$s</string>
+    <!-- A night's spoken summary: "Tue, 6 Oct: 23:40–07:10, 7h 29m in bed, …". -->
+    <string name="sleep_tab_sr_night">%1$s: %2$s.</string>
+</resources>

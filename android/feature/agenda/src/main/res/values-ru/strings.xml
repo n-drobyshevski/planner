@@ -224,4 +224,9 @@
         <item quantity="other">Импортировано %d события</item>
     </plurals>
     <string name="agenda_import_failed">Не получилось импортировать. Ничего не добавлено.</string>
+
+    <string name="agenda_sleep_checkin_title">Как спалось?</string>
+    <string name="agenda_sleep_checkin_times">%1$s–%2$s</string>
+    <string name="agenda_sleep_checkin_open">Оценить прошлую ночь</string>
+    <string name="agenda_sleep_checkin_dismiss">Скрыть утреннюю отметку на сегодня</string>
 </resources>

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -68,6 +69,8 @@ import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.feature.agenda.model.AgendaMode
 import page.planr.android.feature.agenda.model.AgendaNotice
 import page.planr.android.feature.agenda.model.UiText
+import page.planr.android.feature.agenda.sleep.SleepCheckin
+import page.planr.android.feature.agenda.sleep.SleepCheckinViewModel
 import page.planr.android.feature.agenda.ui.AgendaFormats
 import page.planr.android.feature.agenda.ui.AgendaIcons
 import page.planr.android.feature.agenda.ui.LocalAgendaMetrics
@@ -103,6 +106,7 @@ fun AgendaScreen(
     accountAction: (@Composable () -> Unit)? = null,
     todayRequests: Flow<Unit> = emptyFlow(),
     viewModel: AgendaViewModel = hiltViewModel(),
+    sleepCheckin: SleepCheckinViewModel = hiltViewModel(),
 ) {
     // Without a create route, host the editor here (seed in epoch ms; MIN = no seed).
     var inlineCreate by rememberSaveable { mutableIntStateOf(0) }
@@ -164,25 +168,49 @@ fun AgendaScreen(
                 )
             },
         ) { padding ->
-            PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::refresh,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            ) {
-                AgendaPager(
-                    state = state,
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                SleepCheckin(
+                    viewModel = sleepCheckin,
                     formats = formats,
-                    onSettled = viewModel::showPeriod,
-                    onOpenEvent = onOpenEvent,
-                    onOpenDay = viewModel::openDay,
-                    onCreateAt = if (state.canCreate) {
-                        { date, minute -> create(date.atTime(LocalTime(minute / 60, minute % 60)).toInstant(state.zone)) }
-                    } else {
-                        null
-                    },
+                    modifier = Modifier.padding(start = PlanrSpacing.lg, end = PlanrSpacing.lg, bottom = PlanrSpacing.sm),
                 )
+                AgendaContent(state, formats, viewModel, sleepCheckin, onOpenEvent, create)
             }
         }
+    }
+}
+
+/** The pager under pull-to-refresh, which also rereads the sleep check-in's nights. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ColumnScope.AgendaContent(
+    state: AgendaUiState,
+    formats: AgendaFormats,
+    viewModel: AgendaViewModel,
+    sleepCheckin: SleepCheckinViewModel,
+    onOpenEvent: (eventId: String) -> Unit,
+    create: (Instant?) -> Unit,
+) {
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = {
+            viewModel.refresh()
+            sleepCheckin.refresh()
+        },
+        modifier = Modifier.fillMaxWidth().weight(1f),
+    ) {
+        AgendaPager(
+            state = state,
+            formats = formats,
+            onSettled = viewModel::showPeriod,
+            onOpenEvent = onOpenEvent,
+            onOpenDay = viewModel::openDay,
+            onCreateAt = if (state.canCreate) {
+                { date, minute -> create(date.atTime(LocalTime(minute / 60, minute % 60)).toInstant(state.zone)) }
+            } else {
+                null
+            },
+        )
     }
 }
 

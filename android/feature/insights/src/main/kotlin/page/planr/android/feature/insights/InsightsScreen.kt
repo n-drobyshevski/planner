@@ -60,6 +60,8 @@ import page.planr.android.feature.insights.shell.LoadError
 import page.planr.android.feature.insights.shell.PeriodBar
 import page.planr.android.feature.insights.shell.RefreshFailedBanner
 import page.planr.android.feature.insights.shell.periodLabel
+import page.planr.android.feature.insights.sleep.SleepNightsViewModel
+import page.planr.android.feature.insights.sleep.SleepTab
 import page.planr.android.feature.insights.tasks.TasksTab
 import page.planr.android.feature.insights.trends.TrendsTab
 import page.planr.android.feature.insights.ui.components.DayDetailSheet
@@ -83,8 +85,11 @@ fun InsightsScreen(
     accountAction: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
     viewModel: InsightsViewModel = hiltViewModel(),
+    sleepViewModel: SleepNightsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val sleepState by sleepViewModel.state.collectAsStateWithLifecycle()
+    val onSleepTab = state.tab == InsightsTab.Sleep
 
     // The owner is the back-stack entry, so coming back to the tab counts as a resume.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
@@ -111,18 +116,20 @@ fun InsightsScreen(
         ) {
             InsightsHeader(
                 activeFilters = state.filters.activeCount,
-                onFilters = { filtersOpen = true },
+                // The filters narrow categories; the Sleep tab has none to narrow.
+                onFilters = if (onSleepTab) null else ({ filtersOpen = true }),
                 accountAction = accountAction,
             )
             InsightsTabRow(selected = state.tab, onSelect = viewModel::selectTab)
             PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::refresh,
+                isRefreshing = if (onSleepTab) sleepState.isRefreshing else state.isRefreshing,
+                onRefresh = if (onSleepTab) sleepViewModel::refresh else viewModel::refresh,
                 modifier = Modifier.fillMaxSize(),
             ) {
                 InsightsContent(
                     state = state,
                     viewModel = viewModel,
+                    sleepViewModel = sleepViewModel,
                     onOpenAgenda = onOpenAgenda,
                     onOpenTasks = onOpenTasks,
                     onEditCustom = { rangeOpen = true },
@@ -172,7 +179,7 @@ fun InsightsScreen(
 
 /** Title, the filters trigger (a neutral count badge when any filter is on) and the account menu. */
 @Composable
-private fun InsightsHeader(activeFilters: Int, onFilters: () -> Unit, accountAction: (@Composable () -> Unit)?) {
+private fun InsightsHeader(activeFilters: Int, onFilters: (() -> Unit)?, accountAction: (@Composable () -> Unit)?) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -187,30 +194,35 @@ private fun InsightsHeader(activeFilters: Int, onFilters: () -> Unit, accountAct
                 .padding(horizontal = PlanrSpacing.xl, vertical = PlanrSpacing.lg)
                 .semantics { heading() },
         )
-        val description = if (activeFilters > 0) {
-            pluralStringResource(R.plurals.insights_filters_trigger_count, activeFilters, activeFilters)
-        } else {
-            stringResource(R.string.insights_filters_trigger)
-        }
-        IconButton(onClick = onFilters) {
-            BadgedBox(
-                badge = {
-                    if (activeFilters > 0) {
-                        // Secondary, like the web's badge: Material's default error red would read as a warning.
-                        Badge(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.clearAndSetSemantics {},
-                        ) {
-                            Text(activeFilters.toString(), style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMS))
-                        }
-                    }
-                },
-            ) {
-                Icon(painterResource(R.drawable.ic_insights_filters), contentDescription = description)
-            }
-        }
+        if (onFilters != null) FiltersButton(activeFilters, onFilters)
         Box(Modifier.padding(end = PlanrSpacing.sm)) { accountAction?.invoke() }
+    }
+}
+
+@Composable
+private fun FiltersButton(activeFilters: Int, onFilters: () -> Unit) {
+    val description = if (activeFilters > 0) {
+        pluralStringResource(R.plurals.insights_filters_trigger_count, activeFilters, activeFilters)
+    } else {
+        stringResource(R.string.insights_filters_trigger)
+    }
+    IconButton(onClick = onFilters) {
+        BadgedBox(
+            badge = {
+                if (activeFilters > 0) {
+                    // Secondary, like the web's badge: Material's default error red would read as a warning.
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    ) {
+                        Text(activeFilters.toString(), style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMS))
+                    }
+                }
+            },
+        ) {
+            Icon(painterResource(R.drawable.ic_insights_filters), contentDescription = description)
+        }
     }
 }
 
@@ -222,6 +234,7 @@ private fun InsightsHeader(activeFilters: Int, onFilters: () -> Unit, accountAct
 private fun InsightsContent(
     state: InsightsUiState,
     viewModel: InsightsViewModel,
+    sleepViewModel: SleepNightsViewModel,
     onOpenAgenda: () -> Unit,
     onOpenTasks: () -> Unit,
     onEditCustom: () -> Unit,
@@ -267,7 +280,10 @@ private fun InsightsContent(
 
     val saveable = rememberSaveableStateHolder()
     saveable.SaveableStateProvider(state.tab.name) {
-        when (val content = state.content) {
+        // The viewer's own nights: no period, no filters, its own loading.
+        if (state.tab == InsightsTab.Sleep) {
+            SleepTab(sleepViewModel)
+        } else when (val content = state.content) {
             TabContent.Loading -> StatusList(header) { InsightsSkeleton() }
             is TabContent.Failed -> StatusList(header) { LoadError(onRetry = viewModel::retry) }
             is TabContent.Overview -> if (env != null) {
@@ -298,6 +314,7 @@ private fun InsightsContent(
             is TabContent.Tasks -> if (env != null) {
                 TasksTab(model = content.model, env = env, header = header, onOpenTasks = onOpenTasks)
             }
+            TabContent.Sleep -> Unit // drawn above, whatever the shell's state
         }
     }
 }
