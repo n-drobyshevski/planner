@@ -45,7 +45,7 @@ const respond =
   (call: Call): { data?: unknown; error?: unknown } => {
     if (kind(call) === "insert") {
       const row = call.ops[0][1][0] as Record<string, unknown>;
-      return { data: { ...row, id: "new-series" } };
+      return { data: row };
     }
     if (kind(call) === "update") {
       if (cap === "fail") return { error: new Error("cap failed") };
@@ -89,19 +89,34 @@ describe("splitSeries", () => {
     const created = await splitSeries(sb, series, from, { title: "Later standup" });
 
     expect(calls.map(kind)).toEqual(["insert", "update"]);
-    expect(created.id).toBe("new-series");
+    // The id is chosen client-side, so a lost answer can still be undone.
+    const inserted = calls[0].ops[0][1][0] as { id: string };
+    expect(inserted.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(created.id).toBe(inserted.id);
     expect(created.title).toBe("Later standup");
     const cap = calls[1];
     expect(eqId(cap)).toEqual(["id", "evt-1"]);
     expect(patchOf(cap).recurrence_ends_at).toBe(new Date(from - 1000).toISOString());
   });
 
-  it("leaves the original alone when the insert fails", async () => {
+  it("leaves the original alone and deletes the new id when the insert fails", async () => {
     const { sb, calls } = fakeClient((call) =>
       kind(call) === "insert" ? { error: new Error("offline") } : {},
     );
     await expect(splitSeries(sb, series, from, {})).rejects.toThrow("offline");
-    expect(calls.map(kind)).toEqual(["insert"]);
+    // The insert may have committed with only its answer lost: no update of
+    // the original, and the id it would have taken is deleted (best effort).
+    expect(calls.map(kind)).toEqual(["insert", "delete"]);
+    const inserted = calls[0].ops[0][1][0] as { id: string };
+    expect(eqId(calls[1])).toEqual(["id", inserted.id]);
+  });
+
+  it("still reports the failed insert when the cleanup fails too", async () => {
+    const { sb, calls } = fakeClient((call) =>
+      kind(call) === "insert" ? { error: new Error("timeout") } : { error: new Error("offline") },
+    );
+    await expect(splitSeries(sb, series, from, {})).rejects.toThrow("timeout");
+    expect(calls.map(kind)).toEqual(["insert", "delete"]);
   });
 
   it("restores the original rule and deletes the new series when the cap fails, then rethrows", async () => {
@@ -113,7 +128,7 @@ describe("splitSeries", () => {
     const restore = calls[2];
     expect(eqId(restore)).toEqual(["id", "evt-1"]);
     expect(patchOf(restore)).toEqual({ rrule: "FREQ=WEEKLY;BYDAY=MO", recurrence_ends_at: null });
-    expect(eqId(calls[3])).toEqual(["id", "new-series"]);
+    expect(eqId(calls[3])).toEqual(["id", (calls[0].ops[0][1][0] as { id: string }).id]);
   });
 
   it("fails as stale and drops the new series when the original is gone", async () => {
@@ -121,7 +136,7 @@ describe("splitSeries", () => {
     await expect(splitSeries(sb, series, from, {})).rejects.toBeInstanceOf(StaleWriteError);
 
     expect(calls.map(kind)).toEqual(["insert", "update", "update", "delete"]);
-    expect(eqId(calls[3])).toEqual(["id", "new-series"]);
+    expect(eqId(calls[3])).toEqual(["id", (calls[0].ops[0][1][0] as { id: string }).id]);
   });
 });
 

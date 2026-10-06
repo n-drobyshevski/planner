@@ -9,6 +9,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -230,7 +233,9 @@ class MutationsTest {
         assertEquals(setOf("rrule", "recurrence_ends_at"), cap.patch.keys)
         assertEquals(listOf(RowFilter.Eq("id", Fixtures.EVENT_ID)), cap.filters)
         val insert = gateway.callsOf<FakePostgrestGateway.Call.Insert>().single().rows.single()
-        assertEquals(21, insert.size)
+        // Every insertable column, plus the id chosen client-side.
+        assertEquals(22, insert.size)
+        assertEquals(insert["id"]?.jsonPrimitive?.content, result.created.id)
         assertEquals(JsonPrimitive("Later standup"), insert["title"])
         assertEquals(JsonPrimitive("#aabbcc"), insert["color"])
         assertEquals(JsonPrimitive("2026-06-15T09:00:00.000Z"), insert["starts_at"])
@@ -271,6 +276,62 @@ class MutationsTest {
 
         assertEquals(listOf(row), gateway.rows(SupabaseTables.EVENTS))
         assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Update>().isEmpty())
+    }
+
+    @Test
+    fun `an insert that committed but lost its answer is deleted again, the original untouched`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        val lossy = object : PostgrestGateway by gateway {
+            override suspend fun insert(table: String, rows: List<JsonObject>): List<JsonObject> {
+                gateway.insert(table, rows)
+                throw IOException("timeout after commit")
+            }
+        }
+
+        assertFailsWith<IOException> {
+            EventMutations(lossy).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(),
+            )
+        }
+
+        // No open-ended copy next to the uncapped original.
+        assertEquals(listOf(row), gateway.rows(SupabaseTables.EVENTS))
+        assertTrue(gateway.callsOf<FakePostgrestGateway.Call.Update>().isEmpty())
+    }
+
+    @Test
+    fun `a split whose caller is cancelled mid-insert still caps the original`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        val answer = CompletableDeferred<Unit>()
+        val slow = object : PostgrestGateway by gateway {
+            override suspend fun insert(table: String, rows: List<JsonObject>): List<JsonObject> {
+                val stored = gateway.insert(table, rows)
+                answer.await()
+                return stored
+            }
+        }
+
+        val save = launch {
+            EventMutations(slow).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(),
+            )
+        }
+        runCurrent()
+        save.cancel() // the editor closes mid-save
+        answer.complete(Unit)
+        save.join()
+
+        // Both writes landed: the original is capped next to the new series.
+        val stored = gateway.rows(SupabaseTables.EVENTS)
+        assertEquals(2, stored.size)
+        val original = stored.single { it["id"]?.jsonPrimitive?.content == Fixtures.EVENT_ID }
+        assertEquals(JsonPrimitive("2026-06-15T08:59:59.000Z"), original["recurrence_ends_at"])
     }
 
     @Test
