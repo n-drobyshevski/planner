@@ -45,6 +45,7 @@ class MemberAppearanceApplierTest {
         var systemTags = listOf("en-GB")
         val localesSet = mutableListOf<String>()
         var followedSystem = 0
+        var migrationsSkipped = 0
 
         override fun setNightMode(preference: ThemePreference) {
             nightModes += preference
@@ -62,6 +63,10 @@ class MemberAppearanceApplierTest {
         override fun followSystemLocale() {
             followedSystem++
             appTags = emptyList()
+        }
+
+        override fun skipAppCompatLocaleMigration() {
+            migrationsSkipped++
         }
     }
 
@@ -109,6 +114,19 @@ class MemberAppearanceApplierTest {
 
         assertEquals(emptyList(), platform.nightModes)
         assertEquals(emptyList(), platform.localesSet)
+    }
+
+    @Test
+    fun `AppCompat's language copy is skipped at start, before any member`() = runTest {
+        // Synchronously in start(): Application.onCreate, before the first activity.
+        val applier = applier(store())
+        assertEquals(1, platform.migrationsSkipped)
+
+        applier.start()
+        member.value = me(locale = AppLocale.Ru)
+        runCurrent()
+
+        assertEquals(1, platform.migrationsSkipped)
     }
 
     @Test

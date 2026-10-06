@@ -2,7 +2,9 @@ package page.planr.android.core.data.appearance
 
 import android.app.LocaleManager
 import android.app.UiModeManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.os.Build
 import android.os.LocaleList
@@ -40,6 +42,17 @@ interface AppearancePlatform {
      * A no-op where the platform keeps the override (API 33+).
      */
     fun followSystemLocale()
+
+    /**
+     * Called once at startup, before any activity. From API 33 AppCompat
+     * copies the language it stored below 33 into the system once, on its own
+     * thread as the first activity starts; it reads the system's language
+     * through a registered activity, and before one registers it reads none
+     * and clears the member's language the system keeps. This marks that copy
+     * done ([MemberAppearanceApplier] sets the member's language itself).
+     * A no-op below API 33.
+     */
+    fun skipAppCompatLocaleMigration()
 }
 
 class AndroidAppearancePlatform @Inject constructor(
@@ -88,6 +101,20 @@ class AndroidAppearancePlatform @Inject constructor(
         setAppCompatLocales(LocaleListCompat.getEmptyLocaleList())
     }
 
+    override fun skipAppCompatLocaleMigration() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        // AppCompat treats its (otherwise unused) holder service as enabled
+        // once it has copied its stored language to the system.
+        val holder = ComponentName(context, APP_LOCALES_HOLDER)
+        val packages = context.packageManager
+        if (packages.getComponentEnabledSetting(holder) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) return
+        packages.setComponentEnabledSetting(
+            holder,
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP,
+        )
+    }
+
     /** AppCompat applies it to (recreates) its open activities: on the main thread. */
     private fun setAppCompatLocales(locales: LocaleListCompat) {
         ContextCompat.getMainExecutor(context).execute { AppCompatDelegate.setApplicationLocales(locales) }
@@ -103,4 +130,9 @@ class AndroidAppearancePlatform @Inject constructor(
     private fun localeManager(): LocaleManager? = context.getSystemService(LocaleManager::class.java)
 
     private fun String?.tags(): List<String> = orEmpty().split(',').filter { it.isNotBlank() }
+
+    private companion object {
+        /** Declared in the app manifest (autoStoreLocales). */
+        const val APP_LOCALES_HOLDER = "androidx.appcompat.app.AppLocalesMetadataHolderService"
+    }
 }

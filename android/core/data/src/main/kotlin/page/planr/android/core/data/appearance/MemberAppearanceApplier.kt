@@ -46,6 +46,8 @@ class MemberAppearanceApplier internal constructor(
     fun start() {
         if (started) return
         started = true
+        // Here, before the first activity: AppCompat's copy would race it.
+        platform.skipAppCompatLocaleMigration()
         scope.launch {
             currentMember()
                 .filterNotNull()
