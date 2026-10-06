@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.remote.StaleWriteException
@@ -140,7 +142,8 @@ class EventEditViewModel @AssistedInject constructor(
     private suspend fun updateRecurring(form: EventForm, current: Editing, scope: RecurrenceScope) {
         val event = current.event
         val occurrenceDate = current.occurrence.occurrenceDate
-        val attributes = EventWrites.mergedAttributes(form, initialForm ?: form, event.attributes)
+        val initial = initialForm ?: form
+        val attributes = EventWrites.mergedAttributes(form, initial, event.attributes)
         when (scope) {
             RecurrenceScope.This -> {
                 val input = EditSemantics.modifyOccurrence(event.id, occurrenceDate, EventWrites.occurrencePatch(form))
@@ -151,13 +154,14 @@ class EventEditViewModel @AssistedInject constructor(
                 // instance's own change landed, so a failed save leaves the
                 // series untouched.
                 if (attributes != null) patchSeriesAttributes(event, occurrenceDate, prior, attributes)
+                val edits = AttributesMerge.edits(initial.attributes, form.attributes)
                 notices.post(
                     AgendaNotice(
                         UiText(R.string.agenda_toast_this_event_updated),
                         // Without a known prior, an undo could erase an earlier override.
                         undo = suspend {
                             data.revertOverride(event.id, occurrenceDate, prior)
-                            if (attributes != null) data.updateEvent(event.id, attributesPatch(event.attributes))
+                            if (attributes != null) undoSeriesAttributes(event.id, edits, initial.attributes)
                         }.takeIf { prior.canRevert },
                     ),
                 )
@@ -202,7 +206,6 @@ class EventEditViewModel @AssistedInject constructor(
                 )
             }
             RecurrenceScope.All -> {
-                val initial = initialForm ?: form
                 data.updateEvent(
                     event.id,
                     EventWrites.seriesPatch(form, initial, event, current.occurrence, allCategories),
@@ -214,9 +217,12 @@ class EventEditViewModel @AssistedInject constructor(
     }
 
     /**
-     * The side patch of a "this event" save. When it fails, the override just
-     * applied is reverted (best effort) before the failure surfaces, so the
-     * save fails as a whole and saving again redoes both.
+     * The side patch of a "this event" save. [attributes] was merged into the
+     * bag read at load, so it is written only if the series hasn't changed
+     * since ([StaleWriteException] otherwise): the partner's newer attribute
+     * edits are never overwritten. When it fails, the override just applied
+     * is reverted (best effort) before the failure surfaces, so the save
+     * fails as a whole and saving again redoes both.
      */
     private suspend fun patchSeriesAttributes(
         event: PlannerEvent,
@@ -225,7 +231,7 @@ class EventEditViewModel @AssistedInject constructor(
         attributes: JsonObject,
     ) {
         try {
-            data.updateEvent(event.id, attributesPatch(attributes))
+            data.updateEvent(event.id, attributesPatch(attributes), expectedUpdatedAt = event.updatedAt)
         } catch (e: Exception) {
             if (e !is CancellationException && prior.canRevert) {
                 try {
@@ -237,6 +243,29 @@ class EventEditViewModel @AssistedInject constructor(
             }
             throw e
         }
+    }
+
+    /**
+     * Undo of a "this event" side patch: puts back only the keys the save
+     * edited ([edits]) to their [before] option, merged into the series' bag
+     * as it is now, and only where the series still shows what the save
+     * wrote. Whatever changed elsewhere since the save (other keys, or the
+     * same key edited again) is kept.
+     */
+    private suspend fun undoSeriesAttributes(
+        eventId: String,
+        edits: Map<AttributeKey, String?>,
+        before: Map<AttributeKey, String>,
+    ) {
+        val latest = data.getEvent(eventId) ?: return
+        val now = AttributesMerge.known(latest.attributes)
+        val inverse = edits.filter { (key, wrote) -> now[key] == wrote }.mapValues { (key, _) -> before[key] }
+        if (inverse.isEmpty()) return
+        data.updateEvent(
+            eventId,
+            attributesPatch(AttributesMerge.merge(latest.attributes, inverse)),
+            expectedUpdatedAt = latest.updatedAt,
+        )
     }
 
     /** Runs a write with the saving flag up; maps its failure to an effect. */

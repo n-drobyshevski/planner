@@ -541,6 +541,7 @@ class EventEditViewModelTest {
         val side = assertIs<Call.Update>(data.calls.last())
         assertEquals("series", side.id)
         assertEquals(PatchField.Value(expected), side.patch.attributes)
+        assertEquals(tagged.updatedAt, side.expectedUpdatedAt, "merged into the bag read at load, so guarded")
 
         data.calls.clear()
         vm.save()
@@ -552,9 +553,51 @@ class EventEditViewModelTest {
     }
 
     @Test
-    fun `undoing this event also puts the series' attributes back`() = runTest {
-        val stored = buildJsonObject { put("icalUid", "u") }
+    fun `undoing this event puts back only the attributes it edited`() = runTest {
+        val stored = buildJsonObject {
+            put("icalUid", "u")
+            put("energy", 2)
+        }
         data.events.value = listOf(series.copy(attributes = stored))
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(attributes = mapOf(AttributeKey.Energy to "3", AttributeKey.Flexibility to "fixed")) }
+
+        vm.save()
+        vm.chooseScope(RecurrenceScope.This)
+        runCurrent()
+        // The save landed; then the partner set focus on the series.
+        val later = series.updatedAt + 30.seconds
+        data.events.value = listOf(
+            series.copy(
+                updatedAt = later,
+                attributes = buildJsonObject {
+                    put("icalUid", "u")
+                    put("energy", 3)
+                    put("flexibility", "fixed")
+                    put("focus", "deep")
+                },
+            ),
+        )
+        data.calls.clear()
+        posted.single().undo!!.invoke()
+
+        assertIs<Call.Revert>(data.calls.first())
+        val restore = assertIs<Call.Update>(data.calls.last())
+        assertEquals("series", restore.id)
+        val expected = buildJsonObject {
+            put("icalUid", "u")
+            put("energy", 2)
+            put("focus", "deep")
+        }
+        assertEquals(PatchField.Value(expected), restore.patch.attributes)
+        assertEquals(later, restore.expectedUpdatedAt)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `undoing this event keeps an attribute edited again since`() = runTest {
+        data.events.value = listOf(series)
         val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
         val posted = postedNotices()
         vm.update { it.copy(attributes = mapOf(AttributeKey.Flexibility to "fixed")) }
@@ -562,13 +605,37 @@ class EventEditViewModelTest {
         vm.save()
         vm.chooseScope(RecurrenceScope.This)
         runCurrent()
+        data.events.value = listOf(series.copy(attributes = buildJsonObject { put("flexibility", "movable") }))
         data.calls.clear()
         posted.single().undo!!.invoke()
 
-        assertIs<Call.Revert>(data.calls.first())
-        val restore = assertIs<Call.Update>(data.calls.last())
-        assertEquals("series", restore.id)
-        assertEquals(PatchField.Value(stored), restore.patch.attributes)
+        assertIs<Call.Revert>(data.calls.single(), "the partner's newer flexibility stays")
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a series changed since load makes this event stale, and the override is reverted`() = runTest {
+        data.events.value = listOf(series)
+        var sidePatch: Call.Update? = null
+        // The partner wrote the series after this editor loaded it.
+        data.failWhen = { call ->
+            (call as? Call.Update)?.let {
+                sidePatch = it
+                StaleWriteException(SupabaseTables.EVENTS, "series")
+            }
+        }
+        val (vm, effects) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(attributes = mapOf(AttributeKey.Energy to "3")) }
+
+        vm.save()
+        vm.chooseScope(RecurrenceScope.This)
+        runCurrent()
+
+        assertEquals(series.updatedAt, sidePatch?.expectedUpdatedAt)
+        assertEquals(Call.Revert("series", monday, OverridePrior.None), data.calls.last())
+        assertEquals(listOf<EventEditEffect>(EventEditEffect.Stale), effects)
+        assertTrue(posted.isEmpty())
         vm.viewModelScope.cancel()
     }
 
