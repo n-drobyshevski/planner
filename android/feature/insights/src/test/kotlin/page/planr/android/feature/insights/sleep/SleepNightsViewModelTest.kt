@@ -46,7 +46,7 @@ class SleepNightsViewModelTest {
         var failRefresh: Exception? = null
         var failSave: Exception? = null
 
-        override suspend fun refresh() {
+        override suspend fun refresh(force: Boolean) {
             failRefresh?.let { throw it }
             recentLogs.value = stored
         }

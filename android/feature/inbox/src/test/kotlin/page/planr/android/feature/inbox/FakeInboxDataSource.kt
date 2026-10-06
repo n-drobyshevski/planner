@@ -45,6 +45,8 @@ class FakeInboxDataSource(zone: String = "Europe/Berlin") : InboxDataSource {
     val refreshedWindows = mutableListOf<TimeWindow>()
     var requestRefreshes = 0
     var sleepRefreshes = 0
+    /** The `force` of each requests / sleep refresh, in order. */
+    val refreshForces = mutableListOf<Boolean>()
     var failRefresh: Exception? = null
 
     val ratedEvents = mutableListOf<Pair<String, JsonObject>>()
@@ -79,14 +81,16 @@ class FakeInboxDataSource(zone: String = "Europe/Berlin") : InboxDataSource {
         failRefresh?.let { throw it }
     }
 
-    override suspend fun refreshSleep() {
+    override suspend fun refreshSleep(force: Boolean) {
         sleepRefreshes++
+        refreshForces += force
         failRefresh?.let { throw it }
         sleepLogs.value = serverLogs
     }
 
-    override suspend fun refreshRequests() {
+    override suspend fun refreshRequests(force: Boolean) {
         requestRefreshes++
+        refreshForces += force
         failRefresh?.let { throw it }
         requests.value = serverRequests
     }

@@ -68,9 +68,9 @@ class RepositoryInboxDataSource @Inject constructor(
         tasks.refresh()
     }
 
-    override suspend fun refreshSleep() = sleep.refresh()
+    override suspend fun refreshSleep(force: Boolean) = sleep.refresh(force)
 
-    override suspend fun refreshRequests() = timeslots.refresh()
+    override suspend fun refreshRequests(force: Boolean) = timeslots.refresh(force)
 
     override suspend fun nightWindow(): NightWindow =
         sleepPrefs.fetch().let { NightWindow(it.nightWindowStartHour, it.nightWindowEndHour) }

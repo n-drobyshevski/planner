@@ -40,9 +40,11 @@ interface InboxDataSource {
 
     suspend fun refreshTasks()
 
-    suspend fun refreshSleep()
+    /** The viewer's recent nights; with [force] off, skipped when read moments ago. */
+    suspend fun refreshSleep(force: Boolean = true)
 
-    suspend fun refreshRequests()
+    /** The pending requests; with [force] off, skipped when read moments ago. */
+    suspend fun refreshRequests(force: Boolean = true)
 
     /** The viewer's night window (`member_sleep_prefs`), read from the server. */
     suspend fun nightWindow(): NightWindow
