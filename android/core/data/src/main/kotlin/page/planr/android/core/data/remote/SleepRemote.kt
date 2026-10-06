@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.health.SleepNight
+import page.planr.android.core.data.model.SleepPrefsPatch
 import page.planr.android.core.model.PostgresInstantSerializer
 
 /** The columns of a `sleep_logs` row the device owns (times, stages, source). */
@@ -59,11 +60,26 @@ class SleepRemote @Inject constructor(
     suspend fun fetchBlockPrefs(memberId: String): SleepBlockPrefs {
         val row = gateway.select(
             SupabaseTables.MEMBER_SLEEP_PREFS,
-            columns = "sleep_category_id,night_window_start_hour,night_window_end_hour,auto_adjust_sleep_on_feedback",
+            columns = BLOCK_PREFS_COLUMNS,
             filters = listOf(eq("member_id", memberId)),
             limit = 1,
         ).firstOrNull()?.decodeAs(SleepPrefsRow.serializer()) ?: SleepPrefsRow()
-        return SleepBlockPrefs(row.sleepCategoryId, row.nightWindowStartHour, row.nightWindowEndHour, row.autoAdjust)
+        return row.toPrefs()
+    }
+
+    /**
+     * Writes the set fields of [patch] (`upsert` on `member_id`), creating the
+     * row with the DB defaults for the rest when the member has none yet.
+     * Only the edited columns are sent, so the bedtime-calculator settings
+     * the web owns are never touched. Returns the settings as stored.
+     */
+    suspend fun saveBlockPrefs(workspaceId: String, memberId: String, patch: SleepPrefsPatch): SleepBlockPrefs {
+        val stored = gateway.upsert(
+            SupabaseTables.MEMBER_SLEEP_PREFS,
+            listOf(prefsPayload(workspaceId, memberId, patch)),
+            onConflict = "member_id",
+        ).firstOrNull()
+        return stored?.decodeAs(SleepPrefsRow.serializer())?.toPrefs() ?: fetchBlockPrefs(memberId)
     }
 
     suspend fun upsertNights(workspaceId: String, memberId: String, nights: List<SleepNight>) {
@@ -76,8 +92,24 @@ class SleepRemote @Inject constructor(
     }
 
     internal companion object {
+        const val BLOCK_PREFS_COLUMNS =
+            "sleep_category_id,night_window_start_hour,night_window_end_hour,auto_adjust_sleep_on_feedback"
+
         const val DEVICE_COLUMNS =
             "date,bedtime_at,woke_at,times_source,external_id,asleep_min,deep_min,light_min,rem_min,awake_min"
+
+        /** The member's keys plus only the set columns of [patch]. */
+        fun prefsPayload(workspaceId: String, memberId: String, patch: SleepPrefsPatch): JsonObject = buildJsonObject {
+            put("member_id", memberId)
+            put("workspace_id", workspaceId)
+            patch.sleepCategoryId.ifSet { put("sleep_category_id", it) }
+            patch.nightWindowStartHour.ifSet { put("night_window_start_hour", it) }
+            patch.nightWindowEndHour.ifSet { put("night_window_end_hour", it) }
+            patch.autoAdjust.ifSet { put("auto_adjust_sleep_on_feedback", it) }
+        }
+
+        private fun SleepPrefsRow.toPrefs() =
+            SleepBlockPrefs(sleepCategoryId, nightWindowStartHour, nightWindowEndHour, autoAdjust)
 
         /** Every row carries the same keys, so one batch is one column set. */
         fun payload(workspaceId: String, memberId: String, night: SleepNight): JsonObject = buildJsonObject {

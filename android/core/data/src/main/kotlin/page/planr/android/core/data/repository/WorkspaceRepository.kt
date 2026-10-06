@@ -10,7 +10,10 @@ import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.dao.WorkspaceDao
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
+import page.planr.android.core.data.model.MemberPreferencesPatch
+import page.planr.android.core.data.remote.MemberMutations
 import page.planr.android.core.data.remote.WorkspaceQueries
+import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 import page.planr.android.core.model.Board
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
@@ -20,8 +23,10 @@ import page.planr.android.core.model.Member
 class WorkspaceRepository @Inject constructor(
     private val session: SessionManager,
     private val queries: WorkspaceQueries,
+    private val members: MemberMutations,
     private val dao: WorkspaceDao,
     private val gate: CacheGate,
+    private val widgets: WidgetRefreshDispatcher,
 ) {
 
     /** Both members, oldest first (Member A, then Member B). */
@@ -37,6 +42,21 @@ class WorkspaceRepository @Inject constructor(
 
     fun observeBoards(): Flow<List<Board>> =
         session.inWorkspace(emptyList()) { ws -> dao.observeBoards(ws).map { rows -> rows.map { it.toModel() } } }
+
+    /**
+     * Writes the signed-in member's own preferences (time zones, success
+     * notifications) and caches the stored row, so every screen reading the
+     * member (the agenda's zone, the notices) follows at once. The widgets
+     * redraw too: they render in the member's zone.
+     */
+    suspend fun updateMemberPreferences(patch: MemberPreferencesPatch) {
+        if (patch.isEmpty) return
+        val me = session.requireSession()
+        val ticket = gate.ticket()
+        val stored = members.updatePreferences(me.memberId, patch)
+        gate.change(ticket, CacheArea.Workspace) { dao.upsertMembers(listOf(stored.toEntity())) }
+        widgets.requestRefresh()
+    }
 
     /** Refetches the bundle (`fetchWorkspaceBundle`) and replaces the cached copy. */
     suspend fun refresh() {
