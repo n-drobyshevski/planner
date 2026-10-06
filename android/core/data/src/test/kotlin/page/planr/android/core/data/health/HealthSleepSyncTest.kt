@@ -93,12 +93,15 @@ class HealthSleepSyncTest {
             mutex.withLock { transform(state.value).also { state.value = it } }
     }
 
-    /** A calendar holding [blocks]; records what the sync did to it. */
+    /** A calendar holding [blocks]; records what the sync did to it. [offline] fails every call. */
     private class FakeCalendar : SleepBlockCalendar {
         var blocks = listOf<Occurrence>()
+        var offline = false
         val actions = mutableListOf<String>()
-        override suspend fun occurrences(window: TimeWindow, zoneId: String) =
-            blocks.filter { window.intersects(it.start, it.end) }
+        override suspend fun occurrences(window: TimeWindow, zoneId: String): List<Occurrence> {
+            if (offline) throw IOException("offline")
+            return blocks.filter { window.intersects(it.start, it.end) }
+        }
         override suspend fun create(workspaceId: String, ownerId: String, start: Instant, end: Instant, zoneId: String, sleepCategoryId: String?) {
             actions += "create $start $end ${sleepCategoryId ?: "inactive"}"
         }
@@ -395,5 +398,111 @@ class HealthSleepSyncTest {
         sync().connect()
 
         assertEquals(listOf("create 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z cat-sleep"), calendar.actions)
+    }
+
+    private suspend fun pendingSnaps() = store.data.first()[HealthSleepSync.PENDING_SNAP].orEmpty()
+
+    @Test
+    fun `a block that couldn't be snapped is retried on the next sync`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+
+        // The night is saved; only its block is left for later.
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 1, blocks = 0), sync.connect())
+        assertEquals(setOf("2026-10-05"), pendingSnaps())
+
+        // Same device data: the night itself is unchanged, the block still gets snapped.
+        calendar.offline = false
+        now = now.plusSeconds(3600)
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 0, blocks = 1), sync.sync())
+        assertEquals(listOf("create 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z inactive"), calendar.actions)
+        assertEquals(emptySet(), pendingSnaps())
+
+        // ...and only once.
+        now = now.plusSeconds(3600)
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 0, blocks = 0), sync.sync())
+        assertEquals(1, calendar.actions.size)
+    }
+
+    @Test
+    fun `a pending night older than the re-read overlap is read again`() = runTest {
+        source.sessions = (2..5).map { night(it) }
+        val sync = sync()
+        calendar.offline = true
+        sync.connect()
+        assertEquals(setOf("2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"), pendingSnaps())
+
+        // An hour later the overlap alone reaches back to the 3rd only.
+        calendar.offline = false
+        now = now.plusSeconds(3600)
+        val result = sync.sync()
+
+        assertIs<HealthSyncResult.Synced>(result)
+        assertEquals(4, result.blocks)
+        assertEquals(0, result.written)
+        assertEquals(
+            listOf("2026-10-01T21:30:00Z", "2026-10-02T21:30:00Z", "2026-10-03T21:30:00Z", "2026-10-04T21:30:00Z"),
+            calendar.actions.map { it.split(' ')[1] },
+        )
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `a pending night that is no longer recent is let go`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+        sync.connect()
+
+        calendar.offline = false
+        now = LocalDate.of(2026, 10, 10).atTime(9, 0).toInstant(plus2)
+        sync.sync()
+
+        assertTrue(calendar.actions.isEmpty())
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `turning auto-adjust off drops the pending blocks`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+        sync.connect()
+
+        calendar.offline = false
+        fake.seed(
+            SupabaseTables.MEMBER_SLEEP_PREFS,
+            JsonObject(
+                mapOf(
+                    "member_id" to JsonPrimitive(Fixtures.MEMBER_A),
+                    "auto_adjust_sleep_on_feedback" to JsonPrimitive(false),
+                ),
+            ),
+        )
+        now = now.plusSeconds(3600)
+        sync.sync()
+
+        assertTrue(calendar.actions.isEmpty())
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `disconnecting or signing out forgets the pending blocks`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        calendar.offline = true
+
+        sync.connect()
+        assertEquals(setOf("2026-10-05"), pendingSnaps())
+        sync.disconnect()
+        assertEquals(emptySet(), pendingSnaps())
+
+        // The 5th is already imported now; a new night fails instead.
+        source.sessions = listOf(night(4), night(5))
+        sync.connect()
+        assertEquals(setOf("2026-10-04"), pendingSnaps())
+        sync.clearLocal()
+        assertEquals(emptySet(), pendingSnaps())
     }
 }
