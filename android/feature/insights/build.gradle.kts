@@ -1,4 +1,5 @@
-// Insights (Overview / Trends / Patterns / Tasks): read-only analytics over the Room cache.
+// Insights (Overview / Trends / Patterns / Tasks): read-only analytics over the Room cache,
+// plus the viewer's own Sleep nights (sleep_logs, read on demand) with the rating sheet.
 plugins {
     alias(libs.plugins.planr.android.library)
     alias(libs.plugins.planr.android.compose)

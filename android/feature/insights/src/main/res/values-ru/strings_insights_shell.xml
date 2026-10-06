@@ -6,6 +6,7 @@
     <string name="insights_tab_trends">Тренды</string>
     <string name="insights_tab_patterns">Закономерности</string>
     <string name="insights_tab_tasks">Задачи</string>
+    <string name="insights_tab_sleep">Сон</string>
 
     <string name="insights_period_label">Период</string>
     <string name="insights_period_this_week">Эта неделя</string>

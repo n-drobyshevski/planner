@@ -60,6 +60,8 @@ import page.planr.android.feature.insights.shell.LoadError
 import page.planr.android.feature.insights.shell.PeriodBar
 import page.planr.android.feature.insights.shell.RefreshFailedBanner
 import page.planr.android.feature.insights.shell.periodLabel
+import page.planr.android.feature.insights.sleep.SleepNightsViewModel
+import page.planr.android.feature.insights.sleep.SleepTab
 import page.planr.android.feature.insights.tasks.TasksTab
 import page.planr.android.feature.insights.trends.TrendsTab
 import page.planr.android.feature.insights.ui.components.DayDetailSheet
@@ -83,8 +85,11 @@ fun InsightsScreen(
     accountAction: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
     viewModel: InsightsViewModel = hiltViewModel(),
+    sleepViewModel: SleepNightsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val sleepState by sleepViewModel.state.collectAsStateWithLifecycle()
+    val onSleepTab = state.tab == InsightsTab.Sleep
 
     // The owner is the back-stack entry, so coming back to the tab counts as a resume.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
@@ -116,13 +121,14 @@ fun InsightsScreen(
             )
             InsightsTabRow(selected = state.tab, onSelect = viewModel::selectTab)
             PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::refresh,
+                isRefreshing = if (onSleepTab) sleepState.isRefreshing else state.isRefreshing,
+                onRefresh = if (onSleepTab) sleepViewModel::refresh else viewModel::refresh,
                 modifier = Modifier.fillMaxSize(),
             ) {
                 InsightsContent(
                     state = state,
                     viewModel = viewModel,
+                    sleepViewModel = sleepViewModel,
                     onOpenAgenda = onOpenAgenda,
                     onOpenTasks = onOpenTasks,
                     onEditCustom = { rangeOpen = true },
@@ -222,6 +228,7 @@ private fun InsightsHeader(activeFilters: Int, onFilters: () -> Unit, accountAct
 private fun InsightsContent(
     state: InsightsUiState,
     viewModel: InsightsViewModel,
+    sleepViewModel: SleepNightsViewModel,
     onOpenAgenda: () -> Unit,
     onOpenTasks: () -> Unit,
     onEditCustom: () -> Unit,
@@ -267,7 +274,10 @@ private fun InsightsContent(
 
     val saveable = rememberSaveableStateHolder()
     saveable.SaveableStateProvider(state.tab.name) {
-        when (val content = state.content) {
+        // The viewer's own nights: no period, no filters, its own loading.
+        if (state.tab == InsightsTab.Sleep) {
+            SleepTab(sleepViewModel)
+        } else when (val content = state.content) {
             TabContent.Loading -> StatusList(header) { InsightsSkeleton() }
             is TabContent.Failed -> StatusList(header) { LoadError(onRetry = viewModel::retry) }
             is TabContent.Overview -> if (env != null) {
@@ -298,6 +308,7 @@ private fun InsightsContent(
             is TabContent.Tasks -> if (env != null) {
                 TasksTab(model = content.model, env = env, header = header, onOpenTasks = onOpenTasks)
             }
+            TabContent.Sleep -> Unit // drawn above, whatever the shell's state
         }
     }
 }

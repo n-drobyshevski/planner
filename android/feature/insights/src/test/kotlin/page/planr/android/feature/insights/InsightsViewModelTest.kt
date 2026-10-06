@@ -546,8 +546,28 @@ class InsightsViewModelTest {
     }
 
     @Test
+    fun `the Sleep tab builds no period model and is restored`() = test {
+        val saved = SavedStateHandle()
+        val vm = viewModel(FakeInsightsDataSource(), saved)
+        open(vm)
+        advanceUntilIdle()
+        val before = factory.calls.size
+
+        vm.selectTab(InsightsTab.Sleep)
+        advanceUntilIdle()
+
+        assertEquals(TabContent.Sleep, vm.state.value.content)
+        assertEquals(before, factory.calls.size)
+        assertEquals(InsightsTab.Sleep.name, saved["insights.tab"])
+        val restored = viewModel(FakeInsightsDataSource(), saved)
+        open(restored)
+        advanceUntilIdle()
+        assertEquals(InsightsTab.Sleep, restored.state.value.tab)
+    }
+
+    @Test
     fun `an unknown saved state falls back to the defaults`() = test {
-        val saved = SavedStateHandle(mapOf("insights.tab" to "Sleep", "insights.preset" to "yesterday", "insights.granularity" to "hour"))
+        val saved = SavedStateHandle(mapOf("insights.tab" to "Moods", "insights.preset" to "yesterday", "insights.granularity" to "hour"))
         val vm = viewModel(FakeInsightsDataSource(), saved)
         open(vm)
         advanceUntilIdle()

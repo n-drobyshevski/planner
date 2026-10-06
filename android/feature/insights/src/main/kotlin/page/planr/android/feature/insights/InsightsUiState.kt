@@ -12,8 +12,11 @@ import page.planr.android.feature.insights.model.PatternsModel
 import page.planr.android.feature.insights.model.TasksModel
 import page.planr.android.feature.insights.model.TrendsModel
 
-/** The tabs, in display order (no Sleep tab in v1). */
-enum class InsightsTab { Overview, Trends, Patterns, Tasks }
+/**
+ * The tabs, in display order. Sleep is the viewer's own nights only; it has
+ * its own ViewModel and ignores the period and the filters.
+ */
+enum class InsightsTab { Overview, Trends, Patterns, Tasks, Sleep }
 
 /** The resolved period as the period bar shows it. */
 data class PeriodUi(
@@ -52,6 +55,9 @@ sealed interface TabContent {
     data class Patterns(val model: PatternsModel) : TabContent
 
     data class Tasks(val model: TasksModel) : TabContent
+
+    /** Drawn by the Sleep tab's own ViewModel (SleepNightsViewModel). */
+    data object Sleep : TabContent
 }
 
 data class InsightsUiState(
