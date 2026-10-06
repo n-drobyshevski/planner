@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { splitSeries } from "@/lib/supabase/mutations";
+import { splitSeries, StaleWriteError } from "@/lib/supabase/mutations";
 import type { EventRow } from "@/lib/types";
 
 type Call = { table: string; ops: [string, unknown[]][] };
@@ -32,15 +32,25 @@ function fakeClient(respond: (call: Call) => { data?: unknown; error?: unknown }
 
 const kind = (call: Call) => call.ops[0][0];
 
-/** Echoes an insert back as the stored row, like `INSERT … RETURNING`. */
+const eqId = (call: Call) => call.ops.find(([op]) => op === "eq")![1];
+const patchOf = (call: Call) => call.ops[0][1][0] as { rrule: string | null; recurrence_ends_at: string | null };
+
+/**
+ * Echoes an insert back as the stored row, like `INSERT … RETURNING`, and an
+ * update as the one row it matched. `cap` sets how the first update answers.
+ */
 const respond =
-  (failCap: boolean) =>
+  (cap: "ok" | "fail" | "no-row") =>
   (call: Call): { data?: unknown; error?: unknown } => {
     if (kind(call) === "insert") {
       const row = call.ops[0][1][0] as Record<string, unknown>;
       return { data: { ...row, id: "new-series" } };
     }
-    if (kind(call) === "update" && failCap) return { error: new Error("cap failed") };
+    if (kind(call) === "update") {
+      if (cap === "fail") return { error: new Error("cap failed") };
+      if (cap === "no-row") return { data: [] };
+      return { data: [{ ...patchOf(call), id: eqId(call)[1] }] };
+    }
     return {};
   };
 
@@ -74,17 +84,15 @@ const from = Date.UTC(2026, 1, 2, 10);
 
 describe("splitSeries", () => {
   it("inserts the new series before capping the original", async () => {
-    const { sb, calls } = fakeClient(respond(false));
+    const { sb, calls } = fakeClient(respond("ok"));
     const created = await splitSeries(sb, series, from, { title: "Later standup" });
 
     expect(calls.map(kind)).toEqual(["insert", "update"]);
     expect(created.id).toBe("new-series");
     expect(created.title).toBe("Later standup");
     const cap = calls[1];
-    expect(cap.ops.find(([op]) => op === "eq")![1]).toEqual(["id", "evt-1"]);
-    expect((cap.ops[0][1][0] as { recurrence_ends_at: string }).recurrence_ends_at).toBe(
-      new Date(from - 1000).toISOString(),
-    );
+    expect(eqId(cap)).toEqual(["id", "evt-1"]);
+    expect(patchOf(cap).recurrence_ends_at).toBe(new Date(from - 1000).toISOString());
   });
 
   it("leaves the original alone when the insert fails", async () => {
@@ -95,11 +103,23 @@ describe("splitSeries", () => {
     expect(calls.map(kind)).toEqual(["insert"]);
   });
 
-  it("deletes the new series again when the cap fails, then rethrows", async () => {
-    const { sb, calls } = fakeClient(respond(true));
+  it("restores the original rule and deletes the new series when the cap fails, then rethrows", async () => {
+    const { sb, calls } = fakeClient(respond("fail"));
     await expect(splitSeries(sb, series, from, {})).rejects.toThrow("cap failed");
 
-    expect(calls.map(kind)).toEqual(["insert", "update", "delete"]);
-    expect(calls[2].ops.find(([op]) => op === "eq")![1]).toEqual(["id", "new-series"]);
+    expect(calls.map(kind)).toEqual(["insert", "update", "update", "delete"]);
+    // The cap may have landed with its answer lost: the rule goes back first.
+    const restore = calls[2];
+    expect(eqId(restore)).toEqual(["id", "evt-1"]);
+    expect(patchOf(restore)).toEqual({ rrule: "FREQ=WEEKLY;BYDAY=MO", recurrence_ends_at: null });
+    expect(eqId(calls[3])).toEqual(["id", "new-series"]);
+  });
+
+  it("fails as stale and drops the new series when the original is gone", async () => {
+    const { sb, calls } = fakeClient(respond("no-row"));
+    await expect(splitSeries(sb, series, from, {})).rejects.toBeInstanceOf(StaleWriteError);
+
+    expect(calls.map(kind)).toEqual(["insert", "update", "update", "delete"]);
+    expect(eqId(calls[3])).toEqual(["id", "new-series"]);
   });
 });

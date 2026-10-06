@@ -6,8 +6,6 @@ import kotlin.time.Instant
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import page.planr.android.core.data.model.DeletedEventSnapshot
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
@@ -194,7 +192,8 @@ class EventMutations @Inject constructor(
      * All or nothing, in this order: a failed insert leaves the original
      * untouched, and a failed cap deletes the new series again before the
      * failure is rethrown. (Capping first would lose every future occurrence,
-     * for both members, whenever the insert failed.)
+     * for both members, whenever the insert failed.) A cap that finds no row
+     * (the series was deleted meanwhile) fails with [StaleWriteException].
      */
     suspend fun splitSeries(
         event: PlannerEvent,
@@ -209,23 +208,25 @@ class EventMutations @Inject constructor(
         if (newAttributes != null) draft = draft.copy(attributes = newAttributes)
         val created = createEvent(draft)
         val capped = try {
-            gateway.update(
-                SupabaseTables.EVENTS,
-                buildJsonObject {
-                    put("rrule", split.original.rrule)
-                    put("recurrence_ends_at", split.original.recurrenceEndsAt?.let(PostgresTime::toIso))
-                },
-                listOf(eq("id", split.original.id)),
-            )
+            updateEvent(split.original.id, recurrencePatch(split.original.rrule, split.original.recurrenceEndsAt))
         } catch (e: Throwable) {
-            withContext(NonCancellable) { runCatching { deleteEvents(listOf(created.id)) } }
+            withContext(NonCancellable) {
+                // The cap may have landed with only its answer lost (a timeout,
+                // or the screen closing mid-request): put the original rule
+                // back before dropping the new series, or the future is gone.
+                runCatching { gateway.update(SupabaseTables.EVENTS, recurrenceRow(event), listOf(eq("id", event.id))) }
+                runCatching { deleteEvents(listOf(created.id)) }
+            }
             throw e
         }
-        return SplitResult(
-            original = capped.firstOrNull()?.decodeAs(PlannerEvent.serializer()),
-            created = created,
-        )
+        return SplitResult(original = capped, created = created)
     }
+
+    private fun recurrencePatch(rrule: String?, recurrenceEndsAt: Instant?) =
+        EventPatch(rrule = PatchField.Value(rrule), recurrenceEndsAt = PatchField.Value(recurrenceEndsAt))
+
+    private fun recurrenceRow(event: PlannerEvent): JsonObject =
+        EventPayloads.patchRow(recurrencePatch(event.rrule, event.recurrenceEndsAt))
 
     /**
      * `deleteThisAndFuture`: cap the series with UNTIL one second before
@@ -254,8 +255,8 @@ class EventMutations @Inject constructor(
 /** Result of [EventMutations.applyOverride]: the undo token and the stored row. */
 data class AppliedOverride(val prior: OverridePrior, val override: EventOverride?)
 
-/** Result of [EventMutations.splitSeries]: the capped original (if returned) and the new series. */
-data class SplitResult(val original: PlannerEvent?, val created: PlannerEvent)
+/** Result of [EventMutations.splitSeries]: the capped original and the new series. */
+data class SplitResult(val original: PlannerEvent, val created: PlannerEvent)
 
 /** Rows written back by [EventMutations.restoreDeleted]. */
 data class RestoredEvents(val events: List<PlannerEvent>, val overrides: List<EventOverride>)

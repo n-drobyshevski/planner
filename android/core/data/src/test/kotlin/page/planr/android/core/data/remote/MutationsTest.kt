@@ -200,7 +200,7 @@ class MutationsTest {
         assertEquals(JsonPrimitive("2026-06-15T09:00:00.000Z"), insert["starts_at"])
         assertEquals(JsonNull, insert["recurrence_ends_at"])
         assertEquals("Later standup", result.created.title)
-        assertEquals(Fixtures.EVENT_ID, result.original?.id)
+        assertEquals(Fixtures.EVENT_ID, result.original.id)
     }
 
     @Test
@@ -258,6 +258,50 @@ class MutationsTest {
         assertEquals(listOf(row), gateway.rows(SupabaseTables.EVENTS))
         val created = gateway.callsOf<FakePostgrestGateway.Call.Insert>().single()
         assertEquals(JsonPrimitive("Later standup"), created.rows.single()["title"])
+        assertEquals(1, gateway.callsOf<FakePostgrestGateway.Call.Delete>().size)
+    }
+
+    @Test
+    fun `a cap that landed but lost its answer is undone before the new series is deleted`() = runTest {
+        val row = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO")
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf(row)
+        var answered = false
+        val lossy = object : PostgrestGateway by gateway {
+            override suspend fun update(table: String, patch: JsonObject, filters: List<RowFilter>): List<JsonObject> {
+                val rows = gateway.update(table, patch, filters)
+                if (!answered) {
+                    answered = true
+                    throw IOException("timeout after commit")
+                }
+                return rows
+            }
+        }
+
+        assertFailsWith<IOException> {
+            EventMutations(lossy).splitSeries(
+                row.decodeAs(PlannerEvent.serializer()),
+                Instant.parse("2026-06-15T09:00:00Z"),
+                OccurrencePatch(),
+            )
+        }
+
+        // The original runs on uncapped; the new series is gone again.
+        val remaining = gateway.rows(SupabaseTables.EVENTS).single()
+        assertEquals(Fixtures.EVENT_ID, remaining["id"]?.let { (it as JsonPrimitive).content })
+        assertEquals(JsonPrimitive("FREQ=WEEKLY;BYDAY=MO"), remaining["rrule"])
+        assertEquals(JsonNull, remaining["recurrence_ends_at"])
+    }
+
+    @Test
+    fun `splitting a series deleted meanwhile is stale and leaves no new series`() = runTest {
+        val series = Fixtures.eventRow(rrule = "FREQ=WEEKLY;BYDAY=MO").decodeAs(PlannerEvent.serializer())
+        gateway.tables[SupabaseTables.EVENTS] = mutableListOf()
+
+        assertFailsWith<StaleWriteException> {
+            events.splitSeries(series, Instant.parse("2026-06-15T09:00:00Z"), OccurrencePatch())
+        }
+
+        assertTrue(gateway.rows(SupabaseTables.EVENTS).isEmpty())
         assertEquals(1, gateway.callsOf<FakePostgrestGateway.Call.Delete>().size)
     }
 }

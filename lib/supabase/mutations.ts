@@ -466,7 +466,8 @@ export async function updateAll(
  * All or nothing, in this order: a failed insert leaves the original
  * untouched, and a failed cap deletes the new series again before the error
  * is rethrown. (Capping first would lose every future occurrence, for both
- * members, whenever the insert failed.)
+ * members, whenever the insert failed.) A cap that finds no row (the series
+ * was deleted meanwhile) fails with StaleWriteError.
  */
 export async function splitSeries(
   sb: SupabaseClient,
@@ -502,16 +503,17 @@ export async function splitSeries(
   };
   const created = await createEvent(sb, input);
   try {
-    const { error } = await sb
-      .from("events")
-      .update({
-        rrule: original.rrule,
-        recurrence_ends_at:
-          original.recurrenceEndsAt == null ? null : toIso(original.recurrenceEndsAt),
-      })
-      .eq("id", original.id);
-    if (error) throw error;
+    await updateEvent(sb, original.id, {
+      rrule: original.rrule,
+      recurrenceEndsAt: original.recurrenceEndsAt,
+    });
   } catch (e) {
+    // The cap may have landed with only its answer lost: put the original
+    // rule back before dropping the new series, or the future is gone.
+    await updateEvent(sb, event.id, {
+      rrule: event.rrule,
+      recurrenceEndsAt: event.recurrenceEndsAt,
+    }).catch(() => {});
     await deleteEvent(sb, created.id).catch(() => {});
     throw e;
   }

@@ -200,7 +200,8 @@ class EventRepository @Inject constructor(
      * "This and following": start a new series at [fromOccurrence] carrying
      * [patch] and cap [event] before it. Returns the new series. The remote
      * split is all or nothing, and Room only sees it once both writes landed,
-     * so a failure never hides an occurrence locally either.
+     * so a failure never hides an occurrence locally either. Fails with
+     * [StaleWriteException] (after reloading the row) when the series is gone.
      */
     suspend fun splitSeries(
         event: PlannerEvent,
@@ -209,8 +210,10 @@ class EventRepository @Inject constructor(
         newColor: PatchField<String?> = PatchField.Unchanged,
         newAttributes: JsonObject? = null,
     ): PlannerEvent {
-        val result = write({ mutations.splitSeries(event, fromOccurrence, patch, newColor, newAttributes) }) { result ->
-            dao.upsertEvents(listOfNotNull(result.original, result.created).map { it.toEntity() })
+        val result = write({
+            reloadingOnStale(event.id) { mutations.splitSeries(event, fromOccurrence, patch, newColor, newAttributes) }
+        }) { result ->
+            dao.upsertEvents(listOf(result.original, result.created).map { it.toEntity() })
         }
         return result.created
     }

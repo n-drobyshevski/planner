@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
+import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.Occurrence
 import page.planr.android.core.model.OverrideType
@@ -152,6 +154,21 @@ class EventDetailViewModelTest {
         val input = assertIs<Call.Override>(data.calls.single()).input
         assertEquals(OverrideType.Cancel, input.type)
         assertEquals(monday, input.occurrenceDate)
+        h.vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `deleting this instance offers no undo when the override it replaced is unknown`() = runTest {
+        data.events.value = listOf(series)
+        data.overridePrior = OverridePrior.Unknown
+        val h = open(Occurrence.recurringKey("series", monday))
+
+        h.vm.delete(RecurrenceScope.This)
+        runCurrent()
+
+        assertIs<Call.Override>(data.calls.single())
+        assertEquals(UiText(R.string.agenda_toast_event_deleted), h.posted.single().message)
+        assertNull(h.posted.single().undo)
         h.vm.viewModelScope.cancel()
     }
 
