@@ -7,6 +7,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
@@ -74,6 +75,35 @@ class RealtimeChangeApplierTest {
     }
 
     @Test
+    fun `an event that went private for this member leaves the cache`() = runTest {
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow()))
+        val gone = RowGone(SupabaseTables.EVENTS, Fixtures.EVENT_ID, RowGone.Kind.Hidden, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.eventDao().getById(Fixtures.EVENT_ID))
+    }
+
+    @Test
+    fun `a deleted task takes its calendar blocks with it`() = runTest {
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow()))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(taskId = Fixtures.TASK_ID)))
+        val gone = RowGone(SupabaseTables.TASKS, Fixtures.TASK_ID, RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.taskDao().getById(Fixtures.TASK_ID))
+        assertNull(db.eventDao().getById(Fixtures.EVENT_ID))
+    }
+
+    @Test
+    fun `a broadcast for a table the app doesn't cache is a no-op`() = runTest {
+        val gone = RowGone(SupabaseTables.SLEEP_LOGS, "s1", RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
+
+        assertFalse(applier.apply(gone.table, gone.toDelete()))
+    }
+
+    @Test
     fun `isOutdated only skips a row known to be older`() {
         val t = Instant.parse("2026-05-20T08:15:30.123456Z")
         assertTrue(RealtimeChangeApplier.isOutdated(incoming = t, cached = Instant.parse("2026-05-20T08:15:30.123457Z")))
@@ -82,5 +112,9 @@ class RealtimeChangeApplierTest {
         // No updated_at on the incoming row, or nothing cached: apply.
         assertFalse(RealtimeChangeApplier.isOutdated(incoming = null, cached = t))
         assertFalse(RealtimeChangeApplier.isOutdated(incoming = t, cached = null))
+    }
+
+    private companion object {
+        const val PARTNER = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     }
 }
