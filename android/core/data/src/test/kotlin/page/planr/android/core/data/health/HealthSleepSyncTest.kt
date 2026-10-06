@@ -48,10 +48,12 @@ import page.planr.android.core.model.TimeWindow
 class HealthSleepSyncTest {
     private val fake = FakePostgrestGateway()
     private var offline = false
+    /** The server stores the upload, but the response never arrives. */
+    private var responseLost = false
     private val gateway = object : PostgrestGateway by fake {
         override suspend fun upsert(table: String, rows: List<JsonObject>, onConflict: String): List<JsonObject> {
             if (offline) throw IOException("offline")
-            return fake.upsert(table, rows, onConflict)
+            return fake.upsert(table, rows, onConflict).also { if (responseLost) throw IOException("connection reset") }
         }
     }
 
@@ -503,6 +505,23 @@ class HealthSleepSyncTest {
         sync.connect()
         assertEquals(setOf("2026-10-04"), pendingSnaps())
         sync.clearLocal()
+        assertEquals(emptySet(), pendingSnaps())
+    }
+
+    @Test
+    fun `a night stored by an upload whose response was lost still gets its block`() = runTest {
+        source.sessions = listOf(night(5))
+        val sync = sync()
+        responseLost = true
+
+        assertEquals(HealthSyncResult.Failed, sync.connect())
+        assertEquals(1, fake.rows(SupabaseTables.SLEEP_LOGS).size)
+        assertTrue(calendar.actions.isEmpty())
+
+        // The stored row now matches the device: only the remembered night brings the block.
+        responseLost = false
+        assertEquals(HealthSyncResult.Synced(nights = 1, written = 0, blocks = 1), sync.sync())
+        assertEquals(listOf("create 2026-10-04T21:30:00Z 2026-10-05T05:00:00Z inactive"), calendar.actions)
         assertEquals(emptySet(), pendingSnaps())
     }
 }

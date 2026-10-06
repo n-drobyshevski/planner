@@ -87,8 +87,9 @@ sealed interface HealthSyncResult {
  *   web does (a one-off block moves, a routine gets a one-night exception, a
  *   missing one is created), unless the member turned that off. A block moved
  *   by hand afterwards stays put: only new device times move it again. A
- *   night whose block couldn't be snapped (offline halfway) is remembered and
- *   retried on the next sync while it is still among those nights.
+ *   night whose block couldn't be snapped (offline halfway, the sync cut
+ *   short) is remembered and retried on the next sync while it is still
+ *   among those nights.
  * - Connecting is per device and per member: after another member signs in on
  *   this phone, nothing syncs until they connect themselves.
  */
@@ -180,9 +181,16 @@ class HealthSleepSync @Inject constructor(
             val nights = SleepNightMapper.nights(sessions, zone).filter { it.date >= fromDate }
             val stored = remote.fetchDeviceRows(me.memberId, fromDate.toString()).associateBy { it.date }
             val changed = nights.filterNot { stored[it.date.toString()]?.matches(it) == true }
-            remote.upsertNights(me.workspaceId, me.memberId, changed)
             val newTimes = changed.filter { it.date >= recent && stored[it.date.toString()].timesDiffer(it) }
             val toSnap = nights.filter { it in newTimes || it.date in pending }
+            // Remembered before the upload: once the nights are stored they no
+            // longer look new, so a sync cut short from here on (a lost
+            // response, the process killed) would otherwise never snap them.
+            val toSnapDates = toSnap.mapTo(mutableSetOf()) { it.date.toString() }
+            if (toSnapDates.isNotEmpty() && toSnapDates != prefs[PENDING_SNAP]) {
+                store.edit { it[PENDING_SNAP] = toSnapDates }
+            }
+            remote.upsertNights(me.workspaceId, me.memberId, changed)
             val snap = snapBlocks(me, toSnap, zone)
             store.edit {
                 it[LAST_SYNC] = now.toEpochMilli()
