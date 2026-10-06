@@ -142,6 +142,57 @@ class RefreshCoalescingTest {
     }
 
     @Test
+    fun `the Realtime join outdates a refresh done before it`() = runTest {
+        val repo = events()
+        repo.refreshWindow(june)
+
+        gate.outdateSnapshots()
+        repo.refreshWindow(june)
+        assertEquals(2, reads(SupabaseTables.EVENTS), "begun before the join: may miss what the channel never delivers")
+
+        repo.refreshWindow(june)
+        assertEquals(2, reads(SupabaseTables.EVENTS), "the one after it is fresh")
+    }
+
+    @Test
+    fun `a refresh still running when Realtime joins is waited for, not joined`() = runTest {
+        val repo = events()
+        val hold = CompletableDeferred<Unit>()
+        gateway.hold = hold
+        val before = async { repo.refreshWindow(june) }
+        runCurrent()
+
+        gateway.hold = null
+        gate.outdateSnapshots()
+        val after = List(3) { async { repo.refreshWindow(june) } }
+        runCurrent()
+        assertEquals(1, reads(SupabaseTables.EVENTS), "the later callers wait for the older fetch first")
+
+        hold.complete(Unit)
+        before.await()
+        after.awaitAll()
+        assertEquals(2, reads(SupabaseTables.EVENTS), "then share one fetch of their own")
+    }
+
+    @Test
+    fun `a slow refresh finishing doesn't forget a later one's freshness`() = runTest {
+        val repo = events()
+        val hold = CompletableDeferred<Unit>()
+        gateway.hold = hold
+        val slow = async { repo.refreshWindow(june) }
+        runCurrent()
+        gateway.hold = null
+
+        now += 5.seconds
+        repo.refreshWindow(july)
+        hold.complete(Unit)
+        slow.await()
+
+        repo.refreshWindow(july)
+        assertEquals(2, reads(SupabaseTables.EVENTS))
+    }
+
+    @Test
     fun `a failed refresh fails its joiners too, and doesn't count as fresh`() = runTest {
         val repo = events()
         gateway.hold = CompletableDeferred()

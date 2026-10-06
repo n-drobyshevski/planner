@@ -295,8 +295,10 @@ widgets.
   and `WorkspaceRepository` refresh through a `RefreshCoalescer`: a caller
   joins a refresh of the same data already running, and one that succeeded
   less than 30 s ago is not repeated unless forced (pull-to-refresh, the
-  periodic or requested sync, a Realtime rejoin after a drop). A sign-out
-  wipe makes it stale at once. A snapshot identical to the cache is not
+  periodic or requested sync). A sign-out wipe makes it stale at once, and
+  so does every Realtime (re)join: a refresh begun before the channel was
+  subscribed may miss changes that will never arrive over it, so the join's
+  refetch neither joins nor skips one. A snapshot identical to the cache is not
   written; the refresh reports `changed = false` and `SyncRunner` then skips
   the widgets, re-planning only reminders (their plan rolls with the clock).
 - **Periodic, while signed in.** `SyncScheduler` keeps a two-hourly periodic

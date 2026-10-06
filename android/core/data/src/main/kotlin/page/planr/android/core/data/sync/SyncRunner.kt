@@ -53,14 +53,15 @@ class SyncRunner @Inject constructor(
 
     /**
      * Refetches what's on screen (Realtime (re)connect: changes may have been
-     * missed). Unless [force]d, joins the screens' own refreshes of the same
-     * data, or skips what they fetched moments ago.
+     * missed). Joins the same refreshes already running, or skips those done
+     * moments ago, unless they began before the join outdated them
+     * ([page.planr.android.core.data.local.CacheGate.outdateSnapshots]).
      */
-    suspend fun syncVisible(force: Boolean = false) {
+    suspend fun syncVisible() {
         if (session.currentSession == null) return
         val changed = coroutineScope {
             launch { appPrefs.pullQuietly() }
-            refreshAll(force)
+            refreshAll(force = false)
         }
         if (changed) widgets.requestRefresh() else widgets.refreshClockBound()
     }

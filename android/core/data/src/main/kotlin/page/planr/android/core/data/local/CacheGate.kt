@@ -39,6 +39,24 @@ class CacheGate @Inject constructor() {
     /** The current wipe count, read without waiting for the lock ([RefreshCoalescer]'s freshness). */
     internal val currentEpoch: Long get() = epoch
 
+    @Volatile
+    private var outdated = 0L
+
+    /** How often [outdateSnapshots] was called ([RefreshCoalescer]'s freshness). */
+    internal val currentOutdated: Long get() = outdated
+
+    /**
+     * Marks every snapshot fetched, or still being fetched, until now as
+     * possibly behind the server: [RefreshCoalescer] then neither skips a
+     * refresh because of one nor lets a caller join one. The Realtime join
+     * calls it, since changes committed before the channel was subscribed
+     * never arrive over it. Writes are unaffected.
+     */
+    @Synchronized
+    fun outdateSnapshots() {
+        outdated++
+    }
+
     suspend fun ticket(): Ticket = mutex.withLock { Ticket(epoch, changes.copyOf()) }
 
     /**

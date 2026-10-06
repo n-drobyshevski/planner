@@ -122,15 +122,15 @@ class RealtimeSync @Inject constructor(
                     channel.status.collect { _subscribed.value = it == RealtimeChannel.Status.SUBSCRIBED }
                 }
                 launch {
-                    // The first join's refetch may share the screens' own (opening the
-                    // app fires both). A rejoin after a drop always refetches: changes
-                    // made while the channel was down never arrive otherwise.
-                    var joined = false
+                    // Changes committed before the channel was subscribed never arrive
+                    // over it, so a snapshot begun before then (a screen's own refresh
+                    // on opening the app) can't stand in for this refetch. Screens
+                    // refreshing after it join it instead.
                     channel.status
                         .filter { it == RealtimeChannel.Status.SUBSCRIBED }
                         .collect {
-                            refetchQuietly(force = joined)
-                            joined = true
+                            cacheGate.outdateSnapshots()
+                            refetchQuietly()
                         }
                 }
                 launch {
@@ -169,9 +169,9 @@ class RealtimeSync @Inject constructor(
             this.table = table
         }.map { table to RowChange.Delete(it.oldRecord) }
 
-    private suspend fun refetchQuietly(force: Boolean) {
+    private suspend fun refetchQuietly() {
         try {
-            syncRunner.syncVisible(force)
+            syncRunner.syncVisible()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

@@ -152,14 +152,17 @@ class NoOpRefreshTest {
         runner.syncAll()
         val before = widgetRenders to clockBoundRenders
 
-        runner.syncVisible(force = true)
+        // What RealtimeSync does on each join.
+        gate.outdateSnapshots()
+        runner.syncVisible()
         advanceTimeBy(1_000)
         runCurrent()
         assertEquals(before.first, widgetRenders)
         assertEquals(before.second + 1, clockBoundRenders)
 
         replace(SupabaseTables.EVENTS, Fixtures.eventRow(updatedAt = "2026-06-02T08:00:00.000001+00:00"))
-        runner.syncVisible(force = true)
+        gate.outdateSnapshots()
+        runner.syncVisible()
         advanceTimeBy(1_000)
         runCurrent()
         assertEquals(before.first + 1, widgetRenders)
