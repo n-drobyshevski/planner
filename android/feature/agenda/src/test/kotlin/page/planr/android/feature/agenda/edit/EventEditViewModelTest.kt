@@ -470,10 +470,11 @@ class EventEditViewModelTest {
         vm.chooseScope(RecurrenceScope.This)
         runCurrent()
 
-        val side = assertIs<Call.Update>(data.calls.first())
+        // The instance first; the series' attributes only once it landed.
+        assertIs<Call.Override>(data.calls.first())
+        val side = assertIs<Call.Update>(data.calls.last())
         assertEquals("series", side.id)
         assertEquals(PatchField.Value(expected), side.patch.attributes)
-        assertIs<Call.Override>(data.calls.last())
 
         data.calls.clear()
         vm.save()
@@ -481,6 +482,62 @@ class EventEditViewModelTest {
         runCurrent()
 
         assertEquals(expected, assertIs<Call.Split>(data.calls.single()).newAttributes)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `undoing this event also puts the series' attributes back`() = runTest {
+        val stored = buildJsonObject { put("icalUid", "u") }
+        data.events.value = listOf(series.copy(attributes = stored))
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(attributes = mapOf(AttributeKey.Flexibility to "fixed")) }
+
+        vm.save()
+        vm.chooseScope(RecurrenceScope.This)
+        runCurrent()
+        data.calls.clear()
+        posted.single().undo!!.invoke()
+
+        assertIs<Call.Revert>(data.calls.first())
+        val restore = assertIs<Call.Update>(data.calls.last())
+        assertEquals("series", restore.id)
+        assertEquals(PatchField.Value(stored), restore.patch.attributes)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `this event leaves the series alone when the override fails`() = runTest {
+        data.events.value = listOf(series)
+        data.failWhen = { call -> IllegalStateException("offline").takeIf { call is Call.Override } }
+        val (vm, effects) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        vm.update { it.copy(attributes = mapOf(AttributeKey.Flexibility to "fixed")) }
+
+        vm.save()
+        vm.chooseScope(RecurrenceScope.This)
+        runCurrent()
+
+        assertTrue(data.calls.isEmpty(), "no side patch to the series")
+        assertEquals(listOf<EventEditEffect>(EventEditEffect.Failed), effects)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a failed attribute patch reverts the override, so this event fails as a whole`() = runTest {
+        data.events.value = listOf(series)
+        data.failWhen = { call -> IllegalStateException("offline").takeIf { call is Call.Update } }
+        val (vm, effects) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning", attributes = mapOf(AttributeKey.Flexibility to "fixed")) }
+
+        vm.save()
+        vm.chooseScope(RecurrenceScope.This)
+        runCurrent()
+
+        assertIs<Call.Override>(data.calls.first())
+        assertEquals(Call.Revert("series", monday, OverridePrior.None), data.calls.last())
+        assertEquals(listOf<EventEditEffect>(EventEditEffect.Failed), effects)
+        assertTrue(posted.isEmpty())
         vm.viewModelScope.cancel()
     }
 }
