@@ -1,6 +1,7 @@
 package page.planr.android.feature.agenda
 
 import android.content.Context
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -134,6 +135,8 @@ fun AgendaScreen(
     }
 
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // The startup metric (time to full display) ends when the first period shows its events.
+    ReportDrawnWhen { state.isLoaded }
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle

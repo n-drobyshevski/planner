@@ -101,6 +101,8 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.browser)
+    // Installs src/main/baseline-prof.txt (AOT-compiled startup path) on sideloaded builds too.
+    implementation(libs.androidx.profileinstaller)
 
     testImplementation(libs.kotlinx.coroutines.test)
 }
