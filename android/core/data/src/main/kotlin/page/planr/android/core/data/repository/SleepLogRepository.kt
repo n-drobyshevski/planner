@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -80,6 +82,17 @@ class RemoteSleepLogRepository @Inject constructor(
 
     private val cache = MutableStateFlow<Cached?>(null)
 
+    /**
+     * One read or save at a time: a read that started before a save landed
+     * would otherwise overwrite the saved night with its older copy (the
+     * check-in card would come back).
+     */
+    private val io = Mutex()
+
+    /** Reads finished so far; a caller that waited out another read skips its own. */
+    @Volatile
+    private var reads = 0L
+
     private val memberId: Flow<String?> =
         session.authState.map { (it as? AuthState.SignedIn)?.session?.memberId }.distinctUntilChanged()
 
@@ -89,13 +102,19 @@ class RemoteSleepLogRepository @Inject constructor(
 
     override suspend fun refresh() {
         val me = session.currentSession ?: return
-        // A day of slack either side of any zone; the UI picks its own nights.
-        val since = clock.now().toLocalDateTime(TimeZone.UTC).date.minus(DatePeriod(days = SleepLogRepository.RECENT_DAYS + 1))
-        val logs = remote.fetchLogs(me.memberId, since.toString())
-        cache.value = Cached(me.memberId, logs.sortedByDescending { it.date })
+        val seen = reads
+        io.withLock {
+            // The agenda's start and its ON_RESUME (or two screens) ask at once: one read serves both.
+            if (reads != seen && cache.value?.memberId == me.memberId) return
+            // A day of slack either side of any zone; the UI picks its own nights.
+            val since = clock.now().toLocalDateTime(TimeZone.UTC).date.minus(DatePeriod(days = SleepLogRepository.RECENT_DAYS + 1))
+            val logs = remote.fetchLogs(me.memberId, since.toString())
+            cache.value = Cached(me.memberId, logs.sortedByDescending { it.date })
+            reads++
+        }
     }
 
-    override suspend fun save(rating: SleepRating): SleepLog {
+    override suspend fun save(rating: SleepRating): SleepLog = io.withLock {
         val me = session.requireSession()
         // The stored row, not the cache: a Health Connect sync may have just written it.
         val existing = remote.fetchLog(me.memberId, rating.date)
@@ -115,7 +134,7 @@ class RemoteSleepLogRepository @Inject constructor(
                 cached.copy(logs = (cached.logs.filterNot { it.date == stored.date } + stored).sortedByDescending { it.date })
             }
         }
-        return stored
+        stored
     }
 
     // Per device and per member, like the web's localStorage flag; never synced.

@@ -10,9 +10,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.TestScope
@@ -34,6 +36,8 @@ import page.planr.android.core.data.model.SleepTimes
 import page.planr.android.core.data.model.SleepTimesSource
 import page.planr.android.core.data.remote.FakePostgrestGateway
 import page.planr.android.core.data.remote.Fixtures
+import page.planr.android.core.data.remote.PostgrestGateway
+import page.planr.android.core.data.remote.RowOrder
 import page.planr.android.core.data.remote.RowFilter
 import page.planr.android.core.data.remote.SleepRemote
 import page.planr.android.core.data.remote.SupabaseTables
@@ -58,8 +62,27 @@ class SleepLogRepositoryTest {
 
     private val store = MemoryDataStore()
 
-    private fun TestScope.repository(member: String = Fixtures.MEMBER_A): RemoteSleepLogRepository =
-        RemoteSleepLogRepository(SleepRemote(fake), session(member), store, clock)
+    private fun TestScope.repository(
+        member: String = Fixtures.MEMBER_A,
+        gateway: PostgrestGateway = fake,
+    ): RemoteSleepLogRepository = RemoteSleepLogRepository(SleepRemote(gateway), session(member), store, clock)
+
+    /** [fake], but a range read (the refresh) answers only once [release] completes, with what was stored when it was sent. */
+    private class SlowReads(private val inner: FakePostgrestGateway) : PostgrestGateway by inner {
+        var release: CompletableDeferred<Unit>? = null
+
+        override suspend fun select(
+            table: String,
+            columns: String,
+            filters: List<RowFilter>,
+            order: List<RowOrder>,
+            limit: Long?,
+        ): List<JsonObject> {
+            val rows = inner.select(table, columns, filters, order, limit)
+            if (filters.any { it is RowFilter.Gte }) release?.await()
+            return rows
+        }
+    }
 
     private fun TestScope.session(member: String): SessionManager {
         val stored = object : SessionStore {
@@ -234,5 +257,47 @@ class SleepLogRepositoryTest {
 
         assertEquals(oct5, anna.checkinDismissedOn.first())
         assertNull(repository(member = "someone-else").checkinDismissedOn.first())
+    }
+
+    @Test
+    fun `a read that was in flight never brings back a night saved after it`() = runTest {
+        seedDeviceNight()
+        val slow = SlowReads(fake)
+        val repo = repository(gateway = slow)
+        repo.refresh()
+        assertEquals(null, repo.recentLogs.first()?.single()?.quality)
+
+        // A read and a save race: the save waits for the read, then lands on top of it.
+        val gate = CompletableDeferred<Unit>()
+        slow.release = gate
+        backgroundScope.launch { repo.refresh() }
+        runCurrent()
+        backgroundScope.launch { repo.save(SleepRating(oct5, quality = 6, fatigue = null, note = null)) }
+        runCurrent()
+        gate.complete(Unit)
+        runCurrent()
+
+        assertEquals(6, repo.recentLogs.first()?.single()?.quality)
+    }
+
+    @Test
+    fun `two refreshes asked at once read once`() = runTest {
+        seedDeviceNight()
+        val slow = SlowReads(fake)
+        val repo = repository(gateway = slow)
+        val gate = CompletableDeferred<Unit>()
+        slow.release = gate
+
+        backgroundScope.launch { repo.refresh() }
+        backgroundScope.launch { repo.refresh() }
+        runCurrent()
+        gate.complete(Unit)
+        runCurrent()
+
+        assertEquals(1, fake.callsOf<FakePostgrestGateway.Call.Select>().size)
+        assertEquals(listOf(oct5), repo.recentLogs.first()?.map { it.date })
+        // Asked again later: a fresh read.
+        repo.refresh()
+        assertEquals(2, fake.callsOf<FakePostgrestGateway.Call.Select>().size)
     }
 }
