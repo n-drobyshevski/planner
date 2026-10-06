@@ -323,6 +323,7 @@ class InsightsViewModelTest {
         assertFalse(vm.state.value.refreshFailed)
         assertEquals(2, data.referenceRefreshes)
         assertEquals(unionOf(resolve()), data.refreshedWindows.last())
+        assertEquals(listOf(unionOf(resolve()), unionOf(resolve())), data.forcedWindows)
     }
 
     @Test

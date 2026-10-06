@@ -216,8 +216,12 @@ class ReminderScheduler @Inject constructor(
 /**
  * Re-plans reminders wherever the widgets re-render: after the periodic
  * sync, in-app writes and Realtime changes, and the sign-out wipe — the
- * same moments the cache they read from changes.
+ * same moments the cache they read from changes. It [followsClock]: the plan
+ * covers the next [ReminderPlanner.HORIZON] only, so a sync that changed
+ * nothing still moves it forward.
  */
 class ReminderRefresher @Inject constructor(private val scheduler: ReminderScheduler) : WidgetRefresher {
     override suspend fun refreshWidgets() = scheduler.replan()
+
+    override val followsClock: Boolean get() = true
 }

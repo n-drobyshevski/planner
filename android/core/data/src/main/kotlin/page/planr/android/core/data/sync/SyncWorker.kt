@@ -2,6 +2,8 @@ package page.planr.android.core.data.sync
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
@@ -12,20 +14,23 @@ import kotlin.coroutines.cancellation.CancellationException
 import page.planr.android.core.data.auth.NotSignedInException
 
 /**
- * Periodic background refresh (every 30 min on a network): the widgets' days
- * ([SyncWindows.aroundToday]), tasks and reference data into Room, then the
- * widgets. Built by the app's HiltWorkerFactory (see PlanrApplication's
- * WorkManager configuration).
+ * Periodic background refresh (every two hours on a network, see
+ * [SyncScheduler]): the widgets' days ([SyncWindows.aroundToday]), tasks and
+ * reference data into Room, then the widgets. Skipped while the app is on
+ * screen with Realtime joined: the cache is live already. Built by the app's
+ * HiltWorkerFactory (see PlanrApplication's WorkManager configuration).
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val runner: SyncRunner,
+    private val realtime: RealtimeSync,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = try {
-        runner.syncAll()
+        val process = ProcessLifecycleOwner.get().lifecycle.currentStateFlow.value
+        if (backgroundSyncNeeded(process, realtime.subscribed.value)) runner.syncAll() else runner.catchUpClock()
         Result.success()
     } catch (e: CancellationException) {
         throw e
@@ -37,6 +42,14 @@ class SyncWorker @AssistedInject constructor(
         }
     }
 }
+
+/**
+ * Whether a background sync has anything to do: not while the app is in the
+ * foreground ([process] at least STARTED) with Realtime [subscribed], since
+ * every change is reaching the cache already (and the join refetched).
+ */
+internal fun backgroundSyncNeeded(process: Lifecycle.State, subscribed: Boolean): Boolean =
+    !(process.isAtLeast(Lifecycle.State.STARTED) && subscribed)
 
 /** What a failed background sync should do next. */
 internal enum class SyncFailureOutcome {

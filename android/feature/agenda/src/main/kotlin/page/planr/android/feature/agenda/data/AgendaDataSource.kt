@@ -59,11 +59,11 @@ interface AgendaDataSource {
 
     suspend fun setAgendaMode(mode: AgendaMode)
 
-    /** Refetches members and categories. */
-    suspend fun refreshWorkspace()
+    /** Refetches members and categories; skipped when just fetched, unless [force]d. */
+    suspend fun refreshWorkspace(force: Boolean = false)
 
-    /** Refetches the events and overrides of [window]. */
-    suspend fun refreshWindow(window: TimeWindow)
+    /** Refetches the events and overrides of [window]; skipped when just fetched, unless [force]d. */
+    suspend fun refreshWindow(window: TimeWindow, force: Boolean = false)
 
     fun observeEvent(id: String): Flow<PlannerEvent?>
 

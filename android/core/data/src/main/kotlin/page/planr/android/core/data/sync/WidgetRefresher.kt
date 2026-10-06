@@ -26,12 +26,22 @@ import page.planr.android.core.data.di.ApplicationScope
  */
 interface WidgetRefresher {
     suspend fun refreshWidgets()
+
+    /**
+     * Whether what this renders moves on with the clock as well as with the
+     * cache (reminders are planned a rolling day ahead). Such a refresher
+     * also runs after a sync that changed nothing
+     * ([WidgetRefreshDispatcher.refreshClockBound]); the rest only when
+     * something did.
+     */
+    val followsClock: Boolean get() = false
 }
 
 /**
  * Fans refresh requests out to every [WidgetRefresher]. Writes and Realtime
  * changes call [requestRefresh] (debounced, so a burst of row changes
- * re-renders once); the periodic sync awaits [refreshNow].
+ * re-renders once); the periodic sync awaits [refreshNow] when it changed
+ * the cache, and [refreshClockBound] when it didn't.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -53,8 +63,13 @@ class WidgetRefreshDispatcher @Inject constructor(
         requests.tryEmit(Unit)
     }
 
-    suspend fun refreshNow() {
-        for (refresher in refreshers.get()) {
+    suspend fun refreshNow() = refresh(refreshers.get())
+
+    /** Only the refreshers that [follow the clock][WidgetRefresher.followsClock]: the cache didn't change. */
+    suspend fun refreshClockBound() = refresh(refreshers.get().filter { it.followsClock })
+
+    private suspend fun refresh(targets: Collection<WidgetRefresher>) {
+        for (refresher in targets) {
             try {
                 refresher.refreshWidgets()
             } catch (e: CancellationException) {

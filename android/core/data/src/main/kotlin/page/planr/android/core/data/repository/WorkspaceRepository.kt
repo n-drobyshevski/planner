@@ -2,11 +2,13 @@ package page.planr.android.core.data.repository
 
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import page.planr.android.core.data.auth.SessionManager
 import page.planr.android.core.data.local.CacheArea
 import page.planr.android.core.data.local.CacheGate
+import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.local.dao.WorkspaceDao
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
@@ -27,6 +29,7 @@ class WorkspaceRepository @Inject constructor(
     private val dao: WorkspaceDao,
     private val gate: CacheGate,
     private val widgets: WidgetRefreshDispatcher,
+    private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, Clock.System),
 ) {
 
     /** Both members, oldest first (Member A, then Member B). */
@@ -58,16 +61,25 @@ class WorkspaceRepository @Inject constructor(
         widgets.requestRefresh()
     }
 
-    /** Refetches the bundle (`fetchWorkspaceBundle`) and replaces the cached copy. */
-    suspend fun refresh() {
+    /**
+     * Refetches the bundle (`fetchWorkspaceBundle`) and replaces the cached
+     * copy. Joins a refresh already running and skips one done moments ago
+     * unless [force]d ([RefreshCoalescer]). Returns whether the cache changed
+     * (an identical snapshot is not written).
+     */
+    suspend fun refresh(force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
-        gate.refresh(CacheArea.Workspace, fetch = { queries.fetchWorkspaceBundle() }) { bundle ->
-            dao.replaceAll(
-                workspaceId = ws,
-                members = bundle.members.map { it.toEntity() },
-                categories = bundle.categories.map { it.toEntity() },
-                boards = bundle.boards.map { it.toEntity() },
-            )
+        return coalescer.refresh(ws, force) {
+            var changed = false
+            gate.refresh(CacheArea.Workspace, fetch = { queries.fetchWorkspaceBundle() }) { bundle ->
+                changed = dao.replaceIfChanged(
+                    workspaceId = ws,
+                    members = bundle.members.map { it.toEntity() },
+                    categories = bundle.categories.map { it.toEntity() },
+                    boards = bundle.boards.map { it.toEntity() },
+                )
+            }
+            changed
         }
     }
 }

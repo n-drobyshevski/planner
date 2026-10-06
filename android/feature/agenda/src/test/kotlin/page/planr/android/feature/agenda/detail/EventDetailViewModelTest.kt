@@ -129,6 +129,8 @@ class EventDetailViewModelTest {
         val gone = open(Occurrence.recurringKey("nope", monday))
         assertEquals(EventDetailUiState.Missing, gone.vm.state.value)
         assertTrue(data.refreshedWindows.any { monday in it.start..it.end })
+        // Forced: a window fetched moments ago still lacks the event, so its freshness can't count.
+        assertEquals(1, data.forcedRefreshes)
         h.vm.viewModelScope.cancel()
         gone.vm.viewModelScope.cancel()
     }

@@ -366,6 +366,8 @@ class AgendaViewModelTest {
         vm.refresh()
         runCurrent()
         assertEquals(2, data.workspaceRefreshes)
+        // The opening refreshes may be skipped as fresh; the pull's never are.
+        assertEquals(2, data.forcedRefreshes)
         assertTrue(messages.isEmpty())
         assertFalse(vm.state.value.isRefreshing)
 

@@ -46,6 +46,9 @@ class FakeAgendaDataSource(
     val observedWindows = mutableListOf<TimeWindow>()
     val refreshedWindows = mutableListOf<TimeWindow>()
     var workspaceRefreshes = 0
+
+    /** How many refreshes (workspace or window) were forced. */
+    var forcedRefreshes = 0
     val calls = mutableListOf<Call>()
 
     /** Thrown by the next write (and by refreshes while set). */
@@ -119,13 +122,15 @@ class FakeAgendaDataSource(
         }
     }
 
-    override suspend fun refreshWorkspace() {
+    override suspend fun refreshWorkspace(force: Boolean) {
         workspaceRefreshes++
+        if (force) forcedRefreshes++
         failRefresh?.let { throw it }
     }
 
-    override suspend fun refreshWindow(window: TimeWindow) {
+    override suspend fun refreshWindow(window: TimeWindow, force: Boolean) {
         refreshedWindows += window
+        if (force) forcedRefreshes++
         failRefresh?.let { throw it }
     }
 

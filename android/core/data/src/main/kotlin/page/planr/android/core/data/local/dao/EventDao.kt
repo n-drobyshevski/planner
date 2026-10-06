@@ -22,6 +22,12 @@ abstract class EventDao {
     )
     abstract fun observeWindow(workspaceId: String, start: Long, end: Long): Flow<List<EventEntity>>
 
+    @Query("SELECT * FROM events WHERE $IN_WINDOW")
+    abstract suspend fun eventsInWindow(workspaceId: String, start: Long, end: Long): List<EventEntity>
+
+    @Query("SELECT * FROM event_overrides WHERE event_id IN (SELECT id FROM events WHERE $IN_WINDOW)")
+    abstract suspend fun overridesInWindow(workspaceId: String, start: Long, end: Long): List<EventOverrideEntity>
+
     @Query("SELECT id FROM events WHERE $IN_WINDOW")
     abstract suspend fun idsInWindow(workspaceId: String, start: Long, end: Long): List<String>
 

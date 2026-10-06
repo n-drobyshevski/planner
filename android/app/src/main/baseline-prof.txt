@@ -1,0 +1,57 @@
+# Baseline profile for Planr's cold start, written by hand (there is no
+# macrobenchmark module yet). profileinstaller installs it with the app, so
+# ART compiles these classes ahead of time instead of interpreting them on
+# the first launches. Compose, Room, Hilt and the other AndroidX libraries
+# ship their own profiles; these rules cover Planr's code on the way to the
+# first agenda frame:
+#
+#   PlanrApplication (Hilt graph, DataInitializer) -> MainActivity ->
+#   PlanrTheme -> PlanrNavHost -> AgendaScreen / AgendaViewModel ->
+#   OccurrenceRepository (Room + recurrence expansion) -> EventRepository.
+#
+# Syntax: H = hot, S = run at startup, P = run after startup; ** matches any
+# path or name. Keep it to the startup path: every rule costs install time
+# and disk.
+
+# Application and the Hilt graph
+HSPLpage/planr/android/PlanrApplication*;->**(**)**
+HSPLpage/planr/android/Hilt_PlanrApplication*;->**(**)**
+HSPLpage/planr/android/DaggerPlanrApplication_HiltComponents_SingletonC*;->**(**)**
+HSPLpage/planr/android/core/data/sync/DataInitializer*;->**(**)**
+HSPLpage/planr/android/core/data/di/**;->**(**)**
+HSPLpage/planr/android/core/data/auth/SessionManager*;->**(**)**
+HSPLpage/planr/android/core/data/appearance/**;->**(**)**
+
+# The activity, theme and navigation
+HSPLpage/planr/android/MainActivity*;->**(**)**
+HSPLpage/planr/android/Hilt_MainActivity*;->**(**)**
+HSPLpage/planr/android/navigation/**;->**(**)**
+HSPLpage/planr/android/core/design/**;->**(**)**
+
+# The agenda, the first screen
+HSPLpage/planr/android/feature/agenda/**;->**(**)**
+
+# Its data: Room cache, repositories, recurrence expansion, models
+HSPLpage/planr/android/core/data/repository/OccurrenceRepository*;->**(**)**
+HSPLpage/planr/android/core/data/repository/EventRepository*;->**(**)**
+HSPLpage/planr/android/core/data/repository/WorkspaceRepository*;->**(**)**
+HSPLpage/planr/android/core/data/repository/WorkspaceScope*;->**(**)**
+HSPLpage/planr/android/core/data/local/**;->**(**)**
+HSPLpage/planr/android/core/data/prefs/**;->**(**)**
+HSPLpage/planr/android/core/recurrence/**;->**(**)**
+HSPLpage/planr/android/core/model/**;->**(**)**
+
+# Load these classes at startup too (class rules)
+Lpage/planr/android/PlanrApplication;
+Lpage/planr/android/MainActivity;
+Lpage/planr/android/navigation/**;
+Lpage/planr/android/core/design/**;
+Lpage/planr/android/feature/agenda/*;
+Lpage/planr/android/feature/agenda/ui/**;
+Lpage/planr/android/feature/agenda/model/**;
+Lpage/planr/android/core/data/repository/OccurrenceRepository;
+Lpage/planr/android/core/data/repository/EventRepository;
+Lpage/planr/android/core/data/sync/DataInitializer;
+Lpage/planr/android/core/data/local/**;
+Lpage/planr/android/core/recurrence/**;
+Lpage/planr/android/core/model/**;

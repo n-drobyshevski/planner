@@ -86,11 +86,12 @@ class EventDetailViewModel @AssistedInject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EventDetailUiState.Loading)
 
     init {
-        // Opened from a widget or a link before the cache has the event: fetch around it.
+        // Opened from a widget or a link before the cache has the event: fetch around it
+        // (forced: the cache is known to lack it, however recently that window was fetched).
         viewModelScope.launch {
             val anchor = this@EventDetailViewModel.ref.occurrenceDate
             if (anchor != null && data.getEvent(this@EventDetailViewModel.ref.eventId) == null) {
-                runCatchingNonCancel { data.refreshWindow(TimeWindow(anchor - 1.days, anchor + 1.days)) }
+                runCatchingNonCancel { data.refreshWindow(TimeWindow(anchor - 1.days, anchor + 1.days), force = true) }
             }
         }
     }

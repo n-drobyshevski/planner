@@ -25,10 +25,10 @@ interface InsightsDataSource {
     /** Expanded occurrences overlapping [window] from Room. Must NOT mark VisibleWindowTracker. */
     fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>>
 
-    /** Fetches [window] into Room (EventRepository.refreshWindow). */
-    suspend fun refreshWindow(window: TimeWindow)
+    /** Fetches [window] into Room (EventRepository.refreshWindow); skipped when just fetched, unless [force]d. */
+    suspend fun refreshWindow(window: TimeWindow, force: Boolean = false)
 
-    /** Workspace bundle + tasks (pull-to-refresh only). */
+    /** Workspace bundle + tasks (pull-to-refresh only, so always forced). */
     suspend fun refreshReference()
 
     fun observeFilters(viewerId: String): Flow<InsightsFilterPrefs>

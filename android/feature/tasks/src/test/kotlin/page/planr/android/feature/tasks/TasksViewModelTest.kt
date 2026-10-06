@@ -166,6 +166,7 @@ class TasksViewModelTest {
         vm.refresh()
 
         assertEquals(2, data.refreshCount)
+        assertEquals(1, data.forcedRefreshCount, "only the pull is forced, not the opening refresh")
         assertEquals(TasksNotice.Failed, vm.state.value.notice)
         assertEquals(false, vm.state.value.refreshing)
     }

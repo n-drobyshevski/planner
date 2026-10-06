@@ -35,7 +35,8 @@ class RepositorySleepBlockCalendar @Inject constructor(
     private val events: EventRepository,
 ) : SleepBlockCalendar {
     override suspend fun occurrences(window: TimeWindow, zoneId: String): List<Occurrence> {
-        occurrences.refresh(window)
+        // Forced: what this returns decides whether a block is created or moved.
+        occurrences.refresh(window, force = true)
         return occurrences.snapshot(window, TimeZone.of(zoneId))
     }
 

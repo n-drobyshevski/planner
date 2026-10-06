@@ -67,6 +67,11 @@ android {
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
+            // Drops resources R8 left unreferenced. Everything Planr loads is
+            // referenced statically (R.drawable in code, the manifest's icons,
+            // shortcuts.xml, the widgets' info XML and preview layouts), so
+            // nothing needs a res/raw/keep.xml.
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -80,6 +85,14 @@ android {
 // APKs are named after the version: planr-0.2.0-143-debug.apk.
 base {
     archivesName = "planr-$appVersionName-$appVersionCode"
+}
+
+// kotlin-reflect reaches the APK only through postgrest-kt, which needs it
+// just for typed property filters (`Model::field`); Planr filters by column
+// name and decodes JsonObject. Left out of both app variants, so a debug
+// build would surface any use first; R8 reports no missing classes without it.
+configurations.matching { it.name == "debugRuntimeClasspath" || it.name == "releaseRuntimeClasspath" }.configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
 }
 
 dependencies {
@@ -102,6 +115,8 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.browser)
+    // Installs src/main/baseline-prof.txt (AOT-compiled startup path) on sideloaded builds too.
+    implementation(libs.androidx.profileinstaller)
 
     testImplementation(libs.kotlinx.coroutines.test)
 }

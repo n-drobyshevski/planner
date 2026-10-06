@@ -43,8 +43,11 @@ interface TasksDataSource {
 
     fun observeBoards(): Flow<List<Board>>
 
-    /** Refetches tasks and the workspace bundle (members, categories, boards). */
-    suspend fun refresh()
+    /**
+     * Refetches tasks and the workspace bundle (members, categories, boards);
+     * skipped when just fetched, unless [force]d (pull-to-refresh).
+     */
+    suspend fun refresh(force: Boolean = false)
 
     /** The web checkbox: complete or reopen, moving the task between boards. */
     suspend fun setDone(task: Task, done: Boolean): Task
@@ -102,11 +105,12 @@ class RepositoryTasksDataSource @Inject constructor(
 
     override fun observeBoards(): Flow<List<Board>> = workspace.observeBoards()
 
-    override suspend fun refresh() = coroutineScope {
-        val bundle = async { workspace.refresh() }
-        val rows = async { tasks.refresh() }
+    override suspend fun refresh(force: Boolean) = coroutineScope {
+        val bundle = async { workspace.refresh(force) }
+        val rows = async { tasks.refresh(force) }
         bundle.await()
         rows.await()
+        Unit
     }
 
     override suspend fun setDone(task: Task, done: Boolean): Task = tasks.setDone(task, done)

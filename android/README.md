@@ -288,14 +288,29 @@ widgets.
   `postgres_changes` channel per workspace, with the same tables and
   `workspace_id` filter as `lib/supabase/realtime.ts`. Deletes can't be
   filtered (their old record holds only the primary key), so each table also
-  has an unfiltered DELETE binding. Changes go into Room.
+  has an unfiltered DELETE binding. Changes go into Room. The channel stays
+  joined for 60 s after the app leaves the foreground, so coming back within
+  that time neither rejoins nor refetches.
   Every (re)join refetches the visible window, tasks and reference data, in
   case something was missed while disconnected.
-- **Periodic, while signed in.** `SyncScheduler` keeps a 30-minute periodic
-  `SyncWorker` (network required), plus one immediate run after a fresh
-  sign-in. It cancels both on sign-out. The worker syncs the days the widgets
-  can show (today ±7 days and this month's whole weeks, `SyncWindows`),
-  tasks and reference data.
+- **Coalesced refreshes.** `EventRepository` (per window), `TaskRepository`
+  and `WorkspaceRepository` refresh through a `RefreshCoalescer`: a caller
+  joins a refresh of the same data already running, and one that succeeded
+  less than 30 s ago is not repeated unless forced (pull-to-refresh, the
+  periodic or requested sync). A sign-out wipe makes it stale at once, and
+  so does every Realtime (re)join: a refresh begun before the channel was
+  subscribed may miss changes that will never arrive over it, so the join's
+  refetch neither joins nor skips one. A snapshot identical to the cache is not
+  written; the refresh reports `changed = false` and `SyncRunner` then skips
+  the widgets, re-planning only reminders (their plan rolls with the clock).
+- **Periodic, while signed in.** `SyncScheduler` keeps a two-hourly periodic
+  `SyncWorker` (network required, not on a low battery), plus one immediate
+  run after a fresh sign-in. It cancels both on sign-out. The worker syncs the
+  days the widgets can show (today ±7 days and this month's whole weeks,
+  `SyncWindows`), tasks and reference data. It does nothing while the app is
+  in the foreground with the Realtime channel joined (`RealtimeSync.subscribed`):
+  the cache is live then. Two hours is enough: reminders are planned a day
+  ahead and the widgets turn the day over with their own midnight alarm.
 - **Start-up.** `PlanrApplication.onCreate` starts both through
   `DataInitializer`.
 - **Workers.** WorkManager is configured by `PlanrApplication` with
