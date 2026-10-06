@@ -21,4 +21,6 @@
     <string name="inbox_done_ago">Выполнено %1$s</string>
     <string name="inbox_rate_failed">Не удалось сохранить оценку. Попробуй ещё раз.</string>
     <string name="inbox_request_failed">Не удалось обновить запрос. Попробуй ещё раз.</string>
+    <!-- Accessibility action on the error line: tapping it clears it. -->
+    <string name="inbox_error_dismiss">Скрыть</string>
 </resources>

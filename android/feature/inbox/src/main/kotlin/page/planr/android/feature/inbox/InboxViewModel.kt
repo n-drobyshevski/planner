@@ -9,6 +9,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -80,6 +81,7 @@ class InboxViewModel @Inject constructor(
     private val eventCreated = mutableSetOf<String>()
 
     private var refreshJob: Job? = null
+    private var errorTimeout: Job? = null
 
     @Volatile
     private var latest: InboxSnapshot? = null
@@ -111,9 +113,11 @@ class InboxViewModel @Inject constructor(
 
     /**
      * Rereads what the rows come from: the requests, the nights, the tasks
-     * and the last few days of events. Failures keep what is shown.
+     * and the last few days of events. Failures keep what is shown. A failed
+     * write's line goes: the rows it was about are about to be reread.
      */
     fun refresh() {
+        dismissError()
         if (refreshJob?.isActive == true) return
         refreshJob = viewModelScope.launch {
             coroutineScope {
@@ -163,7 +167,9 @@ class InboxViewModel @Inject constructor(
         resolve(item.id, InboxError.RequestFailed) { data.markDeclined(item.requestId) }
     }
 
+    /** Clears the error line (tapped, or on its own after [ERROR_VISIBLE_MS]). */
     fun dismissError() {
+        errorTimeout?.cancel()
         error.value = null
     }
 
@@ -211,7 +217,7 @@ class InboxViewModel @Inject constructor(
     private fun resolve(id: String, failure: InboxError, write: suspend () -> Unit) {
         if (id in hidden.value) return
         hidden.update { it + id }
-        error.value = null
+        dismissError()
         viewModelScope.launch {
             try {
                 write()
@@ -219,8 +225,18 @@ class InboxViewModel @Inject constructor(
                 throw e
             } catch (_: Exception) {
                 hidden.update { it - id }
-                error.value = failure
+                showError(failure)
             }
+        }
+    }
+
+    /** Shows [failure] for [ERROR_VISIBLE_MS], then lets it go. */
+    private fun showError(failure: InboxError) {
+        errorTimeout?.cancel()
+        error.value = failure
+        errorTimeout = viewModelScope.launch {
+            delay(ERROR_VISIBLE_MS)
+            error.value = null
         }
     }
 
@@ -239,8 +255,11 @@ class InboxViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val STOP_TIMEOUT_MS = 5_000L
+    internal companion object {
+        private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How long a failed write's line stays before it goes on its own. */
+        const val ERROR_VISIBLE_MS = 6_000L
     }
 }
 
