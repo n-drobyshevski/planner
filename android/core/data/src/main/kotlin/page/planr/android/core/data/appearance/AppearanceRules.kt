@@ -14,8 +14,18 @@ internal object AppearanceRules {
         ThemePreference.System -> UiModeManager.MODE_NIGHT_AUTO
     }
 
-    /** Only a change reaches the platform (it recreates every activity); nothing applied yet always does. */
-    fun shouldApplyTheme(lastApplied: ThemePreference?, wanted: ThemePreference): Boolean = lastApplied != wanted
+    /**
+     * Only a change reaches the platform (it recreates every activity); nothing
+     * applied yet always does. So does a preference cached while the platform
+     * could not keep it ([reachedPlatform] false) once it can ([platformKeeps]:
+     * the phone was updated to Android 12+), as the system has never seen it.
+     */
+    fun shouldApplyTheme(
+        lastApplied: ThemePreference?,
+        wanted: ThemePreference,
+        platformKeeps: Boolean,
+        reachedPlatform: Boolean,
+    ): Boolean = lastApplied != wanted || (platformKeeps && !reachedPlatform)
 
     /** `members.locale` as a language tag; the DB CHECK and the web's next-intl locales are both en | ru. */
     fun languageTagFor(locale: AppLocale): String = when (locale) {

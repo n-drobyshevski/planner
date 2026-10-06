@@ -5,6 +5,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.os.Build
 import android.os.LocaleList
+import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.RequiresApi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -12,6 +13,9 @@ import page.planr.android.core.model.ThemePreference
 
 /** Where [MemberAppearanceApplier]'s decisions reach Android; a fake in tests. */
 interface AppearancePlatform {
+    /** Whether [setNightMode] reaches the system, which then keeps it across restarts (API 31+). */
+    val keepsNightMode: Boolean
+
     /** Persists the app's own night mode (API 31+; a no-op before, see [ThemeModeStore]). */
     fun setNightMode(preference: ThemePreference)
 
@@ -31,6 +35,10 @@ interface AppearancePlatform {
 class AndroidAppearancePlatform @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : AppearancePlatform {
+
+    @get:ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
+    override val keepsNightMode: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     override fun setNightMode(preference: ThemePreference) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return

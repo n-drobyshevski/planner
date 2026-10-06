@@ -3,6 +3,7 @@ package page.planr.android.core.data.appearance
 import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -39,17 +40,19 @@ annotation class AppearanceDataStore
  * always null. Before that, nothing outside the app knows the preference:
  * activities pass [forcedDark] to PlanrTheme and the system bars, and it is
  * read once, blocking, on first use, so a cold start draws the right theme
- * from the first frame. The file holds one short string.
+ * from the first frame. The file holds one short string and a flag.
  */
 @Singleton
 class ThemeModeStore @Inject constructor(
     @AppearanceDataStore private val dataStore: DataStore<Preferences>,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
+    // A corrupt or unreadable file reads as nothing applied yet.
+    private val stored: Flow<Preferences> =
+        dataStore.data.catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+
     private val preference: Flow<ThemePreference?> =
-        dataStore.data
-            // A corrupt or unreadable file reads as nothing applied yet.
-            .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        stored
             .map { prefs -> prefs[THEME]?.let { name -> ThemePreference.entries.firstOrNull { it.name == name } } }
             .distinctUntilChanged()
 
@@ -66,11 +69,18 @@ class ThemeModeStore @Inject constructor(
     /** The preference last handed to the platform; null before the member's row first loaded. */
     suspend fun lastApplied(): ThemePreference? = preference.first()
 
-    suspend fun save(preference: ThemePreference) {
-        dataStore.edit { it[THEME] = preference.name }
+    /** Whether [lastApplied] reached a platform that keeps it ([AppearancePlatform.keepsNightMode]). */
+    suspend fun lastAppliedOnPlatform(): Boolean = stored.first()[ON_PLATFORM] ?: false
+
+    suspend fun save(preference: ThemePreference, onPlatform: Boolean) {
+        dataStore.edit {
+            it[THEME] = preference.name
+            it[ON_PLATFORM] = onPlatform
+        }
     }
 
     private companion object {
         val THEME = stringPreferencesKey("theme_preference")
+        val ON_PLATFORM = booleanPreferencesKey("theme_on_platform")
     }
 }

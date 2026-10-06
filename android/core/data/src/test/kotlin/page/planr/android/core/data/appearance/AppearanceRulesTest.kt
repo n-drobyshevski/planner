@@ -28,9 +28,19 @@ class AppearanceRulesTest {
 
     @Test
     fun `a theme reaches the platform only when it changed`() {
-        assertTrue(AppearanceRules.shouldApplyTheme(lastApplied = null, wanted = ThemePreference.System))
-        assertTrue(AppearanceRules.shouldApplyTheme(lastApplied = ThemePreference.Light, wanted = ThemePreference.Dark))
-        assertFalse(AppearanceRules.shouldApplyTheme(lastApplied = ThemePreference.Dark, wanted = ThemePreference.Dark))
+        for (keeps in listOf(false, true)) {
+            assertTrue(AppearanceRules.shouldApplyTheme(null, ThemePreference.System, platformKeeps = keeps, reachedPlatform = false))
+            assertTrue(AppearanceRules.shouldApplyTheme(ThemePreference.Light, ThemePreference.Dark, platformKeeps = keeps, reachedPlatform = keeps))
+            assertFalse(AppearanceRules.shouldApplyTheme(ThemePreference.Dark, ThemePreference.Dark, platformKeeps = keeps, reachedPlatform = keeps))
+        }
+    }
+
+    @Test
+    fun `a theme cached before the platform could keep it reaches the platform once it can`() {
+        // Applied on Android 11 (cache only), the phone since updated to 12+.
+        assertTrue(AppearanceRules.shouldApplyTheme(ThemePreference.Dark, ThemePreference.Dark, platformKeeps = true, reachedPlatform = false))
+        // Still below 12: the cache is all there is.
+        assertFalse(AppearanceRules.shouldApplyTheme(ThemePreference.Dark, ThemePreference.Dark, platformKeeps = false, reachedPlatform = false))
     }
 
     @Test

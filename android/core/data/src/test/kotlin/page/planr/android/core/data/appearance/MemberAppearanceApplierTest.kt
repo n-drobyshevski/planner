@@ -2,17 +2,26 @@
 
 package page.planr.android.core.data.appearance
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 import page.planr.android.core.data.sync.WidgetRefresher
 import page.planr.android.core.model.AppLocale
@@ -30,6 +39,8 @@ class MemberAppearanceApplierTest {
 
     private class FakePlatform : AppearancePlatform {
         val nightModes = mutableListOf<ThemePreference>()
+        /** false: below API 31. */
+        override var keepsNightMode = false
         /** null: no per-app language (below API 33). */
         var appTags: List<String>? = emptyList()
         var systemTags = listOf("en-GB")
@@ -126,12 +137,76 @@ class MemberAppearanceApplierTest {
     @Test
     fun `a theme already applied on a previous run is not applied again`() = runTest {
         val store = store()
-        store.save(ThemePreference.Dark)
+        store.save(ThemePreference.Dark, onPlatform = false)
         applier(store)
         member.value = me(ThemePreference.Dark)
         runCurrent()
 
         assertEquals(emptyList(), platform.nightModes)
+    }
+
+    @Test
+    fun `a theme the platform already keeps is not applied again`() = runTest {
+        platform.keepsNightMode = true
+        val store = store()
+        store.save(ThemePreference.Dark, onPlatform = true)
+        applier(store)
+        member.value = me(ThemePreference.Dark)
+        runCurrent()
+
+        assertEquals(emptyList(), platform.nightModes)
+    }
+
+    @Test
+    fun `a theme cached before an update to Android 12 reaches the platform once`() = runTest {
+        val store = store()
+        store.save(ThemePreference.Dark, onPlatform = false)
+        platform.keepsNightMode = true
+        applier(store)
+        member.value = me(ThemePreference.Dark)
+        runCurrent()
+
+        assertEquals(listOf(ThemePreference.Dark), platform.nightModes)
+        assertEquals(true, store.lastAppliedOnPlatform())
+    }
+
+    @Test
+    fun `a theme that cannot be remembered still reaches the platform`() = runTest {
+        platform.keepsNightMode = true
+        val unwritable = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flowOf(emptyPreferences())
+
+            override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
+                throw IOException("No space left on device")
+        }
+        applier(ThemeModeStore(unwritable, backgroundScope))
+        member.value = me(ThemePreference.Dark)
+        runCurrent()
+
+        assertEquals(listOf(ThemePreference.Dark), platform.nightModes)
+    }
+
+    @Test
+    fun `below Android 12 the open screens follow the applied theme`() = runTest {
+        // Unit tests run with Build.VERSION.SDK_INT 0: the cache-backed path.
+        val store = store()
+        applier(store)
+        // Its first read blocks the calling thread (the main thread, in the app) while
+        // DataStore reads on its own; here that is the test dispatcher, so read off it.
+        val forcedDark = withContext(Dispatchers.Default) { store.forcedDark }
+        assertNull(forcedDark.value)
+
+        member.value = me(ThemePreference.Dark)
+        runCurrent()
+        assertEquals(true, forcedDark.value)
+
+        member.value = me(ThemePreference.Light)
+        runCurrent()
+        assertEquals(false, forcedDark.value)
+
+        member.value = me(ThemePreference.System)
+        runCurrent()
+        assertNull(forcedDark.value)
     }
 
     @Test

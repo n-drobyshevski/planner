@@ -1,5 +1,6 @@
 package page.planr.android.core.data.appearance
 
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -62,9 +63,14 @@ class MemberAppearanceApplier internal constructor(
     }
 
     private suspend fun applyTheme(preference: ThemePreference) {
-        if (!AppearanceRules.shouldApplyTheme(themeMode.lastApplied(), preference)) return
+        val keeps = platform.keepsNightMode
+        if (!AppearanceRules.shouldApplyTheme(themeMode.lastApplied(), preference, keeps, themeMode.lastAppliedOnPlatform())) return
         // The cache first: before API 31 it is what the open screens redraw from.
-        themeMode.save(preference)
+        try {
+            themeMode.save(preference, onPlatform = keeps)
+        } catch (_: IOException) {
+            // Not remembered, so applied again on the next start; the platform still takes it now.
+        }
         platform.setNightMode(preference)
     }
 
