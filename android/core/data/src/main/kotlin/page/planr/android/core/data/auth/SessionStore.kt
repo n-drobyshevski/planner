@@ -1,11 +1,14 @@
 package page.planr.android.core.data.auth
 
+import android.util.Log
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import java.util.Base64
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.KSerializer
 import page.planr.android.core.model.PlanrJson
@@ -27,6 +30,11 @@ interface SessionStore {
  * [TokenCipher] (Keystore AES-GCM in production). A value that no longer
  * decrypts — e.g. the Keystore key was wiped — reads as absent and is removed,
  * which simply sends the user back to sign-in.
+ *
+ * Never throws: a store that can't be read (I/O, a Keystore failure) reads
+ * as signed out, and a failed write is logged and dropped — the in-memory
+ * session in [SessionManager] carries on, at worst asking for a sign-in on the
+ * next launch.
  */
 class DataStoreSessionStore @Inject constructor(
     @SessionDataStore private val dataStore: DataStore<Preferences>,
@@ -43,18 +51,25 @@ class DataStoreSessionStore @Inject constructor(
         write(PENDING, pending, PendingAuthorization.serializer())
 
     private suspend fun <T> read(key: Preferences.Key<String>, serializer: KSerializer<T>): T? {
-        val stored = dataStore.data.first()[key] ?: return null
+        val stored = try {
+            dataStore.data.first()[key]
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't read the stored session", e)
+            return null
+        } ?: return null
         return runCatching {
             val plain = cipher.decrypt(Base64.getDecoder().decode(stored))
             PlanrJson.decodeFromString(serializer, plain.decodeToString())
         }.getOrElse {
-            dataStore.edit { it.remove(key) }
+            edit { it.remove(key) }
             null
         }
     }
 
     private suspend fun <T> write(key: Preferences.Key<String>, value: T?, serializer: KSerializer<T>) {
-        dataStore.edit { prefs ->
+        edit { prefs ->
             if (value == null) {
                 prefs.remove(key)
             } else {
@@ -64,8 +79,19 @@ class DataStoreSessionStore @Inject constructor(
         }
     }
 
+    private suspend fun edit(transform: (MutablePreferences) -> Unit) {
+        try {
+            dataStore.edit(transform)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't store the session", e)
+        }
+    }
+
     private companion object {
         val SESSION = stringPreferencesKey("session")
         val PENDING = stringPreferencesKey("pending_authorization")
+        const val TAG = "Planr"
     }
 }

@@ -2,8 +2,10 @@ package page.planr.android.core.data.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.Binds
 import dagger.Module
@@ -58,6 +60,7 @@ abstract class PreferencesModule {
         @ViewPreferencesDataStore
         fun provideViewPreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
             PreferenceDataStoreFactory.create(
+                corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 produceFile = { context.preferencesDataStoreFile("planr_view") },
             )
@@ -67,6 +70,7 @@ abstract class PreferencesModule {
         @InsightsPreferencesDataStore
         fun provideInsightsPreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
             PreferenceDataStoreFactory.create(
+                corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 produceFile = { context.preferencesDataStoreFile("planr_insights") },
             )
@@ -76,6 +80,7 @@ abstract class PreferencesModule {
         @HealthPrefsDataStore
         fun provideHealthPrefsDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
             PreferenceDataStoreFactory.create(
+                corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
                 produceFile = { context.preferencesDataStoreFile("planr_health") },
             )

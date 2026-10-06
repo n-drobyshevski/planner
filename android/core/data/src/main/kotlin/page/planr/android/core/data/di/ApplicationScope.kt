@@ -5,7 +5,7 @@ import javax.inject.Qualifier
 /**
  * A process-lifetime CoroutineScope (SupervisorJob + Dispatchers.Default) for
  * work that must outlive any screen: the OAuth exchange, token refresh,
- * Realtime sync.
+ * Realtime sync. An uncaught failure there is logged, not fatal.
  */
 @Qualifier
 @Retention(AnnotationRetention.BINARY)

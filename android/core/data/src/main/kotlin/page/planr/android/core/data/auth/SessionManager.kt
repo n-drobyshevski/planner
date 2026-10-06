@@ -1,5 +1,6 @@
 package page.planr.android.core.data.auth
 
+import android.util.Log
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.inject.Inject
@@ -169,13 +170,21 @@ class SessionManager @Inject constructor(
      * the fresh sign-in with "signed out".
      */
     private suspend fun restore() = stateMutex.withLock {
-        val stored = store.readSession()
+        val stored = try {
+            store.readSession()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // An unreadable store is "signed out", never a stuck Loading.
+            Log.w(TAG, "Couldn't restore the session", e)
+            null
+        }
         val info = stored?.info()
         if (stored != null && info != null) {
             session.value = stored
             _authState.value = AuthState.SignedIn(info)
         } else {
-            if (stored != null) store.writeSession(null) // a half-finished sign-in
+            if (stored != null) persist(null) // a half-finished sign-in
             _authState.value = AuthState.SignedOut()
         }
     }
@@ -239,7 +248,7 @@ class SessionManager @Inject constructor(
         // only guards a sign-in that replaced the session meanwhile.
         if (session.value?.refreshToken != current.refreshToken) return session.value?.accessToken
         val updated = current.refreshedWith(tokens, clock.now())
-        store.writeSession(updated)
+        persist(updated)
         session.value = updated
         return updated.accessToken
     }
@@ -259,10 +268,32 @@ class SessionManager @Inject constructor(
      */
     private suspend fun clearSession(reason: SignOutReason) {
         session.value = null
-        store.writeSession(null)
-        store.writePending(null)
+        persist(null)
+        try {
+            store.writePending(null)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't clear the pending sign-in", e)
+        }
         _authState.value = AuthState.SignedOut(reason)
         localData.clearAll()
+    }
+
+    /**
+     * Stores [value], logging rather than throwing on failure: the rotated
+     * tokens must reach [session] either way (the old refresh token is already
+     * spent), and a crash here would take the whole process down. At worst the
+     * next launch asks for a sign-in.
+     */
+    private suspend fun persist(value: StoredSession?) {
+        try {
+            store.writeSession(value)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't store the session", e)
+        }
     }
 
     /**
@@ -301,6 +332,8 @@ class SessionManager @Inject constructor(
         val PENDING_TTL: Duration = 15.minutes
 
         val RETRY_DELAY: Duration = 30.seconds
+
+        private const val TAG = "Planr"
     }
 }
 
