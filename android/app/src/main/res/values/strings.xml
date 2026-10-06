@@ -58,6 +58,16 @@
     <string name="settings_notifications_title">Notifications</string>
     <string name="settings_success_toasts">Show success notifications</string>
     <string name="settings_success_toasts_description">Brief confirmations after an action (like “Event updated”). Turn off to mute them — errors and anything you can undo always show.</string>
+    <string name="settings_reminders_title">Reminders</string>
+    <string name="settings_reminders_description">A quiet notification before your own and shared timed events. Set for this phone only.</string>
+    <string name="settings_reminders_lead">Remind me</string>
+    <string name="settings_reminders_off">Off</string>
+    <plurals name="settings_reminders_minutes_before">
+        <item quantity="one">%d minute before</item>
+        <item quantity="other">%d minutes before</item>
+    </plurals>
+    <string name="settings_reminders_blocked">Notifications are blocked for Planr, so reminders can’t show. You can allow them in the system settings.</string>
+    <string name="settings_reminders_open_settings">Open notification settings</string>
     <string name="settings_sleep_title">Sleep</string>
     <string name="settings_sleep_description">Which calendar blocks count as your nights, and whether sleep check-ins move them. Private to you.</string>
     <string name="settings_sleep_unavailable">Couldn\'t load your sleep settings.</string>

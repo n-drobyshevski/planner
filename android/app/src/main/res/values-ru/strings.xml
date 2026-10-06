@@ -53,6 +53,18 @@
     <string name="settings_notifications_title">Уведомления</string>
     <string name="settings_success_toasts">Показывать уведомления об успехе</string>
     <string name="settings_success_toasts_description">Краткие подтверждения после действия (например, «Событие обновлено»). Выключи, чтобы заглушить их — ошибки и всё, что можно отменить, показываются всегда.</string>
+    <string name="settings_reminders_title">Напоминания</string>
+    <string name="settings_reminders_description">Тихое уведомление перед твоими и общими событиями со временем. Настраивается только для этого телефона.</string>
+    <string name="settings_reminders_lead">Напоминать</string>
+    <string name="settings_reminders_off">Не напоминать</string>
+    <plurals name="settings_reminders_minutes_before">
+        <item quantity="one">За %d минуту</item>
+        <item quantity="few">За %d минуты</item>
+        <item quantity="many">За %d минут</item>
+        <item quantity="other">За %d минуты</item>
+    </plurals>
+    <string name="settings_reminders_blocked">Уведомления для Planr заблокированы, поэтому напоминания не появятся. Их можно разрешить в настройках системы.</string>
+    <string name="settings_reminders_open_settings">Открыть настройки уведомлений</string>
     <string name="settings_sleep_title">Сон</string>
     <string name="settings_sleep_description">Какие блоки календаря считаются твоими ночами и двигают ли их отметки сна. Видно только тебе.</string>
     <string name="settings_sleep_unavailable">Не удалось загрузить настройки сна.</string>

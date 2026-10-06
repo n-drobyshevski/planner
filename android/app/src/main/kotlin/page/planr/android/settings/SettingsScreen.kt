@@ -1,5 +1,14 @@
 package page.planr.android.settings
 
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -38,6 +48,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -48,6 +60,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -57,12 +70,14 @@ import kotlinx.coroutines.delay
 import page.planr.android.R
 import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.model.SleepPrefsPatch
+import page.planr.android.core.data.reminders.ReminderLead
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.model.Category
 
 /**
  * Settings that change how the app behaves for the signed-in member: their
- * time zones, success notifications and the calendar side of sleep. Every
+ * time zones, success notifications, this phone's event reminders and the
+ * calendar side of sleep. Every
  * control applies at once; a write that doesn't go through puts the control
  * back and says so in one calm line.
  *
@@ -124,6 +139,8 @@ private fun SettingsContent(state: SettingsUiState, time: TimeSettings, viewMode
             TimeZoneSection(state, time, viewModel)
             HorizontalDivider()
             NotificationsSection(time, viewModel)
+            HorizontalDivider()
+            RemindersSection(state.reminders, state.askNotificationPermission, viewModel)
             HorizontalDivider()
             SleepSection(state, viewModel)
             Spacer(Modifier.size(PlanrSpacing.xl))
@@ -218,6 +235,72 @@ private fun NotificationsSection(time: TimeSettings, viewModel: SettingsViewMode
             description = stringResource(R.string.settings_success_toasts_description),
             checked = time.showSuccessToasts,
             onCheckedChange = viewModel::setShowSuccessToasts,
+        )
+    }
+}
+
+@Composable
+private fun RemindersSection(reminders: ReminderSettings, askPermission: Boolean, viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+        viewModel::onNotificationPermissionResult,
+    )
+    LaunchedEffect(askPermission) {
+        // Only asked for on Android 13+ (the view model knows); the check keeps lint sure of it.
+        if (askPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Marked first, so a recomposition (or rotation) doesn't ask twice.
+            viewModel.onNotificationPermissionAsked()
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    // Notifications may have been allowed or blocked in the system's settings meanwhile.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshNotificationAccess()
+        onPauseOrDispose {}
+    }
+    SettingsSection(
+        title = stringResource(R.string.settings_reminders_title),
+        description = stringResource(R.string.settings_reminders_description),
+    ) {
+        Field(label = stringResource(R.string.settings_reminders_lead), description = null) {
+            ChoiceField(
+                selected = leadLabel(reminders.lead),
+                options = ReminderLead.entries.map { it to leadLabel(it) },
+                onSelect = viewModel::setReminderLead,
+            )
+        }
+        if (reminders.blocked) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xs),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            ) {
+                Hint(stringResource(R.string.settings_reminders_blocked))
+                TextButton(onClick = { openNotificationSettings(context) }) {
+                    Text(stringResource(R.string.settings_reminders_open_settings))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun leadLabel(lead: ReminderLead): String =
+    if (lead == ReminderLead.Off) {
+        stringResource(R.string.settings_reminders_off)
+    } else {
+        pluralStringResource(R.plurals.settings_reminders_minutes_before, lead.minutes, lead.minutes)
+    }
+
+/** The app's page in the system's notification settings; its app info page where that one is missing. */
+private fun openNotificationSettings(context: Context) {
+    val notifications = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    try {
+        context.startActivity(notifications)
+    } catch (_: ActivityNotFoundException) {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
         )
     }
 }

@@ -2,8 +2,10 @@ package page.planr.android.settings
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,6 +28,7 @@ import org.junit.runner.Description
 import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.model.MemberPreferencesPatch
 import page.planr.android.core.data.model.SleepPrefsPatch
+import page.planr.android.core.data.reminders.ReminderLead
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
 import page.planr.android.core.recurrence.PatchField
@@ -193,6 +196,89 @@ class SettingsViewModelTest {
         assertEquals("America/New_York", vm.state.value.time?.timezone)
     }
 
+    @Test
+    fun `reminders are off by default and turn on at once where notifications are allowed`() = runTest {
+        val vm = subject()
+        assertEquals(ReminderSettings(ReminderLead.Off, blocked = false), vm.state.value.reminders)
+
+        vm.setReminderLead(ReminderLead.Ten)
+        runCurrent()
+
+        assertEquals(ReminderSettings(ReminderLead.Ten, blocked = false), vm.state.value.reminders)
+        assertEquals(listOf(ReminderLead.Ten), data.reminderWrites)
+        assertFalse(vm.state.value.askNotificationPermission)
+    }
+
+    @Test
+    fun `turning reminders on without permission asks for it first, and a yes saves the choice`() = runTest {
+        data.allowed = false
+        val vm = subject()
+
+        vm.setReminderLead(ReminderLead.Fifteen)
+        runCurrent()
+        assertTrue(vm.state.value.askNotificationPermission)
+        assertEquals(ReminderSettings(ReminderLead.Fifteen, blocked = false), vm.state.value.reminders, "shown while asking")
+        assertEquals(emptyList(), data.reminderWrites, "nothing saved yet")
+
+        vm.onNotificationPermissionAsked()
+        runCurrent()
+        assertFalse(vm.state.value.askNotificationPermission, "asked once")
+
+        data.allowed = true
+        vm.onNotificationPermissionResult(granted = true)
+        runCurrent()
+        assertEquals(listOf(ReminderLead.Fifteen), data.reminderWrites)
+        assertEquals(ReminderSettings(ReminderLead.Fifteen, blocked = false), vm.state.value.reminders)
+    }
+
+    @Test
+    fun `a denied permission puts reminders back to Off with the blocked line, until notifications are allowed`() = runTest {
+        data.allowed = false
+        data.reminderLead.value = ReminderLead.Five // on before notifications were blocked
+        val vm = subject()
+        assertTrue(vm.state.value.reminders.blocked, "on, but nothing can show")
+
+        vm.setReminderLead(ReminderLead.Ten)
+        vm.onNotificationPermissionAsked()
+        vm.onNotificationPermissionResult(granted = false)
+        runCurrent()
+
+        assertEquals(ReminderSettings(ReminderLead.Off, blocked = true), vm.state.value.reminders)
+        assertEquals(listOf(ReminderLead.Off), data.reminderWrites)
+
+        // Back from the system's settings with notifications allowed: the line goes.
+        data.allowed = true
+        vm.refreshNotificationAccess()
+        runCurrent()
+        assertEquals(ReminderSettings(ReminderLead.Off, blocked = false), vm.state.value.reminders)
+    }
+
+    @Test
+    fun `before Android 13 blocked notifications can't be asked for, so the line shows straight away`() = runTest {
+        data.allowed = false
+        data.canAsk = false
+        val vm = subject()
+
+        vm.setReminderLead(ReminderLead.Thirty)
+        runCurrent()
+
+        assertFalse(vm.state.value.askNotificationPermission)
+        assertEquals(ReminderSettings(ReminderLead.Off, blocked = true), vm.state.value.reminders)
+
+        vm.setReminderLead(ReminderLead.Off)
+        runCurrent()
+        assertFalse(vm.state.value.reminders.blocked, "choosing Off clears it")
+    }
+
+    @Test
+    fun `a permission answer with nothing pending is ignored`() = runTest {
+        val vm = subject()
+        vm.onNotificationPermissionResult(granted = false)
+        runCurrent()
+        assertEquals(ReminderSettings(), vm.state.value.reminders)
+        assertEquals(emptyList(), data.reminderWrites)
+    }
+
     private companion object {
         const val WS = "ws-1"
         const val ANNA = "member-a"
@@ -209,6 +295,10 @@ private class FakeSettingsDataSource(members: List<Member>, categories: List<Cat
     var failMember: Exception? = null
     var failSleep: Exception? = null
     var failSleepLoad: Exception? = null
+    override val reminderLead = MutableStateFlow(ReminderLead.Off)
+    val reminderWrites = mutableListOf<ReminderLead>()
+    var allowed = true
+    var canAsk = true
 
     /** When set, a write waits for it (a write in flight). */
     var memberGate: CompletableDeferred<Unit>? = null
@@ -234,6 +324,15 @@ private class FakeSettingsDataSource(members: List<Member>, categories: List<Cat
         failSleepLoad?.let { throw it }
         return sleep
     }
+
+    override suspend fun setReminderLead(lead: ReminderLead) {
+        reminderWrites += lead
+        reminderLead.value = lead
+    }
+
+    override fun notificationsAllowed(): Boolean = allowed
+
+    override val canRequestNotifications: Boolean get() = canAsk
 
     override suspend fun saveSleepPrefs(patch: SleepPrefsPatch): SleepBlockPrefs {
         sleepWrites += patch
