@@ -19,6 +19,7 @@
     <string name="sleep_rating_saving">Saving…</string>
     <string name="sleep_rating_saved">Check-in saved</string>
     <string name="sleep_rating_save_failed">Couldn\'t save the check-in. Try again.</string>
+    <string name="sleep_rating_times_order">Wake time needs to be after bedtime.</string>
     <string name="sleep_rating_cancel">Cancel</string>
     <string name="sleep_rating_done">Done</string>
     <string-array name="sleep_rating_quality_levels">

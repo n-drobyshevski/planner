@@ -110,7 +110,11 @@ internal fun SleepTab(viewModel: SleepNightsViewModel, modifier: Modifier = Modi
             draft = sheet.form.toDraft(),
             fromHealthConnect = sheet.form.fromHealthConnect,
             saving = sheet.saving,
-            error = if (sheet.failed) stringResource(DesignR.string.sleep_rating_save_failed) else null,
+            error = when {
+                sheet.timesOutOfOrder -> stringResource(DesignR.string.sleep_rating_times_order)
+                sheet.failed -> stringResource(DesignR.string.sleep_rating_save_failed)
+                else -> null
+            },
             onChange = viewModel::updateDraft,
             onSave = viewModel::save,
             onDismiss = viewModel::closeSheet,

@@ -98,7 +98,7 @@ class SleepCheckinViewModel @Inject constructor(
     }
 
     fun updateDraft(draft: SleepRatingDraft) {
-        sheet.update { it?.copy(form = it.form.with(draft), failed = false) }
+        sheet.update { it?.copy(form = it.form.with(draft), failed = false, timesOutOfOrder = false) }
     }
 
     fun closeSheet() {
@@ -109,11 +109,18 @@ class SleepCheckinViewModel @Inject constructor(
     fun save() {
         val current = sheet.value ?: return
         if (current.saving) return
-        sheet.value = current.copy(saving = true, failed = false)
         val rating = current.form.toRating(latestZone)
+        if (!rating.timesInOrder) {
+            sheet.value = current.copy(failed = false, timesOutOfOrder = true)
+            return
+        }
+        sheet.value = current.copy(saving = true, failed = false)
         viewModelScope.launch {
             try {
-                sleep.save(rating)
+                val stored = sleep.save(rating)
+                // Saved with only times (no rating or note), the night still reads as
+                // unrated; the member answered for today, so the card goes anyway.
+                if (!stored.isRated) runCatchingNonCancel { sleep.dismissCheckin(stored.date) }
                 sheet.value = null
                 notices.post(AgendaNotice(UiText(DesignR.string.sleep_rating_saved)))
             } catch (e: CancellationException) {

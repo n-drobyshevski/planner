@@ -94,6 +94,18 @@ data class SleepRating(
     /** The times to send given the night as stored now. */
     fun timesFor(existing: SleepLog?): SleepTimes? =
         if (!timesEdited && existing != null) null else keepDeviceTimes(times, existing)
+
+    /**
+     * False when the member picked a wake that isn't after the bedtime
+     * (sleep_logs' `woke_at > bedtime_at` check would reject the save):
+     * the sheet says so instead of failing like an offline save.
+     */
+    val timesInOrder: Boolean
+        get() {
+            val bed = times?.bedtimeAt ?: return true
+            val woke = times.wokeAt ?: return true
+            return !timesEdited || woke > bed
+        }
 }
 
 /**

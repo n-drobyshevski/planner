@@ -137,4 +137,22 @@ class SleepNightsViewModelTest {
         assertEquals(2, vm.state.value.model?.nights?.single()?.quality)
         vm.viewModelScope.cancel()
     }
+
+    @Test
+    fun `edited times that wake before the bedtime are not sent`() = runTest {
+        val sleep = FakeSleep(listOf(deviceNight))
+        val vm = viewModel(sleep)
+        vm.onShown()
+        runCurrent()
+
+        vm.openNight(oct6)
+        val draft = vm.state.value.sheet!!.form.toDraft()
+        vm.updateDraft(draft.copy(bedtimeMinutes = 9 * 60, timesEdited = true))
+        vm.save()
+        runCurrent()
+
+        assertTrue(assertNotNull(vm.state.value.sheet).timesOutOfOrder)
+        assertTrue(sleep.saved.isEmpty())
+        vm.viewModelScope.cancel()
+    }
 }

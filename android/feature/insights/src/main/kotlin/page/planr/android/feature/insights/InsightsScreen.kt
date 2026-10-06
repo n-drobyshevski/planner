@@ -116,7 +116,8 @@ fun InsightsScreen(
         ) {
             InsightsHeader(
                 activeFilters = state.filters.activeCount,
-                onFilters = { filtersOpen = true },
+                // The filters narrow categories; the Sleep tab has none to narrow.
+                onFilters = if (onSleepTab) null else ({ filtersOpen = true }),
                 accountAction = accountAction,
             )
             InsightsTabRow(selected = state.tab, onSelect = viewModel::selectTab)
@@ -178,7 +179,7 @@ fun InsightsScreen(
 
 /** Title, the filters trigger (a neutral count badge when any filter is on) and the account menu. */
 @Composable
-private fun InsightsHeader(activeFilters: Int, onFilters: () -> Unit, accountAction: (@Composable () -> Unit)?) {
+private fun InsightsHeader(activeFilters: Int, onFilters: (() -> Unit)?, accountAction: (@Composable () -> Unit)?) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -193,30 +194,35 @@ private fun InsightsHeader(activeFilters: Int, onFilters: () -> Unit, accountAct
                 .padding(horizontal = PlanrSpacing.xl, vertical = PlanrSpacing.lg)
                 .semantics { heading() },
         )
-        val description = if (activeFilters > 0) {
-            pluralStringResource(R.plurals.insights_filters_trigger_count, activeFilters, activeFilters)
-        } else {
-            stringResource(R.string.insights_filters_trigger)
-        }
-        IconButton(onClick = onFilters) {
-            BadgedBox(
-                badge = {
-                    if (activeFilters > 0) {
-                        // Secondary, like the web's badge: Material's default error red would read as a warning.
-                        Badge(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.clearAndSetSemantics {},
-                        ) {
-                            Text(activeFilters.toString(), style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMS))
-                        }
-                    }
-                },
-            ) {
-                Icon(painterResource(R.drawable.ic_insights_filters), contentDescription = description)
-            }
-        }
+        if (onFilters != null) FiltersButton(activeFilters, onFilters)
         Box(Modifier.padding(end = PlanrSpacing.sm)) { accountAction?.invoke() }
+    }
+}
+
+@Composable
+private fun FiltersButton(activeFilters: Int, onFilters: () -> Unit) {
+    val description = if (activeFilters > 0) {
+        pluralStringResource(R.plurals.insights_filters_trigger_count, activeFilters, activeFilters)
+    } else {
+        stringResource(R.string.insights_filters_trigger)
+    }
+    IconButton(onClick = onFilters) {
+        BadgedBox(
+            badge = {
+                if (activeFilters > 0) {
+                    // Secondary, like the web's badge: Material's default error red would read as a warning.
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    ) {
+                        Text(activeFilters.toString(), style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMS))
+                    }
+                }
+            },
+        ) {
+            Icon(painterResource(R.drawable.ic_insights_filters), contentDescription = description)
+        }
     }
 }
 

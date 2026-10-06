@@ -116,4 +116,18 @@ class SleepLogTest {
         assertFalse(next.fromHealthConnect)
         assertEquals(LocalTime(23, 40), next.bedtime)
     }
+
+    @Test
+    fun `picked times must wake after the bedtime`() {
+        fun rating(bed: LocalTime, wake: LocalTime, edited: Boolean = true) =
+            SleepRatings.rating(oct5, bed, wake, edited, quality = null, fatigue = null, note = "", zone = berlin)
+
+        assertTrue(rating(LocalTime(23, 40), LocalTime(7, 10)).timesInOrder)
+        assertTrue(rating(LocalTime(0, 30), LocalTime(8, 0)).timesInOrder)
+        // Morning bedtimes are on the wake date: 08:00 → 07:00 runs backwards.
+        assertFalse(rating(LocalTime(8, 0), LocalTime(7, 0)).timesInOrder)
+        assertFalse(rating(LocalTime(7, 0), LocalTime(7, 0)).timesInOrder)
+        // Untouched prefilled times are never the member's mistake.
+        assertTrue(rating(LocalTime(8, 0), LocalTime(7, 0), edited = false).timesInOrder)
+    }
 }

@@ -12,7 +12,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -49,8 +51,8 @@ class SleepCheckinViewModelTest {
     private fun TestScope.viewModel(
         sleep: FakeSleepLogRepository,
         at: String = "09:30",
+        clock: Clock = Fixtures.clockAt("2026-10-06T${at}:00+02:00"),
     ): SleepCheckinViewModel {
-        val clock = Fixtures.clockAt("2026-10-06T${at}:00+02:00")
         val vm = SleepCheckinViewModel(sleep, data, notices, clock)
         backgroundScope.launch { vm.state.collect {} }
         runCurrent()
@@ -194,6 +196,64 @@ class SleepCheckinViewModelTest {
         assertEquals(Instant.parse("2026-10-05T20:30:00Z"), rating.times?.bedtimeAt)
         assertEquals(Instant.parse("2026-10-06T05:00:00Z"), rating.times?.wokeAt)
         assertNull(vm.state.value.card)
+        vm.close()
+    }
+
+    @Test
+    fun `the card leaves at 18 00 while the agenda stays open`() = runTest {
+        var now = Instant.parse("2026-10-06T17:59:30+02:00")
+        val clock = object : Clock {
+            override fun now(): Instant = now
+        }
+        val vm = viewModel(FakeSleepLogRepository(listOf(deviceNight)), clock = clock)
+        assertNotNull(vm.state.value.card)
+
+        now = Instant.parse("2026-10-06T18:00:00+02:00")
+        advanceTimeBy(30_001)
+        runCurrent()
+
+        assertNull(vm.state.value.card)
+        vm.close()
+    }
+
+    @Test
+    fun `saving only the times still answers for today`() = runTest {
+        val sleep = FakeSleepLogRepository()
+        val vm = viewModel(sleep)
+
+        vm.openSheet()
+        vm.save()
+        runCurrent()
+
+        assertNull(sleep.recentLogs.value!!.single().quality)
+        assertEquals(oct6, sleep.checkinDismissedOn.value)
+        assertNull(vm.state.value.sheet)
+        assertNull(vm.state.value.card)
+        vm.close()
+    }
+
+    @Test
+    fun `a wake before the bedtime is caught before saving`() = runTest {
+        val sleep = FakeSleepLogRepository()
+        val vm = viewModel(sleep)
+
+        vm.openSheet()
+        val draft = vm.state.value.sheet!!.form.toDraft()
+        // 08:00 bedtime is on the wake date, after the 07:00 wake.
+        vm.updateDraft(draft.copy(bedtimeMinutes = 8 * 60, timesEdited = true, quality = 5))
+        vm.save()
+        runCurrent()
+
+        val sheet = assertNotNull(vm.state.value.sheet)
+        assertTrue(sheet.timesOutOfOrder)
+        assertFalse(sheet.saving)
+        assertTrue(sleep.saved.isEmpty())
+
+        vm.updateDraft(sheet.form.toDraft().copy(bedtimeMinutes = 23 * 60))
+        assertFalse(vm.state.value.sheet!!.timesOutOfOrder)
+        vm.save()
+        runCurrent()
+        assertEquals(1, sleep.saved.size)
         vm.close()
     }
 }

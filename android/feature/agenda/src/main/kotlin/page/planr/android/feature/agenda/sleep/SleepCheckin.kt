@@ -21,6 +21,8 @@ data class SleepCheckinSheet(
     val saving: Boolean = false,
     /** the last save failed; the sheet stays open to retry */
     val failed: Boolean = false,
+    /** the picked wake isn't after the picked bedtime; nothing was sent */
+    val timesOutOfOrder: Boolean = false,
 )
 
 data class SleepCheckinUiState(val card: SleepCheckinCard? = null, val sheet: SleepCheckinSheet? = null)

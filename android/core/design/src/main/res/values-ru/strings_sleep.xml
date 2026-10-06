@@ -17,6 +17,7 @@
     <string name="sleep_rating_saving">Сохранение…</string>
     <string name="sleep_rating_saved">Отметка сохранена</string>
     <string name="sleep_rating_save_failed">Не удалось сохранить отметку. Попробуй ещё раз.</string>
+    <string name="sleep_rating_times_order">Время подъёма должно быть позже времени сна.</string>
     <string name="sleep_rating_cancel">Отмена</string>
     <string name="sleep_rating_done">Готово</string>
     <string-array name="sleep_rating_quality_levels">
