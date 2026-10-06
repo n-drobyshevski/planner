@@ -90,6 +90,9 @@ sealed interface HealthSyncResult {
  *   night whose block couldn't be snapped (offline halfway, the sync cut
  *   short) is remembered and retried on the next sync while it is still
  *   among those nights.
+ * - **Zone:** the window, the recent nights and the blocks follow the
+ *   member's profile zone, as the check-in card and the Sleep tab do; the
+ *   device's when the profile has none.
  * - Connecting is per device and per member: after another member signs in on
  *   this phone, nothing syncs until they connect themselves.
  */
@@ -98,6 +101,7 @@ class HealthSleepSync @Inject constructor(
     private val source: HealthSleepSource,
     private val remote: SleepRemote,
     private val calendar: SleepBlockCalendar,
+    private val memberZone: MemberZone,
     private val session: SessionManager,
     @HealthPrefsDataStore private val store: DataStore<Preferences>,
     private val clock: Clock,
@@ -106,7 +110,7 @@ class HealthSleepSync @Inject constructor(
     private val mutex = Mutex()
     private var started = false
 
-    /** The device zone; replaced in tests. */
+    /** The device zone, for a member whose profile has none ([zoneOf]); replaced in tests. */
     internal var zone: () -> ZoneId = ZoneId::systemDefault
 
     val status: Flow<HealthSleepStatus> = combine(
@@ -165,7 +169,7 @@ class HealthSleepSync @Inject constructor(
             } else {
                 maxOf(last.minus(OVERLAP), now.minus(BACKFILL))
             }
-            val zone = zone()
+            val zone = zoneOf(me.memberId)
             val recent = now.atZone(zone).toLocalDate().minusDays(BLOCK_NIGHTS - 1)
             // Nights whose block a previous sync failed to snap; older ones are let go.
             val pending = prefs[PENDING_SNAP].orEmpty()
@@ -260,6 +264,13 @@ class HealthSleepSync @Inject constructor(
         }
         return true
     }
+
+    /**
+     * The zone nights are dated and blocks placed in: the member's profile
+     * zone, as the check-in card and the Sleep tab use, else the device's.
+     */
+    private suspend fun zoneOf(memberId: String): ZoneId =
+        memberZone.of(memberId)?.let { id -> runCatching { ZoneId.of(id) }.getOrNull() } ?: zone()
 
     /** [blocks] changed; the nights in [failed] still need their block snapped. */
     private data class SnapResult(val blocks: Int = 0, val failed: Set<LocalDate> = emptySet())

@@ -20,9 +20,11 @@ import kotlinx.coroutines.SupervisorJob
 import page.planr.android.core.data.appearance.AndroidAppearancePlatform
 import page.planr.android.core.data.appearance.AppearanceDataStore
 import page.planr.android.core.data.appearance.AppearancePlatform
+import page.planr.android.core.data.health.CachedMemberZone
 import page.planr.android.core.data.health.HealthConnectSleepSource
 import page.planr.android.core.data.health.HealthPrefsDataStore
 import page.planr.android.core.data.health.HealthSleepSource
+import page.planr.android.core.data.health.MemberZone
 import page.planr.android.core.data.health.RepositorySleepBlockCalendar
 import page.planr.android.core.data.health.SleepBlockCalendar
 import page.planr.android.core.data.prefs.AppPrefsChanges
@@ -55,6 +57,9 @@ abstract class PreferencesModule {
 
     @Binds
     abstract fun bindHealthSleepSource(impl: HealthConnectSleepSource): HealthSleepSource
+
+    @Binds
+    abstract fun bindMemberZone(impl: CachedMemberZone): MemberZone
 
     @Binds
     abstract fun bindSleepBlockCalendar(impl: RepositorySleepBlockCalendar): SleepBlockCalendar
