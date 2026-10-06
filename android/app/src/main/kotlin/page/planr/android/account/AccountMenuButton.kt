@@ -30,16 +30,21 @@ import page.planr.android.importics.IcsFileReader
 
 /**
  * The account action on the Calendar, Tasks and Insights headers: a quiet
- * icon that opens a menu with "Import .ics file", "Sleep from Health
- * Connect", "Sign out" (behind a confirmation) and, below them, the app's
- * version, for bug reports. Signing
+ * icon that opens a menu with "Settings", "Import .ics file", "Sleep from
+ * Health Connect", "Sign out" (behind a confirmation) and, below them, the
+ * app's version, for bug reports. Signing
  * out forgets the session on this device (and ends it on the server), wipes
  * the cached calendar and tasks, and blanks the widgets.
  *
  * @param onImportIcs opens the import review once a picked file was read.
+ * @param onOpenSettings opens the Settings screen.
  */
 @Composable
-fun AccountMenuButton(onImportIcs: () -> Unit = {}, viewModel: AccountViewModel = hiltViewModel()) {
+fun AccountMenuButton(
+    onImportIcs: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    viewModel: AccountViewModel = hiltViewModel(),
+) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     var confirming by rememberSaveable { mutableStateOf(false) }
     var healthOpen by rememberSaveable { mutableStateOf(false) }
@@ -68,6 +73,13 @@ fun AccountMenuButton(onImportIcs: () -> Unit = {}, viewModel: AccountViewModel 
         )
     }
     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.account_settings)) },
+            onClick = {
+                menuOpen = false
+                onOpenSettings()
+            },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.account_import_ics)) },
             onClick = {

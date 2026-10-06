@@ -222,6 +222,7 @@ class EventDetailViewModelTest {
         assertTrue(h.closed.isEmpty())
         assertEquals(1, h.failed.size)
         assertEquals(UiText(R.string.agenda_something_went_wrong), h.posted.single().message)
+        assertTrue(h.posted.single().failedWrite, "a failure shows even with success toasts off")
         assertFalse(h.vm.deleting.value)
         h.vm.viewModelScope.cancel()
     }

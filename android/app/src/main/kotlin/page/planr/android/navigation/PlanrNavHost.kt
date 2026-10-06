@@ -39,12 +39,14 @@ import page.planr.android.feature.quickadd.QuickAddViewModel
 import page.planr.android.feature.tasks.navigateToTask
 import page.planr.android.feature.tasks.taskDetailScreen
 import page.planr.android.feature.tasks.tasksScreen
+import page.planr.android.settings.SettingsScreen
 import page.planr.android.signin.SignInScreen
 import page.planr.android.feature.quickadd.R as QuickAddR
 
 /**
  * App navigation. Signed out, only sign-in; signed in, the Agenda, Tasks and
- * Insights tabs (bottom bar on their roots, hidden on detail screens) with
+ * Insights tabs (bottom bar on their roots, hidden on detail screens and
+ * Settings, which the account menu opens) with
  * Quick add behind the floating button of the tabs that have one. The agenda is always the root of the
  * signed-in back stack, so switching tabs saves and restores each tab's stack
  * against it. Losing the session (the account menu's "Sign out", or a
@@ -76,6 +78,9 @@ fun PlanrNavHost(
     var quickAdd by rememberSaveable { mutableStateOf<QuickAddKind?>(null) }
     // The account menu read a picked .ics file into IcsImportRequests: review it.
     val openImport: () -> Unit = remember(navController) { { navController.open(LaunchRoute.Import) } }
+    val openSettings: () -> Unit = remember(navController) {
+        { navController.navigate(PlanrRoutes.SETTINGS) { launchSingleTop = true } }
+    }
     val snackbar = remember { SnackbarHostState() }
     // Activity-scoped (this is outside the NavHost), so the sheet's view model
     // outlives the sheet and its Undo still runs once it has closed.
@@ -154,13 +159,13 @@ fun PlanrNavHost(
             agendaGraph(
                 navController,
                 onQuickAdd = { quickAdd = TopLevelTab.Agenda.quickAddKind },
-                accountAction = { AccountMenuButton(onImportIcs = openImport) },
+                accountAction = { AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings) },
                 todayRequests = agendaToday,
             )
             tasksScreen(
                 onOpenTask = { id -> navController.navigateToTask(id) },
                 onNewTask = { quickAdd = TopLevelTab.Tasks.quickAddKind },
-                accountAction = { AccountMenuButton(onImportIcs = openImport) },
+                accountAction = { AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings) },
                 scrollToTopRequests = tasksToTop,
             )
             taskDetailScreen(
@@ -186,8 +191,11 @@ fun PlanrNavHost(
                 },
                 onOpenAgenda = { navController.selectTab(TopLevelTab.Agenda) },
                 onOpenTasks = { navController.selectTab(TopLevelTab.Tasks) },
-                accountAction = { AccountMenuButton(onImportIcs = openImport) },
+                accountAction = { AccountMenuButton(onImportIcs = openImport, onOpenSettings = openSettings) },
             )
+            composable(PlanrRoutes.SETTINGS) {
+                SettingsScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 

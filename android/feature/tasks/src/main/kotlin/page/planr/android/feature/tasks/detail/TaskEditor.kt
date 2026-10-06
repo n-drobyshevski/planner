@@ -53,6 +53,9 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.datetime.LocalDate
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.design.component.AttributeDetails
+import page.planr.android.core.design.component.AttributeScale
 import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.model.TaskPriority
@@ -67,8 +70,8 @@ import page.planr.android.feature.tasks.ui.taskColor
 import page.planr.android.feature.tasks.ui.toPickerMillis
 
 /**
- * The task fields, editable for the owner and disabled (read-only) for the
- * partner, then the subtasks. [onOpenTask] opens another task's detail (a
+ * The task fields (with the optional optimization details), editable for the
+ * owner and disabled (read-only) for the partner, then the subtasks. [onOpenTask] opens another task's detail (a
  * subtask, or the parent from the "Subtask of" line).
  */
 @Composable
@@ -161,8 +164,18 @@ internal fun TaskEditor(
         modifier = Modifier.fillMaxWidth(),
     )
 
+    AttributeDetails(
+        scales = AttributeScales,
+        selected = form.attributes.mapKeys { it.key.key },
+        onSelect = { key, option -> AttributeKey.of(key)?.let { viewModel.setAttribute(it, option) } },
+        enabled = enabled,
+    )
+
     if (state.subtasks.isNotEmpty() || state.canEdit) SubtaskList(state, viewModel, onOpenTask)
 }
+
+/** The known attributes, as the shared details editor shows them. */
+private val AttributeScales = AttributeKey.entries.map { AttributeScale(it.key, it.options) }
 
 @Composable
 private fun Field(label: String, content: @Composable () -> Unit) {

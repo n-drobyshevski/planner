@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Optimization attributes, shared by the event and task editors (common.json attributes.*). -->
+<resources>
+    <string name="attributes_details">Детали оптимизации</string>
+    <string name="attributes_clear_hint">Всё необязательно — нажми на выбранный вариант ещё раз, чтобы сбросить.</string>
+    <string name="attributes_expanded">Развёрнуто</string>
+    <string name="attributes_collapsed">Свёрнуто</string>
+
+    <string name="attributes_energy_label">Энергия</string>
+    <string name="attributes_energy_description">Насколько это требует сил.</string>
+    <string name="attributes_energy_1">1 Низкая</string>
+    <string name="attributes_energy_2">2 Ровная</string>
+    <string name="attributes_energy_3">3 Высокая</string>
+    <string name="attributes_energy_4">4 Пиковая</string>
+
+    <string name="attributes_flexibility_label">Гибкость</string>
+    <string name="attributes_flexibility_description">Насколько это можно подвинуть, если день заполнится.</string>
+    <string name="attributes_flexibility_fixed">Жёстко</string>
+    <string name="attributes_flexibility_movable">Подвижно</string>
+    <string name="attributes_flexibility_flexible">Гибко</string>
+
+    <string name="attributes_focus_label">Фокус</string>
+    <string name="attributes_focus_description">Какая нужна концентрация.</string>
+    <string name="attributes_focus_deep">Глубокий</string>
+    <string name="attributes_focus_shallow">Поверхностный</string>
+
+    <string name="attributes_satisfaction_label">Удовлетворённость</string>
+    <string name="attributes_satisfaction_description">Как ощущалось, оглядываясь назад.</string>
+    <string name="attributes_satisfaction_1">1 Плохо</string>
+    <string name="attributes_satisfaction_2">2 Нормально</string>
+    <string name="attributes_satisfaction_3">3 Хорошо</string>
+    <string name="attributes_satisfaction_4">4 Отлично</string>
+</resources>

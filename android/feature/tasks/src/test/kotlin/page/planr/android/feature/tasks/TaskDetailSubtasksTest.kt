@@ -27,7 +27,7 @@ class TaskDetailSubtasksTest {
     @get:Rule val main = MainDispatcherRule()
 
     private val parent = task("t1", collection = COL, board = "todo", category = annaWork.id, assignee = BORIS)
-    private val deletions = TaskDeletions()
+    private val deletions = TaskDeletions(FixedClock)
 
     private fun subject(data: FakeTasksDataSource, id: String = "t1") = TaskDetailViewModel(id, data, FixedClock, deletions)
 

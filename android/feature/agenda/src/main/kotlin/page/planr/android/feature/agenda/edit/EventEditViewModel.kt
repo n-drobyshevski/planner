@@ -126,7 +126,7 @@ class EventEditViewModel @AssistedInject constructor(
         val initial = initialForm ?: form
         data.updateEvent(
             current.event.id,
-            EventWrites.singlePatch(form, initial, allCategories),
+            EventWrites.singlePatch(form, initial, allCategories, current.event.attributes),
             expectedUpdatedAt = current.event.updatedAt,
         )
         notices.post(AgendaNotice(UiText(R.string.agenda_toast_event_updated)))
@@ -135,8 +135,12 @@ class EventEditViewModel @AssistedInject constructor(
     private suspend fun updateRecurring(form: EventForm, current: Editing, scope: RecurrenceScope) {
         val event = current.event
         val occurrenceDate = current.occurrence.occurrenceDate
+        val attributes = EventWrites.mergedAttributes(form, initialForm ?: form, event.attributes)
         when (scope) {
             RecurrenceScope.This -> {
+                // An override can't carry series-level fields: an attribute
+                // change goes to the whole series in a side patch (as on the web).
+                if (attributes != null) data.updateEvent(event.id, EventPatch(attributes = PatchField.Value(attributes)))
                 val input = EditSemantics.modifyOccurrence(event.id, occurrenceDate, EventWrites.occurrencePatch(form))
                 val prior = data.applyOverride(input)
                 notices.post(
@@ -149,7 +153,7 @@ class EventEditViewModel @AssistedInject constructor(
                 )
             }
             RecurrenceScope.Following -> {
-                val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form))
+                val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form), attributes)
                 notices.post(
                     AgendaNotice(UiText(R.string.agenda_toast_this_and_future_updated)) {
                         // Undo the split: restore the original rule FIRST, then drop the

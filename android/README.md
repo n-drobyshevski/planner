@@ -321,6 +321,7 @@ widgets.
   - `event-new?start=…`
   - `ics-import` (the .ics import review)
   - `task/{id}`
+  - `settings` (from the account menu)
 - **Quick add.** The floating button opens the Quick add sheet: an event on
   Calendar, a task on Tasks. Insights has no floating button. The agenda's top-bar "+" opens the
   full event editor instead.
@@ -380,6 +381,25 @@ invitation) are reviewed before anything is written.
   overrides (`cancelOccurrences`); if that fails, the created events are
   deleted again. The agenda then shows "Imported N events" with an Undo that
   deletes them all (`deleteEvents`).
+
+### Settings
+
+**Settings** in the account menu holds what the member sets for the app,
+in self-contained sections (`SettingsScreen`):
+
+- **Time zone.** The primary zone (null follows the device) and the
+  secondary zone on `members`, picked from a searchable list with the
+  device zone first.
+- **Notifications.** `members.show_success_toasts`. Off mutes plain
+  confirmations; failures and notices with Undo always show.
+- **Sleep.** "Update calendar from check-ins", the sleep category and the
+  night window on `member_sleep_prefs`, upserted on `member_id` with only
+  the edited columns.
+
+Every control applies at once and is shown ahead of its write; a failed
+write puts it back with one error line. Member writes go through
+`WorkspaceRepository.updateMemberPreferences`, which caches the stored row,
+so the agenda's zone and the notices follow at once.
 
 ### Insights
 

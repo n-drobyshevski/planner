@@ -33,9 +33,46 @@
     <string name="account_import_ics">Import .ics file</string>
     <string name="import_file_unreadable">Couldn\'t read this file.</string>
     <string name="import_file_too_large">This file is too large to import (over 5 MB).</string>
+    <string name="account_settings">Settings</string>
+    <!-- Settings screen (mirrors the web's settings.json timezone / calendarDisplay / sleep). -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_save_failed">Couldn\'t save that change. Check your connection and try again.</string>
+    <string name="settings_retry">Try again</string>
+    <string name="settings_time_title">Time zone</string>
+    <string name="settings_time_description">The whole calendar shows times in your zone. A shared event stays anchored to the same moment, so each person sees it in their own time.</string>
+    <string name="settings_time_primary">Your time zone</string>
+    <string name="settings_time_primary_description">Event times, day boundaries, and the “now” line all render in this zone — even when you travel and your phone’s clock changes.</string>
+    <string name="settings_time_device">Use device time zone</string>
+    <!-- %1$s: the phone's zone, e.g. "Europe / Berlin". -->
+    <string name="settings_time_device_trigger">Device time zone (%1$s)</string>
+    <!-- %1$s: weekday and time, e.g. "Tue, 14:05"; %2$s: the zone. -->
+    <string name="settings_time_currently">Currently %1$s in %2$s</string>
+    <string name="settings_time_secondary">Secondary time zone</string>
+    <string name="settings_time_secondary_description">A second clock beside yours in the week and day views on the web — handy for a partner in another zone.</string>
+    <string name="settings_time_search">Search time zones…</string>
+    <string name="settings_time_group_default">Default</string>
+    <string name="settings_time_group_workspace">In your workspace</string>
+    <string name="settings_time_group_all">All time zones</string>
+    <string name="settings_time_empty">No time zone found.</string>
+    <string name="settings_notifications_title">Notifications</string>
+    <string name="settings_success_toasts">Show success notifications</string>
+    <string name="settings_success_toasts_description">Brief confirmations after an action (like “Event updated”). Turn off to mute them — errors and anything you can undo always show.</string>
+    <string name="settings_sleep_title">Sleep</string>
+    <string name="settings_sleep_description">Which calendar blocks count as your nights, and whether sleep check-ins move them. Private to you.</string>
+    <string name="settings_sleep_unavailable">Couldn\'t load your sleep settings.</string>
+    <string name="settings_sleep_auto_adjust">Update calendar from check-ins</string>
+    <string name="settings_sleep_auto_adjust_description">When you log a bedtime and wake time, snap that night’s sleep block to match. If there’s no block yet, one is added to your sleep category.</string>
+    <string name="settings_sleep_auto_adjust_description_inactive">When you log a bedtime and wake time, snap that night’s sleep block to match. With no sleep category set, a new block is added as an inactive event.</string>
+    <string name="settings_sleep_category">Sleep category</string>
+    <string name="settings_sleep_category_none">None — count inactive events as sleep</string>
+    <string name="settings_sleep_category_description">When set, only this category’s timed events count as your nights — other inactive blocks (focus time, commutes) stop reading as sleep.</string>
+    <string name="settings_sleep_night_start">Night starts after</string>
+    <string name="settings_sleep_night_end">Night ends by</string>
+    <string name="settings_sleep_night_description">Nights collect sleep between these hours — the start on the evening before, the end on the wake day. Widen it if you sleep past noon or keep unusual hours.</string>
     <string name="account_health">Sleep from Health Connect</string>
     <string name="health_title">Sleep from Health Connect</string>
-    <string name="health_body">Bring in the nights your watch or sleep app saves to Health Connect: bedtime, wake time and sleep stages show up in Insights → Sleep on the web. For the last 4 nights, your sleep blocks in the calendar move to match (turn off with “Update calendar from check-ins” in the web’s sleep settings). Your morning ratings stay yours. Only you can see this data.</string>
+    <string name="health_body">Bring in the nights your watch or sleep app saves to Health Connect: bedtime, wake time and sleep stages show up in Insights → Sleep on the web. For the last 4 nights, your sleep blocks in the calendar move to match (turn off with “Update calendar from check-ins” in Settings → Sleep). Your morning ratings stay yours. Only you can see this data.</string>
     <string name="health_connect">Connect</string>
     <string name="health_connected">Connected.</string>
     <string name="health_sync_now">Sync now</string>

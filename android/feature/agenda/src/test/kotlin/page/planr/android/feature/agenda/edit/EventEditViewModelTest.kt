@@ -17,8 +17,12 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalTime
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Rule
 import org.junit.Test
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.data.attributes.AttributesMerge
 import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.data.remote.SupabaseTables
@@ -390,6 +394,93 @@ class EventEditViewModelTest {
     fun `a ref to a missing event says so`() = runTest {
         val (vm, _) = viewModel(EventEditTarget.Existing("gone"))
         assertEquals(EventEditUiState.Phase.Missing, vm.state.value.phase)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `an attribute edit dirties the form and saves merged into the stored bag`() = runTest {
+        val stored = buildJsonObject {
+            put("icalUid", "abc@example.com")
+            put("energy", 2)
+            put("future", "kept")
+        }
+        data.events.value = listOf(Fixtures.event(id = "one").copy(attributes = stored))
+        val (vm, _) = viewModel(EventEditTarget.Existing("one"))
+        assertEquals(mapOf(AttributeKey.Energy to "2"), vm.state.value.form!!.attributes)
+
+        vm.update { it.copy(attributes = AttributesMerge.select(it.attributes, AttributeKey.Focus, "deep")) }
+        assertTrue(vm.state.value.dirty)
+        vm.update { it.copy(attributes = AttributesMerge.select(it.attributes, AttributeKey.Focus, null)) }
+        assertFalse(vm.state.value.dirty, "clearing it again is no change")
+
+        vm.update { it.copy(attributes = AttributesMerge.select(it.attributes, AttributeKey.Energy, null)) }
+        vm.update { it.copy(attributes = AttributesMerge.select(it.attributes, AttributeKey.Focus, "deep")) }
+        vm.save()
+        runCurrent()
+
+        val update = assertIs<Call.Update>(data.calls.single())
+        assertEquals(
+            PatchField.Value(
+                buildJsonObject {
+                    put("icalUid", "abc@example.com")
+                    put("future", "kept")
+                    put("focus", "deep")
+                },
+            ),
+            update.patch.attributes,
+        )
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `untouched attributes are not rewritten`() = runTest {
+        data.events.value = listOf(Fixtures.event(id = "one").copy(attributes = buildJsonObject { put("energy", "junk") }))
+        val (vm, _) = viewModel(EventEditTarget.Existing("one"))
+        vm.update { it.copy(title = "Retro") }
+        vm.save()
+        runCurrent()
+
+        assertEquals(PatchField.Unchanged, assertIs<Call.Update>(data.calls.single()).patch.attributes)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a new event carries its attributes`() = runTest {
+        val (vm, _) = viewModel(EventEditTarget.New())
+        vm.update { it.copy(title = "Deep work", attributes = mapOf(AttributeKey.Satisfaction to "4")) }
+        vm.save()
+        runCurrent()
+
+        assertEquals(buildJsonObject { put("satisfaction", 4) }, assertIs<Call.Create>(data.calls.single()).draft.attributes)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `this event writes an attribute change to the series, this and following to the new series`() = runTest {
+        val tagged = series.copy(attributes = buildJsonObject { put("icalUid", "u") })
+        data.events.value = listOf(tagged)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        vm.update { it.copy(attributes = mapOf(AttributeKey.Flexibility to "fixed")) }
+        val expected = buildJsonObject {
+            put("icalUid", "u")
+            put("flexibility", "fixed")
+        }
+
+        vm.save()
+        vm.chooseScope(RecurrenceScope.This)
+        runCurrent()
+
+        val side = assertIs<Call.Update>(data.calls.first())
+        assertEquals("series", side.id)
+        assertEquals(PatchField.Value(expected), side.patch.attributes)
+        assertIs<Call.Override>(data.calls.last())
+
+        data.calls.clear()
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+
+        assertEquals(expected, assertIs<Call.Split>(data.calls.single()).newAttributes)
         vm.viewModelScope.cancel()
     }
 }

@@ -52,6 +52,10 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import page.planr.android.core.data.attributes.AttributeKey
+import page.planr.android.core.data.attributes.AttributesMerge
+import page.planr.android.core.design.component.AttributeDetails
+import page.planr.android.core.design.component.AttributeScale
 import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.component.PlaceholderScreen
@@ -79,8 +83,9 @@ import page.planr.android.feature.agenda.ui.rememberAgendaFormats
 
 /**
  * Create or edit an event: title, all-day, start / end, time zone (defaults
- * to the member's), context, sharing, repeat, place and notes. Saving an
- * instance of a series asks "this / this and following / all events" first.
+ * to the member's), context, sharing, repeat, place, notes and the optional
+ * optimization details. Saving an instance of a series asks "this / this
+ * and following / all events" first.
  * A conflicting edit made elsewhere surfaces as a calm snackbar offering to
  * reload; the form is never discarded on failure. Leaving with unsaved
  * changes (Back or Close) asks to discard them first; while a save is in
@@ -274,6 +279,14 @@ private fun EditorFields(
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             modifier = Modifier.fillMaxWidth(),
         )
+        AttributeDetails(
+            scales = AttributeScales,
+            selected = form.attributes.mapKeys { it.key.key },
+            onSelect = { key, option ->
+                val attribute = AttributeKey.of(key) ?: return@AttributeDetails
+                onChange { it.copy(attributes = AttributesMerge.select(it.attributes, attribute, option)) }
+            },
+        )
         Spacer(Modifier.size(PlanrSpacing.xl))
     }
 }
@@ -454,3 +467,6 @@ private fun Swatch(hex: String) {
             .background(parseHexColor(hex, PlanrTokens.WarmStone)),
     )
 }
+
+/** The known attributes, as the shared details editor shows them. */
+private val AttributeScales = AttributeKey.entries.map { AttributeScale(it.key, it.options) }

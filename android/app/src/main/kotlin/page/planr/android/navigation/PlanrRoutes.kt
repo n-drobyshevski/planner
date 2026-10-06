@@ -8,6 +8,7 @@ object PlanrRoutes {
     const val AGENDA = "agenda"
     const val TASKS = "tasks"
     const val INSIGHTS = "insights"
+    const val SETTINGS = "settings"
 
     const val ARG_ID = "id"
     const val EVENT = "event/{$ARG_ID}"
