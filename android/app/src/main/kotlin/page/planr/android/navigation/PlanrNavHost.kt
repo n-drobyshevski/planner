@@ -1,6 +1,7 @@
 package page.planr.android.navigation
 
 import android.widget.Toast
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -20,6 +21,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.datetime.LocalDate
 import page.planr.android.account.AccountMenuButton
 import page.planr.android.feature.agenda.navigation.agendaGraph
@@ -39,6 +41,8 @@ import page.planr.android.feature.quickadd.R as QuickAddR
  * signed-in back stack, so switching tabs saves and restores each tab's stack
  * against it. Losing the session (the account menu's "Sign out", or a
  * refresh token the server rejected) clears the back stack back to sign-in.
+ * Tapping the tab already showing goes back to its root, or on the root to
+ * today (agenda) or the top of the list (tasks); see [reTapAction].
  *
  * @param launchRoute a widget's requested destination, or the import review
  *   for a file opened in or shared to the app; opened once signed in,
@@ -62,6 +66,21 @@ fun PlanrNavHost(
     var quickAdd by rememberSaveable { mutableStateOf<QuickAddKind?>(null) }
     // The account menu read a picked .ics file into IcsImportRequests: review it.
     val openImport: () -> Unit = remember(navController) { { navController.open(LaunchRoute.Import) } }
+    // One-shot re-tap signals; dropped when the screen isn't there to take them.
+    val agendaToday = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+    val tasksToTop = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val onSelectTab: (TopLevelTab) -> Unit = { tab ->
+        val shown = shownTab { route -> navController.hasOnStack(route) }
+        when (reTapAction(tab, shown, navController.currentDestination?.route)) {
+            null -> navController.selectTab(tab)
+            ReTapAction.PopToRoot -> navController.popBackStack(tab.route, inclusive = false)
+            ReTapAction.DispatchBack -> backDispatcher?.onBackPressed()
+            ReTapAction.GoToday -> agendaToday.tryEmit(Unit)
+            ReTapAction.ScrollToTop -> tasksToTop.tryEmit(Unit)
+            ReTapAction.None -> Unit
+        }
+    }
 
     LaunchedEffect(signedIn) {
         if (!signedIn) {
@@ -88,7 +107,7 @@ fun PlanrNavHost(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (signedIn && currentTab != null) {
-                PlanrBottomBar(current = currentTab, onSelect = navController::selectTab)
+                PlanrBottomBar(current = currentTab, onSelect = onSelectTab)
             }
         },
     ) { padding ->
@@ -116,11 +135,13 @@ fun PlanrNavHost(
                 navController,
                 onQuickAdd = { quickAdd = TopLevelTab.Agenda.quickAddKind },
                 accountAction = { AccountMenuButton(onImportIcs = openImport) },
+                todayRequests = agendaToday,
             )
             tasksScreen(
                 onOpenTask = { id -> navController.navigateToTask(id) },
                 onNewTask = { quickAdd = TopLevelTab.Tasks.quickAddKind },
                 accountAction = { AccountMenuButton(onImportIcs = openImport) },
+                scrollToTopRequests = tasksToTop,
             )
             taskDetailScreen(onBack = { navController.popBackStack() })
             insightsScreen(
@@ -155,6 +176,10 @@ private fun NavController.selectTab(tab: TopLevelTab) {
         restoreState = true
     }
 }
+
+/** Whether [route] is on the back stack. */
+private fun NavController.hasOnStack(route: String): Boolean =
+    runCatching { getBackStackEntry(route) }.isSuccess
 
 /**
  * Opens a widget's target on a fresh stack of its tab (no restored detail

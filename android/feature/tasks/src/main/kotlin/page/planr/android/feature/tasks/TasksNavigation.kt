@@ -8,6 +8,8 @@ import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /** Routes of the tasks screens; the same strings as the app's `PlanrRoutes.TASKS` / `TASK`. */
 object TasksDestinations {
@@ -20,15 +22,22 @@ object TasksDestinations {
 
 /**
  * The tasks list destination. [onNewTask] adds a "New task" button (e.g.
- * opening Quick add); [accountAction] is the host's account menu.
+ * opening Quick add); [accountAction] is the host's account menu; each
+ * [scrollToTopRequests] emission scrolls the list to the top.
  */
 fun NavGraphBuilder.tasksScreen(
     onOpenTask: (taskId: String) -> Unit,
     onNewTask: (() -> Unit)? = null,
     accountAction: (@Composable () -> Unit)? = null,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
 ) {
     composable(TasksDestinations.LIST) {
-        TasksScreen(onOpenTask = onOpenTask, onNewTask = onNewTask, accountAction = accountAction)
+        TasksScreen(
+            onOpenTask = onOpenTask,
+            onNewTask = onNewTask,
+            accountAction = accountAction,
+            scrollToTopRequests = scrollToTopRequests,
+        )
     }
 }
 

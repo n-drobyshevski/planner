@@ -8,6 +8,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import kotlin.time.Instant
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import page.planr.android.feature.agenda.AgendaScreen
 import page.planr.android.feature.agenda.EventDetailScreen
 import page.planr.android.feature.agenda.EventEditScreen
@@ -43,13 +45,15 @@ private val idArgument = listOf(navArgument(AgendaRoutes.ARG_ID) { type = NavTyp
 
 /**
  * The agenda (day / week). [onQuickAdd] adds a floating Quick add button;
- * [accountAction] is the host's account menu in the top bar.
+ * [accountAction] is the host's account menu in the top bar; each
+ * [todayRequests] emission goes back to today (the tab re-tapped).
  */
 fun NavGraphBuilder.agendaScreen(
     onOpenEvent: (String) -> Unit,
     onCreateEvent: (Instant?) -> Unit,
     onQuickAdd: (() -> Unit)? = null,
     accountAction: (@Composable () -> Unit)? = null,
+    todayRequests: Flow<Unit> = emptyFlow(),
 ) {
     composable(AgendaRoutes.AGENDA) {
         AgendaScreen(
@@ -57,6 +61,7 @@ fun NavGraphBuilder.agendaScreen(
             onCreateEvent = onCreateEvent,
             onQuickAdd = onQuickAdd,
             accountAction = accountAction,
+            todayRequests = todayRequests,
         )
     }
 }
@@ -114,7 +119,7 @@ fun NavGraphBuilder.icsImportScreen(onDone: () -> Unit, onClose: () -> Unit = on
 
 /**
  * The whole agenda feature wired to [navController]: agenda → detail → edit,
- * plus new-event ([onQuickAdd] as in [agendaScreen]) and the .ics import review. After a save the editor returns to the agenda (a "this and
+ * plus new-event ([onQuickAdd] and [todayRequests] as in [agendaScreen]) and the .ics import review. After a save the editor returns to the agenda (a "this and
  * following" edit can move the instance into a new series, so the detail it
  * came from may no longer exist).
  */
@@ -122,12 +127,14 @@ fun NavGraphBuilder.agendaGraph(
     navController: NavController,
     onQuickAdd: (() -> Unit)? = null,
     accountAction: (@Composable () -> Unit)? = null,
+    todayRequests: Flow<Unit> = emptyFlow(),
 ) {
     agendaScreen(
         onOpenEvent = { ref -> navController.navigate(AgendaRoutes.event(ref)) },
         onCreateEvent = { start -> navController.navigate(AgendaRoutes.newEvent(start)) },
         onQuickAdd = onQuickAdd,
         accountAction = accountAction,
+        todayRequests = todayRequests,
     )
     eventDetailScreen(
         onBack = { navController.popBackStack() },
