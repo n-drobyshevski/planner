@@ -53,6 +53,20 @@ internal object AgendaIcons {
             "M16 3.13a4 4 0 0 1 0 7.75",
         )
     }
+    val SlidersHorizontal by lazy {
+        lucide(
+            "SlidersHorizontal",
+            "M21 4h-7",
+            "M10 4H3",
+            "M21 12h-9",
+            "M8 12H3",
+            "M21 20h-5",
+            "M12 20H3",
+            "M14 2v4",
+            "M8 10v4",
+            "M16 18v4",
+        )
+    }
     val Eye by lazy {
         lucide(
             "Eye",

@@ -108,6 +108,17 @@ internal fun AgendaMetrics.blockFit(height: Dp, compact: Boolean): BlockFit {
     return BlockFit(titleLines = if (twoLines) 2 else 1, showTime = showTime, showHint = showHint)
 }
 
+/** Height of a Month view chip: one small-label line and a little air, growing with the font. */
+internal val AgendaMetrics.monthChipHeight: Dp get() = hintLine + 2.dp
+
+/**
+ * How many chip rows fit a Month cell of [cellHeight] under its date circle,
+ * each with the [MonthRowGap] above it (a cell never shows more than
+ * [maxSlots]); at least one, which then holds "+N".
+ */
+internal fun AgendaMetrics.monthChipSlots(cellHeight: Dp, maxSlots: Int): Int =
+    ((cellHeight - dateCircle - 4.dp) / (monthChipHeight + MonthRowGap)).toInt().coerceIn(1, maxSlots)
+
 /** Distance from midnight to [minuteOfDay] in the grid. */
 internal fun AgendaMetrics.offsetOf(minuteOfDay: Float): Dp = hourHeight * (minuteOfDay / 60f)
 

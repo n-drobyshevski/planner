@@ -11,6 +11,22 @@ internal object ViewKeys {
     val AGENDA_MODE = stringPreferencesKey("agenda_mode")
 
     /**
+     * Set while the agenda shows Month, which `member_app_prefs.agenda_mode`
+     * can't hold yet ([AgendaViewMode.synced]): it overrides [AGENDA_MODE]
+     * (still the synced Day / Week) on this device only.
+     */
+    val AGENDA_MONTH = booleanPreferencesKey("agenda_month")
+
+    /**
+     * The agenda's calendar filter beyond the partner toggle: the viewer's
+     * own calendar hidden, and the hidden contexts (category ids). Device-only:
+     * `member_app_prefs` has no column for them (the web keeps them for the
+     * session), so [AppPrefsSync] never uploads them.
+     */
+    val CALENDAR_OWN_HIDDEN = booleanPreferencesKey("calendar_own_hidden")
+    val CALENDAR_HIDDEN_CATEGORIES = stringSetPreferencesKey("calendar_hidden_categories")
+
+    /**
      * The wake date (yyyy-MM-dd) the morning sleep check-in was dismissed on,
      * per member. Device-only: [AppPrefsSync] never uploads it.
      */

@@ -102,6 +102,37 @@ class AgendaViewModelTest {
     }
 
     @Test
+    fun `month mode shows the month's six weeks, swipes by months and opens a day`() = runTest {
+        val vm = viewModel()
+
+        vm.setMode(AgendaMode.Month)
+        runCurrent()
+        assertEquals(AgendaMode.Month, data.agendaMode.value)
+        val october = vm.state.value
+        assertEquals(LocalDate(2026, 10, 1), october.periodStartAt(october.periodOffset))
+        assertEquals(42, october.days.size)
+        assertEquals(LocalDate(2026, 9, 28), october.days.first())
+        assertEquals(LocalDate(2026, 11, 8), october.days.last())
+        // September's grid to November's, filled before a swipe reveals them.
+        assertEquals(Instant.parse("2026-08-30T22:00:00Z"), data.observedWindows.last().start)
+        assertEquals(Instant.parse("2026-12-06T23:00:00Z"), data.observedWindows.last().end)
+
+        vm.showPeriod(1)
+        assertEquals(1, vm.state.value.periodOffset)
+        assertEquals(LocalDate(2026, 10, 26), vm.state.value.days.first())
+        vm.previous()
+        vm.previous()
+        assertEquals(-1, vm.state.value.periodOffset)
+        assertEquals(LocalDate(2026, 9, 1), vm.state.value.focusDate)
+
+        // A day cell opens that day.
+        vm.openDay(LocalDate(2026, 9, 17))
+        assertEquals(AgendaMode.Day, vm.state.value.mode)
+        assertEquals(listOf(LocalDate(2026, 9, 17)), vm.state.value.days)
+        vm.close()
+    }
+
+    @Test
     fun `opening another day of today's week lands on that day, not today`() = runTest {
         val vm = viewModel()
         vm.setMode(AgendaMode.Week)
@@ -206,6 +237,73 @@ class AgendaViewModelTest {
         vm.setShowPartnerEvents(true)
         runCurrent()
         assertEquals(setOf("mine", "theirs", "joint"), vm.state.value.schedule(sunday).timed.map { it.block.eventId }.toSet())
+        vm.close()
+    }
+
+    @Test
+    fun `the filter sheet hides my calendar and contexts, and says when something is hidden`() = runTest {
+        data.events.value = listOf(
+            Fixtures.event(id = "mine", owner = Fixtures.ANNA, start = "2026-10-04T08:00:00Z", end = "2026-10-04T09:00:00Z"),
+            Fixtures.event(
+                id = "work",
+                owner = Fixtures.ANNA,
+                categoryId = Fixtures.work.id,
+                start = "2026-10-04T09:00:00Z",
+                end = "2026-10-04T10:00:00Z",
+            ),
+            Fixtures.event(id = "theirs", owner = Fixtures.BORIS, start = "2026-10-04T10:00:00Z", end = "2026-10-04T11:00:00Z"),
+            // In the shared Home context: joint.
+            Fixtures.event(
+                id = "home",
+                owner = Fixtures.BORIS,
+                categoryId = Fixtures.home.id,
+                start = "2026-10-04T12:00:00Z",
+                end = "2026-10-04T13:00:00Z",
+            ),
+        )
+        val vm = viewModel()
+        fun shown() = vm.state.value.schedule(sunday).timed.map { it.block.eventId }.toSet()
+
+        val filters = vm.state.value.filters
+        assertEquals(CalendarLayer(name = "Anna", color = "#c0492a", isMemberA = true, shown = true), filters.own)
+        assertEquals(
+            listOf(
+                ContextFilter(id = "cat-work", name = "Work", color = "#0369a1", shared = false, shown = true),
+                ContextFilter(id = "cat-home", name = "Home", color = "#15803d", shared = true, shown = true),
+            ),
+            filters.contexts,
+        )
+        assertFalse(filters.narrowed)
+
+        // My calendar off: joint and the partner's still show.
+        vm.setOwnCalendarShown(false)
+        runCurrent()
+        assertEquals(true, data.ownCalendarHidden.value)
+        assertEquals(setOf("theirs", "home"), shown())
+        assertTrue(vm.state.value.filters.narrowed)
+        vm.setOwnCalendarShown(true)
+
+        // A hidden context hides joint items in it too.
+        vm.setContextShown(Fixtures.home.id, shown = false)
+        vm.setContextShown(Fixtures.work.id, shown = false)
+        runCurrent()
+        assertEquals(setOf("mine", "theirs"), shown())
+        assertEquals(listOf(false, false), vm.state.value.filters.contexts.map { it.shown })
+        assertTrue(vm.state.value.filters.narrowed)
+
+        vm.setContextShown(Fixtures.work.id, shown = true)
+        runCurrent()
+        assertEquals(setOf(Fixtures.home.id), data.hiddenCategories.value)
+
+        vm.showAllContexts()
+        runCurrent()
+        assertEquals(setOf("mine", "work", "theirs", "home"), shown())
+        assertFalse(vm.state.value.filters.narrowed)
+
+        // Hiding the partner isn't "narrowed": the header toggle shows it already.
+        vm.setShowPartnerEvents(false)
+        runCurrent()
+        assertFalse(vm.state.value.filters.narrowed)
         vm.close()
     }
 

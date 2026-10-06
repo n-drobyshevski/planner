@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import page.planr.android.core.model.CalendarFilter
 import page.planr.android.core.model.CalendarVisibility
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
@@ -51,7 +52,7 @@ import page.planr.android.feature.agenda.model.scheduleDays
 import page.planr.android.feature.agenda.model.viewerZone
 
 /**
- * The day / week agenda. Reads occurrences from the local cache (kept fresh
+ * The day / week / month agenda. Reads occurrences from the local cache (kept fresh
  * by Realtime and background sync), fetches each newly shown window from
  * Supabase, and owns navigation between periods. Mode and focus survive
  * process death through [SavedStateHandle]; the mode is also saved to the
@@ -91,9 +92,9 @@ class AgendaViewModel @Inject constructor(
     private val workspace: StateFlow<Workspace> = combine(
         data.observeMembers(),
         data.observeCategories(),
-        data.observeShowPartnerEvents(),
-    ) { m, c, showPartner ->
-        Workspace(m, c, data.currentSession()?.memberId, showPartner)
+        data.observeCalendarFilter(),
+    ) { m, c, filter ->
+        Workspace(m, c, data.currentSession()?.memberId, filter)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), Workspace())
 
     private val frame: Flow<Frame> = combine(mode, focus, minutes, workspace) { mode, focus, now, ws ->
@@ -138,6 +139,7 @@ class AgendaViewModel @Inject constructor(
                 isRefreshing = refreshing,
                 canCreate = ws.viewerId != null,
                 partner = ws.partnerToggle(),
+                filters = ws.filters(),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialState())
 
@@ -166,6 +168,21 @@ class AgendaViewModel @Inject constructor(
         viewModelScope.launch { runCatchingNonCancel { data.setShowPartnerEvents(show) } }
     }
 
+    /** Hides or shows the viewer's own personal events; joint ones show either way. */
+    fun setOwnCalendarShown(shown: Boolean) {
+        viewModelScope.launch { runCatchingNonCancel { data.setOwnCalendarHidden(!shown) } }
+    }
+
+    /** Hides or shows one context's events, the partner's and joint ones included. */
+    fun setContextShown(id: String, shown: Boolean) {
+        viewModelScope.launch { runCatchingNonCancel { data.setCategoryHidden(id, hidden = !shown) } }
+    }
+
+    /** Shows every context again (the web sidebar's "Show all"). */
+    fun showAllContexts() {
+        viewModelScope.launch { runCatchingNonCancel { data.showAllCategories() } }
+    }
+
     fun setMode(mode: AgendaMode) {
         pickMode(mode)
     }
@@ -185,7 +202,7 @@ class AgendaViewModel @Inject constructor(
         focusOn(AgendaPeriods.shiftedStart(current.mode, current.today, offset), current)
     }
 
-    /** Opens [date] in the day view (from a week column header, "+N more", or a widget). */
+    /** Opens [date] in the day view (from a week column header, "+N more", a month cell, or a widget). */
     fun openDay(date: LocalDate) {
         pickMode(AgendaMode.Day)
         focusOn(date, AgendaMode.Day, state.value.today)
@@ -266,7 +283,7 @@ class AgendaViewModel @Inject constructor(
     ): Map<LocalDate, DaySchedule> {
         val members = ws.members.associateBy { it.id }
         val categories = ws.categories.associateBy { it.id }
-        val blocks = CalendarVisibility.filter(occurrences, ws.viewerId, ws.showPartner)
+        val blocks = CalendarVisibility.filter(occurrences, ws.viewerId, ws.filter)
             .map { agendaBlockOf(it, ws.viewerId, members, categories) }
         return scheduleDays(blocks, days, zone)
     }
@@ -275,7 +292,7 @@ class AgendaViewModel @Inject constructor(
         val members: List<Member> = emptyList(),
         val categories: List<Category> = emptyList(),
         val viewerId: String? = null,
-        val showPartner: Boolean = true,
+        val filter: CalendarFilter = CalendarFilter(),
     ) {
         val viewer: Member? get() = members.firstOrNull { it.id == viewerId }
 
@@ -284,9 +301,30 @@ class AgendaViewModel @Inject constructor(
                 name = partner.name,
                 color = partner.color,
                 isMemberA = members.firstOrNull()?.id == partner.id,
-                shown = showPartner,
+                shown = filter.showPartner,
             )
         }
+
+        fun filters(): CalendarFilters = CalendarFilters(
+            own = viewer?.let { me ->
+                CalendarLayer(
+                    name = me.name,
+                    color = me.color,
+                    isMemberA = members.firstOrNull()?.id == me.id,
+                    shown = !filter.ownHidden,
+                )
+            },
+            contexts = categories.map { category ->
+                ContextFilter(
+                    id = category.id,
+                    name = category.name,
+                    color = category.color,
+                    shared = category.isShared,
+                    shown = category.id !in filter.hiddenCategoryIds,
+                )
+            },
+            narrowed = filter.narrows(categories.map { it.id }),
+        )
     }
 
     private data class Frame(val mode: AgendaMode, val today: LocalDate, val focus: LocalDate, val zone: TimeZone)

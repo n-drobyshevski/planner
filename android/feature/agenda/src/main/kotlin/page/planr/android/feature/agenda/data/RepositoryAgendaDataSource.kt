@@ -16,6 +16,7 @@ import page.planr.android.core.data.prefs.ViewPreferences
 import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.OccurrenceRepository
 import page.planr.android.core.data.repository.WorkspaceRepository
+import page.planr.android.core.model.CalendarFilter
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.Member
@@ -45,14 +46,22 @@ class RepositoryAgendaDataSource @Inject constructor(
     override fun observeOccurrences(window: TimeWindow, zone: TimeZone): Flow<List<Occurrence>> =
         occurrences.observeOccurrences(window, zone)
 
-    override fun observeShowPartnerEvents(): Flow<Boolean> = viewPreferences.showPartnerEvents
+    override fun observeCalendarFilter(): Flow<CalendarFilter> = viewPreferences.calendarFilter
 
     override suspend fun setShowPartnerEvents(show: Boolean) = viewPreferences.setShowPartnerEvents(show)
+
+    override suspend fun setOwnCalendarHidden(hidden: Boolean) = viewPreferences.setOwnCalendarHidden(hidden)
+
+    override suspend fun setCategoryHidden(id: String, hidden: Boolean) =
+        viewPreferences.setCalendarCategoryHidden(id, hidden)
+
+    override suspend fun showAllCategories() = viewPreferences.setHiddenCalendarCategories(emptySet())
 
     override fun observeAgendaMode(): Flow<AgendaMode> = viewPreferences.agendaMode.map {
         when (it) {
             AgendaViewMode.Day -> AgendaMode.Day
             AgendaViewMode.Week -> AgendaMode.Week
+            AgendaViewMode.Month -> AgendaMode.Month
         }
     }
 
@@ -60,6 +69,7 @@ class RepositoryAgendaDataSource @Inject constructor(
         when (mode) {
             AgendaMode.Day -> AgendaViewMode.Day
             AgendaMode.Week -> AgendaViewMode.Week
+            AgendaMode.Month -> AgendaViewMode.Month
         },
     )
 

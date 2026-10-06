@@ -1,12 +1,11 @@
 package page.planr.android.widgets
 
-import java.time.temporal.IsoFields
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toJavaLocalDate
 import page.planr.android.core.model.CalendarWeeks
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
+import page.planr.android.core.model.MonthGrids
 import page.planr.android.core.model.Occurrence
 import page.planr.android.core.model.TimeWindow
 
@@ -73,14 +72,15 @@ internal class CalendarDays(
             }
 }
 
-/** Builds [MonthGrid] from expanded occurrences. Pure, so it is unit-tested directly. */
+/**
+ * Builds [MonthGrid] from expanded occurrences. Pure, so it is unit-tested
+ * directly. The grid itself ([MonthGrids], shared with the agenda's Month
+ * view); the widget's part is the chips.
+ */
 internal object MonthGridModel {
 
     /** The grid of [month]'s month, local midnight of its first Monday to the midnight after its last Sunday. */
-    fun gridWindow(month: LocalDate, zone: TimeZone): TimeWindow {
-        val weeks = CalendarWeeks.monthGrid(month)
-        return TodayAgendaModel.daysWindow(weeks.first().first(), weeks.last().last(), zone)
-    }
+    fun gridWindow(month: LocalDate, zone: TimeZone): TimeWindow = MonthGrids.gridWindow(month, zone)
 
     /**
      * Every day of [month]'s grid with its events ([CalendarDays]).
@@ -97,32 +97,15 @@ internal object MonthGridModel {
         members: List<Member>,
         categories: List<Category> = emptyList(),
     ): MonthGrid {
-        val first = CalendarWeeks.monthStart(month)
         val days = CalendarDays(zone, occurrences, members, categories)
-        val grid = CalendarWeeks.monthGrid(month)
-        val weeks = grid.map { week ->
-            week.map { day ->
-                MonthDay(
-                    date = day,
-                    inMonth = day.month == first.month && day.year == first.year,
-                    chips = days.chipsFor(day),
-                )
-            }
-        }
-        return MonthGrid(first, today, weeks, grid.map { isoWeek(it.first()) })
+        val cells = MonthGrids.cells(month, itemsFor = days::chipsFor)
+        val weeks = cells.map { week -> week.map { MonthDay(date = it.date, inMonth = it.inMonth, chips = it.items) } }
+        return MonthGrid(CalendarWeeks.monthStart(month), today, weeks, cells.map { isoWeek(it.first().date) })
     }
 
-    /** ISO-8601 week number of [monday]'s week (weeks start Monday; week 1 holds the first Thursday). */
-    fun isoWeek(monday: LocalDate): Int = monday.toJavaLocalDate().get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
+    /** ISO-8601 week number of [monday]'s week ([MonthGrids.isoWeek]). */
+    fun isoWeek(monday: LocalDate): Int = MonthGrids.isoWeek(monday)
 
-    /**
-     * How a cell with room for [slots] chips shows [eventCount] events: the
-     * chips to draw and the "+N" left over. When they don't all fit, the last
-     * slot goes to "+N", so a cell never pretends to be complete.
-     */
-    fun chipLayout(slots: Int, eventCount: Int): Pair<Int, Int> = when {
-        slots <= 0 -> 0 to 0
-        eventCount <= slots -> eventCount to 0
-        else -> (slots - 1) to (eventCount - (slots - 1))
-    }
+    /** [MonthGrids.chipLayout]: the chips a cell draws and the "+N" left over. */
+    fun chipLayout(slots: Int, eventCount: Int): Pair<Int, Int> = MonthGrids.chipLayout(slots, eventCount)
 }

@@ -1,4 +1,4 @@
-// Agenda (day/week, both members in their colors) and event detail/edit.
+// Agenda (day/week/month, both members in their colors) and event detail/edit.
 plugins {
     alias(libs.plugins.planr.android.library)
     alias(libs.plugins.planr.android.compose)

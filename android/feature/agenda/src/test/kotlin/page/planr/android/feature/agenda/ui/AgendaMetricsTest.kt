@@ -169,4 +169,24 @@ class AgendaMetricsTest {
         // Restored on the taller grid, the same time is at the top, not the same pixels.
         assertEquals(9.5f, gridHoursAt(scrollOffsetFor(hours, after), after), 0.01f)
     }
+
+    @Test
+    fun `a month cell fits fewer chips as the font grows, never none`() {
+        // 1x: 15dp chips under a 26dp circle; a 95dp cell holds the full three.
+        assertDp(15f, metrics(1f).monthChipHeight)
+        assertEquals(3, metrics(1f).monthChipSlots(95.dp, maxSlots = 3))
+        // 2x: 28dp chips under a 41.6dp circle leave room for one, then "+N" takes it.
+        assertEquals(1, metrics(2f).monthChipSlots(95.dp, maxSlots = 3))
+        assertEquals(1, metrics(2f).monthChipSlots(30.dp, maxSlots = 3))
+    }
+
+    @Test
+    fun `month chip rows count the gap above each, so the last never spills out of the cell`() {
+        // 1x: 26dp circle + 4dp padding, then 15dp chips each under a 1dp gap.
+        // 78dp holds three (30 + 3 x 16); one dp less holds two.
+        assertEquals(3, metrics(1f).monthChipSlots(78.dp, maxSlots = 4))
+        assertEquals(2, metrics(1f).monthChipSlots(77.dp, maxSlots = 4))
+        // A roomy cell fits three chips and the "+N" line.
+        assertEquals(4, metrics(1f).monthChipSlots(95.dp, maxSlots = 4))
+    }
 }
