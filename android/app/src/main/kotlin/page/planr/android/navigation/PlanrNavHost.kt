@@ -1,5 +1,6 @@
 package page.planr.android.navigation
 
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -27,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.datetime.LocalDate
 import page.planr.android.account.AccountMenuButton
 import page.planr.android.feature.agenda.navigation.agendaGraph
@@ -49,6 +51,8 @@ import page.planr.android.feature.quickadd.R as QuickAddR
  * refresh token the server rejected) clears the back stack back to sign-in.
  * What Quick add creates is confirmed in a snackbar with Undo, at the root
  * so it outlives the sheet and shows over whichever screen is below.
+ * Tapping the tab already showing goes back to its root, or on the root to
+ * today (agenda) or the top of the list (tasks); see [reTapAction].
  *
  * @param launchRoute a widget's requested destination, or the import review
  *   for a file opened in or shared to the app; opened once signed in,
@@ -80,6 +84,21 @@ fun PlanrNavHost(
     LaunchedEffect(quickAddViewModel, undoFailed) {
         quickAddViewModel.undoFailures.collect { snackbar.showSnackbar(undoFailed) }
     }
+    // One-shot re-tap signals; dropped when the screen isn't there to take them.
+    val agendaToday = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+    val tasksToTop = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val onSelectTab: (TopLevelTab) -> Unit = { tab ->
+        val shown = shownTab { route -> navController.hasOnStack(route) }
+        when (reTapAction(tab, shown, navController.currentDestination?.route)) {
+            null -> navController.selectTab(tab)
+            ReTapAction.PopToRoot -> navController.popBackStack(tab.route, inclusive = false)
+            ReTapAction.DispatchBack -> backDispatcher?.onBackPressed()
+            ReTapAction.GoToday -> agendaToday.tryEmit(Unit)
+            ReTapAction.ScrollToTop -> tasksToTop.tryEmit(Unit)
+            ReTapAction.None -> Unit
+        }
+    }
 
     LaunchedEffect(signedIn) {
         if (!signedIn) {
@@ -108,7 +127,7 @@ fun PlanrNavHost(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             if (signedIn && currentTab != null) {
-                PlanrBottomBar(current = currentTab, onSelect = navController::selectTab)
+                PlanrBottomBar(current = currentTab, onSelect = onSelectTab)
             }
         },
     ) { padding ->
@@ -136,13 +155,28 @@ fun PlanrNavHost(
                 navController,
                 onQuickAdd = { quickAdd = TopLevelTab.Agenda.quickAddKind },
                 accountAction = { AccountMenuButton(onImportIcs = openImport) },
+                todayRequests = agendaToday,
             )
             tasksScreen(
                 onOpenTask = { id -> navController.navigateToTask(id) },
                 onNewTask = { quickAdd = TopLevelTab.Tasks.quickAddKind },
                 accountAction = { AccountMenuButton(onImportIcs = openImport) },
+                scrollToTopRequests = tasksToTop,
             )
-            taskDetailScreen(onBack = { navController.popBackStack() })
+            taskDetailScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTask = { id ->
+                    // The parent's detail is right underneath (its subtask was opened
+                    // from it): go back to it rather than stacking a second copy, and
+                    // through Back, so this detail's discard guard still decides.
+                    val dispatcher = backDispatcher
+                    when {
+                        !navController.isTaskBelow(id) -> navController.navigateToTask(id)
+                        dispatcher != null -> dispatcher.onBackPressed()
+                        else -> navController.popBackStack()
+                    }
+                },
+            )
             insightsScreen(
                 onOpenDay = { date ->
                     // selectTab saves the Insights stack (its ViewModel and saved state),
@@ -189,6 +223,16 @@ private fun NavController.selectTab(tab: TopLevelTab) {
         restoreState = true
     }
 }
+
+/** Whether the entry under the current one is [taskId]'s detail. */
+private fun NavController.isTaskBelow(taskId: String): Boolean {
+    val below = previousBackStackEntry ?: return false
+    return below.destination.route == PlanrRoutes.TASK && below.arguments?.getString(PlanrRoutes.ARG_ID) == taskId
+}
+
+/** Whether [route] is on the back stack. */
+private fun NavController.hasOnStack(route: String): Boolean =
+    runCatching { getBackStackEntry(route) }.isSuccess
 
 /**
  * Opens a widget's target on a fresh stack of its tab (no restored detail

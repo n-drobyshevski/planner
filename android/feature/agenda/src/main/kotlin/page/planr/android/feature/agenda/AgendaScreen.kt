@@ -54,12 +54,16 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import kotlin.time.Instant
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import page.planr.android.core.design.component.PlanrFloatingButton
+import page.planr.android.core.design.component.PlanrHaptics
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.feature.agenda.model.AgendaMode
 import page.planr.android.feature.agenda.model.AgendaNotice
@@ -86,6 +90,8 @@ import page.planr.android.feature.agenda.ui.scrollOffsetFor
  * @param onQuickAdd shows a floating "Quick add" button when set (the host
  *   opens the Quick add sheet); the top bar's "+" still opens the full editor.
  * @param accountAction the host's account menu, at the end of the top bar.
+ * @param todayRequests each emission goes back to today, as the Today button
+ *   does (the host's bottom-bar tab tapped again).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +101,7 @@ fun AgendaScreen(
     onCreateEvent: ((start: Instant?) -> Unit)? = null,
     onQuickAdd: (() -> Unit)? = null,
     accountAction: (@Composable () -> Unit)? = null,
+    todayRequests: Flow<Unit> = emptyFlow(),
     viewModel: AgendaViewModel = hiltViewModel(),
 ) {
     // Without a create route, host the editor here (seed in epoch ms; MIN = no seed).
@@ -122,11 +129,13 @@ fun AgendaScreen(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val undoLabel = stringResource(R.string.agenda_undo)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(viewModel, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.messages.collect { notice -> showNotice(snackbar, notice, context, undoLabel, viewModel::undo) }
+            viewModel.messages.collect { notice -> showNotice(snackbar, notice, context, undoLabel, haptics, viewModel::undo) }
         }
     }
+    LaunchedEffect(viewModel, todayRequests) { todayRequests.collect { viewModel.goToToday() } }
 
     val formats = rememberAgendaFormats()
     CompositionLocalProvider(LocalAgendaMetrics provides rememberAgendaMetrics()) {
@@ -317,14 +326,19 @@ private suspend fun showNotice(
     notice: AgendaNotice,
     context: Context,
     undoLabel: String,
+    haptics: PlanrHaptics,
     onUndo: (AgendaNotice) -> Unit,
 ) {
+    if (notice.failedWrite) haptics.reject()
     val result = host.showSnackbar(
         message = notice.message.resolve(context),
         actionLabel = if (notice.undo != null) undoLabel else null,
         duration = if (notice.undo != null) SnackbarDuration.Long else SnackbarDuration.Short,
     )
-    if (result == SnackbarResult.ActionPerformed) onUndo(notice)
+    if (result == SnackbarResult.ActionPerformed) {
+        haptics.tick()
+        onUndo(notice)
+    }
 }
 
 internal fun UiText.resolve(context: Context): String {

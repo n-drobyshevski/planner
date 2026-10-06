@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,31 +30,42 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import page.planr.android.core.design.component.DiscardChangesDialog
 import page.planr.android.core.design.component.PlaceholderScreen
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
+import page.planr.android.feature.tasks.detail.DeletePlan
 import page.planr.android.feature.tasks.detail.TaskDetailNotice
 import page.planr.android.feature.tasks.detail.TaskDetailUiState
 import page.planr.android.feature.tasks.detail.TaskDetailViewModel
 import page.planr.android.feature.tasks.detail.TaskEditor
+import page.planr.android.feature.tasks.ui.DeletedTaskEffect
 
 /**
  * One task: its fields as an editor for the owner (title, notes, status, due,
  * priority, assignee, context) or read-only for the partner, plus its
- * subtasks (read-only on mobile). Save writes only the changed fields and is
- * rejected, not merged, if the task changed elsewhere meanwhile. Leaving with
- * unsaved changes (Back or the top bar) asks to discard them first.
+ * subtasks (checked off, opened, added). Save writes only the changed fields
+ * and is rejected, not merged, if the task changed elsewhere meanwhile.
+ * Leaving with unsaved changes (Back or the top bar) asks to discard them
+ * first; while a save or delete is in flight Back waits for it (no prompt,
+ * and no pop that would cancel the write). Delete is immediate with Undo when nothing goes with the task, and
+ * asks first when its subtasks or calendar blocks would.
+ *
+ * @param onOpenTask opens another task's detail (a subtask, or the parent).
  */
 @Composable
 fun TaskDetailScreen(
     taskId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenTask: (taskId: String) -> Unit = {},
     viewModel: TaskDetailViewModel = hiltViewModel<TaskDetailViewModel, TaskDetailViewModel.Factory>(
         key = taskId,
         creationCallback = { factory -> factory.create(taskId) },
@@ -62,21 +76,25 @@ fun TaskDetailScreen(
 
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val leave: () -> Unit = {
-        if (state.dirty) {
-            confirmingDiscard = true
-        } else {
-            onBack()
+        when {
+            state.saving || state.deleting -> Unit
+            state.dirty -> confirmingDiscard = true
+            else -> onBack()
         }
     }
 
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
+    LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     NoticeEffect(state.notice, snackbar, viewModel::dismissNotice)
-    BackHandler(enabled = state.dirty) { confirmingDiscard = true }
+    DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
+    // Held while saving or deleting too: either closes the screen itself once
+    // it lands, and a pop meanwhile would cancel the write half-way.
+    BackHandler(enabled = state.dirty || state.saving || state.deleting, onBack = leave)
 
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = { DetailTopBar(state, leave, viewModel::save) },
+        topBar = { DetailTopBar(state, leave, viewModel::save, viewModel::delete) },
     ) { padding ->
         val form = state.form
         when {
@@ -99,6 +117,7 @@ fun TaskDetailScreen(
                     state = state,
                     form = form,
                     viewModel = viewModel,
+                    onOpenTask = onOpenTask,
                 )
             }
         }
@@ -113,17 +132,56 @@ fun TaskDetailScreen(
             onKeepEditing = { confirmingDiscard = false },
         )
     }
+    state.confirmDelete?.let { plan ->
+        ConfirmDeleteDialog(
+            title = state.task?.title.orEmpty(),
+            plan = plan,
+            onDelete = viewModel::confirmDelete,
+            onCancel = viewModel::dismissDelete,
+        )
+    }
+}
+
+/**
+ * Before a delete that cascades: says what goes with the task, and that it
+ * can't be undone. Delete is tinted, not a solid red button (DESIGN.md).
+ */
+@Composable
+private fun ConfirmDeleteDialog(title: String, plan: DeletePlan.Confirm, onDelete: () -> Unit, onCancel: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.task_delete_title, title.ifBlank { stringResource(R.string.task_detail_untitled) })) },
+        text = {
+            Text(
+                when {
+                    plan.subtasks > 0 && plan.withBlocks ->
+                        pluralStringResource(R.plurals.task_delete_body_subtasks_blocks, plan.subtasks, plan.subtasks)
+                    plan.subtasks > 0 -> pluralStringResource(R.plurals.task_delete_body_subtasks, plan.subtasks, plan.subtasks)
+                    else -> stringResource(R.string.task_delete_body_blocks)
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDelete,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(R.string.task_delete_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.task_delete_cancel)) }
+        },
+    )
 }
 
 @Composable
-private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: () -> Unit) {
+private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: () -> Unit, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = PlanrSpacing.xs, vertical = PlanrSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, enabled = !state.saving && !state.deleting) {
             Icon(painterResource(R.drawable.ic_task_back), contentDescription = stringResource(R.string.task_detail_back))
         }
         Text(
@@ -134,6 +192,13 @@ private fun DetailTopBar(state: TaskDetailUiState, onBack: () -> Unit, onSave: (
                 .semantics { heading() },
         )
         if (state.canEdit) {
+            IconButton(onClick = onDelete, enabled = !state.saving && !state.deleting && !state.addingSubtask) {
+                Icon(
+                    painterResource(R.drawable.ic_task_delete),
+                    contentDescription = stringResource(R.string.task_delete),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             TextButton(onClick = onSave, enabled = state.dirty && !state.saving) {
                 Text(stringResource(if (state.saving) R.string.task_detail_saving else R.string.task_detail_save))
             }
@@ -146,6 +211,7 @@ private fun NoticeEffect(notice: TaskDetailNotice?, snackbar: SnackbarHostState,
     val stale = stringResource(R.string.task_stale)
     val failed = stringResource(R.string.task_failed)
     val titleRequired = stringResource(R.string.task_field_title_required)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(notice) {
         val message = when (notice) {
             null -> return@LaunchedEffect
@@ -153,6 +219,7 @@ private fun NoticeEffect(notice: TaskDetailNotice?, snackbar: SnackbarHostState,
             TaskDetailNotice.Failed -> failed
             TaskDetailNotice.TitleRequired -> titleRequired
         }
+        if (notice != TaskDetailNotice.TitleRequired) haptics.reject()
         snackbar.showSnackbar(message)
         dismiss()
     }

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTheme
 import page.planr.android.core.design.theme.TABULAR_NUMS
@@ -77,9 +78,13 @@ internal fun TaskCard(
                 val toggleLabel = stringResource(
                     if (item.done) R.string.task_card_mark_not_done else R.string.task_card_mark_done,
                 )
+                val haptics = rememberPlanrHaptics()
                 Checkbox(
                     checked = item.done,
-                    onCheckedChange = { onToggleDone() },
+                    onCheckedChange = { done ->
+                        if (done) haptics.confirm() else haptics.tick()
+                        onToggleDone()
+                    },
                     enabled = item.canToggleDone && !pending,
                     colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier

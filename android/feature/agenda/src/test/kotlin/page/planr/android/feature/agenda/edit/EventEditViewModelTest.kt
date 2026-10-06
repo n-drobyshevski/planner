@@ -8,6 +8,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.toList
@@ -189,6 +190,29 @@ class EventEditViewModelTest {
         vm.reloadLatest()
         runCurrent()
         assertFalse(vm.state.value.dirty)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a save in flight stays saving and dirty until it lands, then leaves`() = runTest {
+        data.events.value = listOf(Fixtures.event(id = "one", title = "Standup"))
+        val (vm, effects) = viewModel(EventEditTarget.Existing("one"))
+        vm.update { it.copy(title = "Retro") }
+        val gate = CompletableDeferred<Unit>()
+        data.writeGate = gate
+
+        vm.save()
+        runCurrent()
+
+        // The screen holds Back on `saving`, so the write is neither prompted over nor cancelled.
+        assertTrue(vm.state.value.saving)
+        assertTrue(vm.state.value.dirty)
+        assertTrue(effects.isEmpty())
+
+        gate.complete(Unit)
+        runCurrent()
+        assertFalse(vm.state.value.saving)
+        assertEquals(listOf<EventEditEffect>(EventEditEffect.Done), effects)
         vm.viewModelScope.cancel()
     }
 

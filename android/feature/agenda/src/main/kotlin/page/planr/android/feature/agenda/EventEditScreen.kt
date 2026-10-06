@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import page.planr.android.core.design.component.DiscardChangesDialog
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTokens
@@ -82,7 +83,8 @@ import page.planr.android.feature.agenda.ui.rememberAgendaFormats
  * instance of a series asks "this / this and following / all events" first.
  * A conflicting edit made elsewhere surfaces as a calm snackbar offering to
  * reload; the form is never discarded on failure. Leaving with unsaved
- * changes (Back or Close) asks to discard them first.
+ * changes (Back or Close) asks to discard them first; while a save is in
+ * flight Back waits for it (no prompt, and no pop that would cancel it).
  *
  * @param onDone called after a successful save.
  * @param onClose called when the editor is closed without saving.
@@ -105,27 +107,33 @@ fun EventEditScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
     val close: () -> Unit = {
-        if (state.dirty) {
-            confirmingDiscard = true
-        } else {
-            onClose()
+        when {
+            state.saving -> Unit
+            state.dirty -> confirmingDiscard = true
+            else -> onClose()
         }
     }
-    // An in-place editor always takes over Back; a route only while there is something to lose.
-    BackHandler(enabled = viewModelKey != null || state.dirty, onBack = close)
+    // An in-place editor always takes over Back; a route only while there is
+    // something to lose, or a save in flight (it leaves by itself once it lands).
+    BackHandler(enabled = viewModelKey != null || state.dirty || state.saving, onBack = close)
     val snackbar = remember { SnackbarHostState() }
     val staleText = stringResource(R.string.agenda_stale_event)
     val reloadText = stringResource(R.string.agenda_stale_reload)
     val failedText = stringResource(R.string.agenda_something_went_wrong)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 EventEditEffect.Done -> onDone()
                 EventEditEffect.Stale -> {
+                    haptics.reject()
                     val result = snackbar.showSnackbar(staleText, actionLabel = reloadText, duration = SnackbarDuration.Indefinite, withDismissAction = true)
                     if (result == SnackbarResult.ActionPerformed) viewModel.reloadLatest()
                 }
-                EventEditEffect.Failed -> snackbar.showSnackbar(failedText)
+                EventEditEffect.Failed -> {
+                    haptics.reject()
+                    snackbar.showSnackbar(failedText)
+                }
             }
         }
     }
@@ -140,7 +148,7 @@ fun EventEditScreen(
                     Text(stringResource(if (state.isNew) R.string.agenda_editor_new_event else R.string.agenda_editor_edit_event))
                 },
                 navigationIcon = {
-                    IconButton(onClick = close) {
+                    IconButton(onClick = close, enabled = !state.saving) {
                         Icon(AgendaIcons.Close, contentDescription = stringResource(R.string.agenda_close))
                     }
                 },

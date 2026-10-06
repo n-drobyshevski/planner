@@ -212,7 +212,9 @@ class AgendaViewModel @Inject constructor(
         val undo = notice.undo ?: return
         viewModelScope.launch {
             val ok = runCatchingNonCancel { undo() }
-            ownNotices.send(AgendaNotice(UiText(if (ok) R.string.agenda_toast_undone else R.string.agenda_toast_couldnt_undo)))
+            ownNotices.send(
+                AgendaNotice(UiText(if (ok) R.string.agenda_toast_undone else R.string.agenda_toast_couldnt_undo), failedWrite = !ok),
+            )
         }
     }
 

@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import page.planr.android.core.data.auth.AuthState
 import page.planr.android.core.data.auth.SessionManager
+import page.planr.android.core.data.model.DeletedTaskSnapshot
+import page.planr.android.core.data.model.TaskDraft
 import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.repository.TaskRepository
 import page.planr.android.core.data.repository.WorkspaceRepository
@@ -41,6 +43,18 @@ interface TasksDataSource {
 
     /** Throws StaleWriteException when [expectedUpdatedAt] no longer matches. */
     suspend fun updateTask(id: String, patch: TaskPatch, expectedUpdatedAt: Instant?): Task
+
+    /** Creates a task (a subtask, from the detail). */
+    suspend fun createTask(draft: TaskDraft): Task
+
+    /** Deletes a task with its subtasks and calendar blocks; the snapshot holds its own row. */
+    suspend fun deleteTask(id: String): DeletedTaskSnapshot
+
+    /** Undo of [deleteTask] for a task that had no subtasks or blocks. */
+    suspend fun restoreTask(snapshot: DeletedTaskSnapshot)
+
+    /** Whether calendar blocks are linked to any of [taskIds] (asks the server). */
+    suspend fun hasCalendarBlocks(taskIds: Collection<String>): Boolean
 }
 
 /** The production [TasksDataSource]: Room-backed repositories plus the session. */
@@ -72,4 +86,12 @@ class RepositoryTasksDataSource @Inject constructor(
 
     override suspend fun updateTask(id: String, patch: TaskPatch, expectedUpdatedAt: Instant?): Task =
         tasks.updateTask(id, patch, expectedUpdatedAt)
+
+    override suspend fun createTask(draft: TaskDraft): Task = tasks.createTask(draft)
+
+    override suspend fun deleteTask(id: String): DeletedTaskSnapshot = tasks.deleteTask(id)
+
+    override suspend fun restoreTask(snapshot: DeletedTaskSnapshot) = tasks.restoreTask(snapshot)
+
+    override suspend fun hasCalendarBlocks(taskIds: Collection<String>): Boolean = tasks.hasCalendarBlocks(taskIds)
 }

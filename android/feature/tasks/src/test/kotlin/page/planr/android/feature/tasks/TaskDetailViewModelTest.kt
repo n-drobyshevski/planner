@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import org.junit.Rule
@@ -12,6 +13,7 @@ import page.planr.android.core.data.model.TaskPatch
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.model.TaskPriority
 import page.planr.android.core.recurrence.PatchField
+import page.planr.android.feature.tasks.detail.TaskDeletions
 import page.planr.android.feature.tasks.detail.TaskDetailNotice
 import page.planr.android.feature.tasks.detail.TaskDetailViewModel
 import page.planr.android.feature.tasks.model.TaskForm
@@ -34,7 +36,7 @@ class TaskDetailViewModelTest {
         board("elsewhere", "other", position = 0.0),
     )
 
-    private fun subject(data: FakeTasksDataSource) = TaskDetailViewModel("t1", data, FixedClock)
+    private fun subject(data: FakeTasksDataSource) = TaskDetailViewModel("t1", data, FixedClock, TaskDeletions())
 
     @Test
     fun `loads the task with its collection columns, subtasks and eligible contexts`() = runTest {
@@ -54,7 +56,7 @@ class TaskDetailViewModelTest {
         assertEquals(original, state.task)
         assertTrue(state.canEdit)
         assertEquals(listOf("todo", "doing", "done"), state.boards.map { it.id })
-        assertEquals(listOf("s1", "s2"), state.subtasks.map { it.id })
+        assertEquals(listOf("s1", "s2"), state.subtasks.map { it.task.id })
         assertEquals(1, state.progress?.done)
         assertEquals(listOf(sharedHome.id, annaWork.id), state.categories.map { it.id })
         assertTrue(state.overdue)
@@ -157,6 +159,29 @@ class TaskDetailViewModelTest {
 
         assertTrue(data.updates.isEmpty())
         assertEquals(TaskDetailNotice.TitleRequired, vm.state.value.notice)
+    }
+
+    @Test
+    fun `a save in flight stays saving and dirty until it lands`() = runTest {
+        val data = FakeTasksDataSource(tasks = listOf(original))
+        val vm = subject(data)
+        keepCollecting(vm.state)
+        val gate = CompletableDeferred<Unit>()
+        data.updateGate = gate
+
+        vm.setTitle("Book train")
+        vm.save()
+
+        // The screen holds Back on `saving`: no discard prompt, no pop that cancels the write.
+        assertTrue(vm.state.value.saving)
+        assertTrue(vm.state.value.dirty)
+        assertFalse(vm.state.value.saved)
+        vm.setTitle("Edited meanwhile")
+        assertEquals("Book train", vm.state.value.form?.title, "the form is frozen while saving")
+
+        gate.complete(Unit)
+        assertFalse(vm.state.value.saving)
+        assertTrue(vm.state.value.saved)
     }
 
     @Test

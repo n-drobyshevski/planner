@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -43,8 +45,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import page.planr.android.core.design.component.PlaceholderScreen
 import page.planr.android.core.design.component.PlanrFloatingButton
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.TABULAR_NUMS
 import page.planr.android.feature.tasks.list.TasksNotice
@@ -55,6 +60,7 @@ import page.planr.android.feature.tasks.model.TaskGroup
 import page.planr.android.feature.tasks.model.TaskGroupKey
 import page.planr.android.feature.tasks.model.TaskScope
 import page.planr.android.feature.tasks.model.TaskStateFilter
+import page.planr.android.feature.tasks.ui.DeletedTaskEffect
 import page.planr.android.feature.tasks.ui.TaskCard
 import page.planr.android.feature.tasks.ui.groupLabel
 
@@ -65,6 +71,8 @@ import page.planr.android.feature.tasks.ui.groupLabel
  *
  * @param onNewTask shows a "New task" button when set (the host opens Quick add).
  * @param accountAction the host's account menu, beside the title.
+ * @param scrollToTopRequests each emission scrolls the list to the top (the
+ *   host's bottom-bar tab tapped again).
  */
 @Composable
 fun TasksScreen(
@@ -72,11 +80,17 @@ fun TasksScreen(
     modifier: Modifier = Modifier,
     onNewTask: (() -> Unit)? = null,
     accountAction: (@Composable () -> Unit)? = null,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     NoticeEffect(state.notice, snackbar, viewModel)
+    DeletedTaskEffect(viewModel.deletedTasks, snackbar, viewModel::undoDelete)
+    val listState = rememberLazyListState()
+    LaunchedEffect(scrollToTopRequests) {
+        scrollToTopRequests.collect { if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(0) }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -115,6 +129,7 @@ fun TasksScreen(
             )
             TaskListBody(
                 state = state,
+                listState = listState,
                 onRefresh = viewModel::refresh,
                 onOpenTask = onOpenTask,
                 onToggleDone = viewModel::toggleDone,
@@ -131,6 +146,7 @@ private fun NoticeEffect(notice: TasksNotice?, snackbar: SnackbarHostState, view
     val stale = stringResource(R.string.task_stale)
     val failed = stringResource(R.string.task_failed)
     val undo = stringResource(R.string.task_undo)
+    val haptics = rememberPlanrHaptics()
     LaunchedEffect(notice) {
         if (notice == null) return@LaunchedEffect
         try {
@@ -141,10 +157,19 @@ private fun NoticeEffect(notice: TasksNotice?, snackbar: SnackbarHostState, view
                         actionLabel = undo,
                         duration = SnackbarDuration.Short,
                     )
-                    if (result == SnackbarResult.ActionPerformed) viewModel.undo(notice)
+                    if (result == SnackbarResult.ActionPerformed) {
+                        haptics.tick()
+                        viewModel.undo(notice)
+                    }
                 }
-                TasksNotice.Stale -> snackbar.showSnackbar(stale)
-                TasksNotice.Failed -> snackbar.showSnackbar(failed)
+                TasksNotice.Stale -> {
+                    haptics.reject()
+                    snackbar.showSnackbar(stale)
+                }
+                TasksNotice.Failed -> {
+                    haptics.reject()
+                    snackbar.showSnackbar(failed)
+                }
             }
         } finally {
             // Consumed even when cancelled (the user navigated away mid-snackbar):
@@ -210,6 +235,7 @@ private fun Filters(
 @Composable
 private fun TaskListBody(
     state: TasksUiState,
+    listState: LazyListState,
     onRefresh: () -> Unit,
     onOpenTask: (String) -> Unit,
     onToggleDone: (String) -> Unit,
@@ -235,7 +261,7 @@ private fun TaskListBody(
                     }
                 },
             )
-            else -> TaskGroupsList(state, onOpenTask, onToggleDone)
+            else -> TaskGroupsList(state, listState, onOpenTask, onToggleDone)
         }
     }
 }
@@ -244,11 +270,13 @@ private fun TaskListBody(
 @Composable
 private fun TaskGroupsList(
     state: TasksUiState,
+    listState: LazyListState,
     onOpenTask: (String) -> Unit,
     onToggleDone: (String) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(start = PlanrSpacing.xl, end = PlanrSpacing.xl, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(PlanrSpacing.sm),
     ) {

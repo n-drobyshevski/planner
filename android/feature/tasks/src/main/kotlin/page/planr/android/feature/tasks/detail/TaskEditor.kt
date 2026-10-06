@@ -1,6 +1,7 @@
 package page.planr.android.feature.tasks.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,16 +9,21 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -34,16 +40,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import kotlinx.datetime.LocalDate
+import page.planr.android.core.design.component.rememberPlanrHaptics
 import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.model.TaskPriority
 import page.planr.android.feature.tasks.R
@@ -56,9 +66,18 @@ import page.planr.android.feature.tasks.ui.priorityLabel
 import page.planr.android.feature.tasks.ui.taskColor
 import page.planr.android.feature.tasks.ui.toPickerMillis
 
-/** The task fields, editable for the owner and disabled (read-only) for the partner. */
+/**
+ * The task fields, editable for the owner and disabled (read-only) for the
+ * partner, then the subtasks. [onOpenTask] opens another task's detail (a
+ * subtask, or the parent from the "Subtask of" line).
+ */
 @Composable
-internal fun TaskEditor(state: TaskDetailUiState, form: TaskForm, viewModel: TaskDetailViewModel) {
+internal fun TaskEditor(
+    state: TaskDetailUiState,
+    form: TaskForm,
+    viewModel: TaskDetailViewModel,
+    onOpenTask: (taskId: String) -> Unit,
+) {
     val enabled = state.canEdit && !state.saving
 
     if (!state.canEdit) {
@@ -69,7 +88,16 @@ internal fun TaskEditor(state: TaskDetailUiState, form: TaskForm, viewModel: Tas
         )
     }
     state.parent?.let { parent ->
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
+        val openParent = stringResource(R.string.task_subtask_open_parent)
+        Row(
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .clip(MaterialTheme.shapes.small)
+                // Not mid-write: the save or delete closes this screen once it lands.
+                .clickable(enabled = !state.saving && !state.deleting, onClickLabel = openParent) { onOpenTask(parent.id) },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm),
+        ) {
             Icon(
                 painterResource(R.drawable.ic_task_subtask),
                 contentDescription = null,
@@ -77,9 +105,10 @@ internal fun TaskEditor(state: TaskDetailUiState, form: TaskForm, viewModel: Tas
                 modifier = Modifier.size(16.dp),
             )
             Text(
-                text = stringResource(R.string.task_subtask_of, parent.title),
+                text = stringResource(R.string.task_subtask_of, parent.title.ifBlank { stringResource(R.string.task_detail_untitled) }),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textDecoration = TextDecoration.Underline,
             )
         }
     }
@@ -132,7 +161,7 @@ internal fun TaskEditor(state: TaskDetailUiState, form: TaskForm, viewModel: Tas
         modifier = Modifier.fillMaxWidth(),
     )
 
-    if (state.subtasks.isNotEmpty()) SubtaskList(state)
+    if (state.subtasks.isNotEmpty() || state.canEdit) SubtaskList(state, viewModel, onOpenTask)
 }
 
 @Composable
@@ -296,10 +325,14 @@ private fun ColorDot(hex: String) {
     )
 }
 
-/** Subtasks, read-only on mobile: done state, title, and the subtree progress. */
+/**
+ * Subtasks with the subtree progress: the checkbox completes or reopens one
+ * (owner only; under a sequential parent only the next one), tapping the
+ * row opens it, and the owner adds one from the field at the end.
+ */
 @Composable
-private fun SubtaskList(state: TaskDetailUiState) {
-    Column(verticalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
+private fun SubtaskList(state: TaskDetailUiState, viewModel: TaskDetailViewModel, onOpenTask: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.sm)) {
             Text(
                 text = stringResource(R.string.task_subtasks_title),
@@ -314,37 +347,101 @@ private fun SubtaskList(state: TaskDetailUiState) {
                 )
             }
         }
-        state.subtasks.forEach { subtask ->
-            val done = subtask.completedAt != null
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(PlanrSpacing.md),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .background(
-                            if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            MaterialTheme.shapes.extraSmall,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (done) {
-                        Icon(
-                            painterResource(R.drawable.ic_task_check),
-                            contentDescription = stringResource(R.string.task_status_done),
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(12.dp),
-                        )
-                    }
-                }
+        state.subtasks.forEach { item ->
+            SubtaskRow(
+                item = item,
+                canOpen = !state.saving && !state.deleting,
+                onToggle = { viewModel.toggleSubtask(item.task.id) },
+                onOpen = { onOpenTask(item.task.id) },
+            )
+        }
+        if (state.canEdit) {
+            AddSubtaskField(
+                value = state.subtaskTitle,
+                enabled = !state.saving && !state.deleting,
+                adding = state.addingSubtask,
+                onValueChange = viewModel::setSubtaskTitle,
+                onAdd = viewModel::addSubtask,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SubtaskRow(item: SubtaskItem, canOpen: Boolean, onToggle: () -> Unit, onOpen: () -> Unit) {
+    val haptics = rememberPlanrHaptics()
+    val openLabel = stringResource(R.string.task_subtask_open)
+    val toggleLabel = stringResource(if (item.done) R.string.task_card_mark_not_done else R.string.task_card_mark_done)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(enabled = canOpen, onClickLabel = openLabel, onClick = onOpen),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = item.done,
+            onCheckedChange = { done ->
+                if (done) haptics.confirm() else haptics.tick()
+                onToggle()
+            },
+            enabled = item.canToggle && !item.pending,
+            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
+            modifier = Modifier
+                .size(PlanrSpacing.touchTarget)
+                .semantics { contentDescription = toggleLabel },
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = PlanrSpacing.xs, end = PlanrSpacing.sm, top = PlanrSpacing.xs, bottom = PlanrSpacing.xs),
+        ) {
+            Text(
+                text = item.task.title.ifBlank { stringResource(R.string.task_detail_untitled) },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (item.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (item.done) TextDecoration.LineThrough else null,
+            )
+            if (item.blocked) {
                 Text(
-                    text = subtask.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (done) TextDecoration.LineThrough else null,
+                    text = stringResource(R.string.task_subtask_blocked),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
     }
+}
+
+/** "Add a subtask": the keyboard's Done (or the + button) creates it and clears the field for the next. */
+@Composable
+private fun AddSubtaskField(
+    value: String,
+    enabled: Boolean,
+    adding: Boolean,
+    onValueChange: (String) -> Unit,
+    onAdd: () -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        enabled = enabled,
+        singleLine = true,
+        placeholder = { Text(stringResource(R.string.task_subtask_add_placeholder)) },
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onAdd() }),
+        trailingIcon = {
+            IconButton(onClick = onAdd, enabled = enabled && !adding && value.isNotBlank()) {
+                Icon(
+                    painterResource(R.drawable.ic_task_add),
+                    contentDescription = stringResource(R.string.task_subtask_add),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = PlanrSpacing.xs),
+    )
 }

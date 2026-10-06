@@ -48,17 +48,24 @@ class EventDetailViewModelTest {
     )
     private val monday = Instant.parse("2026-10-05T07:00:00Z")
 
-    private class Harness(val vm: EventDetailViewModel, val closed: List<Unit>, val posted: List<AgendaNotice>)
+    private class Harness(
+        val vm: EventDetailViewModel,
+        val closed: List<Unit>,
+        val posted: List<AgendaNotice>,
+        val failed: List<Unit>,
+    )
 
     private fun TestScope.open(ref: String): Harness {
         val vm = EventDetailViewModel(ref, data, DefaultRecurrenceExpander, notices)
         val closed = mutableListOf<Unit>()
         val posted = mutableListOf<AgendaNotice>()
+        val failed = mutableListOf<Unit>()
         backgroundScope.launch { vm.state.collect {} }
         backgroundScope.launch { vm.closed.toList(closed) }
+        backgroundScope.launch { vm.failed.toList(failed) }
         backgroundScope.launch { notices.notices.toList(posted) }
         runCurrent()
-        return Harness(vm, closed, posted)
+        return Harness(vm, closed, posted, failed)
     }
 
     private fun Harness.ready(): EventDetail = assertIs<EventDetailUiState.Ready>(vm.state.value).detail
@@ -136,6 +143,7 @@ class EventDetailViewModelTest {
 
         assertEquals(Call.Delete("one"), data.calls.single())
         assertEquals(1, h.closed.size)
+        assertTrue(h.failed.isEmpty())
         val notice = h.posted.single()
         assertEquals(UiText(R.string.agenda_toast_event_deleted), notice.message)
         notice.undo!!.invoke()
@@ -212,6 +220,7 @@ class EventDetailViewModelTest {
         runCurrent()
 
         assertTrue(h.closed.isEmpty())
+        assertEquals(1, h.failed.size)
         assertEquals(UiText(R.string.agenda_something_went_wrong), h.posted.single().message)
         assertFalse(h.vm.deleting.value)
         h.vm.viewModelScope.cancel()

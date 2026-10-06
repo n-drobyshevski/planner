@@ -30,6 +30,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Planr"
         android:localeConfig="@xml/locales_config"
+        android:enableOnBackInvokedCallback="true"
         tools:ignore="UnusedAttribute">
 
         <activity

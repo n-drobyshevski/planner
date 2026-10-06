@@ -116,7 +116,9 @@ class RepositoryQuickAddDataSource @Inject constructor(
     }
 
     /** Through the repository, so Room and the widgets drop it too. */
-    override suspend fun deleteTask(id: String) = tasks.deleteTask(id)
+    override suspend fun deleteTask(id: String) {
+        tasks.deleteTask(id)
+    }
 
     /** The undo of a create: no snapshot to restore is kept. */
     override suspend fun deleteEvent(id: String) = events.deleteEvents(listOf(id))

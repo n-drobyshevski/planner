@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.model.TaskPatch
@@ -162,6 +163,41 @@ class MutationsTest {
 
         val restored = events.restoreDeleted(snapshot)
         assertEquals(Fixtures.EVENT_ID, restored.events.single().id)
+    }
+
+    @Test
+    fun `deleteTask snapshots the task's row, and restoring brings it back with its id`() = runTest {
+        val snapshot = tasks.deleteTask(Fixtures.TASK_ID)
+        assertEquals(1, snapshot.tasks.size)
+        assertTrue(gateway.rows(SupabaseTables.TASKS).isEmpty())
+
+        val restored = tasks.restoreDeleted(snapshot)
+        assertEquals(Fixtures.TASK_ID, restored.single().id)
+        assertEquals("Buy paint", restored.single().title)
+        assertEquals(Fixtures.taskRow(), gateway.callsOf<FakePostgrestGateway.Call.Insert>().single().rows.single())
+    }
+
+    @Test
+    fun `deleteTask also snapshots the checkpoints and dependency edges it cascades, restored after the task`() = runTest {
+        fun row(vararg pairs: Pair<String, String>) = JsonObject(pairs.associate { (k, v) -> k to JsonPrimitive(v) })
+        val checkpoint = row("id" to "cp-1", "task_id" to Fixtures.TASK_ID, "workspace_id" to Fixtures.WS)
+        val blockedBy = row("id" to "dep-1", "task_id" to "other", "depends_on_task_id" to Fixtures.TASK_ID)
+        val blocks = row("id" to "dep-2", "task_id" to Fixtures.TASK_ID, "depends_on_task_id" to "other")
+        val unrelated = row("id" to "dep-3", "task_id" to "a", "depends_on_task_id" to "b")
+        gateway.seed(SupabaseTables.TASK_CHECKPOINTS, checkpoint, row("id" to "cp-2", "task_id" to "other"))
+        gateway.seed(SupabaseTables.TASK_DEPENDENCIES, blockedBy, blocks, unrelated)
+
+        val snapshot = tasks.deleteTask(Fixtures.TASK_ID)
+        assertEquals(listOf("cp-1"), snapshot.checkpoints.map { it.getValue("id").jsonPrimitive.content })
+        assertEquals(setOf("dep-1", "dep-2"), snapshot.dependencies.map { it.getValue("id").jsonPrimitive.content }.toSet())
+
+        tasks.restoreDeleted(snapshot)
+        val inserts = gateway.callsOf<FakePostgrestGateway.Call.Insert>()
+        assertEquals(
+            listOf(SupabaseTables.TASKS, SupabaseTables.TASK_CHECKPOINTS, SupabaseTables.TASK_DEPENDENCIES),
+            inserts.map { it.table },
+        )
+        assertEquals(snapshot.dependencies, inserts.last().rows)
     }
 
     @Test
