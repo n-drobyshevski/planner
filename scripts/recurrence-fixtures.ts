@@ -247,7 +247,7 @@ function eventRow(s: EventSpec): JsonObject {
 }
 
 /** DB row for a domain event (used to feed split output back into expansion). */
-function rowFromDomain(id: string, e: Omit<EventRow, "id" | "createdAt" | "updatedAt">): JsonObject {
+function rowFromDomain(id: string, e: Omit<EventRow, "id" | "createdAt" | "updatedAt" | "updatedBy">): JsonObject {
   return eventRow({
     id,
     title: e.title,
@@ -374,7 +374,7 @@ function overrideInputJson(o: OverrideInput): JsonObject {
   return out;
 }
 
-function domainEventJson(e: Omit<EventRow, "id" | "createdAt" | "updatedAt">): JsonObject {
+function domainEventJson(e: Omit<EventRow, "id" | "createdAt" | "updatedAt" | "updatedBy">): JsonObject {
   return {
     workspaceId: e.workspaceId,
     ownerId: e.ownerId,

@@ -39,6 +39,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     attributes: {},
     createdAt: T0,
     updatedAt: T0,
+    updatedBy: null,
     ...over,
   };
 }

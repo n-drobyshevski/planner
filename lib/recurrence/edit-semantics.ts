@@ -134,7 +134,7 @@ export function splitThisAndFuture(
   patch: OccurrencePatch,
 ): {
   original: { id: string; rrule: string | null; recurrenceEndsAt: number | null };
-  newSeries: Omit<EventRow, "id" | "createdAt" | "updatedAt">;
+  newSeries: Omit<EventRow, "id" | "createdAt" | "updatedAt" | "updatedBy">;
 } {
   const untilMs = fromOccurrenceMs - 1000;
 
@@ -171,7 +171,7 @@ export function splitThisAndFuture(
     newRrule = stripRrulePrefix(RRule.optionsToString(opts));
   }
 
-  const newSeries: Omit<EventRow, "id" | "createdAt" | "updatedAt"> = {
+  const newSeries: Omit<EventRow, "id" | "createdAt" | "updatedAt" | "updatedBy"> = {
     workspaceId: event.workspaceId,
     ownerId: event.ownerId,
     categoryId:

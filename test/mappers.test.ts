@@ -191,6 +191,30 @@ describe("attributes round-trip", () => {
   });
 });
 
+describe("updated_by (server-stamped, read-only)", () => {
+  it("mapEvent/mapTask read updated_by, null when missing", () => {
+    expect(mapEvent(baseRow).updatedBy).toBeNull();
+    expect(mapEvent({ ...baseRow, updated_by: "m2" }).updatedBy).toBe("m2");
+    expect(mapTask(baseTaskRow).updatedBy).toBeNull();
+    expect(mapTask({ ...baseTaskRow, updated_by: null }).updatedBy).toBeNull();
+    expect(mapTask({ ...baseTaskRow, updated_by: "m2" }).updatedBy).toBe("m2");
+  });
+
+  it("input and patch mappers never send it, even when a row is spread in", () => {
+    const event = mapEvent({ ...baseRow, updated_by: "m2" });
+    const task = mapTask({ ...baseTaskRow, updated_by: "m2" });
+
+    expect(eventInputToRow(event as unknown as EventInput)).not.toHaveProperty("updated_by");
+    expect(eventPatchToRow(event as Parameters<typeof eventPatchToRow>[0])).not.toHaveProperty(
+      "updated_by",
+    );
+    expect(taskInputToRow(task as unknown as TaskInput)).not.toHaveProperty("updated_by");
+    expect(taskPatchToRow(task as Parameters<typeof taskPatchToRow>[0])).not.toHaveProperty(
+      "updated_by",
+    );
+  });
+});
+
 const baseSleepRow = {
   id: "s1",
   workspace_id: "w1",
