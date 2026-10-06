@@ -5,6 +5,10 @@
     <string name="attributes_clear_hint">Всё необязательно — нажми на выбранный вариант ещё раз, чтобы сбросить.</string>
     <string name="attributes_expanded">Развёрнуто</string>
     <string name="attributes_collapsed">Свёрнуто</string>
+    <!-- Spoken for an option chip: "Энергия: 1 Низкая", then its state. -->
+    <string name="attributes_option_a11y">%1$s: %2$s</string>
+    <string name="attributes_option_selected">выбрано</string>
+    <string name="attributes_option_not_selected">не выбрано</string>
 
     <string name="attributes_energy_label">Энергия</string>
     <string name="attributes_energy_description">Насколько это требует сил.</string>
