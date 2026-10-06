@@ -553,6 +553,24 @@ export async function splitSeries(
   return created;
 }
 
+/**
+ * Undo a `splitSeries`: put the original's rule back FIRST, then delete the
+ * new series. If the restore fails, the new series stays and the error is
+ * rethrown, so the future occurrences survive in one of the two rows.
+ * (Deleting first would lose them whenever the restore then failed.)
+ */
+export async function revertSplit(
+  sb: SupabaseClient,
+  original: EventRow,
+  newSeriesId: string,
+): Promise<void> {
+  await updateEvent(sb, original.id, {
+    rrule: original.rrule,
+    recurrenceEndsAt: original.recurrenceEndsAt,
+  });
+  await deleteEvent(sb, newSeriesId);
+}
+
 /** "This and following": cap the series with UNTIL just before the occurrence. */
 export async function deleteThisAndFuture(
   sb: SupabaseClient,

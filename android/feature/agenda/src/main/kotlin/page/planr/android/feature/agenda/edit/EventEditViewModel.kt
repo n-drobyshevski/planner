@@ -152,9 +152,11 @@ class EventEditViewModel @AssistedInject constructor(
                 val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form))
                 notices.post(
                     AgendaNotice(UiText(R.string.agenda_toast_this_and_future_updated)) {
-                        // Undo the split: drop the new series, restore the original rule.
-                        data.deleteEvent(created.id)
+                        // Undo the split: restore the original rule FIRST, then drop the
+                        // new series. A failed restore keeps the new series, so the
+                        // future occurrences are never lost.
                         data.updateEvent(event.id, restoreRecurrence(event))
+                        data.deleteEvent(created.id)
                     },
                 )
             }

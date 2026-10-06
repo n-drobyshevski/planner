@@ -426,14 +426,8 @@ export function useEventMutations(workspaceId: string | undefined) {
         m.splitSeries(sb, event, occurrenceMs, patch, color, attributes),
         t("thisAndFutureUpdated"),
         (newSeries) =>
-          // Undo the split: drop the new future series, restore the original rrule.
-          inverse(t("undoLabel.edit"), async () => {
-            await m.deleteEvent(sb, newSeries.id);
-            await m.updateEvent(sb, event.id, {
-              rrule: event.rrule,
-              recurrenceEndsAt: event.recurrenceEndsAt,
-            });
-          }),
+          // Undo the split: restore the original rrule first, then drop the new series.
+          inverse(t("undoLabel.edit"), () => m.revertSplit(sb, event, newSeries.id)),
       ),
     editAll: (event: EventRow, patch: OccurrencePatch) =>
       run(

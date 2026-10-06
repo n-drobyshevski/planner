@@ -2,6 +2,7 @@ package page.planr.android.feature.agenda.edit
 
 import androidx.lifecycle.viewModelScope
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -260,6 +261,45 @@ class EventEditViewModelTest {
         val split = assertIs<Call.Split>(data.calls.single())
         assertEquals(monday, split.from)
         assertEquals("Planning", split.patch.title)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `undoing this and following restores the rule before dropping the new series`() = runTest {
+        data.events.value = listOf(series)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+        val created = "split-1"
+
+        posted.single().undo!!.invoke()
+
+        val (restore, delete) = data.calls.drop(1)
+        val update = assertIs<Call.Update>(restore)
+        assertEquals("series", update.id)
+        assertEquals(PatchField.Value("FREQ=DAILY"), update.patch.rrule)
+        assertEquals(PatchField.Value(null), update.patch.recurrenceEndsAt)
+        assertEquals(Call.Delete(created), delete)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun `a failed restore keeps the new series`() = runTest {
+        data.events.value = listOf(series)
+        val (vm, _) = viewModel(EventEditTarget.Existing(Occurrence.recurringKey("series", monday)))
+        val posted = postedNotices()
+        vm.update { it.copy(title = "Planning") }
+        vm.save()
+        vm.chooseScope(RecurrenceScope.Following)
+        runCurrent()
+        data.failNext = IllegalStateException("offline")
+
+        assertFailsWith<IllegalStateException> { posted.single().undo!!.invoke() }
+
+        assertTrue(data.calls.none { it is Call.Delete }, "the future stays in the new series")
         vm.viewModelScope.cancel()
     }
 

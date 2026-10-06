@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { splitSeries, StaleWriteError } from "@/lib/supabase/mutations";
+import { revertSplit, splitSeries, StaleWriteError } from "@/lib/supabase/mutations";
 import type { EventRow } from "@/lib/types";
 
 type Call = { table: string; ops: [string, unknown[]][] };
@@ -121,5 +121,24 @@ describe("splitSeries", () => {
 
     expect(calls.map(kind)).toEqual(["insert", "update", "update", "delete"]);
     expect(eqId(calls[3])).toEqual(["id", "new-series"]);
+  });
+});
+
+describe("revertSplit", () => {
+  it("restores the original rule before deleting the new series", async () => {
+    const { sb, calls } = fakeClient(respond("ok"));
+    await revertSplit(sb, series, "new-series");
+
+    expect(calls.map(kind)).toEqual(["update", "delete"]);
+    expect(eqId(calls[0])).toEqual(["id", "evt-1"]);
+    expect(patchOf(calls[0])).toEqual({ rrule: "FREQ=WEEKLY;BYDAY=MO", recurrence_ends_at: null });
+    expect(eqId(calls[1])).toEqual(["id", "new-series"]);
+  });
+
+  it("keeps the new series when the restore fails, so the future isn't lost", async () => {
+    const { sb, calls } = fakeClient(respond("fail"));
+    await expect(revertSplit(sb, series, "new-series")).rejects.toThrow("cap failed");
+
+    expect(calls.map(kind)).toEqual(["update"]);
   });
 });
