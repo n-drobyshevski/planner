@@ -21,4 +21,6 @@
     <string name="inbox_done_ago">Done %1$s</string>
     <string name="inbox_rate_failed">Couldn\'t save the rating. Try again.</string>
     <string name="inbox_request_failed">Couldn\'t update the request. Try again.</string>
+    <!-- Accessibility action on the error line: tapping it clears it. -->
+    <string name="inbox_error_dismiss">Dismiss</string>
 </resources>

@@ -81,6 +81,6 @@ describe("this-and-following edits", () => {
     await mutations().editFuture(series, occurrence, { title: "Later" });
     await expect(undoStack()[0].undo()).resolves.toBe(true);
 
-    expect(revertSplit).toHaveBeenCalledWith({}, series, "new-series");
+    expect(revertSplit).toHaveBeenCalledWith({}, series, "new-series", occurrence);
   });
 });

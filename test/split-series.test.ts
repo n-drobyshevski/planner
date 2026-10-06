@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { capThisAndFuture } from "@/lib/recurrence/edit-semantics";
 import { revertSplit, splitSeries, StaleWriteError } from "@/lib/supabase/mutations";
 import type { EventRow } from "@/lib/types";
 
@@ -127,7 +128,7 @@ describe("splitSeries", () => {
 describe("revertSplit", () => {
   it("restores the original rule before deleting the new series", async () => {
     const { sb, calls } = fakeClient(respond("ok"));
-    await revertSplit(sb, series, "new-series");
+    await revertSplit(sb, series, "new-series", from);
 
     expect(calls.map(kind)).toEqual(["update", "delete"]);
     expect(eqId(calls[0])).toEqual(["id", "evt-1"]);
@@ -137,8 +138,47 @@ describe("revertSplit", () => {
 
   it("keeps the new series when the restore fails, so the future isn't lost", async () => {
     const { sb, calls } = fakeClient(respond("fail"));
-    await expect(revertSplit(sb, series, "new-series")).rejects.toThrow("cap failed");
+    await expect(revertSplit(sb, series, "new-series", from)).rejects.toThrow("cap failed");
 
-    expect(calls.map(kind)).toEqual(["update"]);
+    // The restore may have landed with only its answer lost: the cap is tried again.
+    expect(calls.map(kind)).toEqual(["update", "update"]);
+    expect(patchOf(calls[1]).rrule).toBe(capThisAndFuture(series, from).rrule);
+  });
+
+  it("caps the original again when the delete fails, so the future doesn't show twice", async () => {
+    const { sb, calls } = fakeClient((call) =>
+      kind(call) === "delete" ? { error: new Error("delete failed") } : respond("ok")(call),
+    );
+    await expect(revertSplit(sb, series, "new-series", from)).rejects.toThrow("delete failed");
+
+    expect(calls.map(kind)).toEqual(["update", "delete", "delete", "update"]);
+    expect(eqId(calls[3])).toEqual(["id", "evt-1"]);
+    const cap = capThisAndFuture(series, from);
+    expect(patchOf(calls[3])).toEqual({
+      rrule: cap.rrule,
+      recurrence_ends_at: new Date(from - 1000).toISOString(),
+    });
+  });
+
+  it("still reports the failed undo when the re-cap fails too", async () => {
+    let updates = 0;
+    const { sb, calls } = fakeClient((call) => {
+      if (kind(call) === "delete") return { error: new Error("delete failed") };
+      if (kind(call) === "update" && ++updates > 1) return { error: new Error("offline") };
+      return respond("ok")(call);
+    });
+    await expect(revertSplit(sb, series, "new-series", from)).rejects.toThrow("delete failed");
+
+    expect(calls.map(kind)).toEqual(["update", "delete", "delete", "update"]);
+  });
+
+  it("tries a failed delete once more instead of capping, since it may have landed", async () => {
+    let deletes = 0;
+    const { sb, calls } = fakeClient((call) =>
+      kind(call) === "delete" && deletes++ === 0 ? { error: new Error("timeout") } : respond("ok")(call),
+    );
+    await expect(revertSplit(sb, series, "new-series", from)).resolves.toBeUndefined();
+
+    expect(calls.map(kind)).toEqual(["update", "delete", "delete"]);
   });
 });

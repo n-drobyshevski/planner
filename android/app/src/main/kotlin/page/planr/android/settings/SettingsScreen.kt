@@ -161,8 +161,8 @@ private fun TimeZoneSection(state: SettingsUiState, time: TimeSettings, viewMode
         ) {
             OutlinedButton(onClick = { picking = ZoneTarget.Primary }, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    time.timezone?.let(::zoneLabel)
-                        ?: stringResource(R.string.settings_time_device_trigger, zoneLabel(state.deviceZone)),
+                    time.timezone?.let { shownZoneLabel(it) }
+                        ?: stringResource(R.string.settings_time_device_trigger, shownZoneLabel(state.deviceZone)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -177,7 +177,7 @@ private fun TimeZoneSection(state: SettingsUiState, time: TimeSettings, viewMode
         )
         time.secondaryTimezone?.let { secondary ->
             OutlinedButton(onClick = { picking = ZoneTarget.Secondary }, modifier = Modifier.fillMaxWidth()) {
-                Text(zoneLabel(secondary), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(shownZoneLabel(secondary), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             CurrentTime(secondary)
         }
@@ -451,3 +451,7 @@ private fun <T> ChoiceField(selected: String, options: List<Pair<T, String>>, on
         }
     }
 }
+
+/** [zone] as the picker lists it: a legacy alias ("Asia/Calcutta") reads as its primary id. */
+@Composable
+private fun shownZoneLabel(zone: String): String = remember(zone) { zoneLabel(ZoneChoices.displayed(zone)) }

@@ -10,6 +10,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import page.planr.android.core.data.model.EventPatch
 import page.planr.android.core.data.model.OverridePrior
@@ -29,6 +31,7 @@ import page.planr.android.core.model.PlannerEvent
 import page.planr.android.core.recurrence.EditSemantics
 import page.planr.android.core.recurrence.PatchField
 import page.planr.android.core.recurrence.RecurrenceExpander
+import page.planr.android.core.recurrence.SeriesEnd
 import page.planr.android.feature.agenda.EventEditTarget
 import page.planr.android.feature.agenda.R
 import page.planr.android.feature.agenda.data.AgendaDataSource
@@ -160,14 +163,41 @@ class EventEditViewModel @AssistedInject constructor(
                 )
             }
             RecurrenceScope.Following -> {
-                val created = data.splitSeries(event, occurrenceDate, EventWrites.occurrencePatch(form), attributes)
+                val patch = EventWrites.occurrencePatch(form)
+                val created = data.splitSeries(event, occurrenceDate, patch, attributes)
+                // The rule the split capped the original to (the same split the write made).
+                val cap = capRecurrence(EditSemantics.splitThisAndFuture(event, occurrenceDate, patch).original)
                 notices.post(
                     AgendaNotice(UiText(R.string.agenda_toast_this_and_future_updated)) {
                         // Undo the split: restore the original rule FIRST, then drop the
                         // new series. A failed restore keeps the new series, so the
                         // future occurrences are never lost.
-                        data.updateEvent(event.id, restoreRecurrence(event))
-                        data.deleteEvent(created.id)
+                        try {
+                            data.updateEvent(event.id, restoreRecurrence(event))
+                        } catch (e: Throwable) {
+                            // The restore may have landed with only its answer lost (a
+                            // timeout, or the agenda closing mid-request): cap again so the
+                            // future doesn't show twice. The new series is untouched.
+                            withContext(NonCancellable) { runCatching { data.updateEvent(event.id, cap) } }
+                            throw e
+                        }
+                        try {
+                            data.deleteEvent(created.id)
+                        } catch (e: Throwable) {
+                            withContext(NonCancellable) {
+                                // The delete may have landed with only its answer lost, and
+                                // capping then would end the future for both members. It is
+                                // idempotent, so try it once more first.
+                                if (runCatching { data.deleteEvent(created.id) }.isFailure) {
+                                    // Both series are live, so every future occurrence shows
+                                    // twice: cap the original again (back to the split).
+                                    runCatching { data.updateEvent(event.id, cap) }
+                                    throw e
+                                }
+                            }
+                            // The second try dropped it: the undo is done.
+                            if (e is CancellationException) throw e
+                        }
                     },
                 )
             }
@@ -286,4 +316,10 @@ private fun attributesPatch(attributes: JsonObject) = EventPatch(attributes = Pa
 internal fun restoreRecurrence(event: PlannerEvent) = EventPatch(
     rrule = PatchField.Value(event.rrule),
     recurrenceEndsAt = PatchField.Value(event.recurrenceEndsAt),
+)
+
+/** The patch that ends a series where a split capped it (re-applied when a split's undo stops halfway). */
+internal fun capRecurrence(end: SeriesEnd) = EventPatch(
+    rrule = PatchField.Value(end.rrule),
+    recurrenceEndsAt = PatchField.Value(end.recurrenceEndsAt),
 )

@@ -58,7 +58,7 @@ class QuickAddActivity : ComponentActivity() {
                     kind = kind,
                     shared = shared,
                     onDismiss = ::finish,
-                    onSaved = { saved -> confirm(saved.kind) },
+                    onSaved = { saved -> if (saved.confirm) confirm(saved.kind) },
                 )
             }
         }
@@ -66,7 +66,10 @@ class QuickAddActivity : ComponentActivity() {
 
     /**
      * The web's success toast; the sheet itself is gone by the time it shows.
-     * No Undo here: over the home screen there is no snackbar to carry one.
+     * No Undo here: over the home screen there is no snackbar to carry one,
+     * so it is a plain confirmation and shows only with the member's
+     * `show_success_toasts` ([QuickAddSaved.confirm]). A failed save keeps
+     * the sheet open with its error.
      */
     private fun confirm(kind: QuickAddKind) {
         val message = when (kind) {

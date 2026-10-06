@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -147,6 +148,59 @@ class InboxViewModelTest {
 
         data.failRate = null
         vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        assertNull(vm.state.value.error)
+        vm.close()
+    }
+
+    @Test
+    fun `the error line goes on its own after a few seconds`() = runTest {
+        val data = data().apply { failRate = IOException("offline") }
+        val vm = viewModel(data)
+
+        vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        advanceTimeBy(InboxViewModel.ERROR_VISIBLE_MS - 1)
+        runCurrent()
+        assertEquals(InboxError.RateFailed, vm.state.value.error)
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertNull(vm.state.value.error)
+        vm.close()
+    }
+
+    @Test
+    fun `a second failure shows for its own full time`() = runTest {
+        val data = data().apply { failDecline = IOException("offline") }
+        val vm = viewModel(data)
+
+        vm.decline(vm.state.value.requests.first())
+        runCurrent()
+        advanceTimeBy(InboxViewModel.ERROR_VISIBLE_MS - 1_000)
+        vm.decline(vm.state.value.requests.first())
+        runCurrent()
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertEquals(InboxError.RequestFailed, vm.state.value.error)
+        vm.close()
+    }
+
+    @Test
+    fun `tapping the error line or coming back to the screen clears it`() = runTest {
+        val data = data().apply { failRate = IOException("offline") }
+        val vm = viewModel(data)
+
+        vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        vm.dismissError()
+        runCurrent()
+        assertNull(vm.state.value.error)
+
+        vm.rate(vm.state.value.ratings.first(), "4")
+        runCurrent()
+        assertEquals(InboxError.RateFailed, vm.state.value.error)
+        vm.refresh()
         runCurrent()
         assertNull(vm.state.value.error)
         vm.close()

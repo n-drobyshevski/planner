@@ -16,6 +16,7 @@ import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toJavaLocalTime
 import kotlinx.datetime.toLocalDateTime
+import page.planr.android.core.design.format.DateTitles
 
 /**
  * Locale-aware date and time labels for the agenda, honoring the device's
@@ -31,7 +32,7 @@ internal class AgendaFormats(private val locale: Locale, is24Hour: Boolean) {
     private val dayMonthYear = formatter("dMMMy")
     private val weekdayDayMonth = formatter("EEEdMMM")
     private val dayMonthLong = formatter("dMMMM")
-    private val monthYear = formatter("LLLLy")
+    private val monthYear = DateTimeFormatter.ofPattern(DateTitles.monthYearPattern(locale), locale)
 
     fun time(instant: Instant, zone: TimeZone): String = time(instant.toLocalDateTime(zone).time)
 
@@ -48,8 +49,8 @@ internal class AgendaFormats(private val locale: Locale, is24Hour: Boolean) {
     fun rangeTitle(first: LocalDate, last: LocalDate): String =
         "${dayMonth.format(first.toJavaLocalDate())} – ${dayMonthYear.format(last.toJavaLocalDate())}"
 
-    /** "October 2026": the Month view's title. */
-    fun monthTitle(month: LocalDate): String = monthYear.format(month.toJavaLocalDate())
+    /** "October 2026" / "Октябрь 2026": the Month view's title, written like the Month widget's. */
+    fun monthTitle(month: LocalDate): String = DateTitles.capitalized(monthYear.format(month.toJavaLocalDate()), locale)
 
     /** "6 October": a month cell, as TalkBack reads it. */
     fun dayMonth(date: LocalDate): String = dayMonthLong.format(date.toJavaLocalDate())

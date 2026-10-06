@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import page.planr.android.R
 import page.planr.android.core.design.theme.PlanrSpacing
+import java.time.ZoneId
 
 /**
  * A searchable list of time zones (the web's zone combobox): "Use device
@@ -50,11 +51,17 @@ internal fun ZonePickerDialog(
     onDismiss: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val all = remember { ZoneChoices.all() }
-    val zones = remember(query, deviceZone) { ZoneChoices.filter(all, deviceZone, query) }
+    val ids = remember { ZoneId.getAvailableZoneIds() }
+    val all = remember(ids) { ZoneChoices.all(ids) }
+    // A saved legacy alias ("Asia/Calcutta") is shown selected as its primary id.
+    val selected = remember(current, ids) { current?.let { ZoneChoices.displayed(it, ids) } }
+    // The device may report an alias too ("Europe/Kiev"): it leads the list as its primary id.
+    val device = remember(deviceZone, ids) { ZoneChoices.displayed(deviceZone, ids) }
+    val zones = remember(query, device) { ZoneChoices.filter(all, device, query) }
     val shownPartners = remember(query, partners) { ZoneChoices.partners(partners, query) }
     val deviceLabel = stringResource(R.string.settings_time_device)
-    val showDevice = allowDevice && (ZoneChoices.matches(deviceZone, query) || deviceLabel.contains(query.trim(), ignoreCase = true))
+    val showDevice = allowDevice &&
+        (ZoneChoices.matches(deviceZone, query) || ZoneChoices.matches(device, query) || deviceLabel.contains(query.trim(), ignoreCase = true))
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp) {
             Column(Modifier.padding(PlanrSpacing.xl)) {
@@ -70,19 +77,20 @@ internal fun ZonePickerDialog(
                     if (showDevice) {
                         group(R.string.settings_time_group_default)
                         item(key = "device") {
-                            ZoneRow(deviceLabel, zoneLabel(deviceZone), selected = current == null) { onPick(null) }
+                            ZoneRow(deviceLabel, zoneLabel(device), selected = current == null) { onPick(null) }
                         }
                     }
                     if (shownPartners.isNotEmpty()) {
                         group(R.string.settings_time_group_workspace)
                         items(shownPartners, key = { "partner:${it.zone}" }) { partner ->
-                            ZoneRow(partner.name, zoneLabel(partner.zone), selected = partner.zone == current) { onPick(partner.zone) }
+                            val shown = ZoneChoices.displayed(partner.zone, ids)
+                            ZoneRow(partner.name, zoneLabel(shown), selected = shown == selected) { onPick(partner.zone) }
                         }
                     }
                     if (zones.isNotEmpty()) {
                         group(R.string.settings_time_group_all)
                         items(zones, key = { it }) { zone ->
-                            ZoneRow(zoneLabel(zone), hint = null, selected = zone == current) { onPick(zone) }
+                            ZoneRow(zoneLabel(zone), hint = null, selected = zone == selected) { onPick(zone) }
                         }
                     }
                     if (!showDevice && shownPartners.isEmpty() && zones.isEmpty()) {

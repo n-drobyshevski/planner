@@ -129,7 +129,15 @@ class QuickAddViewModel @Inject constructor(
                         data.createEvent(form.title, start, end, form.allDay, zone, form.description).id
                     }
                 }
-                saved = QuickAddSaved(form.kind, id)
+                // A preference that can't be read keeps the confirmation.
+                val confirm = try {
+                    data.showSuccessToasts()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    true
+                }
+                saved = QuickAddSaved(form.kind, id, confirm)
                 null
             } catch (e: CancellationException) {
                 throw e
