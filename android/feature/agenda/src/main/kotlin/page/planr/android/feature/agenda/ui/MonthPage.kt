@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.pluralStringResource
@@ -44,7 +45,6 @@ import page.planr.android.core.design.theme.PlanrSpacing
 import page.planr.android.core.design.theme.PlanrTheme
 import page.planr.android.core.design.theme.PlanrTokens
 import page.planr.android.core.design.theme.parseHexColor
-import page.planr.android.core.model.MonthGrids
 import page.planr.android.feature.agenda.R
 import page.planr.android.feature.agenda.model.AgendaBlock
 import page.planr.android.feature.agenda.model.AgendaMonthModel
@@ -135,13 +135,15 @@ private fun MonthCell(
                 role = Role.Button
             },
     ) {
-        val slots = metrics.monthChipSlots(maxHeight, AgendaMonthModel.CHIP_SLOTS)
-        val (shown, more) = MonthGrids.chipLayout(slots, count)
+        val rows = metrics.monthChipSlots(maxHeight, AgendaMonthModel.CHIP_ROWS)
+        val (shown, more) = AgendaMonthModel.chipLayout(rows, count)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+            verticalArrangement = Arrangement.spacedBy(MonthRowGap),
             modifier = Modifier
                 .fillMaxSize()
+                // A short cell (landscape, split screen) cuts its last line rather than draw over the next week.
+                .clipToBounds()
                 .padding(horizontal = 1.dp, vertical = 2.dp)
                 // Days of the neighbouring months recede.
                 .alpha(if (cell.inMonth) 1f else OutsideMonthAlpha),
@@ -215,6 +217,9 @@ private fun MonthChip(block: AgendaBlock) {
         )
     }
 }
+
+/** Air between a cell's date and chip lines ([monthChipSlots] counts it). */
+internal val MonthRowGap = 1.dp
 
 /** Days outside the shown month recede, as the Month widget fades them. */
 private const val OutsideMonthAlpha = 0.5f

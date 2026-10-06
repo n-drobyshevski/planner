@@ -179,4 +179,14 @@ class AgendaMetricsTest {
         assertEquals(1, metrics(2f).monthChipSlots(95.dp, maxSlots = 3))
         assertEquals(1, metrics(2f).monthChipSlots(30.dp, maxSlots = 3))
     }
+
+    @Test
+    fun `month chip rows count the gap above each, so the last never spills out of the cell`() {
+        // 1x: 26dp circle + 4dp padding, then 15dp chips each under a 1dp gap.
+        // 78dp holds three (30 + 3 x 16); one dp less holds two.
+        assertEquals(3, metrics(1f).monthChipSlots(78.dp, maxSlots = 4))
+        assertEquals(2, metrics(1f).monthChipSlots(77.dp, maxSlots = 4))
+        // A roomy cell fits three chips and the "+N" line.
+        assertEquals(4, metrics(1f).monthChipSlots(95.dp, maxSlots = 4))
+    }
 }

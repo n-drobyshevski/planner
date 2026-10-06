@@ -71,7 +71,27 @@ class MonthModelTest {
         )
         // Contexts are backdrops and cancelled ones are left out, as in the Month widget.
         assertEquals(listOf("holiday", "early", "late"), grid.on(LocalDate(2026, 10, 6)).items.map { it.key })
+        // An all-day context window is still a backdrop, not a chip.
+        val allDayContext = month(
+            block("away", "2026-10-07T00:00:00Z", "2026-10-08T00:00:00Z", allDay = true, kind = EventKind.Context),
+        )
+        assertEquals(emptyList(), allDayContext.on(LocalDate(2026, 10, 7)).items)
         assertEquals(emptyList(), grid.on(LocalDate(2026, 10, 5)).items)
+    }
+
+    @Test
+    fun `a cell shows up to three chips and gives the overflow a line of its own when there is room`() {
+        // Room for three chips and "+N".
+        assertEquals(3 to 0, AgendaMonthModel.chipLayout(rows = 4, eventCount = 3))
+        assertEquals(3 to 1, AgendaMonthModel.chipLayout(rows = 4, eventCount = 4))
+        assertEquals(3 to 4, AgendaMonthModel.chipLayout(rows = 4, eventCount = 7))
+        // Room for three lines: all three chips, or two and "+N".
+        assertEquals(3 to 0, AgendaMonthModel.chipLayout(rows = 3, eventCount = 3))
+        assertEquals(2 to 2, AgendaMonthModel.chipLayout(rows = 3, eventCount = 4))
+        // One line (large font): a lone event, else just "+N".
+        assertEquals(1 to 0, AgendaMonthModel.chipLayout(rows = 1, eventCount = 1))
+        assertEquals(0 to 2, AgendaMonthModel.chipLayout(rows = 1, eventCount = 2))
+        assertEquals(0 to 0, AgendaMonthModel.chipLayout(rows = 4, eventCount = 0))
     }
 
     @Test
