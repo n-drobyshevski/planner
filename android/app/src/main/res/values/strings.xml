@@ -26,4 +26,27 @@
     <string name="account_import_ics">Import .ics file</string>
     <string name="import_file_unreadable">Couldn\'t read this file.</string>
     <string name="import_file_too_large">This file is too large to import (over 5 MB).</string>
+    <string name="account_health">Sleep from Health Connect</string>
+    <string name="health_title">Sleep from Health Connect</string>
+    <string name="health_body">Bring in the nights your watch or sleep app saves to Health Connect: bedtime, wake time and sleep stages show up in Insights → Sleep on the web. Your morning ratings stay yours. Only you can see this data.</string>
+    <string name="health_connect">Connect</string>
+    <string name="health_connected">Connected.</string>
+    <string name="health_sync_now">Sync now</string>
+    <string name="health_syncing">Syncing…</string>
+    <string name="health_disconnect">Disconnect</string>
+    <!-- %1$s: a relative time, e.g. "5 minutes ago". -->
+    <string name="health_last_synced">Synced %1$s</string>
+    <plurals name="health_nights">
+        <item quantity="one">%d night</item>
+        <item quantity="other">%d nights</item>
+    </plurals>
+    <string name="health_sync_failed">Couldn\'t sync. Planr tries again the next time you open it.</string>
+    <string name="health_denied">Planr needs access to sleep to bring your nights in. You can allow it here or in Health Connect.</string>
+    <string name="health_permission_lost">Access to Health Connect was turned off. Connect again to keep your nights in sync.</string>
+    <string name="health_unsupported">Health Connect isn\'t available on this phone.</string>
+    <string name="health_needs_install">Install or update Health Connect from the Play Store, then come back here.</string>
+    <string name="health_install">Open Play Store</string>
+    <string name="health_rationale_title">How Planr uses your sleep data</string>
+    <string name="health_rationale_body">Planr reads your sleep sessions from Health Connect: when you went to bed, when you woke up, and the time spent in each sleep stage. It saves one entry per night to your Planr account so the Sleep insights on the web can show them.\n\nThis data is private to you: your partner in Planr can\'t see it, it isn\'t shared with anyone else, and it is never sent to an AI model. Planr only reads; it never writes to Health Connect.\n\nTo stop, choose Disconnect in Planr (account menu → Sleep from Health Connect) or remove Planr\'s access in Health Connect. Nights already brought in stay in your account until you delete them on the web.</string>
+    <string name="health_rationale_close">Close</string>
 </resources>

@@ -121,6 +121,12 @@ export function mapSleepLog(r: Row): SleepLog {
     quality: (r.quality as number | null) ?? null,
     fatigue: (r.fatigue as number | null) ?? null,
     note: (r.note as string | null) ?? null,
+    timesSource: r.times_source === "health_connect" ? "health_connect" : "manual",
+    asleepMin: (r.asleep_min as number | null) ?? null,
+    deepMin: (r.deep_min as number | null) ?? null,
+    lightMin: (r.light_min as number | null) ?? null,
+    remMin: (r.rem_min as number | null) ?? null,
+    awakeMin: (r.awake_min as number | null) ?? null,
     createdAt: toMs(r.created_at),
   };
 }
@@ -131,6 +137,7 @@ export interface SleepLogInput {
   memberId: string;
   /** WAKE date "yyyy-MM-dd" in the viewer's zone */
   date: string;
+  /** Leave both out to keep the stored times (e.g. Health Connect's). */
   bedtimeAt?: number | null;
   wokeAt?: number | null;
   quality?: number | null;
@@ -138,17 +145,27 @@ export interface SleepLogInput {
   note?: string | null;
 }
 
+/**
+ * The upsert row. Only the columns sent are updated on conflict, so times
+ * (and `times_source: 'manual'`) go out only when the input carries them,
+ * and the device's stage columns never do: rating a night Health Connect
+ * filled keeps its times and stages.
+ */
 export function sleepLogInputToRow(input: SleepLogInput): Row {
-  return {
+  const row: Row = {
     workspace_id: input.workspaceId,
     member_id: input.memberId,
     date: input.date,
-    bedtime_at: toIsoOrNull(input.bedtimeAt ?? null),
-    woke_at: toIsoOrNull(input.wokeAt ?? null),
     quality: input.quality ?? null,
     fatigue: input.fatigue ?? null,
     note: input.note ?? null,
   };
+  if ("bedtimeAt" in input || "wokeAt" in input) {
+    row.bedtime_at = toIsoOrNull(input.bedtimeAt ?? null);
+    row.woke_at = toIsoOrNull(input.wokeAt ?? null);
+    row.times_source = "manual";
+  }
+  return row;
 }
 
 export function mapCategoryGoal(r: Row): CategoryGoal {

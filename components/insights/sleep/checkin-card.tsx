@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useNotify } from "@/lib/hooks/use-notify";
 import type { SleepLogInput } from "@/lib/supabase/mappers";
 import type { DerivedNight } from "@/lib/sleep/derive";
+import type { SleepLog } from "@/lib/types";
 import { msToTimeInput } from "@/lib/datetime/local";
 import {
   draftHasContent,
@@ -32,8 +33,8 @@ function readLastDismissed(storageKey: string): string | null {
 }
 
 /**
- * Morning check-in for today's wake date. The parent only renders it when no
- * log exists for today; saving upserts the log (which hides the card), and
+ * Morning check-in for today's wake date. The parent only renders it while
+ * today isn't rated yet; saving upserts the log (which hides the card), and
  * dismissing hides it until tomorrow.
  */
 export function CheckinCard({
@@ -41,6 +42,7 @@ export function CheckinCard({
   todayKey,
   timeZone,
   derivedToday,
+  todayLog,
   onSave,
 }: {
   viewerId: string;
@@ -48,6 +50,8 @@ export function CheckinCard({
   timeZone: string;
   /** today's derived night, for prefilling the time fields */
   derivedToday: DerivedNight | null;
+  /** today's row when Health Connect already synced the night (unrated) */
+  todayLog: SleepLog | null;
   onSave: (input: Omit<SleepLogInput, "workspaceId" | "memberId">) => Promise<void>;
 }) {
   const t = useTranslations("sleep");
@@ -55,12 +59,16 @@ export function CheckinCard({
   const [dismissed, setDismissed] = useState(
     () => readLastDismissed(storageKey) === todayKey,
   );
-  const [draft, setDraft] = useState<SleepLogDraft>(() => ({
-    ...EMPTY_DRAFT,
-    bedtime:
-      derivedToday?.start != null ? msToTimeInput(derivedToday.start, timeZone) : "",
-    wake: derivedToday?.end != null ? msToTimeInput(derivedToday.end, timeZone) : "",
-  }));
+  // Prefill: the device's times win over the calendar-derived ones.
+  const [draft, setDraft] = useState<SleepLogDraft>(() => {
+    const bed = todayLog?.bedtimeAt ?? derivedToday?.start ?? null;
+    const wake = todayLog?.wokeAt ?? derivedToday?.end ?? null;
+    return {
+      ...EMPTY_DRAFT,
+      bedtime: bed !== null ? msToTimeInput(bed, timeZone) : "",
+      wake: wake !== null ? msToTimeInput(wake, timeZone) : "",
+    };
+  });
   const [saving, setSaving] = useState(false);
   const notify = useNotify();
 

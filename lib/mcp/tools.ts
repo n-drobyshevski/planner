@@ -508,9 +508,15 @@ export function registerTools(server: McpServer): void {
         const avg = (xs: number[]) =>
           xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null;
         const qualities = recent.map((l) => l.quality).filter((q): q is number => q != null);
+        // Time actually asleep, when a tracker (Health Connect) reported stages.
+        const asleep = recent
+          .map((l) => l.asleepMin)
+          .filter((m): m is number => m != null)
+          .map((m) => m / 60);
         return ok({
           nights: recent.length,
           avgDurationHrs: avg(durations),
+          avgAsleepHrs: avg(asleep),
           avgQuality: avg(qualities),
           logs: recent.map((l) => ({
             date: l.date,
@@ -518,6 +524,12 @@ export function registerTools(server: McpServer): void {
             woke: l.wokeAt ? toIso(l.wokeAt) : undefined,
             quality: l.quality ?? undefined,
             fatigue: l.fatigue ?? undefined,
+            asleepMin: l.asleepMin ?? undefined,
+            stagesMin:
+              l.deepMin != null || l.lightMin != null || l.remMin != null
+                ? { deep: l.deepMin, light: l.lightMin, rem: l.remMin, awake: l.awakeMin }
+                : undefined,
+            source: l.timesSource,
           })),
         });
       }),

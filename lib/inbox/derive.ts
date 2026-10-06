@@ -96,8 +96,9 @@ export interface InboxInput {
   occurrences: Occurrence[];
   /** Workspace tasks (top-level + subtasks; we filter). */
   tasks: TaskRow[];
-  /** Wake-date tokens ("yyyy-MM-dd") that already have a sleep-log row for the
-   *  viewer — sleep logs are member-private, so this is the viewer's set. */
+  /** Wake-date tokens ("yyyy-MM-dd") the viewer already rated (a row Health
+   *  Connect filled with times only doesn't count) — sleep logs are
+   *  member-private, so this is the viewer's set. */
   sleepLogDates: ReadonlySet<string>;
   /** Pending public-share timeslot requests addressed to the viewer (RLS-scoped
    *  to the owner). Optional so existing callers/tests need no change. */

@@ -25,12 +25,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import page.planr.android.BuildConfig
 import page.planr.android.R
+import page.planr.android.account.health.HealthConnectSheet
 import page.planr.android.importics.IcsFileReader
 
 /**
  * The account action on the Calendar, Tasks and Insights headers: a quiet
- * icon that opens a menu with "Import .ics file", "Sign out" (behind a
- * confirmation) and, below them, the app's version, for bug reports. Signing
+ * icon that opens a menu with "Import .ics file", "Sleep from Health
+ * Connect", "Sign out" (behind a confirmation) and, below them, the app's
+ * version, for bug reports. Signing
  * out forgets the session on this device (and ends it on the server), wipes
  * the cached calendar and tasks, and blanks the widgets.
  *
@@ -40,6 +42,7 @@ import page.planr.android.importics.IcsFileReader
 fun AccountMenuButton(onImportIcs: () -> Unit = {}, viewModel: AccountViewModel = hiltViewModel()) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     var confirming by rememberSaveable { mutableStateOf(false) }
+    var healthOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val openImport by rememberUpdatedState(onImportIcs)
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -73,6 +76,13 @@ fun AccountMenuButton(onImportIcs: () -> Unit = {}, viewModel: AccountViewModel 
             },
         )
         DropdownMenuItem(
+            text = { Text(stringResource(R.string.account_health)) },
+            onClick = {
+                menuOpen = false
+                healthOpen = true
+            },
+        )
+        DropdownMenuItem(
             text = { Text(stringResource(R.string.sign_out)) },
             onClick = {
                 menuOpen = false
@@ -91,6 +101,9 @@ fun AccountMenuButton(onImportIcs: () -> Unit = {}, viewModel: AccountViewModel 
             onClick = {},
             enabled = false,
         )
+    }
+    if (healthOpen) {
+        HealthConnectSheet(onDismiss = { healthOpen = false })
     }
     if (confirming) {
         AlertDialog(

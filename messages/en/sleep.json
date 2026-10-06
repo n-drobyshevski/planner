@@ -58,6 +58,14 @@
     "legend": "Solid line: quality (higher is better) · dashed: tiredness (lower is better)",
     "empty": "Rate how you slept in the morning check-in and your quality and sleepiness trends will show here, night over night."
   },
+  "stages": {
+    "label": "Sleep stages",
+    "asleep": "{duration} asleep",
+    "srNight": "{day}: {summary}.",
+    "sr": { "deep": "deep {duration}", "light": "light {duration}", "rem": "REM {duration}", "awake": "awake {duration}" },
+    "legend": { "deep": "Deep", "light": "Light", "rem": "REM", "awake": "Awake" },
+    "fromHealthConnect": "from Health Connect"
+  },
   "hints": {
     "label": "Hints · last {days} days",
     "unlock": "Log {count, plural, one {# more morning} other {# more mornings}} to unlock sleep hints — they compare how you score after different kinds of nights, against your <link>sleep settings</link>.",

@@ -24,4 +24,28 @@
     <string name="account_import_ics">Импорт файла .ics</string>
     <string name="import_file_unreadable">Не получилось прочитать файл.</string>
     <string name="import_file_too_large">Файл слишком большой для импорта (больше 5 МБ).</string>
+    <string name="account_health">Сон из Health Connect</string>
+    <string name="health_title">Сон из Health Connect</string>
+    <string name="health_body">Подтягивает ночи, которые часы или приложение для сна сохраняют в Health Connect: время отхода ко сну, подъёма и фазы сна появятся в «Аналитика → Сон» на сайте. Утренние оценки остаются твоими. Эти данные видишь только ты.</string>
+    <string name="health_connect">Подключить</string>
+    <string name="health_connected">Подключено.</string>
+    <string name="health_sync_now">Синхронизировать</string>
+    <string name="health_syncing">Синхронизация…</string>
+    <string name="health_disconnect">Отключить</string>
+    <string name="health_last_synced">Синхронизировано %1$s</string>
+    <plurals name="health_nights">
+        <item quantity="one">%d ночь</item>
+        <item quantity="few">%d ночи</item>
+        <item quantity="many">%d ночей</item>
+        <item quantity="other">%d ночи</item>
+    </plurals>
+    <string name="health_sync_failed">Не получилось синхронизировать. Planr попробует снова, когда ты его откроешь.</string>
+    <string name="health_denied">Чтобы подтянуть ночи, Planr нужен доступ ко сну. Его можно дать здесь или в Health Connect.</string>
+    <string name="health_permission_lost">Доступ к Health Connect выключен. Подключи снова, чтобы ночи продолжали синхронизироваться.</string>
+    <string name="health_unsupported">Health Connect недоступен на этом телефоне.</string>
+    <string name="health_needs_install">Установи или обнови Health Connect в Play Маркете и вернись сюда.</string>
+    <string name="health_install">Открыть Play Маркет</string>
+    <string name="health_rationale_title">Как Planr использует данные о сне</string>
+    <string name="health_rationale_body">Planr читает из Health Connect сеансы сна: время отхода ко сну и подъёма и длительность каждой фазы сна. Для каждой ночи он сохраняет одну запись в твоём аккаунте Planr, чтобы её показала аналитика сна на сайте.\n\nЭти данные видишь только ты: партнёр в Planr их не видит, они никому не передаются и никогда не отправляются в AI-модель. Planr только читает и ничего не записывает в Health Connect.\n\nЧтобы остановить, нажми «Отключить» в Planr (меню аккаунта → Сон из Health Connect) или убери доступ Planr в Health Connect. Уже подтянутые ночи остаются в аккаунте, пока ты не удалишь их на сайте.</string>
+    <string name="health_rationale_close">Закрыть</string>
 </resources>
