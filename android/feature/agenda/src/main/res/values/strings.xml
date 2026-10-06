@@ -232,4 +232,11 @@
         <item quantity="other">Imported %d events</item>
     </plurals>
     <string name="agenda_import_failed">Couldn\'t import. Nothing was added.</string>
+
+    <!-- Morning sleep check-in card (checkin-card.tsx) -->
+    <string name="agenda_sleep_checkin_title">How did you sleep?</string>
+    <!-- Last night's bedtime and wake: "23:40–07:10". -->
+    <string name="agenda_sleep_checkin_times">%1$s–%2$s</string>
+    <string name="agenda_sleep_checkin_open">Rate last night</string>
+    <string name="agenda_sleep_checkin_dismiss">Dismiss the morning check-in for today</string>
 </resources>
