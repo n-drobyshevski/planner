@@ -137,9 +137,17 @@ create trigger collections_broadcast_delete
 create trigger boards_broadcast_delete
   after delete on boards
   for each row execute function broadcast_row_gone();
-create trigger task_checkpoints_broadcast_delete
-  after delete on task_checkpoints
-  for each row execute function broadcast_row_gone();
+-- task_checkpoints may not exist yet on every database (its migration can be
+-- pending), so its trigger is created only where the table is there.
+do $$
+begin
+  if to_regclass('public.task_checkpoints') is not null then
+    create trigger task_checkpoints_broadcast_delete
+      after delete on public.task_checkpoints
+      for each row execute function public.broadcast_row_gone();
+  end if;
+end;
+$$;
 create trigger sleep_logs_broadcast_delete
   after delete on sleep_logs
   for each row execute function broadcast_row_gone();
