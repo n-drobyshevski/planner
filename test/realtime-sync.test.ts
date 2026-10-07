@@ -126,8 +126,12 @@ describe("rowGoneRemoves", () => {
   });
 });
 
-/** A client double: records channels, their broadcast handlers and status callbacks. */
-function mockClient(memberId: string | null = ME) {
+/**
+ * A client double: records channels, their broadcast handlers and status callbacks.
+ * With `holdRemovals`, a removal stays pending until `finishRemovals()`, and like
+ * the real client, `channel(topic)` hands back the leaving channel until then.
+ */
+function mockClient(memberId: string | null = ME, { holdRemovals = false } = {}) {
   type Handler = (message: unknown) => void;
   const channels = new Map<
     string,
@@ -139,6 +143,7 @@ function mockClient(memberId: string | null = ME) {
     }
   >();
   const membersQuery = vi.fn(async () => ({ data: memberId ? { id: memberId } : null }));
+  const pendingRemovals: (() => void)[] = [];
   const sb = {
     channel: vi.fn((topic: string, opts?: unknown) => {
       const record = channels.get(topic) ?? {
@@ -164,6 +169,11 @@ function mockClient(memberId: string | null = ME) {
     removeChannel: vi.fn(async (ch: { topic: string }) => {
       const record = channels.get(ch.topic);
       if (record) record.removed = true;
+      if (holdRemovals) {
+        // Left the client's list only once the leave is acked.
+        await new Promise<void>((resolve) => pendingRemovals.push(resolve));
+        channels.delete(ch.topic);
+      }
       return "ok";
     }),
     realtime: { setAuth: vi.fn(async () => undefined) },
@@ -175,7 +185,10 @@ function mockClient(memberId: string | null = ME) {
   const send = (message: unknown) => {
     for (const h of channels.get(syncTopic(WS))?.broadcast ?? []) h(message);
   };
-  return { sb: sb as unknown as SupabaseClient, raw: sb, channels, send, membersQuery };
+  const finishRemovals = () => {
+    for (const resolve of pendingRemovals.splice(0)) resolve();
+  };
+  return { sb: sb as unknown as SupabaseClient, raw: sb, channels, send, membersQuery, finishRemovals };
 }
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
@@ -288,5 +301,50 @@ describe("subscribeWorkspace — sync channel", () => {
     leaveC();
     await vi.advanceTimersByTimeAsync(SYNC_LINGER_MS);
     expect(channels.get(syncTopic(WS))?.removed).toBe(true);
+  });
+
+  it("a subscriber arriving while the channel is still leaving joins a fresh one once it has left", async () => {
+    const { sb, raw, channels, send, finishRemovals } = mockClient(ME, { holdRemovals: true });
+    const leaveA = subscribeWorkspace(sb, WS, () => {}, "main");
+    await flush();
+    const first = channels.get(syncTopic(WS))!;
+
+    leaveA();
+    await vi.advanceTimersByTimeAsync(SYNC_LINGER_MS);
+    expect(first.removed).toBe(true); // leaving, not yet acked
+
+    const seen: WorkspaceChange[] = [];
+    const leaveB = subscribeWorkspace(sb, WS, (c) => seen.push(c), "tasks");
+    await flush();
+    // Not handed the leaving channel, which could never join again.
+    expect(raw.channel.mock.calls.filter(([t]) => t === syncTopic(WS))).toHaveLength(1);
+
+    finishRemovals();
+    await flush();
+
+    expect(raw.channel.mock.calls.filter(([t]) => t === syncTopic(WS))).toHaveLength(2);
+    const second = channels.get(syncTopic(WS))!;
+    expect(second).not.toBe(first);
+    expect(second.onStatus).not.toBeNull(); // subscribed
+    send({ payload: { table: "events", id: "e1", kind: "delete" } });
+    expect(seen).toMatchObject([{ eventType: "DELETE", table: "events", old: { id: "e1" } }]);
+    leaveB();
+  });
+
+  it("a subscriber gone again before the old channel left never opens one", async () => {
+    const { sb, raw, finishRemovals } = mockClient(ME, { holdRemovals: true });
+    const leaveA = subscribeWorkspace(sb, WS, () => {}, "main");
+    await flush();
+    leaveA();
+    await vi.advanceTimersByTimeAsync(SYNC_LINGER_MS);
+
+    const leaveB = subscribeWorkspace(sb, WS, () => {}, "tasks");
+    leaveB();
+    await vi.advanceTimersByTimeAsync(SYNC_LINGER_MS);
+    finishRemovals();
+    await flush();
+
+    expect(raw.channel.mock.calls.filter(([t]) => t === syncTopic(WS))).toHaveLength(1);
+    expect(raw.removeChannel.mock.calls.filter(([c]) => c.topic === syncTopic(WS))).toHaveLength(1);
   });
 });
