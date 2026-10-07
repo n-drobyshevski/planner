@@ -76,7 +76,8 @@ import page.planr.android.core.model.Category
 
 /**
  * Settings that change how the app behaves for the signed-in member: their
- * time zones, success notifications, this phone's event reminders and the
+ * time zones, success notifications, this phone's opt-in notifications
+ * (new time requests, the partner's changes) and event reminders, and the
  * calendar side of sleep. Every
  * control applies at once; a write that doesn't go through puts the control
  * back and says so in one calm line.
@@ -115,6 +116,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 
 @Composable
 private fun SettingsContent(state: SettingsUiState, time: TimeSettings, viewModel: SettingsViewModel, modifier: Modifier) {
+    NotificationPermission(state.askNotificationPermission, viewModel)
     Column(modifier.fillMaxSize()) {
         // Pinned above the scroll, so a failed change at the bottom (sleep)
         // still shows its line; read out once as it appears.
@@ -138,9 +140,9 @@ private fun SettingsContent(state: SettingsUiState, time: TimeSettings, viewMode
         ) {
             TimeZoneSection(state, time, viewModel)
             HorizontalDivider()
-            NotificationsSection(time, viewModel)
+            NotificationsSection(time, state.notify, viewModel)
             HorizontalDivider()
-            RemindersSection(state.reminders, state.askNotificationPermission, viewModel)
+            RemindersSection(state.reminders, viewModel)
             HorizontalDivider()
             SleepSection(state, viewModel)
             Spacer(Modifier.size(PlanrSpacing.xl))
@@ -227,21 +229,14 @@ private fun CurrentTime(zone: String) {
     Hint(stringResource(R.string.settings_time_currently, now.format(formatter), zoneLabel(zone)))
 }
 
+/**
+ * The notification permission request every notifying setting shares
+ * (reminders, new time requests, the partner's changes): launched when the
+ * view model asks, answered back to it. Also re-reads whether notifications
+ * are allowed on every return to the screen.
+ */
 @Composable
-private fun NotificationsSection(time: TimeSettings, viewModel: SettingsViewModel) {
-    SettingsSection(title = stringResource(R.string.settings_notifications_title)) {
-        SwitchRow(
-            label = stringResource(R.string.settings_success_toasts),
-            description = stringResource(R.string.settings_success_toasts_description),
-            checked = time.showSuccessToasts,
-            onCheckedChange = viewModel::setShowSuccessToasts,
-        )
-    }
-}
-
-@Composable
-private fun RemindersSection(reminders: ReminderSettings, askPermission: Boolean, viewModel: SettingsViewModel) {
-    val context = LocalContext.current
+private fun NotificationPermission(askPermission: Boolean, viewModel: SettingsViewModel) {
     val permission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
         viewModel::onNotificationPermissionResult,
@@ -259,6 +254,50 @@ private fun RemindersSection(reminders: ReminderSettings, askPermission: Boolean
         viewModel.refreshNotificationAccess()
         onPauseOrDispose {}
     }
+}
+
+@Composable
+private fun NotificationsSection(time: TimeSettings, notify: NotifySettings, viewModel: SettingsViewModel) {
+    SettingsSection(title = stringResource(R.string.settings_notifications_title)) {
+        SwitchRow(
+            label = stringResource(R.string.settings_success_toasts),
+            description = stringResource(R.string.settings_success_toasts_description),
+            checked = time.showSuccessToasts,
+            onCheckedChange = viewModel::setShowSuccessToasts,
+        )
+        SwitchRow(
+            label = stringResource(R.string.settings_notify_requests),
+            description = stringResource(R.string.settings_notify_requests_description),
+            checked = notify.newRequests,
+            onCheckedChange = viewModel::setNewRequestsNotify,
+        )
+        SwitchRow(
+            label = stringResource(R.string.settings_notify_partner),
+            description = stringResource(R.string.settings_notify_partner_description),
+            checked = notify.partnerChanges,
+            onCheckedChange = viewModel::setPartnerChangesNotify,
+        )
+        if (notify.blocked) BlockedLine(stringResource(R.string.settings_notify_blocked))
+    }
+}
+
+/** Notifications can't show: one calm line, and the way to the system's notification settings. */
+@Composable
+private fun BlockedLine(text: String) {
+    val context = LocalContext.current
+    Column(
+        verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xs),
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Hint(text)
+        TextButton(onClick = { openNotificationSettings(context) }) {
+            Text(stringResource(R.string.settings_reminders_open_settings))
+        }
+    }
+}
+
+@Composable
+private fun RemindersSection(reminders: ReminderSettings, viewModel: SettingsViewModel) {
     SettingsSection(
         title = stringResource(R.string.settings_reminders_title),
         description = stringResource(R.string.settings_reminders_description),
@@ -270,17 +309,7 @@ private fun RemindersSection(reminders: ReminderSettings, askPermission: Boolean
                 onSelect = viewModel::setReminderLead,
             )
         }
-        if (reminders.blocked) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(PlanrSpacing.xs),
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            ) {
-                Hint(stringResource(R.string.settings_reminders_blocked))
-                TextButton(onClick = { openNotificationSettings(context) }) {
-                    Text(stringResource(R.string.settings_reminders_open_settings))
-                }
-            }
-        }
+        if (reminders.blocked) BlockedLine(stringResource(R.string.settings_reminders_blocked))
     }
 }
 

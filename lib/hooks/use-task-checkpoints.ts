@@ -1,12 +1,29 @@
 "use client";
 
 import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchTaskCheckpoints } from "@/lib/supabase/queries";
-import { subscribeWorkspace } from "@/lib/supabase/realtime";
+import { isHiddenChange, subscribeWorkspace } from "@/lib/supabase/realtime";
 import { qk } from "@/lib/supabase/query-keys";
+import { removeCheckpointsOfTask, reshowsHiddenTask } from "@/lib/tasks/checkpoint-cache";
 import type { TaskCheckpoint } from "@/lib/types";
+
+/**
+ * The tasks whose checkpoints a query cache dropped when they turned private,
+ * so sharing one again refetches them. Kept with the cache rather than the
+ * hook: the dropped data outlives a remount of the Flows view.
+ */
+const hiddenTasksByClient = new WeakMap<QueryClient, Set<string>>();
+
+function hiddenTasksOf(qc: QueryClient): Set<string> {
+  let hidden = hiddenTasksByClient.get(qc);
+  if (!hidden) {
+    hidden = new Set();
+    hiddenTasksByClient.set(qc, hidden);
+  }
+  return hidden;
+}
 
 /**
  * The workspace's flow milestone checkpoints, for the Flows view. Mirrors
@@ -30,6 +47,23 @@ export function useTaskCheckpoints(workspaceId: string | undefined): {
       sb,
       workspaceId,
       (change) => {
+        // A task turned private takes its checkpoints out of view with it,
+        // with no checkpoint change of their own: drop them here.
+        if (change.table === "tasks" && isHiddenChange(change)) {
+          const taskId = (change.old as { id?: string }).id;
+          if (taskId) {
+            hiddenTasksOf(qc).add(taskId);
+            qc.setQueryData<TaskCheckpoint[]>(qk.taskCheckpoints(workspaceId), (old) =>
+              old ? removeCheckpointsOfTask(old, taskId) : old,
+            );
+          }
+          return;
+        }
+        // Shared again: its checkpoints come back with no change of their own.
+        if (reshowsHiddenTask(hiddenTasksOf(qc), change)) {
+          void qc.invalidateQueries({ queryKey: qk.taskCheckpoints(workspaceId) });
+          return;
+        }
         if (change.table !== "task_checkpoints") return;
         void qc.invalidateQueries({ queryKey: qk.taskCheckpoints(workspaceId) });
       },

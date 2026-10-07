@@ -21,16 +21,15 @@ import page.planr.android.core.model.Task
 
 /** One Realtime row change, reduced to what the cache needs. */
 sealed interface RowChange {
-    /** INSERT / UPDATE: the full new row. */
-    data class Upsert(val record: JsonObject) : RowChange
+    /** INSERT ([inserted]) / UPDATE: the full new row. */
+    data class Upsert(val record: JsonObject, val inserted: Boolean = false) : RowChange
 
     /**
-     * DELETE: the old record, which carries only the primary key (default
-     * replica identity; and with RLS on, Realtime strips it to the key
-     * anyway), so `id` is all we can rely on. Deletes arrive through their
-     * own unfiltered binding: see [RealtimeSync].
+     * DELETE (or a row turned private, gone for this member): a record that
+     * carries only `id`. Built from a [RowGone] broadcast ([gone]), since a
+     * filtered Postgres Changes binding never sees a delete: see [RealtimeSync].
      */
-    data class Delete(val oldRecord: JsonObject) : RowChange
+    data class Delete(val oldRecord: JsonObject, val gone: RowGone? = null) : RowChange
 }
 
 /**
@@ -41,10 +40,14 @@ sealed interface RowChange {
  * Changes can arrive out of order (and after the row a write returned was
  * already cached), so an event or task row older than the cached one is
  * skipped: see [isOutdated].
+ *
+ * Each event row stored or deleted is also told to [changes] (with what was
+ * cached before), for the partner-change notifications.
  */
 class RealtimeChangeApplier @Inject constructor(
     private val db: PlanrDatabase,
     private val gate: CacheGate,
+    private val changes: EventChangeObserver = EventChangeObserver.None,
 ) {
 
     /**
@@ -52,17 +55,36 @@ class RealtimeChangeApplier @Inject constructor(
      * the channel joined: a change still being delivered after a sign-out
      * wiped the cache is dropped (null: take one now).
      */
-    suspend fun apply(table: String, change: RowChange, ticket: CacheGate.Ticket? = null): Boolean {
-        val area = areaOf(table) ?: return false
-        var applied = false
+    suspend fun apply(table: String, change: RowChange, ticket: CacheGate.Ticket? = null): Boolean =
+        applyChange(table, change, ticket).changed
+
+    /** [apply], telling also what the cache still lacks after it ([Applied.overridesUnknownOf]). */
+    suspend fun applyChange(table: String, change: RowChange, ticket: CacheGate.Ticket? = null): Applied {
+        val area = areaOf(table) ?: return Applied(changed = false)
+        var applied = Applied(changed = false)
         gate.change(ticket ?: gate.ticket(), *area) {
             applied = when (change) {
-                is RowChange.Upsert -> upsert(table, change.record)
-                is RowChange.Delete -> change.oldRecord.string("id")?.let { delete(table, it) } ?: false
+                is RowChange.Upsert -> upsert(table, change)
+                is RowChange.Delete ->
+                    Applied(changed = change.oldRecord.string("id")?.let { delete(table, it, change.gone) } ?: false)
             }
         }
         return applied
     }
+
+    /** What [applyChange] did. */
+    data class Applied(
+        /** Whether the change touched the cache. */
+        val changed: Boolean,
+        /**
+         * A series the cache didn't hold that arrived by an UPDATE: most
+         * likely shared again after being private, which took its overrides
+         * out of the cache. They didn't change, so none of them arrive on
+         * their own: refetch them (`EventRepository.refreshOverridesOf`).
+         * Null otherwise (a new series has none yet; they arrive as inserts).
+         */
+        val overridesUnknownOf: String? = null,
+    )
 
     private fun areaOf(table: String): Array<CacheArea>? = when (table) {
         SupabaseTables.EVENTS, SupabaseTables.EVENT_OVERRIDES -> arrayOf(CacheArea.Events)
@@ -72,21 +94,25 @@ class RealtimeChangeApplier @Inject constructor(
         else -> null
     }
 
-    private suspend fun upsert(table: String, record: JsonObject): Boolean {
+    private suspend fun upsert(table: String, change: RowChange.Upsert): Applied {
+        val record = change.record
         when (table) {
             SupabaseTables.EVENTS -> {
-                val cached = record.string("id")?.let { db.eventDao().getById(it) }
-                if (isOutdated(record.updatedAt(), cached?.let { runCatching { it.toModel().updatedAt }.getOrNull() })) {
-                    return false
-                }
-                db.eventDao().upsertEvents(listOf(record.decodeAs(PlannerEvent.serializer()).toEntity()))
+                val row = record.string("id")?.let { db.eventDao().getById(it) }
+                val cached = row?.let { runCatching { it.toModel() }.getOrNull() }
+                if (isOutdated(record.updatedAt(), cached?.updatedAt)) return Applied(changed = false)
+                val event = record.decodeAs(PlannerEvent.serializer())
+                db.eventDao().upsertEvents(listOf(event.toEntity()))
+                if (changes.listening) changes.eventsChanged(listOf(cached to event))
+                val overridesUnknown = row == null && !change.inserted && event.isRecurring
+                return Applied(changed = true, overridesUnknownOf = event.id.takeIf { overridesUnknown })
             }
             SupabaseTables.EVENT_OVERRIDES ->
                 db.eventDao().upsertOverrides(listOf(record.decodeAs(EventOverride.serializer()).toEntity()))
             SupabaseTables.TASKS -> {
                 val cached = record.string("id")?.let { db.taskDao().getById(it) }
                 if (isOutdated(record.updatedAt(), cached?.let { runCatching { it.toModel().updatedAt }.getOrNull() })) {
-                    return false
+                    return Applied(changed = false)
                 }
                 db.taskDao().upsert(listOf(record.decodeAs(Task.serializer()).toEntity()))
             }
@@ -94,22 +120,36 @@ class RealtimeChangeApplier @Inject constructor(
                 db.workspaceDao().upsertCategories(listOf(record.decodeAs(Category.serializer()).toEntity()))
             SupabaseTables.BOARDS ->
                 db.workspaceDao().upsertBoards(listOf(record.decodeAs(Board.serializer()).toEntity()))
-            else -> return false
+            else -> return Applied(changed = false)
         }
-        return true
+        return Applied(changed = true)
     }
 
-    private suspend fun delete(table: String, id: String): Boolean {
+    /**
+     * Mirrors what the database cascades from a delete. A row that only
+     * turned private ([gone] of [RowGone.Kind.Hidden]) was not deleted, so
+     * it takes just itself: a task's subtasks and calendar blocks keep their
+     * own visibility (an event's overrides go with it).
+     */
+    private suspend fun delete(table: String, id: String, gone: RowGone?): Boolean {
+        val hidden = gone?.kind == RowGone.Kind.Hidden
         when (table) {
             SupabaseTables.EVENTS -> db.withTransaction {
+                val deleted = gone?.takeIf { it.kind == RowGone.Kind.Delete && changes.listening }
+                val cached = deleted?.let { db.eventDao().getById(id) }?.let { runCatching { it.toModel() }.getOrNull() }
                 db.eventDao().deleteOverridesOf(listOf(id))
                 db.eventDao().deleteEvents(listOf(id))
+                if (deleted != null) changes.eventGone(cached, deleted)
             }
             SupabaseTables.EVENT_OVERRIDES -> db.eventDao().deleteOverride(id)
-            SupabaseTables.TASKS -> db.withTransaction {
-                val ids = db.taskDao().subtreeIds(id)
-                db.eventDao().deleteEventsOfTasks(ids)
-                db.taskDao().delete(ids)
+            SupabaseTables.TASKS -> if (hidden) {
+                db.taskDao().delete(listOf(id))
+            } else {
+                db.withTransaction {
+                    val ids = db.taskDao().subtreeIds(id)
+                    db.eventDao().deleteEventsOfTasks(ids)
+                    db.taskDao().delete(ids)
+                }
             }
             SupabaseTables.CATEGORIES -> db.workspaceDao().deleteCategory(id)
             SupabaseTables.BOARDS -> db.workspaceDao().deleteBoard(id)

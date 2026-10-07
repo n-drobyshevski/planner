@@ -6,6 +6,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.datetime.LocalDate
+import page.planr.android.core.data.notify.NotifyTarget
+import page.planr.android.notify.AndroidNotificationPort
 
 class LaunchRouteTest {
 
@@ -39,6 +41,21 @@ class LaunchRouteTest {
     }
 
     @Test
+    fun `the inbox opens over the agenda`() {
+        val parsed = LaunchRoute.parse("inbox")
+        assertEquals(LaunchRoute.Inbox, parsed)
+        assertEquals(TopLevelTab.Agenda, parsed?.tab)
+        assertEquals(PlanrRoutes.INBOX, LaunchRoute.Inbox.route)
+    }
+
+    @Test
+    fun `the notifications' targets are routes the app accepts`() {
+        assertEquals(LaunchRoute.Inbox, LaunchRoute.parse(AndroidNotificationPort.routeOf(NotifyTarget.Inbox)))
+        val day = LocalDate(2026, 10, 8)
+        assertEquals(LaunchRoute.Day(day), LaunchRoute.parse(AndroidNotificationPort.routeOf(NotifyTarget.Day(day))))
+    }
+
+    @Test
     fun `anything else is ignored`() {
         listOf(
             null,
@@ -57,6 +74,7 @@ class LaunchRouteTest {
             "day/2026-10-07T10:00",
             "day/+2026-10-07",
             "day/2026-10-07/x",
+            "inbox/1",
         ).forEach { assertNull(LaunchRoute.parse(it), "route: $it") }
     }
 
@@ -76,5 +94,14 @@ class LaunchRouteTest {
         assertFalse(isEditorRoute(PlanrRoutes.AGENDA))
         assertFalse(isEditorRoute(PlanrRoutes.EVENT))
         assertFalse(isEditorRoute(null))
+    }
+
+    @Test
+    fun `an editor anywhere on the stack is found, not just on top`() {
+        // An earlier launch pushed the Inbox over the event editor.
+        assertTrue(hasEditor(listOf(null, PlanrRoutes.AGENDA, "event-edit/{id}", PlanrRoutes.INBOX)))
+        assertTrue(hasEditor(listOf(null, PlanrRoutes.AGENDA, PlanrRoutes.TASKS, PlanrRoutes.TASK, PlanrRoutes.EVENT)))
+        assertFalse(hasEditor(listOf(null, PlanrRoutes.AGENDA, PlanrRoutes.INBOX, PlanrRoutes.EVENT)))
+        assertFalse(hasEditor(emptyList()))
     }
 }

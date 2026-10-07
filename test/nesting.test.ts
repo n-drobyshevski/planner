@@ -26,6 +26,7 @@ function mk(p: Partial<TaskRow> & { id: string }): TaskRow {
     attributes: {},
     createdAt: 0,
     updatedAt: 0,
+    updatedBy: null,
     ...p,
   };
 }

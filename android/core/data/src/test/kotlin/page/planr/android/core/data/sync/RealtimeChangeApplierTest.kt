@@ -7,6 +7,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
@@ -20,6 +21,7 @@ import page.planr.android.core.data.local.PlanrDatabase
 import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.remote.Fixtures
 import page.planr.android.core.data.remote.SupabaseTables
+import page.planr.android.core.model.PlannerEvent
 
 /** Realtime echoes into a real (in-memory) Room: out-of-order rows never revert newer ones. */
 @RunWith(RobolectricTestRunner::class)
@@ -74,6 +76,89 @@ class RealtimeChangeApplierTest {
     }
 
     @Test
+    fun `an event that went private for this member leaves the cache`() = runTest {
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow()))
+        val gone = RowGone(SupabaseTables.EVENTS, Fixtures.EVENT_ID, RowGone.Kind.Hidden, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.eventDao().getById(Fixtures.EVENT_ID))
+    }
+
+    @Test
+    fun `a deleted task takes its calendar blocks with it`() = runTest {
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow()))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(taskId = Fixtures.TASK_ID)))
+        val gone = RowGone(SupabaseTables.TASKS, Fixtures.TASK_ID, RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.taskDao().getById(Fixtures.TASK_ID))
+        assertNull(db.eventDao().getById(Fixtures.EVENT_ID))
+    }
+
+    @Test
+    fun `a deleted task takes its subtasks with it`() = runTest {
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow()))
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow(id = SUBTASK).with("parent_id", Fixtures.TASK_ID)))
+        val gone = RowGone(SupabaseTables.TASKS, Fixtures.TASK_ID, RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.taskDao().getById(SUBTASK))
+    }
+
+    @Test
+    fun `a task turned private leaves alone, keeping its subtasks and calendar blocks`() = runTest {
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow()))
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow(id = SUBTASK).with("parent_id", Fixtures.TASK_ID)))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(taskId = Fixtures.TASK_ID)))
+        val gone = RowGone(SupabaseTables.TASKS, Fixtures.TASK_ID, RowGone.Kind.Hidden, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.taskDao().getById(Fixtures.TASK_ID))
+        assertEquals(SUBTASK, db.taskDao().getById(SUBTASK)?.id, "the subtask has its own visibility")
+        assertEquals(Fixtures.EVENT_ID, db.eventDao().getById(Fixtures.EVENT_ID)?.id, "so does the calendar block")
+    }
+
+    @Test
+    fun `event upserts and deletes are told with what was cached, for the partner's changes`() = runTest {
+        val heard = RecordingObserver()
+        val applier = RealtimeChangeApplier(db, CacheGate(), heard)
+
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(updatedAt = earlier)))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(updatedAt = later).with("title", "Moved")))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(updatedAt = earlier).with("title", "Stale")))
+        val gone = RowGone(SupabaseTables.EVENTS, Fixtures.EVENT_ID, RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER, title = "Moved")
+        applier.apply(gone.table, gone.toDelete())
+
+        assertEquals(listOf(null to "Standup", "Standup" to "Moved"), heard.changed.map { (b, a) -> b?.title to a.title }, "not the stale echo")
+        assertEquals(listOf("Moved" to gone), heard.gone.map { (b, g) -> b?.title to g })
+    }
+
+    @Test
+    fun `a row turned private is not a removal, and nothing is read while nobody listens`() = runTest {
+        val heard = RecordingObserver()
+        val applier = RealtimeChangeApplier(db, CacheGate(), heard)
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow()))
+        val hidden = RowGone(SupabaseTables.EVENTS, Fixtures.EVENT_ID, RowGone.Kind.Hidden, ownerId = PARTNER, actor = PARTNER)
+        applier.apply(hidden.table, hidden.toDelete())
+        assertEquals(emptyList(), heard.gone)
+
+        heard.listening = false
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow()))
+        assertEquals(1, heard.changed.size)
+    }
+
+    @Test
+    fun `a broadcast for a table the app doesn't cache is a no-op`() = runTest {
+        val gone = RowGone(SupabaseTables.SLEEP_LOGS, "s1", RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
+
+        assertFalse(applier.apply(gone.table, gone.toDelete()))
+    }
+
+    @Test
     fun `isOutdated only skips a row known to be older`() {
         val t = Instant.parse("2026-05-20T08:15:30.123456Z")
         assertTrue(RealtimeChangeApplier.isOutdated(incoming = t, cached = Instant.parse("2026-05-20T08:15:30.123457Z")))
@@ -82,5 +167,24 @@ class RealtimeChangeApplierTest {
         // No updated_at on the incoming row, or nothing cached: apply.
         assertFalse(RealtimeChangeApplier.isOutdated(incoming = null, cached = t))
         assertFalse(RealtimeChangeApplier.isOutdated(incoming = t, cached = null))
+    }
+
+    private class RecordingObserver : EventChangeObserver {
+        override var listening = true
+        val changed = mutableListOf<Pair<PlannerEvent?, PlannerEvent>>()
+        val gone = mutableListOf<Pair<PlannerEvent?, RowGone>>()
+
+        override fun eventsChanged(changes: List<Pair<PlannerEvent?, PlannerEvent>>) {
+            changed += changes
+        }
+
+        override fun eventGone(before: PlannerEvent?, gone: RowGone) {
+            this.gone += before to gone
+        }
+    }
+
+    private companion object {
+        const val PARTNER = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        const val SUBTASK = "ssssssss-ssss-ssss-ssss-ssssssssssss"
     }
 }

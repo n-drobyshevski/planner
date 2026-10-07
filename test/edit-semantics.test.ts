@@ -39,6 +39,7 @@ function makeEvent(overrides: Partial<EventRow> = {}): EventRow {
     attributes: {},
     createdAt: Date.UTC(2025, 11, 1),
     updatedAt: Date.UTC(2025, 11, 1),
+    updatedBy: null,
     ...overrides,
   };
 }

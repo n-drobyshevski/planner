@@ -37,6 +37,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     attributes: {},
     createdAt: T0,
     updatedAt: T0,
+    updatedBy: null,
     ...over,
   };
 }
@@ -81,6 +82,7 @@ function block(over: Partial<EventRow>): EventRow {
     attributes: {},
     createdAt: T0,
     updatedAt: T0,
+    updatedBy: null,
     ...over,
   };
 }

@@ -309,6 +309,7 @@ export function toTaskRow(t: TaskJson): TaskRow {
     attributes: {},
     createdAt: t.createdAt,
     updatedAt: t.createdAt,
+    updatedBy: null,
   };
 }
 

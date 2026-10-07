@@ -12,6 +12,7 @@ import io.github.jan.supabase.exceptions.RestException
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import page.planr.android.core.data.auth.NotSignedInException
+import page.planr.android.core.data.notify.NewRequestNotifier
 
 /**
  * Periodic background refresh (every two hours on a network, see
@@ -19,8 +20,9 @@ import page.planr.android.core.data.auth.NotSignedInException
  * reference data into Room, then the widgets. The periodic run is skipped
  * while the app is on screen with Realtime joined (the cache is live
  * already); a requested one ([SyncScheduler.syncNow]: a fresh sign-in, a
- * widget placed) always runs. Built by the app's HiltWorkerFactory (see
- * PlanrApplication's WorkManager configuration).
+ * widget placed) always runs. A sync that ran also checks for new timeslot
+ * requests ([NewRequestNotifier]; never failing the sync). Built by the
+ * app's HiltWorkerFactory (see PlanrApplication's WorkManager configuration).
  */
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -28,12 +30,17 @@ class SyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val runner: SyncRunner,
     private val realtime: RealtimeSync,
+    private val newRequests: NewRequestNotifier,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = try {
         val requested = inputData.getBoolean(SyncScheduler.KEY_REQUESTED, false)
         val process = ProcessLifecycleOwner.get().lifecycle.currentStateFlow.value
-        if (backgroundSyncNeeded(process, realtime.subscribed.value, requested)) runner.syncAll() else runner.catchUpClock()
+        if (backgroundSyncNeeded(process, realtime.subscribed.value, requested)) {
+            if (runner.syncAll()) checkRequestsQuietly()
+        } else {
+            runner.catchUpClock()
+        }
         Result.success()
     } catch (e: CancellationException) {
         throw e
@@ -42,6 +49,16 @@ class SyncWorker @AssistedInject constructor(
             SyncFailureOutcome.Retry -> Result.retry()
             SyncFailureOutcome.Done -> Result.success()
             SyncFailureOutcome.Fail -> Result.failure()
+        }
+    }
+
+    private suspend fun checkRequestsQuietly() {
+        try {
+            newRequests.checkInBackground()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // The sync itself went through; the next one checks again.
         }
     }
 }

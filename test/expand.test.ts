@@ -40,6 +40,7 @@ function makeEvent(p: Partial<EventRow> = {}): EventRow {
     attributes: {},
     createdAt: 0,
     updatedAt: 0,
+    updatedBy: null,
     ...p,
   };
 }

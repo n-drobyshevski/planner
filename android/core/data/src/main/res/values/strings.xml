@@ -2,4 +2,28 @@
 <resources>
     <!-- Title of a calendar sleep block created from a Health Connect night (the web's insights.sleep.blockTitle). -->
     <string name="sleep_block_title">Sleep</string>
+
+    <!-- "New time requests" notifications (Settings → Notifications). %2$s / %1$s: "Tue 7 Oct, 14:00–15:00". -->
+    <string name="notify_request_title">New time request</string>
+    <plurals name="notify_requests_title">
+        <item quantity="one">%d new time request</item>
+        <item quantity="other">%d new time requests</item>
+    </plurals>
+    <string name="notify_request_named">%1$s asked for %2$s</string>
+    <string name="notify_request_anonymous">Someone asked for %1$s</string>
+
+    <!-- "Partner's changes" notifications: titled with the partner's name (or this when unknown),
+         or with the count of changes. -->
+    <string name="notify_partner_someone">Your partner</string>
+    <!-- One change: %1$s the event's title, %2$s when ("Thu 8 Oct, 18:00", or just "19:30" for a move within the day). -->
+    <string name="notify_partner_line_added">Added %1$s, %2$s</string>
+    <string name="notify_partner_line_moved">Moved %1$s to %2$s</string>
+    <!-- Only the end changed: %2$s the new span ("19:00–21:00", or the days of an all-day event). -->
+    <string name="notify_partner_line_resized">Changed %1$s to %2$s</string>
+    <string name="notify_partner_line_cancelled">Cancelled %1$s (%2$s)</string>
+    <string name="notify_partner_line_removed">Removed %1$s (%2$s)</string>
+    <plurals name="notify_partner_title">
+        <item quantity="one">%1$d change from %2$s</item>
+        <item quantity="other">%1$d changes from %2$s</item>
+    </plurals>
 </resources>

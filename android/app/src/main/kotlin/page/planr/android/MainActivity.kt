@@ -4,9 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.annotation.StringRes
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -44,8 +44,9 @@ import page.planr.android.widgets.WidgetLaunch
  * callback goes to [SessionManager], which validates `state` and exchanges
  * the code.
  *
- * Widget taps arrive the same two ways, with [WidgetLaunch.ACTION_OPEN] and a
- * route; it is validated ([LaunchRoute.parse]) and opened once signed in.
+ * Widget and notification taps arrive the same two ways, with
+ * [WidgetLaunch.ACTION_OPEN] and a route; it is validated
+ * ([LaunchRoute.parse]) and opened once signed in.
  *
  * So do .ics files: a VIEW of a `content:` / `file:` URI (opened from Files,
  * Gmail, a download) or a SEND of a calendar. The file is read right away
@@ -53,7 +54,7 @@ import page.planr.android.widgets.WidgetLaunch
  * ([LaunchRoute.Import]) opens once signed in.
  */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var sessionManager: SessionManager

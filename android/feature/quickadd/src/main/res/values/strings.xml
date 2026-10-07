@@ -36,4 +36,6 @@
     <string name="quickadd_error_end">End must be after start.</string>
     <string name="quickadd_error_signed_out">Sign in to Planr first.</string>
     <string name="quickadd_error_failed">Something went wrong</string>
+    <!-- Quick Settings tile (QuickAddTileService). -->
+    <string name="quickadd_tile_label">Add to Planr</string>
 </resources>

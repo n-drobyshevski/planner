@@ -68,6 +68,42 @@ class RowDecodingTest {
     }
 
     @Test
+    fun `updated_by decodes when present and is null on older rows`() {
+        val base = """
+            "id":"t1","workspace_id":"w1","owner_id":"m1","title":"Pay rent",
+            "created_at":"2026-06-01T00:00:00+00:00","updated_at":"2026-06-30T18:00:00+00:00"
+        """.trimIndent()
+
+        assertEquals("m2", PlanrJson.decodeFromString<Task>("{$base,\"updated_by\":\"m2\"}").updatedBy)
+        assertNull(PlanrJson.decodeFromString<Task>("{$base,\"updated_by\":null}").updatedBy)
+        assertNull(PlanrJson.decodeFromString<Task>("{$base}").updatedBy)
+
+        val event = """
+            {"id":"e1","workspace_id":"w1","owner_id":"m1","title":"Standup",
+             "starts_at":"2026-03-27T08:00:00+00:00","ends_at":"2026-03-27T08:30:00+00:00",
+             "time_zone":"UTC","created_at":"2026-03-01T10:00:00+00:00",
+             "updated_at":"2026-03-01T10:00:00+00:00","updated_by":"m2"}
+        """.trimIndent()
+        assertEquals("m2", PlanrJson.decodeFromString<PlannerEvent>(event).updatedBy)
+    }
+
+    @Test
+    fun `event drafts never carry updated_by`() {
+        val event = PlanrJson.decodeFromString<PlannerEvent>(
+            """
+                {"id":"e1","workspace_id":"w1","owner_id":"m1","title":"Standup",
+                 "starts_at":"2026-03-27T08:00:00+00:00","ends_at":"2026-03-27T08:30:00+00:00",
+                 "time_zone":"UTC","created_at":"2026-03-01T10:00:00+00:00",
+                 "updated_at":"2026-03-01T10:00:00+00:00","updated_by":"m2"}
+            """.trimIndent(),
+        )
+
+        val row = PlanrJson.parseToJsonElement(PlanrJson.encodeToString(event.toDraft())).jsonObject
+
+        assertNull(row["updated_by"])
+    }
+
+    @Test
     fun `event drafts encode snake_case columns and ISO instants`() {
         val draft = PlannerEventDraft(
             workspaceId = "w1",

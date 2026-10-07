@@ -1,9 +1,12 @@
 package page.planr.android.settings
 
+import android.content.Context
 import android.os.Build
+import androidx.core.app.NotificationManagerCompat
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.time.ZoneId
 import javax.inject.Inject
@@ -20,6 +23,9 @@ import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.model.MemberPreferencesPatch
 import page.planr.android.core.data.model.SleepPrefsPatch
+import page.planr.android.core.data.notify.NotificationPort
+import page.planr.android.core.data.notify.NotifyChannel
+import page.planr.android.core.data.notify.NotifyPrefs
 import page.planr.android.core.data.reminders.ReminderLead
 import page.planr.android.core.data.reminders.ReminderScheduler
 import page.planr.android.core.data.repository.SleepPrefsRepository
@@ -27,6 +33,9 @@ import page.planr.android.core.data.repository.WorkspaceRepository
 import page.planr.android.core.model.Category
 import page.planr.android.core.model.Member
 import page.planr.android.reminders.ReminderNotifier
+
+/** The settings that show notifications, each on its own channel. */
+enum class NotifyKind { Reminders, NewRequests, PartnerChanges }
 
 /** What the Settings screen reads and writes; the repositories behind it keep Room and the widgets in step. */
 interface SettingsDataSource {
@@ -52,19 +61,35 @@ interface SettingsDataSource {
     /** Saves [lead] and re-arms reminders with it. */
     suspend fun setReminderLead(lead: ReminderLead)
 
-    /** Whether the app may post notifications right now. */
+    /** "New time requests": this device's own switch, never synced. */
+    val newRequestsNotify: Flow<Boolean>
+
+    suspend fun setNewRequestsNotify(on: Boolean)
+
+    /** "Partner's changes": this device's own switch, never synced. */
+    val partnerChangesNotify: Flow<Boolean>
+
+    suspend fun setPartnerChangesNotify(on: Boolean)
+
+    /** Whether the app may post notifications right now (what the permission governs). */
     fun notificationsAllowed(): Boolean
+
+    /** Whether [kind]'s notifications can show: the app's allowed, and its channel not turned off. */
+    fun canShow(kind: NotifyKind): Boolean = notificationsAllowed()
 
     /** Whether the app can ask for notifications (Android 13+); before that only system settings turn them on. */
     val canRequestNotifications: Boolean
 }
 
 class RepositorySettingsDataSource @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val session: SessionManager,
     private val workspace: WorkspaceRepository,
     private val sleep: SleepPrefsRepository,
     private val reminders: ReminderScheduler,
     private val notifier: ReminderNotifier,
+    private val notifyPrefs: NotifyPrefs,
+    private val port: NotificationPort,
     @ApplicationScope private val appScope: CoroutineScope,
 ) : SettingsDataSource {
     override val currentMemberId: Flow<String?> =
@@ -91,7 +116,22 @@ class RepositorySettingsDataSource @Inject constructor(
         reminders.setLead(lead)
     }
 
-    override fun notificationsAllowed(): Boolean = notifier.canPost()
+    override val newRequestsNotify: Flow<Boolean> = notifyPrefs.newRequests
+
+    override suspend fun setNewRequestsNotify(on: Boolean) = notifyPrefs.setNewRequests(on)
+
+    override val partnerChangesNotify: Flow<Boolean> = notifyPrefs.partnerChanges
+
+    override suspend fun setPartnerChangesNotify(on: Boolean) = notifyPrefs.setPartnerChanges(on)
+
+    // The app's notifications as a whole (what the permission governs), not one channel.
+    override fun notificationsAllowed(): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+    override fun canShow(kind: NotifyKind): Boolean = when (kind) {
+        NotifyKind.Reminders -> notifier.canPost()
+        NotifyKind.NewRequests -> port.canPost(NotifyChannel.TimeRequests)
+        NotifyKind.PartnerChanges -> port.canPost(NotifyChannel.PartnerChanges)
+    }
 
     override val canRequestNotifications: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 

@@ -57,11 +57,12 @@ import page.planr.android.feature.quickadd.R as QuickAddR
  * Tapping the tab already showing goes back to its root, or on the root to
  * today (agenda) or the top of the list (tasks); see [reTapAction].
  *
- * @param launchRoute a widget's requested destination, or the import review
- *   for a file opened in or shared to the app; opened once signed in,
- *   then reported through [onLaunchRouteHandled] (also when it was dropped
- *   because nobody is signed in).
- * @param onOpenDay asks the agenda to show a day (a widget's [LaunchRoute.Day]).
+ * @param launchRoute a widget's or notification's requested destination, or
+ *   the import review for a file opened in or shared to the app; opened once
+ *   signed in, then reported through [onLaunchRouteHandled] (also when it was
+ *   dropped because nobody is signed in).
+ * @param onOpenDay asks the agenda to show a day (a widget's or a partner's
+ *   changes notification's [LaunchRoute.Day]).
  */
 @Composable
 fun PlanrNavHost(
@@ -258,9 +259,11 @@ private fun NavController.hasOnStack(route: String): Boolean =
  * Opens a widget's target on a fresh stack of its tab (no restored detail
  * screens underneath), then pushes the detail, so Back returns to the tab.
  *
- * Over an editor ([isEditorRoute]) nothing is popped, so its draft survives:
- * a detail target is pushed on top (Back returns to the editor), and a bare
- * tab target leaves the editor where it is.
+ * With an editor ([isEditorRoute]) anywhere on the stack nothing is popped,
+ * so its draft survives: a detail target is pushed on top (Back returns
+ * towards the editor), and a bare tab or day target leaves the stack as it
+ * is. Anywhere, not just on top: an earlier launch may have pushed the Inbox
+ * or a detail over the editor.
  */
 private fun NavController.open(target: LaunchRoute) {
     val detail = when (target) {
@@ -268,8 +271,10 @@ private fun NavController.open(target: LaunchRoute) {
         is LaunchRoute.Event -> target.route
         is LaunchRoute.Task -> target.route
         is LaunchRoute.Import -> target.route
+        is LaunchRoute.Inbox -> target.route
     }
-    if (isEditorRoute(currentDestination?.route)) {
+    // Probed per editor route: NavController.currentBackStack is library-restricted.
+    if (hasEditor(EDITOR_ROUTES.filter(::hasOnStack))) {
         if (detail != null) runCatching { navigate(detail) }
         return
     }

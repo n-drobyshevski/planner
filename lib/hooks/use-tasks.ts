@@ -15,9 +15,9 @@ import type { TaskRow } from "@/lib/types";
  * needed). Mirrors use-window-events but is not windowed — the board and list
  * need the full set.
  *
- * Known gap (unchanged from the invalidate days): when a task flips to
- * private, RLS stops delivering its events to the partner — no payload, so
- * the stale row lingers until the next refetch (window refocus or reconnect).
+ * Deletes, and a task the partner made private (RLS stops delivering it),
+ * arrive as DELETE payloads from the workspace's sync channel; see
+ * `subscribeWorkspace`.
  */
 export function useTasks(workspaceId: string | undefined): {
   tasks: TaskRow[];

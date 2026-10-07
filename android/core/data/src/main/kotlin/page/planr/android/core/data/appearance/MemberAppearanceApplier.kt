@@ -46,6 +46,8 @@ class MemberAppearanceApplier internal constructor(
     fun start() {
         if (started) return
         started = true
+        // Here, before the first activity: AppCompat's copy would race it.
+        platform.skipAppCompatLocaleMigration()
         scope.launch {
             currentMember()
                 .filterNotNull()
@@ -75,8 +77,14 @@ class MemberAppearanceApplier internal constructor(
     }
 
     private fun applyLocale(locale: AppLocale) {
-        val appTags = platform.appLocales() ?: return
-        val tag = AppearanceRules.localeTagToApply(locale, appTags, platform.systemLocales()) ?: return
+        val appTags = platform.appLocales()
+        val tag = AppearanceRules.localeTagToApply(locale, appTags, platform.systemLocales())
+        if (tag == null) {
+            // Already shown. Following the system, say so: an override stored
+            // earlier may not have been read yet (below Android 13).
+            if (appTags.isEmpty()) platform.followSystemLocale()
+            return
+        }
         platform.setAppLocale(tag)
         // Widgets are rendered from the app's resources: redraw them in the new language.
         widgets.requestRefresh()
