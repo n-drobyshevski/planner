@@ -88,3 +88,10 @@ internal fun isEditorRoute(route: String?): Boolean =
         route == AgendaRoutes.EVENT_NEW ||
         route == AgendaRoutes.IMPORT ||
         route == PlanrRoutes.TASK
+
+/**
+ * Whether any of a back stack's [routes] is an editor ([isEditorRoute]),
+ * not just the top one: a launch may have pushed the Inbox or a detail over
+ * it, and popping to a tab root would still drop its draft.
+ */
+internal fun hasEditor(routes: List<String?>): Boolean = routes.any(::isEditorRoute)

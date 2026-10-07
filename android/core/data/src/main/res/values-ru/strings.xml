@@ -13,12 +13,9 @@
     <string name="notify_request_anonymous">Запрос на время: %1$s</string>
 
     <string name="notify_partner_someone">Партнёр</string>
-    <string name="notify_partner_added">%1$s: новое событие «%2$s», %3$s</string>
-    <string name="notify_partner_moved">%1$s: событие «%2$s» перенесено на %3$s</string>
-    <string name="notify_partner_cancelled">%1$s: событие «%2$s» отменено (%3$s)</string>
-    <string name="notify_partner_removed">%1$s: событие «%2$s» удалено (%3$s)</string>
     <string name="notify_partner_line_added">Добавлено: «%1$s», %2$s</string>
     <string name="notify_partner_line_moved">Перенесено: «%1$s» на %2$s</string>
+    <string name="notify_partner_line_resized">Новое время: «%1$s», %2$s</string>
     <string name="notify_partner_line_cancelled">Отменено: «%1$s» (%2$s)</string>
     <string name="notify_partner_line_removed">Удалено: «%1$s» (%2$s)</string>
     <plurals name="notify_partner_title">

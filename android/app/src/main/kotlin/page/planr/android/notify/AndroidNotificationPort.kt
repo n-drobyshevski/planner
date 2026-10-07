@@ -81,7 +81,6 @@ class AndroidNotificationPort @Inject constructor(
         } else if (content.text.isNotEmpty()) {
             builder.setContentText(content.text).setStyle(NotificationCompat.BigTextStyle().bigText(content.text))
         }
-        // Else a one-sentence notification (one partner change): the title says it all.
         manager.notify(content.id, builder.build())
     }
 

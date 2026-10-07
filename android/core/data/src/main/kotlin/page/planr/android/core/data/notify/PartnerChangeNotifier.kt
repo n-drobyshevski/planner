@@ -8,6 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -29,10 +30,11 @@ import page.planr.android.core.model.PlannerEvent
 
 /**
  * The "Partner's changes" notification for [PartnerChange]s, in the
- * viewer's zone. One change is one sentence ("Anna moved Dinner to 19:30",
- * "Anna added Gym, Thu 8 Oct, 18:00", "Anna removed Dinner (Tue 7 Oct,
- * 19:00)"); several are "3 changes from Anna" listing up to five. Tapping
- * opens the agenda on the first change's day.
+ * viewer's zone. One change is titled with the partner's name, the change
+ * its text ("Anna" / "Moved Dinner to Thu 8 Oct, 19:30"), so a long one
+ * wraps when expanded instead of being cut off in the one-line title;
+ * several are "3 changes from Anna" listing up to five. Tapping opens the
+ * agenda on the first change's day.
  */
 class PartnerChangeDigest(private val res: Resources, private val formats: WhenFormats) {
 
@@ -44,10 +46,10 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
         require(changes.isNotEmpty())
         val name = partnerName?.trim()?.takeIf { it.isNotEmpty() } ?: res.getString(R.string.notify_partner_someone)
         val target = NotifyTarget.Day(dayOf(changes.first().start, changes.first().allDay, zone))
-        if (changes.size == 1) {
-            return NotifyContent(NotifyChannel.PartnerChanges, id, sentence(name, changes.single(), zone), text = "", target = target)
-        }
         val lines = changes.map { line(it, zone) }
+        if (changes.size == 1) {
+            return NotifyContent(NotifyChannel.PartnerChanges, id, title = name, text = lines.single(), target = target)
+        }
         return NotifyContent(
             channel = NotifyChannel.PartnerChanges,
             id = id,
@@ -59,18 +61,11 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
         )
     }
 
-    /** "Anna moved Dinner to 19:30". */
-    fun sentence(name: String, change: PartnerChange, zone: TimeZone): String = when (change.kind) {
-        PartnerChange.Kind.Added -> res.getString(R.string.notify_partner_added, name, change.title, whenOf(change, zone))
-        PartnerChange.Kind.Moved -> res.getString(R.string.notify_partner_moved, name, change.title, movedTo(change, zone))
-        PartnerChange.Kind.Cancelled -> res.getString(R.string.notify_partner_cancelled, name, change.title, whenOf(change, zone))
-        PartnerChange.Kind.Removed -> res.getString(R.string.notify_partner_removed, name, change.title, whenOf(change, zone))
-    }
-
-    /** "Moved Dinner to 19:30": one row of the expanded list. */
+    /** "Moved Dinner to 19:30": a single change's text, or one row of the expanded list. */
     fun line(change: PartnerChange, zone: TimeZone): String = when (change.kind) {
         PartnerChange.Kind.Added -> res.getString(R.string.notify_partner_line_added, change.title, whenOf(change, zone))
         PartnerChange.Kind.Moved -> res.getString(R.string.notify_partner_line_moved, change.title, movedTo(change, zone))
+        PartnerChange.Kind.Resized -> res.getString(R.string.notify_partner_line_resized, change.title, span(change, zone))
         PartnerChange.Kind.Cancelled -> res.getString(R.string.notify_partner_line_cancelled, change.title, whenOf(change, zone))
         PartnerChange.Kind.Removed -> res.getString(R.string.notify_partner_line_removed, change.title, whenOf(change, zone))
     }
@@ -85,6 +80,23 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
         if (change.allDay || previous == null) return whenOf(change, zone)
         val to = change.start.toLocalDateTime(zone)
         return if (previous.toLocalDateTime(zone).date == to.date) formats.time(to.time) else formats.moment(change.start, zone)
+    }
+
+    /**
+     * A resized event's new span: "19:00–21:00" within a day (it starts as
+     * before), else both ends' day and time; an all-day one's days
+     * ("Thu 8 Oct – Sat 10 Oct", or the one day).
+     */
+    private fun span(change: PartnerChange, zone: TimeZone): String {
+        if (change.allDay) {
+            val first = dayOf(change.start, allDay = true, zone)
+            // `end` is exclusive (the next UTC midnight).
+            val last = dayOf(if (change.end > change.start) change.end - 1.milliseconds else change.start, allDay = true, zone)
+            return if (first == last) formats.day(first) else "${formats.day(first)} – ${formats.day(last)}"
+        }
+        val from = change.start.toLocalDateTime(zone)
+        val to = change.end.toLocalDateTime(zone)
+        return if (from.date == to.date) "${formats.time(from.time)}–${formats.time(to.time)}" else formats.slot(change.start, change.end, zone)
     }
 
     /** The day an event is on: an all-day one's is its UTC date (they are anchored to UTC midnight). */
@@ -105,7 +117,7 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
  * changes; [PartnerChangeThrottle] posts at most one notification every two
  * minutes, holding the rest. Changes are dropped while the app is in the
  * foreground (they show live on screen), and so is what was held when it
- * comes back. What is held lives in memory only: should the process end
+ * comes back ([AppForeground.entries]). What is held lives in memory only: should the process end
  * before it is posted, it is lost, never posted twice.
  */
 @Singleton
@@ -135,6 +147,8 @@ class PartnerChangeNotifier @Inject constructor(
 
     init {
         scope.launch { for (detect in heard) reportQuietly(detect) }
+        // What was held is on screen now, even when no change or flush falls in the visit to drop it.
+        scope.launch { foreground.entries().collect { mutex.withLock { throttle.clear() } } }
     }
 
     override fun eventsChanged(changes: List<Pair<PlannerEvent?, PlannerEvent>>) {
@@ -157,7 +171,7 @@ class PartnerChangeNotifier @Inject constructor(
         val viewer = audience.get().viewer() ?: return@withLock
         val partnerId = viewer.partnerId ?: return@withLock
         val now = clock.now()
-        val found = detect(PartnerScope(viewer.memberId, partnerId, viewer.sleepCategoryId, now, since))
+        val found = detect(PartnerScope(viewer.memberId, partnerId, viewer.sleepCategoryId, now, since, viewer.zone))
         when (val offer = throttle.offer(found, now)) {
             is PartnerChangeThrottle.Offer.Post -> post(offer.changes, viewer, now)
             is PartnerChangeThrottle.Offer.WaitUntil -> scope.launch {

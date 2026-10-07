@@ -2,8 +2,11 @@ package page.planr.android.core.data.notify
 
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.sync.RowGone
 import page.planr.android.core.model.EventKind
@@ -18,10 +21,22 @@ data class PartnerChange(
     val start: Instant,
     val end: Instant,
     val allDay: Boolean = false,
-    /** Where a [Kind.Moved] event started before. */
+    /** Where a [Kind.Moved] or [Kind.Resized] event started before. */
     val previousStart: Instant? = null,
+    /** Where a [Kind.Moved] or [Kind.Resized] event ended before. */
+    val previousEnd: Instant? = null,
 ) {
-    enum class Kind { Added, Moved, Cancelled, Removed }
+    enum class Kind {
+        Added,
+
+        /** Its start changed (its end may have too). */
+        Moved,
+
+        /** Only its end changed: longer or shorter, starting as before. */
+        Resized,
+        Cancelled,
+        Removed,
+    }
 }
 
 /** Who and when a change is judged for. */
@@ -33,6 +48,8 @@ data class PartnerScope(
     val now: Instant,
     /** When "Partner's changes" was turned on: older edits are never reported. */
     val since: Instant,
+    /** The viewer's zone: an all-day event's day (its UTC date) is judged against their today. */
+    val zone: TimeZone,
 ) {
     /** The end of the window a change must touch: [PartnerChangeDetector.WINDOW] from [now]. */
     val horizon: Instant get() = now + PartnerChangeDetector.WINDOW
@@ -45,9 +62,10 @@ data class PartnerScope(
  * Reported: an event the viewer can see, whose last write was the
  * partner's (`updated_by`), made since the setting was turned on, that
  * starts (before or after the change) within [WINDOW] from now. All-day
- * events count while their day is still ahead or today. Added = a row not
- * cached before; Moved = its start or end changed; Cancelled = its status
- * turned cancelled. Removed comes only from a `row_gone` delete whose actor
+ * events count while their day is still ahead or today in the viewer's
+ * zone, up to the day [WINDOW] from now ends on. Added = a row not cached
+ * before; Moved = its start changed; Resized = only its end did;
+ * Cancelled = its status turned cancelled. Removed comes only from a `row_gone` delete whose actor
  * is the partner: a refresh can't tell who removed a row.
  *
  * Left out: the viewer's own changes, contexts (backdrop bands), inactive
@@ -73,10 +91,12 @@ object PartnerChangeDetector {
             before == null -> if (after.status == EventStatus.Cancelled) return null else PartnerChange.Kind.Added
             before.status != EventStatus.Cancelled && after.status == EventStatus.Cancelled -> PartnerChange.Kind.Cancelled
             after.status == EventStatus.Cancelled -> return null
-            before.start != after.start || before.end != after.end -> PartnerChange.Kind.Moved
+            before.start != after.start -> PartnerChange.Kind.Moved
+            before.end != after.end -> PartnerChange.Kind.Resized
             else -> return null
         }
         if (!inWindow(after, scope) && (before == null || !inWindow(before, scope))) return null
+        val retimed = kind == PartnerChange.Kind.Moved || kind == PartnerChange.Kind.Resized
         return PartnerChange(
             kind = kind,
             eventId = after.id,
@@ -84,7 +104,8 @@ object PartnerChangeDetector {
             start = after.start,
             end = after.end,
             allDay = after.allDay,
-            previousStart = before?.start?.takeIf { kind == PartnerChange.Kind.Moved },
+            previousStart = before?.start?.takeIf { retimed },
+            previousEnd = before?.end?.takeIf { retimed },
         )
     }
 
@@ -115,9 +136,19 @@ object PartnerChangeDetector {
     private fun inWindow(event: PlannerEvent, scope: PartnerScope): Boolean =
         inWindow(event.start, event.end, event.allDay, scope)
 
-    /** A timed event starting within the window; an all-day one whose days aren't over yet and begin by its end. */
-    private fun inWindow(start: Instant, end: Instant, allDay: Boolean, scope: PartnerScope): Boolean =
-        if (allDay) end > scope.now && start <= scope.horizon else start >= scope.now && start <= scope.horizon
+    /**
+     * A timed event starting within the window; an all-day one whose days
+     * aren't over yet and begin by its end. All-day days are dates (their
+     * UTC dates, being anchored to UTC midnight), so they are compared with
+     * the viewer's dates, not as instants against the real now.
+     */
+    private fun inWindow(start: Instant, end: Instant, allDay: Boolean, scope: PartnerScope): Boolean {
+        if (!allDay) return start >= scope.now && start <= scope.horizon
+        val first = start.toLocalDateTime(TimeZone.UTC).date
+        // `end` is exclusive (the next UTC midnight); a zero-length one still covers its day.
+        val last = (if (end > start) end - 1.milliseconds else start).toLocalDateTime(TimeZone.UTC).date
+        return last >= scope.now.toLocalDateTime(scope.zone).date && first <= scope.horizon.toLocalDateTime(scope.zone).date
+    }
 }
 
 /**
@@ -180,15 +211,25 @@ class PartnerChangeThrottle(private val interval: Duration = INTERVAL) {
             // Added, then changed again: still new to the reader, unless it went again.
             prev.kind == PartnerChange.Kind.Added -> when (change.kind) {
                 PartnerChange.Kind.Removed, PartnerChange.Kind.Cancelled -> null
-                else -> change.copy(kind = PartnerChange.Kind.Added, previousStart = null)
+                else -> change.copy(kind = PartnerChange.Kind.Added, previousStart = null, previousEnd = null)
             }
-            // Moved twice: from where it was first; back where it was: nothing to say.
-            prev.kind == PartnerChange.Kind.Moved && change.kind == PartnerChange.Kind.Moved ->
-                change.copy(previousStart = prev.previousStart).takeIf { it.previousStart != it.start }
+            // Moved or resized twice: from where it was first, by what changed overall;
+            // back where it was (start and end): nothing to say.
+            prev.retimed && change.retimed -> retimed(change.copy(previousStart = prev.previousStart, previousEnd = prev.previousEnd))
             else -> change
         }
         held.remove(change.eventId)
         if (merged != null) held[change.eventId] = merged
+    }
+
+    private val PartnerChange.retimed: Boolean
+        get() = kind == PartnerChange.Kind.Moved || kind == PartnerChange.Kind.Resized
+
+    /** [change] judged against where it was first: moved, resized, or (null) back as it was. */
+    private fun retimed(change: PartnerChange): PartnerChange? = when {
+        change.previousStart != change.start -> change.copy(kind = PartnerChange.Kind.Moved)
+        change.previousEnd != null && change.previousEnd != change.end -> change.copy(kind = PartnerChange.Kind.Resized)
+        else -> null
     }
 
     companion object {

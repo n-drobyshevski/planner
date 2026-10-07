@@ -4,8 +4,10 @@ import androidx.test.core.app.ApplicationProvider
 import android.content.Context
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -37,6 +39,17 @@ class NewRequestsTest {
 
         assertEquals(listOf("r-newer", "r-new"), plan.toNotify.map { it.id })
         assertEquals(setOf("r-newer", "r-new", "r-old"), plan.newSeen, "r-gone is no longer pending: pruned")
+    }
+
+    @Test
+    fun `requests made before notifying was turned on are never new`() {
+        val before = request("r-before", created = "2026-10-06T09:00:00Z")
+        val after = request("r-after", created = "2026-10-06T11:00:00Z")
+
+        val plan = NewRequestsPlanner.plan(listOf(before, after), seen = emptySet(), since = Instant.parse("2026-10-06T10:00:00Z"))
+
+        assertEquals(listOf("r-after"), plan.toNotify.map { it.id })
+        assertEquals(setOf("r-before", "r-after"), plan.newSeen)
     }
 
     @Test
@@ -88,7 +101,17 @@ class NewRequestsTest {
         assertEquals("P1 asked for Wed 7 Oct, 14:00–15:00", content.text)
         assertEquals(5, content.lines.size)
         assertEquals(2, content.more)
-        assertEquals(NewRequestTexts.SUMMARY_ID, content.id)
+        assertEquals(NewRequestTexts.summaryId(requests.first()), content.id)
+    }
+
+    @Test
+    fun `each summary has its own id, so a later batch alerts again and leaves the earlier one showing`() {
+        val t = texts()
+        val first = t.content(listOf(request("b"), request("c")), berlin)
+        val second = t.content(listOf(request("d"), request("e")), berlin)
+
+        assertNotEquals(first.id, second.id)
+        assertNotEquals("b".hashCode(), first.id, "nor a single request's notification")
     }
 
     @Test
@@ -133,6 +156,44 @@ class NewRequestsTest {
 
         notifier.check(listOf(request("r1"), request("r2"), request("r3", created = "2026-10-06T11:00:00Z")))
         assertEquals(1, port.posted.size, "each request notifies once")
+    }
+
+    @Test
+    fun `turned on offline, a stale cached list primes, yet the requests it missed still don't notify`() = runTest {
+        // On at 10:00; the Inbox's list was fetched an hour before, with only A.
+        prefs.requestsSince = Instant.parse("2026-10-06T10:00:00Z")
+        val a = request("a", created = "2026-10-06T08:00:00Z")
+        val notifier = notifier()
+
+        notifier.check(listOf(a))
+        assertEquals(setOf("a"), prefs.seen)
+
+        // The next sync brings B and C, made before it was turned on, and D, after.
+        notifier.check(
+            listOf(
+                a,
+                request("b", created = "2026-10-06T09:00:00Z"),
+                request("c", created = "2026-10-06T09:30:00Z"),
+                request("d", name = "Boris", created = "2026-10-06T10:30:00Z"),
+            ),
+        )
+
+        assertEquals(listOf("Boris asked for Wed 7 Oct, 14:00–15:00"), port.posted.map { it.text })
+        assertEquals(setOf("a", "b", "c", "d"), prefs.seen)
+    }
+
+    @Test
+    fun `a second batch while the first is unread posts a notification of its own`() = runTest {
+        prefs.seen = emptySet()
+        val notifier = notifier()
+        val b = request("b", created = "2026-10-06T10:00:00Z")
+        val c = request("c", created = "2026-10-06T10:01:00Z")
+
+        notifier.check(listOf(b, c))
+        notifier.check(listOf(b, c, request("d", created = "2026-10-06T12:00:00Z"), request("e", created = "2026-10-06T12:01:00Z")))
+
+        assertEquals(listOf("2 new time requests", "2 new time requests"), port.posted.map { it.title })
+        assertEquals(2, port.posted.map { it.id }.toSet().size, "the second never silently replaces the first")
     }
 
     @Test

@@ -259,9 +259,11 @@ private fun NavController.hasOnStack(route: String): Boolean =
  * Opens a widget's target on a fresh stack of its tab (no restored detail
  * screens underneath), then pushes the detail, so Back returns to the tab.
  *
- * Over an editor ([isEditorRoute]) nothing is popped, so its draft survives:
- * a detail target is pushed on top (Back returns to the editor), and a bare
- * tab target leaves the editor where it is.
+ * With an editor ([isEditorRoute]) anywhere on the stack nothing is popped,
+ * so its draft survives: a detail target is pushed on top (Back returns
+ * towards the editor), and a bare tab or day target leaves the stack as it
+ * is. Anywhere, not just on top: an earlier launch may have pushed the Inbox
+ * or a detail over the editor.
  */
 private fun NavController.open(target: LaunchRoute) {
     val detail = when (target) {
@@ -271,7 +273,7 @@ private fun NavController.open(target: LaunchRoute) {
         is LaunchRoute.Import -> target.route
         is LaunchRoute.Inbox -> target.route
     }
-    if (isEditorRoute(currentDestination?.route)) {
+    if (hasEditor(currentBackStack.value.map { it.destination.route })) {
         if (detail != null) runCatching { navigate(detail) }
         return
     }
