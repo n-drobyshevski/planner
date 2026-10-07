@@ -169,7 +169,7 @@ class PartnerChangeNotifier @Inject constructor(
         val viewer = audience.get().viewer() ?: return@withLock
         val partnerId = viewer.partnerId ?: return@withLock
         val now = clock.now()
-        val found = detect(PartnerScope(viewer.memberId, partnerId, viewer.sleepCategoryId, now, since))
+        val found = detect(PartnerScope(viewer.memberId, partnerId, viewer.sleepCategoryId, now, since, viewer.zone))
         when (val offer = throttle.offer(found, now)) {
             is PartnerChangeThrottle.Offer.Post -> post(offer.changes, viewer, now)
             is PartnerChangeThrottle.Offer.WaitUntil -> scope.launch {

@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
 import page.planr.android.core.data.sync.RowGone
 import page.planr.android.core.model.EventKind
 import page.planr.android.core.model.EventStatus
@@ -13,7 +14,7 @@ import page.planr.android.core.model.PlannerEvent
 /** Which cache changes are the partner's, and worth a notification. */
 class PartnerChangeDetectorTest {
     private val now = Instant.parse("2026-10-07T09:00:00Z")
-    private val scope = PartnerScope(ME, PARTNER, sleepCategoryId = SLEEP, now = now, since = Instant.parse("2026-10-01T00:00:00Z"))
+    private val scope = PartnerScope(ME, PARTNER, sleepCategoryId = SLEEP, now = now, since = Instant.parse("2026-10-01T00:00:00Z"), zone = TimeZone.of("Europe/Berlin"))
 
     private fun event(
         id: String = "e1",
@@ -118,6 +119,27 @@ class PartnerChangeDetectorTest {
             PartnerChange.Kind.Added,
             PartnerChangeDetector.changed(null, event(start = today, end = today + 24.hours, allDay = true), scope)?.kind,
         )
+    }
+
+    @Test
+    fun `an all-day event's day is judged against the viewer's own today, whatever their offset`() {
+        fun allDay(day: String, days: Int = 1) =
+            Instant.parse("${day}T00:00:00Z").let { event(start = it, end = it + (24 * days).hours, allDay = true) }
+
+        // Los Angeles, 18:00 on Wed 7 Oct (01:00 on the 8th in UTC): the 7th is still today.
+        val la = scope.copy(now = Instant.parse("2026-10-08T01:00:00Z"), zone = TimeZone.of("America/Los_Angeles"))
+        assertEquals(PartnerChange.Kind.Added, PartnerChangeDetector.changed(null, allDay("2026-10-07"), la)?.kind)
+        assertEquals(PartnerChange.Kind.Cancelled, PartnerChangeDetector.changed(allDay("2026-10-07"), allDay("2026-10-07").copy(status = EventStatus.Cancelled), la)?.kind)
+        val gone = RowGone("events", "e1", RowGone.Kind.Delete, PARTNER, PARTNER, "Dinner", Instant.parse("2026-10-07T00:00:00Z"), Instant.parse("2026-10-08T00:00:00Z"))
+        assertEquals(PartnerChange.Kind.Removed, PartnerChangeDetector.removed(allDay("2026-10-07"), gone, la)?.kind)
+        assertEquals(PartnerChange.Kind.Added, PartnerChangeDetector.changed(null, allDay("2026-10-09"), la)?.kind, "the window's last day")
+        assertNull(PartnerChangeDetector.changed(null, allDay("2026-10-10"), la))
+
+        // Moscow, 01:00 on Thu 8 Oct (22:00 on the 7th in UTC): the 7th is over, the 10th is in the window.
+        val moscow = scope.copy(now = Instant.parse("2026-10-07T22:00:00Z"), zone = TimeZone.of("Europe/Moscow"))
+        assertNull(PartnerChangeDetector.changed(null, allDay("2026-10-07"), moscow), "yesterday")
+        assertEquals(PartnerChange.Kind.Added, PartnerChangeDetector.changed(null, allDay("2026-10-07", days = 2), moscow)?.kind, "ends today")
+        assertEquals(PartnerChange.Kind.Added, PartnerChangeDetector.changed(null, allDay("2026-10-10"), moscow)?.kind)
     }
 
     @Test
