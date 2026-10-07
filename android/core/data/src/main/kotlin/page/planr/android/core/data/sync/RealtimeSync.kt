@@ -53,6 +53,7 @@ import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.remote.SupabaseTables
+import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.TimeslotRequestRepository
 
 /**
@@ -89,6 +90,7 @@ class RealtimeSync @Inject constructor(
     private val applier: RealtimeChangeApplier,
     private val cacheGate: CacheGate,
     private val syncRunner: SyncRunner,
+    private val events: EventRepository,
     private val timeslotRequests: TimeslotRequestRepository,
     private val widgets: WidgetRefreshDispatcher,
     private val appPrefs: AppPrefsSync,
@@ -140,8 +142,10 @@ class RealtimeSync @Inject constructor(
                 )
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     changes.collect { (table, change) ->
-                        val applied = runCatching { applier.apply(table, change, ticket) }.getOrDefault(false)
-                        if (applied) widgets.requestRefresh()
+                        val applied = runCatching { applier.applyChange(table, change, ticket) }.getOrNull()
+                        if (applied?.changed == true) widgets.requestRefresh()
+                        // Off the collector: the next changes needn't wait on the network.
+                        applied?.overridesUnknownOf?.let { id -> launch { refreshOverridesQuietly(id) } }
                     }
                 }
                 launch(start = CoroutineStart.UNDISPATCHED) {
@@ -218,7 +222,7 @@ class RealtimeSync @Inject constructor(
             filter("workspace_id", FilterOperator.EQ, workspaceId)
         }.keepingEvery().mapNotNull { action ->
             val change = when (action) {
-                is PostgresAction.Insert -> RowChange.Upsert(action.record)
+                is PostgresAction.Insert -> RowChange.Upsert(action.record, inserted = true)
                 is PostgresAction.Update -> RowChange.Upsert(action.record)
                 // Never delivered under a filter; deletes come as [RowGone] broadcasts.
                 is PostgresAction.Delete, is PostgresAction.Select -> null
@@ -233,6 +237,16 @@ class RealtimeSync @Inject constructor(
             throw e
         } catch (_: Exception) {
             // Offline or a server hiccup: the next (re)join or periodic sync catches up.
+        }
+    }
+
+    private suspend fun refreshOverridesQuietly(eventId: String) {
+        try {
+            events.refreshOverridesOf(eventId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // As above: the next window refresh brings them.
         }
     }
 

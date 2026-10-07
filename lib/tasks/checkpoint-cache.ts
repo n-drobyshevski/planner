@@ -33,6 +33,24 @@ export function removeCheckpointsOfTask(
   return next.length === list.length ? list : next;
 }
 
+/**
+ * Whether `change` shares again a task whose checkpoints were dropped when it
+ * turned private (`hiddenTasks`, which then forgets it). That is a plain tasks
+ * UPDATE: the checkpoints themselves didn't change, so none of them arrive on
+ * their own, and the cache has to refetch them.
+ */
+export function reshowsHiddenTask(
+  hiddenTasks: Set<string>,
+  change: { table: string; eventType: string; new: unknown },
+): boolean {
+  if (change.table !== "tasks" || change.eventType !== "UPDATE") return false;
+  const row = change.new as { id?: unknown; is_private?: unknown } | null;
+  const id = typeof row?.id === "string" ? row.id : null;
+  if (id === null || row?.is_private !== false || !hiddenTasks.has(id)) return false;
+  hiddenTasks.delete(id);
+  return true;
+}
+
 /** Drop a checkpoint by id. */
 export function removeCheckpoint(
   list: TaskCheckpoint[],

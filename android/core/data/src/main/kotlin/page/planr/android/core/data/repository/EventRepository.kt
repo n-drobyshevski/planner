@@ -105,6 +105,27 @@ class EventRepository @Inject constructor(
     }
 
     /**
+     * Refetches the overrides of the series [eventId] and replaces what Room
+     * holds for it, while the event is cached. For a series that came (back)
+     * into view over Realtime, shared again after being private: its
+     * overrides didn't change then, so none of them arrive on their own.
+     * Redraws the widgets when that wrote anything.
+     */
+    suspend fun refreshOverridesOf(eventId: String) {
+        val ws = session.requireSession().workspaceId
+        var changed = false
+        gate.refresh(CacheArea.Events, fetch = { queries.fetchOverrides(ws, eventId) }) { overrides ->
+            changed = db.withTransaction {
+                if (dao.getById(eventId) == null) return@withTransaction false
+                dao.deleteOverridesOf(listOf(eventId))
+                dao.upsertOverrides(overrides.map { it.toEntity() })
+                true
+            }
+        }
+        if (changed) widgets.requestRefresh()
+    }
+
+    /**
      * Refetches [window] (`fetchWindow`) and replaces what Room holds for it,
      * so rows deleted elsewhere disappear too.
      *
