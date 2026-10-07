@@ -3,6 +3,7 @@ import {
   upsertCheckpoint,
   removeCheckpoint,
   removeCheckpointsOfTask,
+  reshowsHiddenTask,
 } from "@/lib/tasks/checkpoint-cache";
 import type { TaskCheckpoint } from "@/lib/types";
 
@@ -64,5 +65,32 @@ describe("removeCheckpointsOfTask", () => {
     ];
     expect(removeCheckpointsOfTask(list, "t1").map((c) => c.id)).toEqual(["b"]);
     expect(removeCheckpointsOfTask(list, "t9")).toBe(list);
+  });
+});
+
+describe("reshowsHiddenTask", () => {
+  const update = (row: Record<string, unknown>, table = "tasks", eventType = "UPDATE") => ({
+    table,
+    eventType,
+    new: row,
+  });
+
+  it("refetches once when a task whose checkpoints were dropped is shared again", () => {
+    const hidden = new Set(["t1"]);
+
+    expect(reshowsHiddenTask(hidden, update({ id: "t1", is_private: false }))).toBe(true);
+    expect(hidden.has("t1")).toBe(false);
+    // The next edit of the task is an ordinary one.
+    expect(reshowsHiddenTask(hidden, update({ id: "t1", is_private: false }))).toBe(false);
+  });
+
+  it("ignores other tasks, a task still private, and other changes", () => {
+    const hidden = new Set(["t1"]);
+
+    expect(reshowsHiddenTask(hidden, update({ id: "t2", is_private: false }))).toBe(false);
+    expect(reshowsHiddenTask(hidden, update({ id: "t1", is_private: true }))).toBe(false);
+    expect(reshowsHiddenTask(hidden, update({ id: "t1", is_private: false }, "events"))).toBe(false);
+    expect(reshowsHiddenTask(hidden, update({ id: "t1", is_private: false }, "tasks", "INSERT"))).toBe(false);
+    expect(hidden.has("t1")).toBe(true);
   });
 });

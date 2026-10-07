@@ -105,6 +105,17 @@ class RowGoneTest {
     }
 
     @Test
+    fun `a deleted timeslot request refreshes its owner's Inbox only`() {
+        val gone = RowGone.parse(
+            Fixtures.row("""{"table":"timeslot_requests","id":"r1","kind":"delete","owner_id":"$ME","actor":"$ME"}"""),
+        )!!
+
+        assertTrue(gone.isRequestOf(ME))
+        assertFalse(gone.isRequestOf(PARTNER), "the partner hears of it too, and ignores it")
+        assertFalse(RowGone("events", "e1", RowGone.Kind.Delete, ownerId = ME, actor = ME).isRequestOf(ME))
+    }
+
+    @Test
     fun `topic matches the realtime messages policy`() {
         assertEquals("workspace:${Fixtures.WS}:sync", RowGone.topic(Fixtures.WS))
     }

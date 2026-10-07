@@ -23,6 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -51,6 +53,7 @@ import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.remote.SupabaseTables
+import page.planr.android.core.data.repository.EventRepository
 import page.planr.android.core.data.repository.TimeslotRequestRepository
 
 /**
@@ -76,8 +79,9 @@ import page.planr.android.core.data.repository.TimeslotRequestRepository
  * was down or the app was in the background (see [refetchOnJoin]).
  *
  * The member's own timeslot requests (owner-only under RLS) aren't cached
- * in Room: a change to one refetches the Inbox's list
- * ([TimeslotRequestRepository]), which the badge and the "New time
+ * in Room: a change to one (a delete arrives as a [RowGone], migration
+ * `20261010000000_broadcast_timeslot_request_deletes`) refetches the Inbox's
+ * list ([TimeslotRequestRepository]), which the badge and the "New time
  * requests" notifications follow.
  */
 @Singleton
@@ -87,6 +91,7 @@ class RealtimeSync @Inject constructor(
     private val applier: RealtimeChangeApplier,
     private val cacheGate: CacheGate,
     private val syncRunner: SyncRunner,
+    private val events: EventRepository,
     private val timeslotRequests: TimeslotRequestRepository,
     private val widgets: WidgetRefreshDispatcher,
     private val appPrefs: AppPrefsSync,
@@ -138,16 +143,21 @@ class RealtimeSync @Inject constructor(
                 )
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     changes.collect { (table, change) ->
-                        val applied = runCatching { applier.apply(table, change, ticket) }.getOrDefault(false)
-                        if (applied) widgets.requestRefresh()
+                        val applied = runCatching { applier.applyChange(table, change, ticket) }.getOrNull()
+                        if (applied?.changed == true) widgets.requestRefresh()
+                        // Off the collector: the next changes needn't wait on the network.
+                        applied?.overridesUnknownOf?.let { id -> launch { refreshOverridesQuietly(id) } }
                     }
                 }
                 launch(start = CoroutineStart.UNDISPATCHED) {
-                    sync.broadcastFlow<JsonObject>(RowGone.EVENT).mapNotNull { RowGone.parse(it) }.collect { gone ->
-                        if (gone.removesFor(session.currentSession?.memberId)) {
+                    sync.broadcastFlow<JsonObject>(RowGone.EVENT).keepingEvery().mapNotNull { RowGone.parse(it) }.collect { gone ->
+                        val memberId = session.currentSession?.memberId
+                        if (gone.removesFor(memberId)) {
                             val applied = runCatching { applier.apply(gone.table, gone.toDelete(), ticket) }.getOrDefault(false)
                             if (applied) widgets.requestRefresh()
                         }
+                        // A request deleted (its share link deleted, say): never seen by the filtered binding below.
+                        if (gone.isRequestOf(memberId)) launch { refreshRequestsQuietly(force = true) }
                         _rowGone.emit(gone)
                     }
                 }
@@ -214,9 +224,9 @@ class RealtimeSync @Inject constructor(
         channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             this.table = table
             filter("workspace_id", FilterOperator.EQ, workspaceId)
-        }.mapNotNull { action ->
+        }.keepingEvery().mapNotNull { action ->
             val change = when (action) {
-                is PostgresAction.Insert -> RowChange.Upsert(action.record)
+                is PostgresAction.Insert -> RowChange.Upsert(action.record, inserted = true)
                 is PostgresAction.Update -> RowChange.Upsert(action.record)
                 // Never delivered under a filter; deletes come as [RowGone] broadcasts.
                 is PostgresAction.Delete, is PostgresAction.Select -> null
@@ -231,6 +241,16 @@ class RealtimeSync @Inject constructor(
             throw e
         } catch (_: Exception) {
             // Offline or a server hiccup: the next (re)join or periodic sync catches up.
+        }
+    }
+
+    private suspend fun refreshOverridesQuietly(eventId: String) {
+        try {
+            events.refreshOverridesOf(eventId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // As above: the next window refresh brings them.
         }
     }
 
@@ -304,6 +324,17 @@ internal fun refetchOnJoin(mainJoined: Flow<Boolean>, syncJoined: Flow<Boolean>,
             }
         }
     }
+
+/**
+ * [this] with an unbounded buffer. supabase-kt's `broadcastFlow` and
+ * `postgresChangeFlow` are `callbackFlow`s that `trySend` each message into
+ * the default 64-slot buffer and ignore a failure, so while the collector is
+ * busy (every change waits on the cache's lock and a Room transaction) a
+ * burst past 64 (an .ics import undone, a task subtree deleted, with their
+ * cascades) would be dropped without a trace. Placed right after the
+ * library's flow, it fuses into that `callbackFlow`'s own channel.
+ */
+internal fun <T> Flow<T>.keepingEvery(): Flow<T> = buffer(Channel.UNLIMITED)
 
 /**
  * The workspace whose channel should be open, or null for none: the

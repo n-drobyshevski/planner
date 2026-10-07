@@ -138,6 +138,11 @@ class WorkspaceQueries @Inject constructor(
         filters = listOf(eq("workspace_id", workspaceId), eq("id", id)),
     ).firstOrNull()?.decodeAs(PlannerEvent.serializer())
 
+    /** Every override of the series [eventId], all pages; none when it is gone or hidden. */
+    suspend fun fetchOverrides(workspaceId: String, eventId: String): List<EventOverride> =
+        selectAllPages(SupabaseTables.EVENT_OVERRIDES, filters = listOf(eq("workspace_id", workspaceId), eq("event_id", eventId)))
+            .decodeAll(EventOverride.serializer())
+
     /** One task row; null when gone or hidden. */
     suspend fun fetchTask(workspaceId: String, id: String): Task? = gateway.select(
         SupabaseTables.TASKS,

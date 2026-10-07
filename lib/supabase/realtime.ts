@@ -255,7 +255,8 @@ interface SyncListener {
 }
 
 interface SyncEntry {
-  channel: RealtimeChannel;
+  /** null until the previous channel for the topic has finished leaving */
+  channel: RealtimeChannel | null;
   listeners: Set<SyncListener>;
   closed: boolean;
   /** pending removal once the last subscriber left (see SYNC_LINGER_MS) */
@@ -269,10 +270,26 @@ interface SyncEntry {
 // client hands back the same channel object for the same topic.
 const syncChannels = new WeakMap<SupabaseClient, Map<string, SyncEntry>>();
 
+// Sync channels still leaving, per client and workspace. Until the server acks
+// the leave (or it times out) the client keeps the channel in its list, and
+// `sb.channel(topic)` hands back that same leaving object, which can never join
+// again; so a subscriber arriving meanwhile waits for the leave to finish.
+const leavingSyncChannels = new WeakMap<SupabaseClient, Map<string, Promise<unknown>>>();
+
+function leavingOf(sb: SupabaseClient): Map<string, Promise<unknown>> {
+  let leaving = leavingSyncChannels.get(sb);
+  if (!leaving) {
+    leaving = new Map();
+    leavingSyncChannels.set(sb, leaving);
+  }
+  return leaving;
+}
+
 /**
  * How long the sync channel outlives its last subscriber. A remount (route
  * change, Strict Mode) leaves and rejoins in one commit; removing the channel
- * at once would hand the rejoin the same, still-leaving channel object.
+ * at once would hand the rejoin the same, still-leaving channel object. A
+ * rejoin after it waits for the leave instead (see leavingSyncChannels).
  */
 export const SYNC_LINGER_MS = 1_000;
 
@@ -313,50 +330,16 @@ function joinSyncChannel(
   }
   let entry = byWorkspace.get(workspaceId);
   if (!entry) {
-    const channel = sb.channel(syncTopic(workspaceId), { config: { private: true } });
     const created: SyncEntry = {
-      channel,
+      channel: null,
       listeners: new Set(),
       closed: false,
       leaveTimer: null,
       memberId: null,
     };
-    const dispatch = (gone: RowGone) => {
-      const change = rowGoneToChange(gone);
-      for (const l of created.listeners) l.onChange(change);
-    };
-    channel.on("broadcast", { event: ROW_GONE_EVENT }, (message) => {
-      const gone = parseRowGone(message);
-      if (!gone) return;
-      if (gone.kind === "delete") return dispatch(gone);
-      void memberIdOf(sb, created).then((memberId) => {
-        if (!created.closed && rowGoneRemoves(gone, memberId)) dispatch(gone);
-      });
-    });
-    // A first join that comes only after failed attempts is a reconnect too:
-    // deletes sent meanwhile were missed (the main channel was likely live).
-    let mayHaveMissed = false;
-    let warned = false;
-    // A private channel joins with the session's token: make sure the socket
-    // holds it first (the client also refreshes it on its own afterwards).
-    void sb.realtime
-      .setAuth()
-      .catch(() => undefined)
-      .then(() => {
-        if (created.closed) return;
-        channel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            if (mayHaveMissed) for (const l of created.listeners) l.onReconnect();
-            mayHaveMissed = true;
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            mayHaveMissed = true;
-            if (!warned) {
-              warned = true;
-              console.warn("[planner] Sync realtime channel error; deletes may show late until it reconnects.");
-            }
-          }
-        });
-      });
+    const previous = leavingOf(sb).get(workspaceId);
+    if (previous) void previous.then(() => openSyncChannel(sb, workspaceId, created));
+    else openSyncChannel(sb, workspaceId, created);
     entry = created;
     byWorkspace.set(workspaceId, entry);
   }
@@ -378,7 +361,60 @@ function joinSyncChannel(
       if (joined.listeners.size > 0) return;
       joined.closed = true;
       if (byWorkspace.get(workspaceId) === joined) byWorkspace.delete(workspaceId);
-      void sb.removeChannel(joined.channel);
+      // Never opened (still waiting on an earlier leave): nothing to remove.
+      if (!joined.channel) return;
+      const leaving = leavingOf(sb);
+      const removal = sb.removeChannel(joined.channel).catch(() => undefined);
+      leaving.set(workspaceId, removal);
+      void removal.then(() => {
+        if (leaving.get(workspaceId) === removal) leaving.delete(workspaceId);
+      });
     }, SYNC_LINGER_MS);
   };
+}
+
+/**
+ * Create `entry`'s channel, route its row_gone broadcasts to the listeners and
+ * join it; nothing once the entry was closed.
+ */
+function openSyncChannel(sb: SupabaseClient, workspaceId: string, entry: SyncEntry): void {
+  if (entry.closed) return;
+  const channel = sb.channel(syncTopic(workspaceId), { config: { private: true } });
+  entry.channel = channel;
+  const dispatch = (gone: RowGone) => {
+    const change = rowGoneToChange(gone);
+    for (const l of entry.listeners) l.onChange(change);
+  };
+  channel.on("broadcast", { event: ROW_GONE_EVENT }, (message) => {
+    const gone = parseRowGone(message);
+    if (!gone) return;
+    if (gone.kind === "delete") return dispatch(gone);
+    void memberIdOf(sb, entry).then((memberId) => {
+      if (!entry.closed && rowGoneRemoves(gone, memberId)) dispatch(gone);
+    });
+  });
+  // A first join that comes only after failed attempts is a reconnect too:
+  // deletes sent meanwhile were missed (the main channel was likely live).
+  let mayHaveMissed = false;
+  let warned = false;
+  // A private channel joins with the session's token: make sure the socket
+  // holds it first (the client also refreshes it on its own afterwards).
+  void sb.realtime
+    .setAuth()
+    .catch(() => undefined)
+    .then(() => {
+      if (entry.closed) return;
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          if (mayHaveMissed) for (const l of entry.listeners) l.onReconnect();
+          mayHaveMissed = true;
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          mayHaveMissed = true;
+          if (!warned) {
+            warned = true;
+            console.warn("[planner] Sync realtime channel error; deletes may show late until it reconnects.");
+          }
+        }
+      });
+    });
 }

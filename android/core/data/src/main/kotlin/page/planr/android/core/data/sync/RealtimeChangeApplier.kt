@@ -21,8 +21,8 @@ import page.planr.android.core.model.Task
 
 /** One Realtime row change, reduced to what the cache needs. */
 sealed interface RowChange {
-    /** INSERT / UPDATE: the full new row. */
-    data class Upsert(val record: JsonObject) : RowChange
+    /** INSERT ([inserted]) / UPDATE: the full new row. */
+    data class Upsert(val record: JsonObject, val inserted: Boolean = false) : RowChange
 
     /**
      * DELETE (or a row turned private, gone for this member): a record that
@@ -55,17 +55,36 @@ class RealtimeChangeApplier @Inject constructor(
      * the channel joined: a change still being delivered after a sign-out
      * wiped the cache is dropped (null: take one now).
      */
-    suspend fun apply(table: String, change: RowChange, ticket: CacheGate.Ticket? = null): Boolean {
-        val area = areaOf(table) ?: return false
-        var applied = false
+    suspend fun apply(table: String, change: RowChange, ticket: CacheGate.Ticket? = null): Boolean =
+        applyChange(table, change, ticket).changed
+
+    /** [apply], telling also what the cache still lacks after it ([Applied.overridesUnknownOf]). */
+    suspend fun applyChange(table: String, change: RowChange, ticket: CacheGate.Ticket? = null): Applied {
+        val area = areaOf(table) ?: return Applied(changed = false)
+        var applied = Applied(changed = false)
         gate.change(ticket ?: gate.ticket(), *area) {
             applied = when (change) {
-                is RowChange.Upsert -> upsert(table, change.record)
-                is RowChange.Delete -> change.oldRecord.string("id")?.let { delete(table, it, change.gone) } ?: false
+                is RowChange.Upsert -> upsert(table, change)
+                is RowChange.Delete ->
+                    Applied(changed = change.oldRecord.string("id")?.let { delete(table, it, change.gone) } ?: false)
             }
         }
         return applied
     }
+
+    /** What [applyChange] did. */
+    data class Applied(
+        /** Whether the change touched the cache. */
+        val changed: Boolean,
+        /**
+         * A series the cache didn't hold that arrived by an UPDATE: most
+         * likely shared again after being private, which took its overrides
+         * out of the cache. They didn't change, so none of them arrive on
+         * their own: refetch them (`EventRepository.refreshOverridesOf`).
+         * Null otherwise (a new series has none yet; they arrive as inserts).
+         */
+        val overridesUnknownOf: String? = null,
+    )
 
     private fun areaOf(table: String): Array<CacheArea>? = when (table) {
         SupabaseTables.EVENTS, SupabaseTables.EVENT_OVERRIDES -> arrayOf(CacheArea.Events)
@@ -75,21 +94,25 @@ class RealtimeChangeApplier @Inject constructor(
         else -> null
     }
 
-    private suspend fun upsert(table: String, record: JsonObject): Boolean {
+    private suspend fun upsert(table: String, change: RowChange.Upsert): Applied {
+        val record = change.record
         when (table) {
             SupabaseTables.EVENTS -> {
-                val cached = record.string("id")?.let { db.eventDao().getById(it) }?.let { runCatching { it.toModel() }.getOrNull() }
-                if (isOutdated(record.updatedAt(), cached?.updatedAt)) return false
+                val row = record.string("id")?.let { db.eventDao().getById(it) }
+                val cached = row?.let { runCatching { it.toModel() }.getOrNull() }
+                if (isOutdated(record.updatedAt(), cached?.updatedAt)) return Applied(changed = false)
                 val event = record.decodeAs(PlannerEvent.serializer())
                 db.eventDao().upsertEvents(listOf(event.toEntity()))
                 if (changes.listening) changes.eventsChanged(listOf(cached to event))
+                val overridesUnknown = row == null && !change.inserted && event.isRecurring
+                return Applied(changed = true, overridesUnknownOf = event.id.takeIf { overridesUnknown })
             }
             SupabaseTables.EVENT_OVERRIDES ->
                 db.eventDao().upsertOverrides(listOf(record.decodeAs(EventOverride.serializer()).toEntity()))
             SupabaseTables.TASKS -> {
                 val cached = record.string("id")?.let { db.taskDao().getById(it) }
                 if (isOutdated(record.updatedAt(), cached?.let { runCatching { it.toModel().updatedAt }.getOrNull() })) {
-                    return false
+                    return Applied(changed = false)
                 }
                 db.taskDao().upsert(listOf(record.decodeAs(Task.serializer()).toEntity()))
             }
@@ -97,9 +120,9 @@ class RealtimeChangeApplier @Inject constructor(
                 db.workspaceDao().upsertCategories(listOf(record.decodeAs(Category.serializer()).toEntity()))
             SupabaseTables.BOARDS ->
                 db.workspaceDao().upsertBoards(listOf(record.decodeAs(Board.serializer()).toEntity()))
-            else -> return false
+            else -> return Applied(changed = false)
         }
-        return true
+        return Applied(changed = true)
     }
 
     /**
