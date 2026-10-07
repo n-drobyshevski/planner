@@ -60,6 +60,8 @@ object NewRequestsPlanner {
  * The "Time requests" notification: one for a single new request ("New
  * time request", "Anna asked for Tue 7 Oct, 14:00–15:00"), else one summary
  * ("3 new time requests") listing up to five. Tapping opens the Inbox.
+ * Every post has its own id, so a later batch alerts again and leaves an
+ * earlier one, still unread, showing.
  */
 class NewRequestTexts(private val res: Resources, private val formats: WhenFormats) {
 
@@ -81,7 +83,7 @@ class NewRequestTexts(private val res: Resources, private val formats: WhenForma
         }
         return NotifyContent(
             channel = NotifyChannel.TimeRequests,
-            id = SUMMARY_ID,
+            id = summaryId(requests.first()),
             title = res.getQuantityString(R.plurals.notify_requests_title, requests.size, requests.size),
             text = lines.first(),
             lines = lines.take(MAX_LINES),
@@ -102,9 +104,14 @@ class NewRequestTexts(private val res: Resources, private val formats: WhenForma
     }
 
     internal companion object {
-        /** The summary's id; a single request's is its id's hash. */
-        const val SUMMARY_ID = 0x7e9_0001
         const val MAX_LINES = 5
+
+        /**
+         * A summary's id, from its newest request: that one is new to this
+         * batch alone (seen from then on), so no two summaries share it. A
+         * single request's id is its own id's hash.
+         */
+        fun summaryId(newest: TimeslotRequest): Int = "requests@${newest.id}".hashCode()
     }
 }
 

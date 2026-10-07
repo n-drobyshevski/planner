@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import android.content.Context
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -88,7 +89,17 @@ class NewRequestsTest {
         assertEquals("P1 asked for Wed 7 Oct, 14:00–15:00", content.text)
         assertEquals(5, content.lines.size)
         assertEquals(2, content.more)
-        assertEquals(NewRequestTexts.SUMMARY_ID, content.id)
+        assertEquals(NewRequestTexts.summaryId(requests.first()), content.id)
+    }
+
+    @Test
+    fun `each summary has its own id, so a later batch alerts again and leaves the earlier one showing`() {
+        val t = texts()
+        val first = t.content(listOf(request("b"), request("c")), berlin)
+        val second = t.content(listOf(request("d"), request("e")), berlin)
+
+        assertNotEquals(first.id, second.id)
+        assertNotEquals("b".hashCode(), first.id, "nor a single request's notification")
     }
 
     @Test
@@ -133,6 +144,20 @@ class NewRequestsTest {
 
         notifier.check(listOf(request("r1"), request("r2"), request("r3", created = "2026-10-06T11:00:00Z")))
         assertEquals(1, port.posted.size, "each request notifies once")
+    }
+
+    @Test
+    fun `a second batch while the first is unread posts a notification of its own`() = runTest {
+        prefs.seen = emptySet()
+        val notifier = notifier()
+        val b = request("b", created = "2026-10-06T10:00:00Z")
+        val c = request("c", created = "2026-10-06T10:01:00Z")
+
+        notifier.check(listOf(b, c))
+        notifier.check(listOf(b, c, request("d", created = "2026-10-06T12:00:00Z"), request("e", created = "2026-10-06T12:01:00Z")))
+
+        assertEquals(listOf("2 new time requests", "2 new time requests"), port.posted.map { it.title })
+        assertEquals(2, port.posted.map { it.id }.toSet().size, "the second never silently replaces the first")
     }
 
     @Test
