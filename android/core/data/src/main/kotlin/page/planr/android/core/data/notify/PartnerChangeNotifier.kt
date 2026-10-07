@@ -10,6 +10,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -125,16 +126,25 @@ class PartnerChangeNotifier @Inject constructor(
 
     override val listening: Boolean get() = enabled.value != false && !foreground.isForeground()
 
+    /**
+     * What the cache told, judged one at a time in the order it was told: the
+     * application scope is multi-threaded, so a launch per change could let a
+     * cancellation overtake the move before it.
+     */
+    private val heard = Channel<(PartnerScope) -> List<PartnerChange>>(Channel.UNLIMITED)
+
+    init {
+        scope.launch { for (detect in heard) reportQuietly(detect) }
+    }
+
     override fun eventsChanged(changes: List<Pair<PlannerEvent?, PlannerEvent>>) {
         if (!listening) return
-        scope.launch {
-            reportQuietly { s -> changes.mapNotNull { (before, after) -> PartnerChangeDetector.changed(before, after, s) } }
-        }
+        heard.trySend { s -> changes.mapNotNull { (before, after) -> PartnerChangeDetector.changed(before, after, s) } }
     }
 
     override fun eventGone(before: PlannerEvent?, gone: RowGone) {
         if (!listening) return
-        scope.launch { reportQuietly { s -> listOfNotNull(PartnerChangeDetector.removed(before, gone, s)) } }
+        heard.trySend { s -> listOfNotNull(PartnerChangeDetector.removed(before, gone, s)) }
     }
 
     /** Detects with [detect] (in the viewer's [PartnerScope]) and posts or holds what it finds. */

@@ -96,6 +96,8 @@ object PartnerChangeDetector {
         val start = gone.start ?: before?.start ?: return null
         val end = gone.end ?: before?.end ?: start
         if (before != null && (!reportable(before, scope) || before.status == EventStatus.Cancelled)) return null
+        // Not cached: the broadcast's owner and title still tell the partner's sleep block.
+        if (before == null && gone.ownerId == scope.partnerId && title.trim() in SLEEP_BLOCK_TITLES) return null
         val allDay = before?.allDay ?: false
         if (!inWindow(start, end, allDay, scope)) return null
         return PartnerChange(PartnerChange.Kind.Removed, gone.id, title, start, end, allDay)

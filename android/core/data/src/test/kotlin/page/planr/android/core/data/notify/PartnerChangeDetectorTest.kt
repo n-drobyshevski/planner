@@ -139,6 +139,8 @@ class PartnerChangeDetectorTest {
         assertNull(PartnerChangeDetector.removed(null, gone.copy(start = now + 50.hours, end = now + 51.hours), scope))
         assertNull(PartnerChangeDetector.removed(event(inactive = true), gone, scope), "a sleep block, as cached")
         assertNull(PartnerChangeDetector.removed(event(rrule = "FREQ=WEEKLY"), gone, scope), "a series")
+        assertNull(PartnerChangeDetector.removed(null, gone.copy(title = "Sleep"), scope), "the partner's sleep block, not cached")
+        assertNull(PartnerChangeDetector.removed(null, gone.copy(title = "Сон"), scope))
     }
 
     private companion object {
