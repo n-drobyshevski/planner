@@ -95,4 +95,13 @@ class LaunchRouteTest {
         assertFalse(isEditorRoute(PlanrRoutes.EVENT))
         assertFalse(isEditorRoute(null))
     }
+
+    @Test
+    fun `an editor anywhere on the stack is found, not just on top`() {
+        // An earlier launch pushed the Inbox over the event editor.
+        assertTrue(hasEditor(listOf(null, PlanrRoutes.AGENDA, "event-edit/{id}", PlanrRoutes.INBOX)))
+        assertTrue(hasEditor(listOf(null, PlanrRoutes.AGENDA, PlanrRoutes.TASKS, PlanrRoutes.TASK, PlanrRoutes.EVENT)))
+        assertFalse(hasEditor(listOf(null, PlanrRoutes.AGENDA, PlanrRoutes.INBOX, PlanrRoutes.EVENT)))
+        assertFalse(hasEditor(emptyList()))
+    }
 }
