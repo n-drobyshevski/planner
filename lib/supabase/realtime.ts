@@ -216,8 +216,16 @@ export function rowGoneRemoves(gone: RowGone, memberId: string | null): boolean 
 }
 
 /**
+ * The key on a row_gone DELETE's `old` that says why the row went. A real
+ * Postgres Changes payload never carries it (no table has such a column).
+ */
+export const ROW_GONE_KIND = "_row_gone";
+
+/**
  * The row_gone as the DELETE payload the subscribers already handle (`old`
- * carries just the id, exactly like a Postgres Changes DELETE).
+ * carries the id, exactly like a Postgres Changes DELETE, plus
+ * [ROW_GONE_KIND], so a subscriber can tell a row turned private from one
+ * deleted: see `isHiddenChange`).
  */
 export function rowGoneToChange(gone: RowGone): WorkspaceChange {
   return {
@@ -227,8 +235,18 @@ export function rowGoneToChange(gone: RowGone): WorkspaceChange {
     errors: [],
     eventType: "DELETE",
     new: {},
-    old: { id: gone.id },
+    old: { id: gone.id, [ROW_GONE_KIND]: gone.kind },
   };
+}
+
+/**
+ * Whether `change` is a row that only turned private ("hidden"): the database
+ * removed nothing, so a cache drops just that row, not what a delete cascades
+ * to (a task's subtasks, its calendar blocks).
+ */
+export function isHiddenChange(change: WorkspaceChange): boolean {
+  if (change.eventType !== "DELETE") return false;
+  return (change.old as Record<string, unknown> | undefined)?.[ROW_GONE_KIND] === "hidden";
 }
 
 interface SyncListener {

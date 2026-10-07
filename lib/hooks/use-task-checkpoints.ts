@@ -4,8 +4,9 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchTaskCheckpoints } from "@/lib/supabase/queries";
-import { subscribeWorkspace } from "@/lib/supabase/realtime";
+import { isHiddenChange, subscribeWorkspace } from "@/lib/supabase/realtime";
 import { qk } from "@/lib/supabase/query-keys";
+import { removeCheckpointsOfTask } from "@/lib/tasks/checkpoint-cache";
 import type { TaskCheckpoint } from "@/lib/types";
 
 /**
@@ -30,6 +31,17 @@ export function useTaskCheckpoints(workspaceId: string | undefined): {
       sb,
       workspaceId,
       (change) => {
+        // A task turned private takes its checkpoints out of view with it,
+        // with no checkpoint change of their own: drop them here.
+        if (change.table === "tasks" && isHiddenChange(change)) {
+          const taskId = (change.old as { id?: string }).id;
+          if (taskId) {
+            qc.setQueryData<TaskCheckpoint[]>(qk.taskCheckpoints(workspaceId), (old) =>
+              old ? removeCheckpointsOfTask(old, taskId) : old,
+            );
+          }
+          return;
+        }
         if (change.table !== "task_checkpoints") return;
         void qc.invalidateQueries({ queryKey: qk.taskCheckpoints(workspaceId) });
       },

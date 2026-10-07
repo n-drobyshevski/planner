@@ -46,8 +46,11 @@ data class RowGone(
         Kind.Hidden -> memberId == null || ownerId != memberId
     }
 
-    /** The cache change that drops the row (and what Room cascades from it). */
-    fun toDelete(): RowChange.Delete = RowChange.Delete(JsonObject(mapOf("id" to JsonPrimitive(id))))
+    /**
+     * The cache change that drops the row: with what the database cascades
+     * from a delete, or the row alone when it only turned private.
+     */
+    fun toDelete(): RowChange.Delete = RowChange.Delete(JsonObject(mapOf("id" to JsonPrimitive(id))), gone = this)
 
     companion object {
         /** The broadcast event name the triggers send. */

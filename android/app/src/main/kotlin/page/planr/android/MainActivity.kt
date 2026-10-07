@@ -44,8 +44,9 @@ import page.planr.android.widgets.WidgetLaunch
  * callback goes to [SessionManager], which validates `state` and exchanges
  * the code.
  *
- * Widget taps arrive the same two ways, with [WidgetLaunch.ACTION_OPEN] and a
- * route; it is validated ([LaunchRoute.parse]) and opened once signed in.
+ * Widget and notification taps arrive the same two ways, with
+ * [WidgetLaunch.ACTION_OPEN] and a route; it is validated
+ * ([LaunchRoute.parse]) and opened once signed in.
  *
  * So do .ics files: a VIEW of a `content:` / `file:` URI (opened from Files,
  * Gmail, a download) or a SEND of a calendar. The file is read right away

@@ -12,7 +12,9 @@ import kotlinx.datetime.LocalDate
  * the strings of `PlanrRoutes`), or `day/{yyyy-mm-dd}` for the agenda's day
  * view of that date. The activity reads it with [routeOf] in
  * `onCreate` and `onNewIntent` and navigates there once signed in; with no
- * route (or signed out) it simply opens where it would anyway.
+ * route (or signed out) it simply opens where it would anyway. The app's
+ * notifications open it the same way (reminders, and `inbox` for new time
+ * requests).
  */
 object WidgetLaunch {
     const val ACTION_OPEN = "page.planr.android.widgets.action.OPEN"

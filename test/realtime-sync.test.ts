@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  isHiddenChange,
   parseRowGone,
   rowGoneRemoves,
   rowGoneToChange,
@@ -101,7 +102,27 @@ describe("rowGoneRemoves", () => {
     const change = rowGoneToChange(gone("delete"));
 
     expect(change).toMatchObject({ eventType: "DELETE", table: "tasks", old: { id: "t1" } });
+    expect(isHiddenChange(change)).toBe(false);
     expect(applyTaskChange([task, sub, other], change)).toEqual([other]);
+  });
+
+  it("drops only the task itself when it turned private, keeping its subtasks", () => {
+    const task = { id: "t1", parentId: null } as TaskRow;
+    const sub = { id: "t2", parentId: "t1" } as TaskRow;
+    const other = { id: "t3", parentId: null } as TaskRow;
+
+    const change = rowGoneToChange(gone("hidden"));
+
+    expect(change).toMatchObject({ eventType: "DELETE", table: "tasks", old: { id: "t1" } });
+    expect(isHiddenChange(change)).toBe(true);
+    expect(applyTaskChange([task, sub, other], change)).toEqual([sub, other]);
+  });
+
+  it("never reads a plain Postgres Changes payload as hidden", () => {
+    const plain = { eventType: "DELETE", table: "tasks", old: { id: "t1" }, new: {} } as unknown as WorkspaceChange;
+    const upsert = { eventType: "UPDATE", table: "tasks", old: {}, new: { id: "t1" } } as unknown as WorkspaceChange;
+    expect(isHiddenChange(plain)).toBe(false);
+    expect(isHiddenChange(upsert)).toBe(false);
   });
 });
 

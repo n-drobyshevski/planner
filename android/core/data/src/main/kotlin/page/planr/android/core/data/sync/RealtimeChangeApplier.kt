@@ -26,10 +26,10 @@ sealed interface RowChange {
 
     /**
      * DELETE (or a row turned private, gone for this member): a record that
-     * carries only `id`. Built from a [RowGone] broadcast, since a filtered
-     * Postgres Changes binding never sees a delete: see [RealtimeSync].
+     * carries only `id`. Built from a [RowGone] broadcast ([gone]), since a
+     * filtered Postgres Changes binding never sees a delete: see [RealtimeSync].
      */
-    data class Delete(val oldRecord: JsonObject) : RowChange
+    data class Delete(val oldRecord: JsonObject, val gone: RowGone? = null) : RowChange
 }
 
 /**
@@ -40,10 +40,14 @@ sealed interface RowChange {
  * Changes can arrive out of order (and after the row a write returned was
  * already cached), so an event or task row older than the cached one is
  * skipped: see [isOutdated].
+ *
+ * Each event row stored or deleted is also told to [changes] (with what was
+ * cached before), for the partner-change notifications.
  */
 class RealtimeChangeApplier @Inject constructor(
     private val db: PlanrDatabase,
     private val gate: CacheGate,
+    private val changes: EventChangeObserver = EventChangeObserver.None,
 ) {
 
     /**
@@ -57,7 +61,7 @@ class RealtimeChangeApplier @Inject constructor(
         gate.change(ticket ?: gate.ticket(), *area) {
             applied = when (change) {
                 is RowChange.Upsert -> upsert(table, change.record)
-                is RowChange.Delete -> change.oldRecord.string("id")?.let { delete(table, it) } ?: false
+                is RowChange.Delete -> change.oldRecord.string("id")?.let { delete(table, it, change.gone) } ?: false
             }
         }
         return applied
@@ -74,11 +78,11 @@ class RealtimeChangeApplier @Inject constructor(
     private suspend fun upsert(table: String, record: JsonObject): Boolean {
         when (table) {
             SupabaseTables.EVENTS -> {
-                val cached = record.string("id")?.let { db.eventDao().getById(it) }
-                if (isOutdated(record.updatedAt(), cached?.let { runCatching { it.toModel().updatedAt }.getOrNull() })) {
-                    return false
-                }
-                db.eventDao().upsertEvents(listOf(record.decodeAs(PlannerEvent.serializer()).toEntity()))
+                val cached = record.string("id")?.let { db.eventDao().getById(it) }?.let { runCatching { it.toModel() }.getOrNull() }
+                if (isOutdated(record.updatedAt(), cached?.updatedAt)) return false
+                val event = record.decodeAs(PlannerEvent.serializer())
+                db.eventDao().upsertEvents(listOf(event.toEntity()))
+                if (changes.listening) changes.eventsChanged(listOf(cached to event))
             }
             SupabaseTables.EVENT_OVERRIDES ->
                 db.eventDao().upsertOverrides(listOf(record.decodeAs(EventOverride.serializer()).toEntity()))
@@ -98,17 +102,31 @@ class RealtimeChangeApplier @Inject constructor(
         return true
     }
 
-    private suspend fun delete(table: String, id: String): Boolean {
+    /**
+     * Mirrors what the database cascades from a delete. A row that only
+     * turned private ([gone] of [RowGone.Kind.Hidden]) was not deleted, so
+     * it takes just itself: a task's subtasks and calendar blocks keep their
+     * own visibility (an event's overrides go with it).
+     */
+    private suspend fun delete(table: String, id: String, gone: RowGone?): Boolean {
+        val hidden = gone?.kind == RowGone.Kind.Hidden
         when (table) {
             SupabaseTables.EVENTS -> db.withTransaction {
+                val deleted = gone?.takeIf { it.kind == RowGone.Kind.Delete && changes.listening }
+                val cached = deleted?.let { db.eventDao().getById(id) }?.let { runCatching { it.toModel() }.getOrNull() }
                 db.eventDao().deleteOverridesOf(listOf(id))
                 db.eventDao().deleteEvents(listOf(id))
+                if (deleted != null) changes.eventGone(cached, deleted)
             }
             SupabaseTables.EVENT_OVERRIDES -> db.eventDao().deleteOverride(id)
-            SupabaseTables.TASKS -> db.withTransaction {
-                val ids = db.taskDao().subtreeIds(id)
-                db.eventDao().deleteEventsOfTasks(ids)
-                db.taskDao().delete(ids)
+            SupabaseTables.TASKS -> if (hidden) {
+                db.taskDao().delete(listOf(id))
+            } else {
+                db.withTransaction {
+                    val ids = db.taskDao().subtreeIds(id)
+                    db.eventDao().deleteEventsOfTasks(ids)
+                    db.taskDao().delete(ids)
+                }
             }
             SupabaseTables.CATEGORIES -> db.workspaceDao().deleteCategory(id)
             SupabaseTables.BOARDS -> db.workspaceDao().deleteBoard(id)

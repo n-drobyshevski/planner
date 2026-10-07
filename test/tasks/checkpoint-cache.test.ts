@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { upsertCheckpoint, removeCheckpoint } from "@/lib/tasks/checkpoint-cache";
+import {
+  upsertCheckpoint,
+  removeCheckpoint,
+  removeCheckpointsOfTask,
+} from "@/lib/tasks/checkpoint-cache";
 import type { TaskCheckpoint } from "@/lib/types";
 
 function cp(over: Partial<TaskCheckpoint>): TaskCheckpoint {
@@ -48,5 +52,17 @@ describe("removeCheckpoint", () => {
     const list = [cp({ id: "a" }), cp({ id: "b" })];
     expect(removeCheckpoint(list, "a").map((c) => c.id)).toEqual(["b"]);
     expect(removeCheckpoint(list, "z")).toBe(list);
+  });
+});
+
+describe("removeCheckpointsOfTask", () => {
+  it("drops every checkpoint of the task and is a no-op otherwise", () => {
+    const list = [
+      cp({ id: "a", taskId: "t1" }),
+      cp({ id: "b", taskId: "t2" }),
+      cp({ id: "c", taskId: "t1" }),
+    ];
+    expect(removeCheckpointsOfTask(list, "t1").map((c) => c.id)).toEqual(["b"]);
+    expect(removeCheckpointsOfTask(list, "t9")).toBe(list);
   });
 });

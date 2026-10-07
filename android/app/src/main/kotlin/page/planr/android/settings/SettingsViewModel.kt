@@ -7,10 +7,12 @@ import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -50,6 +52,16 @@ data class ReminderSettings(
     val blocked: Boolean = false,
 )
 
+/** The Notifications section's opt-in notifications: this device's switches, and whether notifications are blocked. */
+data class NotifySettings(
+    /** "New time requests". */
+    val newRequests: Boolean = false,
+    /** "Partner's changes". */
+    val partnerChanges: Boolean = false,
+    /** One is on (or was just refused) but can't show: the calm line, as for reminders. */
+    val blocked: Boolean = false,
+)
+
 /** Why the calm error line shows. */
 enum class SettingsError { SaveFailed }
 
@@ -63,6 +75,7 @@ data class SettingsUiState(
     /** What sleep can be filed under: shared contexts and the viewer's own. */
     val sleepCategories: List<Category> = emptyList(),
     val reminders: ReminderSettings = ReminderSettings(),
+    val notify: NotifySettings = NotifySettings(),
     /** Ask for the notification permission now (Android 13+); the screen reports back. */
     val askNotificationPermission: Boolean = false,
     val error: SettingsError? = null,
@@ -79,10 +92,11 @@ data class SettingsUiState(
  * ([CoroutineStart.UNDISPATCHED]) before the multi-threaded application
  * scope can reorder two quick taps.
  *
- * Reminders are this device's own (no account write). Turning them on
+ * Reminders, new time requests and the partner's changes are this device's
+ * own (no account write), and share one way on ([OptIn]): turning one on
  * where notifications aren't allowed first asks for the permission
- * (Android 13+); denied, or blocked with no way to ask, they go back to
- * Off and a calm line points to the system's notification settings.
+ * (Android 13+); denied, or blocked with no way to ask, it goes back to
+ * off and a calm line points to the system's notification settings.
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -97,28 +111,29 @@ class SettingsViewModel @Inject constructor(
     private val error = MutableStateFlow<SettingsError?>(null)
     private val memberWrites = Mutex()
     private val sleepWrites = Mutex()
-    private val reminderWrites = Mutex()
 
-    /** The lead shown while the permission is asked for or the write is in flight. */
-    private val reminderPending = MutableStateFlow<ReminderLead?>(null)
-    private val notificationsAllowed = MutableStateFlow(data.notificationsAllowed())
-    private val permissionDenied = MutableStateFlow(false)
+    /** Which settings' notifications can show (the app's allowed and that channel on), as last read. */
+    private val canShow = MutableStateFlow(readCanShow())
     private val askPermission = MutableStateFlow(false)
+
+    /** The setting the permission request is for, until it is answered. */
+    private var awaiting: OptIn<*>? = null
+    private val reminders = OptIn(NotifyKind.Reminders, ReminderLead.Off, data::setReminderLead)
+    private val newRequests = OptIn(NotifyKind.NewRequests, false, data::setNewRequestsNotify)
+    private val partnerChanges = OptIn(NotifyKind.PartnerChanges, false, data::setPartnerChangesNotify)
     private val deviceZone = data.deviceZone()
 
     private val sleepState = combine(sleepStored, sleepPending) { stored, pending ->
         if (stored is SleepSettings.Ready) SleepSettings.Ready(pending.applyTo(stored.prefs)) else stored
     }
 
-    private val reminderState = combine(
-        data.reminderLead,
-        reminderPending,
-        notificationsAllowed,
-        permissionDenied,
-    ) { stored, pending, allowed, denied ->
-        val lead = pending ?: stored
-        // Not while the permission is being asked for: the answer decides.
-        ReminderSettings(lead, blocked = !allowed && (denied || (pending == null && lead != ReminderLead.Off)))
+    private val reminderState = reminders.shown(data.reminderLead).map { (lead, blocked) -> ReminderSettings(lead, blocked) }
+
+    private val notifyState = combine(
+        newRequests.shown(data.newRequestsNotify),
+        partnerChanges.shown(data.partnerChangesNotify),
+    ) { (requests, requestsBlocked), (partner, partnerBlocked) ->
+        NotifySettings(requests, partner, blocked = requestsBlocked || partnerBlocked)
     }
 
     val state: StateFlow<SettingsUiState> = combine(
@@ -126,8 +141,8 @@ class SettingsViewModel @Inject constructor(
         data.observeMembers(),
         data.observeCategories(),
         combine(memberPending, sleepState, error, ::Triple),
-        combine(reminderState, askPermission, ::Pair),
-    ) { viewerId, members, categories, (pending, sleep, error), (reminders, ask) ->
+        combine(reminderState, notifyState, askPermission, ::Triple),
+    ) { viewerId, members, categories, (pending, sleep, error), (reminders, notify, ask) ->
         val me = members.firstOrNull { it.id == viewerId }
         SettingsUiState(
             time = me?.let { pending.applyTo(it) }?.let { TimeSettings(it.timezone, it.secondaryTimezone, it.showSuccessToasts) },
@@ -139,6 +154,7 @@ class SettingsViewModel @Inject constructor(
             sleep = sleep,
             sleepCategories = categories.filter { it.ownerId == null || it.ownerId == viewerId }.sortedBy { it.sortOrder },
             reminders = reminders,
+            notify = notify,
             askNotificationPermission = ask,
             error = error,
         )
@@ -170,21 +186,11 @@ class SettingsViewModel @Inject constructor(
 
     fun setAutoAdjust(on: Boolean) = writeSleep(SleepPrefsPatch(autoAdjust = Value(on)))
 
-    fun setReminderLead(lead: ReminderLead) {
-        val allowed = data.notificationsAllowed()
-        notificationsAllowed.value = allowed
-        when {
-            lead == ReminderLead.Off || allowed -> {
-                permissionDenied.value = false
-                writeReminder(lead)
-            }
-            data.canRequestNotifications -> {
-                reminderPending.value = lead
-                askPermission.value = true
-            }
-            else -> denyReminders()
-        }
-    }
+    fun setReminderLead(lead: ReminderLead) = reminders.choose(lead)
+
+    fun setNewRequestsNotify(on: Boolean) = newRequests.choose(on)
+
+    fun setPartnerChangesNotify(on: Boolean) = partnerChanges.choose(on)
 
     /** The screen has launched the permission request. */
     fun onNotificationPermissionAsked() {
@@ -193,23 +199,20 @@ class SettingsViewModel @Inject constructor(
 
     fun onNotificationPermissionResult(granted: Boolean) {
         askPermission.value = false
-        val lead = reminderPending.value ?: return
-        notificationsAllowed.value = data.notificationsAllowed()
-        if (granted) {
-            permissionDenied.value = false
-            writeReminder(lead)
-        } else {
-            reminderPending.value = null
-            denyReminders()
-        }
+        val optIn = awaiting ?: return
+        awaiting = null
+        canShow.value = readCanShow()
+        optIn.answered(granted)
     }
 
     /** Back on the screen (e.g. from the system's settings): notifications may have been allowed or blocked meanwhile. */
     fun refreshNotificationAccess() {
-        val allowed = data.notificationsAllowed()
-        notificationsAllowed.value = allowed
-        if (allowed) permissionDenied.value = false
+        val shows = readCanShow()
+        canShow.value = shows
+        listOf(reminders, newRequests, partnerChanges).forEach { if (shows.getValue(it.kind)) it.denied.value = false }
     }
+
+    private fun readCanShow(): Map<NotifyKind, Boolean> = NotifyKind.entries.associateWith(data::canShow)
 
     /** The sleep section's "Try again" after a failed load. */
     fun retrySleep() {
@@ -268,25 +271,84 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Notifications can't show: back to Off, with the blocked line. */
-    private fun denyReminders() {
-        permissionDenied.value = true
-        writeReminder(ReminderLead.Off)
-    }
+    /**
+     * One setting that shows notifications, [off] or on. A choice shows at
+     * once and is saved with [save], one at a time and in order. Turning it
+     * on where notifications aren't allowed asks for the permission first
+     * (the choice shows meanwhile); refused, or blocked with no way to ask,
+     * it goes back to [off] with the blocked line. Allowed, but with [kind]'s
+     * channel turned off in the system's settings, it stays on with the line.
+     */
+    private inner class OptIn<T : Any>(val kind: NotifyKind, private val off: T, private val save: suspend (T) -> Unit) {
+        /** The choice shown while the permission is asked for or the write is in flight. */
+        private val pending = MutableStateFlow<T?>(null)
 
-    private fun writeReminder(lead: ReminderLead) {
-        reminderPending.value = lead
-        error.value = null
-        writeScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            try {
-                reminderWrites.withLock { data.setReminderLead(lead) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                error.value = SettingsError.SaveFailed
-            } finally {
-                // A later choice may already be showing: only drop this one.
-                reminderPending.update { if (it == lead) null else it }
+        /** Refused: the blocked line shows even though the setting is back to [off]. */
+        val denied = MutableStateFlow(false)
+        private val writes = Mutex()
+
+        /** What the screen shows, from [stored], and whether its blocked line shows. */
+        fun shown(stored: Flow<T>): Flow<Pair<T, Boolean>> =
+            combine(stored, pending, canShow, denied) { saved, choice, shows, refused ->
+                val value = choice ?: saved
+                // Not while the permission is being asked for: the answer decides.
+                value to (shows[kind] != true && (refused || (choice == null && value != off)))
+            }
+
+        fun choose(value: T) {
+            val allowed = data.notificationsAllowed()
+            canShow.value = readCanShow()
+            when {
+                value == off || allowed -> {
+                    denied.value = false
+                    write(value)
+                }
+                data.canRequestNotifications -> {
+                    // Another setting still waiting for an answer shows its stored value again.
+                    awaiting?.takeIf { it !== this }?.forget()
+                    pending.value = value
+                    awaiting = this
+                    askPermission.value = true
+                }
+                else -> deny()
+            }
+        }
+
+        fun answered(granted: Boolean) {
+            val value = pending.value ?: return
+            if (granted) {
+                denied.value = false
+                write(value)
+            } else {
+                pending.value = null
+                deny()
+            }
+        }
+
+        fun forget() {
+            pending.value = null
+        }
+
+        /** Notifications can't show: back to [off], with the blocked line. */
+        private fun deny() {
+            denied.value = true
+            write(off)
+        }
+
+        private fun write(value: T) {
+            pending.value = value
+            error.value = null
+            writeScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                try {
+                    writes.withLock { save(value) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    error.value = SettingsError.SaveFailed
+                } finally {
+                    // A later choice may already be showing: only drop this one.
+                    pending.update { if (it == value) null else it }
+                }
             }
         }
     }
