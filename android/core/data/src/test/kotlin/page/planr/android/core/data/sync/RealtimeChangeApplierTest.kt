@@ -97,6 +97,31 @@ class RealtimeChangeApplierTest {
     }
 
     @Test
+    fun `a deleted task takes its subtasks with it`() = runTest {
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow()))
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow(id = SUBTASK).with("parent_id", Fixtures.TASK_ID)))
+        val gone = RowGone(SupabaseTables.TASKS, Fixtures.TASK_ID, RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.taskDao().getById(SUBTASK))
+    }
+
+    @Test
+    fun `a task turned private leaves alone, keeping its subtasks and calendar blocks`() = runTest {
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow()))
+        applier.apply(SupabaseTables.TASKS, RowChange.Upsert(Fixtures.taskRow(id = SUBTASK).with("parent_id", Fixtures.TASK_ID)))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(taskId = Fixtures.TASK_ID)))
+        val gone = RowGone(SupabaseTables.TASKS, Fixtures.TASK_ID, RowGone.Kind.Hidden, ownerId = PARTNER, actor = PARTNER)
+
+        assertTrue(applier.apply(gone.table, gone.toDelete()))
+
+        assertNull(db.taskDao().getById(Fixtures.TASK_ID))
+        assertEquals(SUBTASK, db.taskDao().getById(SUBTASK)?.id, "the subtask has its own visibility")
+        assertEquals(Fixtures.EVENT_ID, db.eventDao().getById(Fixtures.EVENT_ID)?.id, "so does the calendar block")
+    }
+
+    @Test
     fun `a broadcast for a table the app doesn't cache is a no-op`() = runTest {
         val gone = RowGone(SupabaseTables.SLEEP_LOGS, "s1", RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
 
@@ -116,5 +141,6 @@ class RealtimeChangeApplierTest {
 
     private companion object {
         const val PARTNER = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        const val SUBTASK = "ssssssss-ssss-ssss-ssss-ssssssssssss"
     }
 }

@@ -34,6 +34,9 @@ function rowSpan(row: Record<string, unknown> | undefined): [number, number] | n
  * under the default replica identity, so a moved/removed event could leave a
  * stale neighbour window). For everything we can't bound — UPDATE, DELETE,
  * recurring series, and override changes — fall back to invalidating all windows.
+ * That covers an event turned private (a "hidden" row_gone, also a DELETE) too:
+ * overrides are cached inside each window's data, not on their own, so the
+ * refetch drops the event's overrides along with it.
  */
 function invalidateAffectedWindows(
   qc: QueryClient,

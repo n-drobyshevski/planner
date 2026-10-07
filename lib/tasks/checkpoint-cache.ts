@@ -20,6 +20,19 @@ export function upsertCheckpoint(
   return next;
 }
 
+/**
+ * Drop every checkpoint of `taskId`: the task turned private, and its
+ * checkpoints with it (they inherit its visibility), but nothing was deleted,
+ * so no checkpoint change arrives on its own.
+ */
+export function removeCheckpointsOfTask(
+  list: TaskCheckpoint[],
+  taskId: string,
+): TaskCheckpoint[] {
+  const next = list.filter((c) => c.taskId !== taskId);
+  return next.length === list.length ? list : next;
+}
+
 /** Drop a checkpoint by id. */
 export function removeCheckpoint(
   list: TaskCheckpoint[],

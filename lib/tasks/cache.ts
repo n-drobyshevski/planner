@@ -3,7 +3,7 @@
 // whole set on every change; consumers re-sort via groupByParent, so list
 // order here doesn't matter. Pure — no I/O.
 import { mapTask } from "@/lib/supabase/mappers";
-import type { WorkspaceChange } from "@/lib/supabase/realtime";
+import { isHiddenChange, type WorkspaceChange } from "@/lib/supabase/realtime";
 import type { TaskRow } from "@/lib/types";
 
 /**
@@ -47,12 +47,19 @@ export function removeTasks(list: TaskRow[], ids: Iterable<string>): TaskRow[] {
 /**
  * Apply one realtime row change. INSERT/UPDATE carry the full row in `new`;
  * DELETE carries only the primary key in `old` (default replica identity),
- * which is all `removeTask` needs.
+ * which is all `removeTask` needs. A task that only turned private (the
+ * partner's, `isHiddenChange`) leaves alone: nothing was deleted, and its
+ * subtasks keep their own visibility.
  */
 export function applyTaskChange(list: TaskRow[], change: WorkspaceChange): TaskRow[] {
   if (change.eventType === "DELETE") {
     const id = (change.old as { id?: string }).id;
-    return id ? removeTask(list, id) : list;
+    if (!id) return list;
+    if (isHiddenChange(change)) {
+      const next = list.filter((t) => t.id !== id);
+      return next.length === list.length ? list : next;
+    }
+    return removeTask(list, id);
   }
   const row = change.new as Record<string, unknown>;
   if (typeof row?.id !== "string") return list;
