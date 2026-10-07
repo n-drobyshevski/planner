@@ -273,7 +273,8 @@ private fun NavController.open(target: LaunchRoute) {
         is LaunchRoute.Import -> target.route
         is LaunchRoute.Inbox -> target.route
     }
-    if (hasEditor(currentBackStack.value.map { it.destination.route })) {
+    // Probed per editor route: NavController.currentBackStack is library-restricted.
+    if (hasEditor(EDITOR_ROUTES.filter(::hasOnStack))) {
         if (detail != null) runCatching { navigate(detail) }
         return
     }

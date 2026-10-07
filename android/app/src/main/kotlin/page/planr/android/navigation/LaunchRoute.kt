@@ -83,11 +83,11 @@ sealed interface LaunchRoute {
  * task detail, which edits in place, and the .ics import review. A launch
  * from outside must not pop them.
  */
-internal fun isEditorRoute(route: String?): Boolean =
-    route == AgendaRoutes.EVENT_EDIT ||
-        route == AgendaRoutes.EVENT_NEW ||
-        route == AgendaRoutes.IMPORT ||
-        route == PlanrRoutes.TASK
+internal fun isEditorRoute(route: String?): Boolean = route in EDITOR_ROUTES
+
+/** The routes [isEditorRoute] accepts. */
+internal val EDITOR_ROUTES: List<String> =
+    listOf(AgendaRoutes.EVENT_EDIT, AgendaRoutes.EVENT_NEW, AgendaRoutes.IMPORT, PlanrRoutes.TASK)
 
 /**
  * Whether any of a back stack's [routes] is an editor ([isEditorRoute]),
