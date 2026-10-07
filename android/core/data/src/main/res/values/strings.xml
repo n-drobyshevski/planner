@@ -12,14 +12,10 @@
     <string name="notify_request_named">%1$s asked for %2$s</string>
     <string name="notify_request_anonymous">Someone asked for %1$s</string>
 
-    <!-- "Partner's changes" notifications. %1$s: the partner's name; %2$s: the event's title;
-         %3$s: when ("Thu 8 Oct, 18:00", or just "19:30" for a move within the day). -->
+    <!-- "Partner's changes" notifications: titled with the partner's name (or this when unknown),
+         or with the count of changes. -->
     <string name="notify_partner_someone">Your partner</string>
-    <string name="notify_partner_added">%1$s added %2$s, %3$s</string>
-    <string name="notify_partner_moved">%1$s moved %2$s to %3$s</string>
-    <string name="notify_partner_cancelled">%1$s cancelled %2$s (%3$s)</string>
-    <string name="notify_partner_removed">%1$s removed %2$s (%3$s)</string>
-    <!-- One row of several changes: %1$s the event's title, %2$s when. -->
+    <!-- One change: %1$s the event's title, %2$s when ("Thu 8 Oct, 18:00", or just "19:30" for a move within the day). -->
     <string name="notify_partner_line_added">Added %1$s, %2$s</string>
     <string name="notify_partner_line_moved">Moved %1$s to %2$s</string>
     <string name="notify_partner_line_cancelled">Cancelled %1$s (%2$s)</string>

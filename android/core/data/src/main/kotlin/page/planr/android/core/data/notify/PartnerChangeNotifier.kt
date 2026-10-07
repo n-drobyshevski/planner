@@ -29,10 +29,11 @@ import page.planr.android.core.model.PlannerEvent
 
 /**
  * The "Partner's changes" notification for [PartnerChange]s, in the
- * viewer's zone. One change is one sentence ("Anna moved Dinner to 19:30",
- * "Anna added Gym, Thu 8 Oct, 18:00", "Anna removed Dinner (Tue 7 Oct,
- * 19:00)"); several are "3 changes from Anna" listing up to five. Tapping
- * opens the agenda on the first change's day.
+ * viewer's zone. One change is titled with the partner's name, the change
+ * its text ("Anna" / "Moved Dinner to Thu 8 Oct, 19:30"), so a long one
+ * wraps when expanded instead of being cut off in the one-line title;
+ * several are "3 changes from Anna" listing up to five. Tapping opens the
+ * agenda on the first change's day.
  */
 class PartnerChangeDigest(private val res: Resources, private val formats: WhenFormats) {
 
@@ -44,10 +45,10 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
         require(changes.isNotEmpty())
         val name = partnerName?.trim()?.takeIf { it.isNotEmpty() } ?: res.getString(R.string.notify_partner_someone)
         val target = NotifyTarget.Day(dayOf(changes.first().start, changes.first().allDay, zone))
-        if (changes.size == 1) {
-            return NotifyContent(NotifyChannel.PartnerChanges, id, sentence(name, changes.single(), zone), text = "", target = target)
-        }
         val lines = changes.map { line(it, zone) }
+        if (changes.size == 1) {
+            return NotifyContent(NotifyChannel.PartnerChanges, id, title = name, text = lines.single(), target = target)
+        }
         return NotifyContent(
             channel = NotifyChannel.PartnerChanges,
             id = id,
@@ -59,15 +60,7 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
         )
     }
 
-    /** "Anna moved Dinner to 19:30". */
-    fun sentence(name: String, change: PartnerChange, zone: TimeZone): String = when (change.kind) {
-        PartnerChange.Kind.Added -> res.getString(R.string.notify_partner_added, name, change.title, whenOf(change, zone))
-        PartnerChange.Kind.Moved -> res.getString(R.string.notify_partner_moved, name, change.title, movedTo(change, zone))
-        PartnerChange.Kind.Cancelled -> res.getString(R.string.notify_partner_cancelled, name, change.title, whenOf(change, zone))
-        PartnerChange.Kind.Removed -> res.getString(R.string.notify_partner_removed, name, change.title, whenOf(change, zone))
-    }
-
-    /** "Moved Dinner to 19:30": one row of the expanded list. */
+    /** "Moved Dinner to 19:30": a single change's text, or one row of the expanded list. */
     fun line(change: PartnerChange, zone: TimeZone): String = when (change.kind) {
         PartnerChange.Kind.Added -> res.getString(R.string.notify_partner_line_added, change.title, whenOf(change, zone))
         PartnerChange.Kind.Moved -> res.getString(R.string.notify_partner_line_moved, change.title, movedTo(change, zone))

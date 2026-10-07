@@ -43,33 +43,28 @@ class PartnerChangeNotifierTest {
     // --- PartnerChangeDigest ---
 
     @Test
-    fun `one change is one sentence`() {
+    fun `each change reads as one line`() {
         val d = digest()
+        assertEquals("Moved Dinner to 19:30", d.line(change(Kind.Moved, start = dinner + 30.minutes, previous = dinner), berlin))
         assertEquals(
-            "Anna moved Dinner to 19:30",
-            d.sentence("Anna", change(Kind.Moved, start = dinner + 30.minutes, previous = dinner), berlin),
-        )
-        assertEquals(
-            "Anna moved Dinner to Thu 8 Oct, 19:00",
-            d.sentence("Anna", change(Kind.Moved, start = dinner + 24.hours, previous = dinner), berlin),
+            "Moved Dinner to Thu 8 Oct, 19:00",
+            d.line(change(Kind.Moved, start = dinner + 24.hours, previous = dinner), berlin),
             "to another day: the day too",
         )
-        assertEquals("Anna added Gym, Thu 8 Oct, 18:00", d.sentence("Anna", change(Kind.Added, "Gym", Instant.parse("2026-10-08T16:00:00Z")), berlin))
-        assertEquals("Anna removed Dinner (Wed 7 Oct, 19:00)", d.sentence("Anna", change(Kind.Removed), berlin))
-        assertEquals("Anna cancelled Dinner (Wed 7 Oct, 19:00)", d.sentence("Anna", change(Kind.Cancelled), berlin))
-        assertEquals(
-            "Anna added Trip, Thu 8 Oct",
-            d.sentence("Anna", change(Kind.Added, "Trip", Instant.parse("2026-10-08T00:00:00Z"), allDay = true), berlin),
-        )
+        assertEquals("Added Gym, Thu 8 Oct, 18:00", d.line(change(Kind.Added, "Gym", Instant.parse("2026-10-08T16:00:00Z")), berlin))
+        assertEquals("Removed Dinner (Wed 7 Oct, 19:00)", d.line(change(Kind.Removed), berlin))
+        assertEquals("Cancelled Dinner (Wed 7 Oct, 19:00)", d.line(change(Kind.Cancelled), berlin))
+        assertEquals("Added Trip, Thu 8 Oct", d.line(change(Kind.Added, "Trip", Instant.parse("2026-10-08T00:00:00Z"), allDay = true), berlin))
     }
 
     @Test
-    fun `a single change's notification is its sentence, opening its day`() {
-        val content = digest().content("Anna", listOf(change(Kind.Removed)), berlin, id = 7)
+    fun `a single change is titled with the partner, the change its text, opening its day`() {
+        val content = digest().content("Anna", listOf(change(Kind.Moved, "Dinner with parents", dinner + 24.hours, dinner)), berlin, id = 7)
 
-        assertEquals("Anna removed Dinner (Wed 7 Oct, 19:00)", content.title)
-        assertEquals("", content.text)
-        assertEquals(NotifyTarget.Day(LocalDate(2026, 10, 7)), content.target)
+        assertEquals("Anna", content.title, "short: a title shows on one line")
+        assertEquals("Moved Dinner with parents to Thu 8 Oct, 19:00", content.text, "the text wraps when expanded")
+        assertEquals(emptyList(), content.lines)
+        assertEquals(NotifyTarget.Day(LocalDate(2026, 10, 8)), content.target)
         assertEquals(NotifyChannel.PartnerChanges, content.channel)
         assertEquals(7, content.id)
     }
@@ -91,16 +86,21 @@ class PartnerChangeNotifierTest {
 
     @Test
     fun `an uncached partner is "Your partner"`() {
-        assertEquals("Your partner removed Dinner (Wed 7 Oct, 19:00)", digest().content(null, listOf(change(Kind.Removed)), berlin, 1).title)
+        assertEquals("Your partner", digest().content(null, listOf(change(Kind.Removed)), berlin, 1).title)
+        assertEquals("Your partner", digest().content("  ", listOf(change(Kind.Removed)), berlin, 1).title)
     }
 
     @Test
     @Config(qualifiers = "ru")
     fun `russian reads the same changes without a gendered verb, and counts them`() {
         val d = digest()
-        assertEquals("Анна: событие «Ужин» перенесено на 19:30", d.sentence("Анна", change(Kind.Moved, "Ужин", dinner + 30.minutes, dinner), berlin))
-        assertEquals("Анна: новое событие «Спорт», Wed 7 Oct, 19:00", d.sentence("Анна", change(Kind.Added, "Спорт"), berlin))
-        assertEquals("Анна: событие «Ужин» удалено (Wed 7 Oct, 19:00)", d.sentence("Анна", change(Kind.Removed, "Ужин"), berlin))
+        assertEquals("Перенесено: «Ужин» на 19:30", d.line(change(Kind.Moved, "Ужин", dinner + 30.minutes, dinner), berlin))
+        assertEquals("Добавлено: «Спорт», Wed 7 Oct, 19:00", d.line(change(Kind.Added, "Спорт"), berlin))
+        assertEquals("Удалено: «Ужин» (Wed 7 Oct, 19:00)", d.line(change(Kind.Removed, "Ужин"), berlin))
+        val single = d.content("Анна", listOf(change(Kind.Cancelled, "Ужин")), berlin, 1)
+        assertEquals("Анна", single.title)
+        assertEquals("Отменено: «Ужин» (Wed 7 Oct, 19:00)", single.text)
+        assertEquals("Партнёр", d.content(null, listOf(change(Kind.Removed, "Ужин")), berlin, 1).title)
 
         fun title(n: Int) = d.content("Анна", (1..n).map { change(Kind.Removed, "e$it") }, berlin, 1).title
         assertEquals("Анна: 2 изменения", title(2))
@@ -150,7 +150,7 @@ class PartnerChangeNotifierTest {
 
         notifier.eventsChanged(listOf(null to event("Gym")))
         runCurrent()
-        assertEquals(listOf("Anna added Gym, Wed 7 Oct, 19:00"), port.posted.map { it.title })
+        assertEquals(listOf("Added Gym, Wed 7 Oct, 19:00"), port.posted.map { it.text })
 
         notifier.eventsChanged(listOf(event("Dinner") to event("Dinner", start = dinner + 30.minutes)))
         notifier.eventGone(null, RowGone("events", "Call", RowGone.Kind.Delete, PARTNER, PARTNER, "Call", dinner, dinner + 1.hours))

@@ -23,8 +23,8 @@ sealed interface NotifyTarget {
 }
 
 /**
- * One notification, as built here and posted by the app. [text] may be
- * empty (one sentence says it all, in [title]). [lines] (at most five) are
+ * One notification, as built here and posted by the app. [title] is short
+ * (it shows on one line); [text] wraps when expanded. [lines] (at most five) are
  * shown expanded under [title], with "+[more]" when some were left out;
  * [id] replaces a notification posted under the same id.
  */
