@@ -14,8 +14,14 @@ class PartnerChangeThrottleTest {
     private val t0 = Instant.parse("2026-10-07T09:00:00Z")
     private val at = t0 + 5.hours
 
-    private fun change(kind: Kind, id: String = "e1", start: Instant = at, previous: Instant? = null) =
-        PartnerChange(kind, id, "Dinner", start, start + 1.hours, previousStart = previous)
+    private fun change(
+        kind: Kind,
+        id: String = "e1",
+        start: Instant = at,
+        previous: Instant? = null,
+        end: Instant = start + 1.hours,
+        previousEnd: Instant? = previous?.plus(1.hours),
+    ) = PartnerChange(kind, id, "Dinner", start, end, previousStart = previous, previousEnd = previousEnd)
 
     @Test
     fun `the first changes post at once, later ones wait for the interval, then post together`() {
@@ -81,6 +87,39 @@ class PartnerChangeThrottleTest {
                 change(Kind.Added, "a", start = at + 1.hours),
                 change(Kind.Moved, "c", start = at + 2.hours, previous = at),
                 change(Kind.Cancelled, "e", start = at + 1.hours),
+            ),
+            throttle.due(t0 + 2.minutes),
+        )
+    }
+
+    @Test
+    fun `held moves and resizes merge by what changed overall, start and end`() {
+        val throttle = PartnerChangeThrottle()
+        throttle.offer(listOf(change(Kind.Added, "warmup")), t0)
+
+        throttle.offer(
+            listOf(
+                // Resized twice (20:00, then 21:00 then 22:00 end): still resized, from its first end.
+                change(Kind.Resized, "a", start = at, end = at + 2.hours, previous = at, previousEnd = at + 1.hours),
+                change(Kind.Resized, "a", start = at, end = at + 3.hours, previous = at, previousEnd = at + 2.hours),
+                // Resized and back: nothing to say.
+                change(Kind.Resized, "b", start = at, end = at + 2.hours, previous = at, previousEnd = at + 1.hours),
+                change(Kind.Resized, "b", start = at, end = at + 1.hours, previous = at, previousEnd = at + 2.hours),
+                // Moved, then moved back with a new end: resized.
+                change(Kind.Moved, "c", start = at + 1.hours, previous = at),
+                change(Kind.Moved, "c", start = at, end = at + 3.hours, previous = at + 1.hours),
+                // Resized, then moved: moved.
+                change(Kind.Resized, "d", start = at, end = at + 2.hours, previous = at, previousEnd = at + 1.hours),
+                change(Kind.Moved, "d", start = at + 1.hours, end = at + 3.hours, previous = at, previousEnd = at + 2.hours),
+            ),
+            t0 + 10.seconds,
+        )
+
+        assertEquals(
+            listOf(
+                change(Kind.Resized, "a", start = at, end = at + 3.hours, previous = at, previousEnd = at + 1.hours),
+                change(Kind.Resized, "c", start = at, end = at + 3.hours, previous = at, previousEnd = at + 1.hours),
+                change(Kind.Moved, "d", start = at + 1.hours, end = at + 3.hours, previous = at, previousEnd = at + 1.hours),
             ),
             throttle.due(t0 + 2.minutes),
         )

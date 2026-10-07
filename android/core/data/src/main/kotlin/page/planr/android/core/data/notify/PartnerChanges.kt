@@ -18,10 +18,22 @@ data class PartnerChange(
     val start: Instant,
     val end: Instant,
     val allDay: Boolean = false,
-    /** Where a [Kind.Moved] event started before. */
+    /** Where a [Kind.Moved] or [Kind.Resized] event started before. */
     val previousStart: Instant? = null,
+    /** Where a [Kind.Moved] or [Kind.Resized] event ended before. */
+    val previousEnd: Instant? = null,
 ) {
-    enum class Kind { Added, Moved, Cancelled, Removed }
+    enum class Kind {
+        Added,
+
+        /** Its start changed (its end may have too). */
+        Moved,
+
+        /** Only its end changed: longer or shorter, starting as before. */
+        Resized,
+        Cancelled,
+        Removed,
+    }
 }
 
 /** Who and when a change is judged for. */
@@ -46,7 +58,8 @@ data class PartnerScope(
  * partner's (`updated_by`), made since the setting was turned on, that
  * starts (before or after the change) within [WINDOW] from now. All-day
  * events count while their day is still ahead or today. Added = a row not
- * cached before; Moved = its start or end changed; Cancelled = its status
+ * cached before; Moved = its start changed; Resized = only its end did;
+ * Cancelled = its status
  * turned cancelled. Removed comes only from a `row_gone` delete whose actor
  * is the partner: a refresh can't tell who removed a row.
  *
@@ -73,10 +86,12 @@ object PartnerChangeDetector {
             before == null -> if (after.status == EventStatus.Cancelled) return null else PartnerChange.Kind.Added
             before.status != EventStatus.Cancelled && after.status == EventStatus.Cancelled -> PartnerChange.Kind.Cancelled
             after.status == EventStatus.Cancelled -> return null
-            before.start != after.start || before.end != after.end -> PartnerChange.Kind.Moved
+            before.start != after.start -> PartnerChange.Kind.Moved
+            before.end != after.end -> PartnerChange.Kind.Resized
             else -> return null
         }
         if (!inWindow(after, scope) && (before == null || !inWindow(before, scope))) return null
+        val retimed = kind == PartnerChange.Kind.Moved || kind == PartnerChange.Kind.Resized
         return PartnerChange(
             kind = kind,
             eventId = after.id,
@@ -84,7 +99,8 @@ object PartnerChangeDetector {
             start = after.start,
             end = after.end,
             allDay = after.allDay,
-            previousStart = before?.start?.takeIf { kind == PartnerChange.Kind.Moved },
+            previousStart = before?.start?.takeIf { retimed },
+            previousEnd = before?.end?.takeIf { retimed },
         )
     }
 
@@ -180,15 +196,25 @@ class PartnerChangeThrottle(private val interval: Duration = INTERVAL) {
             // Added, then changed again: still new to the reader, unless it went again.
             prev.kind == PartnerChange.Kind.Added -> when (change.kind) {
                 PartnerChange.Kind.Removed, PartnerChange.Kind.Cancelled -> null
-                else -> change.copy(kind = PartnerChange.Kind.Added, previousStart = null)
+                else -> change.copy(kind = PartnerChange.Kind.Added, previousStart = null, previousEnd = null)
             }
-            // Moved twice: from where it was first; back where it was: nothing to say.
-            prev.kind == PartnerChange.Kind.Moved && change.kind == PartnerChange.Kind.Moved ->
-                change.copy(previousStart = prev.previousStart).takeIf { it.previousStart != it.start }
+            // Moved or resized twice: from where it was first, by what changed overall;
+            // back where it was (start and end): nothing to say.
+            prev.retimed && change.retimed -> retimed(change.copy(previousStart = prev.previousStart, previousEnd = prev.previousEnd))
             else -> change
         }
         held.remove(change.eventId)
         if (merged != null) held[change.eventId] = merged
+    }
+
+    private val PartnerChange.retimed: Boolean
+        get() = kind == PartnerChange.Kind.Moved || kind == PartnerChange.Kind.Resized
+
+    /** [change] judged against where it was first: moved, resized, or (null) back as it was. */
+    private fun retimed(change: PartnerChange): PartnerChange? = when {
+        change.previousStart != change.start -> change.copy(kind = PartnerChange.Kind.Moved)
+        change.previousEnd != null && change.previousEnd != change.end -> change.copy(kind = PartnerChange.Kind.Resized)
+        else -> null
     }
 
     companion object {

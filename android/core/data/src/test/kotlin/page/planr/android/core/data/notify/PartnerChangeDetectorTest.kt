@@ -57,14 +57,30 @@ class PartnerChangeDetectorTest {
     }
 
     @Test
-    fun `a new start or end is a move, from where it was`() {
+    fun `a new start is a move, from where it was`() {
         val before = event()
         val after = event(start = now + 12.hours)
         val change = PartnerChangeDetector.changed(before, after, scope)
         assertEquals(PartnerChange.Kind.Moved, change?.kind)
         assertEquals(now + 10.hours, change?.previousStart)
+        assertEquals(now + 11.hours, change?.previousEnd)
+    }
 
-        assertEquals(PartnerChange.Kind.Moved, PartnerChangeDetector.changed(before, event(end = now + 13.hours), scope)?.kind)
+    @Test
+    fun `a new end alone is a resize, not a move to where it already started`() {
+        val change = PartnerChangeDetector.changed(event(), event(end = now + 13.hours), scope)
+        assertEquals(
+            PartnerChange(
+                PartnerChange.Kind.Resized,
+                "e1",
+                "Dinner",
+                start = now + 10.hours,
+                end = now + 13.hours,
+                previousStart = now + 10.hours,
+                previousEnd = now + 11.hours,
+            ),
+            change,
+        )
     }
 
     @Test

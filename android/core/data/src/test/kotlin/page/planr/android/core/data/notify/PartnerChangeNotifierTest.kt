@@ -58,6 +58,23 @@ class PartnerChangeNotifierTest {
     }
 
     @Test
+    fun `a new end alone reads as the new span, not a move`() {
+        val d = digest()
+        fun resized(start: Instant, end: Instant, allDay: Boolean = false) =
+            PartnerChange(Kind.Resized, "e", "Dinner", start, end, allDay, previousStart = start, previousEnd = start + 1.hours)
+
+        assertEquals("Changed Dinner to 19:00–21:00", d.line(resized(dinner, dinner + 2.hours), berlin))
+        assertEquals(
+            "Changed Dinner to Wed 7 Oct, 19:00 – Thu 8 Oct, 01:00",
+            d.line(resized(dinner, dinner + 6.hours), berlin),
+            "past midnight: both days",
+        )
+        val trip = Instant.parse("2026-10-08T00:00:00Z")
+        assertEquals("Changed Dinner to Thu 8 Oct – Sat 10 Oct", d.line(resized(trip, trip + 72.hours, allDay = true), berlin))
+        assertEquals("Changed Dinner to Thu 8 Oct", d.line(resized(trip, trip + 24.hours, allDay = true), berlin), "shortened to one day")
+    }
+
+    @Test
     fun `a single change is titled with the partner, the change its text, opening its day`() {
         val content = digest().content("Anna", listOf(change(Kind.Moved, "Dinner with parents", dinner + 24.hours, dinner)), berlin, id = 7)
 
@@ -97,6 +114,10 @@ class PartnerChangeNotifierTest {
         assertEquals("Перенесено: «Ужин» на 19:30", d.line(change(Kind.Moved, "Ужин", dinner + 30.minutes, dinner), berlin))
         assertEquals("Добавлено: «Спорт», Wed 7 Oct, 19:00", d.line(change(Kind.Added, "Спорт"), berlin))
         assertEquals("Удалено: «Ужин» (Wed 7 Oct, 19:00)", d.line(change(Kind.Removed, "Ужин"), berlin))
+        assertEquals(
+            "Новое время: «Ужин», 19:00–21:00",
+            d.line(PartnerChange(Kind.Resized, "e", "Ужин", dinner, dinner + 2.hours, previousStart = dinner, previousEnd = dinner + 1.hours), berlin),
+        )
         val single = d.content("Анна", listOf(change(Kind.Cancelled, "Ужин")), berlin, 1)
         assertEquals("Анна", single.title)
         assertEquals("Отменено: «Ужин» (Wed 7 Oct, 19:00)", single.text)

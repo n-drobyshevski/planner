@@ -8,6 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -64,6 +65,7 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
     fun line(change: PartnerChange, zone: TimeZone): String = when (change.kind) {
         PartnerChange.Kind.Added -> res.getString(R.string.notify_partner_line_added, change.title, whenOf(change, zone))
         PartnerChange.Kind.Moved -> res.getString(R.string.notify_partner_line_moved, change.title, movedTo(change, zone))
+        PartnerChange.Kind.Resized -> res.getString(R.string.notify_partner_line_resized, change.title, span(change, zone))
         PartnerChange.Kind.Cancelled -> res.getString(R.string.notify_partner_line_cancelled, change.title, whenOf(change, zone))
         PartnerChange.Kind.Removed -> res.getString(R.string.notify_partner_line_removed, change.title, whenOf(change, zone))
     }
@@ -78,6 +80,23 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
         if (change.allDay || previous == null) return whenOf(change, zone)
         val to = change.start.toLocalDateTime(zone)
         return if (previous.toLocalDateTime(zone).date == to.date) formats.time(to.time) else formats.moment(change.start, zone)
+    }
+
+    /**
+     * A resized event's new span: "19:00–21:00" within a day (it starts as
+     * before), else both ends' day and time; an all-day one's days
+     * ("Thu 8 Oct – Sat 10 Oct", or the one day).
+     */
+    private fun span(change: PartnerChange, zone: TimeZone): String {
+        if (change.allDay) {
+            val first = dayOf(change.start, allDay = true, zone)
+            // `end` is exclusive (the next UTC midnight).
+            val last = dayOf(if (change.end > change.start) change.end - 1.milliseconds else change.start, allDay = true, zone)
+            return if (first == last) formats.day(first) else "${formats.day(first)} – ${formats.day(last)}"
+        }
+        val from = change.start.toLocalDateTime(zone)
+        val to = change.end.toLocalDateTime(zone)
+        return if (from.date == to.date) "${formats.time(from.time)}–${formats.time(to.time)}" else formats.slot(change.start, change.end, zone)
     }
 
     /** The day an event is on: an all-day one's is its UTC date (they are anchored to UTC midnight). */
