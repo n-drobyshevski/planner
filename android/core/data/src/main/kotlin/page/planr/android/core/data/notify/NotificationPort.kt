@@ -3,6 +3,11 @@ package page.planr.android.core.data.notify
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
 
 /** The opt-in notifications' channels. */
@@ -55,10 +60,20 @@ interface NotificationPort {
 /** Whether the app is on screen: nothing is notified then (the badge and the live agenda show it). */
 fun interface AppForeground {
     fun isForeground(): Boolean
+
+    /**
+     * Emits each time the app comes to the foreground, even for a visit no
+     * change or check falls in (by default never: a fixed answer has no entries).
+     */
+    fun entries(): Flow<Unit> = emptyFlow()
 }
 
 /** The process lifecycle: in the foreground from STARTED on, as [page.planr.android.core.data.sync.SyncWorker] reads it. */
 class ProcessAppForeground @Inject constructor() : AppForeground {
-    override fun isForeground(): Boolean =
-        ProcessLifecycleOwner.get().lifecycle.currentStateFlow.value.isAtLeast(Lifecycle.State.STARTED)
+    private val state get() = ProcessLifecycleOwner.get().lifecycle.currentStateFlow
+
+    override fun isForeground(): Boolean = state.value.isAtLeast(Lifecycle.State.STARTED)
+
+    override fun entries(): Flow<Unit> =
+        state.map { it.isAtLeast(Lifecycle.State.STARTED) }.distinctUntilChanged().filter { it }.map { }
 }

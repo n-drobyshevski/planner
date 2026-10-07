@@ -117,7 +117,7 @@ class PartnerChangeDigest(private val res: Resources, private val formats: WhenF
  * changes; [PartnerChangeThrottle] posts at most one notification every two
  * minutes, holding the rest. Changes are dropped while the app is in the
  * foreground (they show live on screen), and so is what was held when it
- * comes back. What is held lives in memory only: should the process end
+ * comes back ([AppForeground.entries]). What is held lives in memory only: should the process end
  * before it is posted, it is lost, never posted twice.
  */
 @Singleton
@@ -147,6 +147,8 @@ class PartnerChangeNotifier @Inject constructor(
 
     init {
         scope.launch { for (detect in heard) reportQuietly(detect) }
+        // What was held is on screen now, even when no change or flush falls in the visit to drop it.
+        scope.launch { foreground.entries().collect { mutex.withLock { throttle.clear() } } }
     }
 
     override fun eventsChanged(changes: List<Pair<PlannerEvent?, PlannerEvent>>) {

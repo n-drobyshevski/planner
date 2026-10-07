@@ -10,8 +10,11 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -135,6 +138,7 @@ class PartnerChangeNotifierTest {
     private val prefs = FakeNotifyPrefs(partnerChanges = true).also { it.since = Instant.parse("2026-10-01T00:00:00Z") }
     private val port = FakeNotificationPort()
     private var foreground = false
+    private val entered = MutableSharedFlow<Unit>()
 
     private fun TestScope.notifier(): PartnerChangeNotifier {
         val clock = object : Clock {
@@ -145,7 +149,11 @@ class PartnerChangeNotifierTest {
             prefs = prefs,
             audience = { NotifyAudience { NotifyViewer(ME, berlin, null, PARTNER, "Anna") } },
             port = port,
-            foreground = { foreground },
+            foreground = object : AppForeground {
+                override fun isForeground(): Boolean = foreground
+
+                override fun entries(): Flow<Unit> = entered
+            },
             digest = digest(),
             clock = clock,
             scope = backgroundScope,
@@ -207,6 +215,34 @@ class PartnerChangeNotifierTest {
         advanceTimeBy(2.minutes)
         runCurrent()
         assertEquals(1, port.posted.size, "on screen already")
+    }
+
+    @Test
+    fun `a visit to the foreground drops what was held, though no change fell in it`() = runTest {
+        val notifier = notifier()
+        notifier.eventsChanged(listOf(null to event("Gym")))
+        runCurrent()
+        assertEquals(1, port.posted.size)
+
+        advanceTimeBy(30.seconds)
+        notifier.eventsChanged(listOf(null to event("Run")))
+        runCurrent()
+
+        // Opened at +40s (Run shows live), left at +80s; the flush falls due at +2m.
+        advanceTimeBy(10.seconds)
+        foreground = true
+        entered.emit(Unit)
+        advanceTimeBy(40.seconds)
+        foreground = false
+        advanceTimeBy(2.minutes)
+        runCurrent()
+
+        assertEquals(1, port.posted.size, "Run was seen on screen")
+
+        // Later changes post as before.
+        notifier.eventsChanged(listOf(null to event("Swim")))
+        runCurrent()
+        assertEquals(listOf("Added Swim, Wed 7 Oct, 19:00"), port.posted.drop(1).map { it.text })
     }
 
     @Test
