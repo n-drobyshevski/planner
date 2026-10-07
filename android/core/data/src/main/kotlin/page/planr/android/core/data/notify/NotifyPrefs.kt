@@ -33,7 +33,11 @@ interface NotifyPrefs {
     /** "Partner's changes": a digest of what the partner changed in the next two days. */
     val partnerChanges: Flow<Boolean>
 
-    /** Turning it on forgets the seen requests, so the first check marks the backlog seen without notifying. */
+    /**
+     * Turning it on forgets the seen requests, so the first check marks the
+     * backlog seen without notifying, and starts the requests it reports from
+     * now on ([newRequestsSince]).
+     */
     suspend fun setNewRequests(on: Boolean)
 
     /** Turning it on starts the changes it reports from now on ([partnerChangesSince]). */
@@ -43,6 +47,13 @@ interface NotifyPrefs {
     suspend fun seenRequests(): Set<String>?
 
     suspend fun setSeenRequests(ids: Set<String>)
+
+    /**
+     * When "New time requests" was turned on; null while off. Requests made
+     * before it are never notified, even when the first check primed from a
+     * list fetched earlier (offline when it was turned on).
+     */
+    suspend fun newRequestsSince(): Instant?
 
     /** When "Partner's changes" was turned on; null while off. Older edits are never reported. */
     suspend fun partnerChangesSince(): Instant?
@@ -55,6 +66,7 @@ internal object NotifyKeys {
     val NEW_REQUESTS = booleanPreferencesKey("new_requests")
     val PARTNER_CHANGES = booleanPreferencesKey("partner_changes")
     val SEEN_REQUESTS = stringSetPreferencesKey("seen_requests")
+    val REQUESTS_SINCE = longPreferencesKey("new_requests_since")
     val PARTNER_SINCE = longPreferencesKey("partner_changes_since")
 }
 
@@ -72,8 +84,14 @@ class DataStoreNotifyPrefs @Inject constructor(
 
     override suspend fun setNewRequests(on: Boolean) {
         dataStore.edit { prefs ->
-            if (on && prefs[NotifyKeys.NEW_REQUESTS] != true) prefs.remove(NotifyKeys.SEEN_REQUESTS)
-            if (!on) prefs.remove(NotifyKeys.SEEN_REQUESTS)
+            if (on && prefs[NotifyKeys.NEW_REQUESTS] != true) {
+                prefs.remove(NotifyKeys.SEEN_REQUESTS)
+                prefs[NotifyKeys.REQUESTS_SINCE] = clock.now().toEpochMilliseconds()
+            }
+            if (!on) {
+                prefs.remove(NotifyKeys.SEEN_REQUESTS)
+                prefs.remove(NotifyKeys.REQUESTS_SINCE)
+            }
             prefs[NotifyKeys.NEW_REQUESTS] = on
         }
     }
@@ -94,6 +112,12 @@ class DataStoreNotifyPrefs @Inject constructor(
         dataStore.edit { it[NotifyKeys.SEEN_REQUESTS] = ids }
     }
 
+    override suspend fun newRequestsSince(): Instant? {
+        val prefs = dataStore.data.first()
+        if (prefs[NotifyKeys.NEW_REQUESTS] != true) return null
+        return prefs[NotifyKeys.REQUESTS_SINCE]?.let(Instant::fromEpochMilliseconds)
+    }
+
     override suspend fun partnerChangesSince(): Instant? {
         val prefs = dataStore.data.first()
         if (prefs[NotifyKeys.PARTNER_CHANGES] != true) return null
@@ -103,7 +127,8 @@ class DataStoreNotifyPrefs @Inject constructor(
     override suspend fun clearMember() {
         dataStore.edit { prefs ->
             prefs.remove(NotifyKeys.SEEN_REQUESTS)
-            // The next member's changes start from their own sign-in, not the backlog the first sync brings.
+            // The next member's requests and changes start from their own sign-in, not the backlog the first sync brings.
+            if (prefs[NotifyKeys.NEW_REQUESTS] == true) prefs[NotifyKeys.REQUESTS_SINCE] = clock.now().toEpochMilliseconds()
             if (prefs[NotifyKeys.PARTNER_CHANGES] == true) prefs[NotifyKeys.PARTNER_SINCE] = clock.now().toEpochMilliseconds()
         }
     }

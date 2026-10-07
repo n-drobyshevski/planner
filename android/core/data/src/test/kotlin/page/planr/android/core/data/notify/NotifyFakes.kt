@@ -25,12 +25,15 @@ class FakeNotifyPrefs(newRequests: Boolean = false, partnerChanges: Boolean = fa
     override val partnerChanges = MutableStateFlow(partnerChanges)
     var seen: Set<String>? = null
     var since: Instant? = null
+    var requestsSince: Instant? = null
     var cleared = 0
 
     override suspend fun setNewRequests(on: Boolean) {
         if (on != newRequests.value) seen = null
         newRequests.value = on
     }
+
+    override suspend fun newRequestsSince(): Instant? = requestsSince.takeIf { newRequests.value }
 
     override suspend fun setPartnerChanges(on: Boolean) {
         partnerChanges.value = on

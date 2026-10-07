@@ -40,21 +40,27 @@ class DataStoreNotifyPrefsTest {
         assertFalse(prefs.partnerChanges.first())
         assertNull(prefs.seenRequests())
         assertNull(prefs.partnerChangesSince())
+        assertNull(prefs.newRequestsSince())
     }
 
     @Test
     fun `turning new requests on again starts unprimed, so the backlog is marked seen without notifying`() = runTest {
         val prefs = prefs()
         prefs.setNewRequests(true)
+        val on = now
         prefs.setSeenRequests(setOf("r1"))
+        now = Instant.parse("2026-10-07T10:00:00Z")
         prefs.setNewRequests(true) // already on: kept
         assertEquals(setOf("r1"), prefs.seenRequests())
+        assertEquals(on, prefs.newRequestsSince(), "turning it on again keeps the start")
 
         prefs.setNewRequests(false)
         assertNull(prefs.seenRequests())
+        assertNull(prefs.newRequestsSince())
         prefs.setNewRequests(true)
         assertTrue(prefs.newRequests.first())
         assertNull(prefs.seenRequests())
+        assertEquals(now, prefs.newRequestsSince())
     }
 
     @Test
@@ -84,5 +90,6 @@ class DataStoreNotifyPrefsTest {
         assertTrue(prefs.partnerChanges.first())
         assertNull(prefs.seenRequests())
         assertEquals(now, prefs.partnerChangesSince(), "the next member's changes start now")
+        assertEquals(now, prefs.newRequestsSince(), "and their requests")
     }
 }

@@ -6,6 +6,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
@@ -38,10 +39,15 @@ object NewRequestsPlanner {
         val newSeen: Set<String>,
     )
 
-    fun plan(pending: List<TimeslotRequest>, seen: Set<String>): Plan {
+    /**
+     * [since]: when notifying was turned on (null: unknown). A request made
+     * before it is never new, even when it is missing from [seen] because
+     * the first check primed from a list fetched before it arrived.
+     */
+    fun plan(pending: List<TimeslotRequest>, seen: Set<String>, since: Instant? = null): Plan {
         val considered = considered(pending)
         return Plan(
-            toNotify = considered.filter { it.id !in seen },
+            toNotify = considered.filter { it.id !in seen && (since == null || it.createdAt > since) },
             newSeen = considered.mapTo(LinkedHashSet()) { it.id },
         )
     }
@@ -124,7 +130,8 @@ class NewRequestTexts(private val res: Resources, private val formats: WhenForma
  * in the background ([checkInBackground]). Every request seen is
  * remembered ([NotifyPrefs.seenRequests]), so each notifies once, and the
  * first check after turning it on marks the backlog seen without
- * notifying. Nothing is notified while the app is in the foreground (the
+ * notifying; a request made before it was turned on never notifies, even
+ * when that first check saw an older cached list ([NotifyPrefs.newRequestsSince]). Nothing is notified while the app is in the foreground (the
  * account button's badge shows it), though what arrived is marked seen.
  */
 @Singleton
@@ -170,7 +177,7 @@ class NewRequestNotifier @Inject constructor(
             prefs.setSeenRequests(NewRequestsPlanner.prime(pending))
             return@withLock
         }
-        val plan = NewRequestsPlanner.plan(pending, seen)
+        val plan = NewRequestsPlanner.plan(pending, seen, prefs.newRequestsSince())
         if (plan.newSeen != seen) prefs.setSeenRequests(plan.newSeen)
         if (plan.toNotify.isEmpty() || foreground.isForeground() || !port.canPost(NotifyChannel.TimeRequests)) return@withLock
         val viewer = audience.viewer() ?: return@withLock

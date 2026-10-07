@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -38,6 +39,17 @@ class NewRequestsTest {
 
         assertEquals(listOf("r-newer", "r-new"), plan.toNotify.map { it.id })
         assertEquals(setOf("r-newer", "r-new", "r-old"), plan.newSeen, "r-gone is no longer pending: pruned")
+    }
+
+    @Test
+    fun `requests made before notifying was turned on are never new`() {
+        val before = request("r-before", created = "2026-10-06T09:00:00Z")
+        val after = request("r-after", created = "2026-10-06T11:00:00Z")
+
+        val plan = NewRequestsPlanner.plan(listOf(before, after), seen = emptySet(), since = Instant.parse("2026-10-06T10:00:00Z"))
+
+        assertEquals(listOf("r-after"), plan.toNotify.map { it.id })
+        assertEquals(setOf("r-before", "r-after"), plan.newSeen)
     }
 
     @Test
@@ -144,6 +156,30 @@ class NewRequestsTest {
 
         notifier.check(listOf(request("r1"), request("r2"), request("r3", created = "2026-10-06T11:00:00Z")))
         assertEquals(1, port.posted.size, "each request notifies once")
+    }
+
+    @Test
+    fun `turned on offline, a stale cached list primes, yet the requests it missed still don't notify`() = runTest {
+        // On at 10:00; the Inbox's list was fetched an hour before, with only A.
+        prefs.requestsSince = Instant.parse("2026-10-06T10:00:00Z")
+        val a = request("a", created = "2026-10-06T08:00:00Z")
+        val notifier = notifier()
+
+        notifier.check(listOf(a))
+        assertEquals(setOf("a"), prefs.seen)
+
+        // The next sync brings B and C, made before it was turned on, and D, after.
+        notifier.check(
+            listOf(
+                a,
+                request("b", created = "2026-10-06T09:00:00Z"),
+                request("c", created = "2026-10-06T09:30:00Z"),
+                request("d", name = "Boris", created = "2026-10-06T10:30:00Z"),
+            ),
+        )
+
+        assertEquals(listOf("Boris asked for Wed 7 Oct, 14:00–15:00"), port.posted.map { it.text })
+        assertEquals(setOf("a", "b", "c", "d"), prefs.seen)
     }
 
     @Test
