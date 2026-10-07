@@ -66,7 +66,6 @@ class AndroidNotificationPort @Inject constructor(
         val builder = NotificationCompat.Builder(context, content.channel.id)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(content.title)
-            .setContentText(content.text)
             .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setPriority(
                 if (content.channel == NotifyChannel.PartnerChanges) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_DEFAULT,
@@ -78,10 +77,11 @@ class AndroidNotificationPort @Inject constructor(
             val style = NotificationCompat.InboxStyle().setBigContentTitle(content.title)
             content.lines.forEach(style::addLine)
             if (content.more > 0) style.setSummaryText(context.getString(R.string.notify_more, content.more))
-            builder.setStyle(style)
-        } else {
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(content.text))
+            builder.setContentText(content.text).setStyle(style)
+        } else if (content.text.isNotEmpty()) {
+            builder.setContentText(content.text).setStyle(NotificationCompat.BigTextStyle().bigText(content.text))
         }
+        // Else a one-sentence notification (one partner change): the title says it all.
         manager.notify(content.id, builder.build())
     }
 

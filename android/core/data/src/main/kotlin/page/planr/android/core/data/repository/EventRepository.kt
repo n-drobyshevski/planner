@@ -14,6 +14,7 @@ import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.local.PlanrDatabase
 import page.planr.android.core.data.local.RefreshCoalescer
 import page.planr.android.core.data.local.dao.sameRows
+import page.planr.android.core.data.local.entity.EventEntity
 import page.planr.android.core.data.local.entity.toEntity
 import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.model.DeletedEventSnapshot
@@ -22,6 +23,7 @@ import page.planr.android.core.data.model.OverridePrior
 import page.planr.android.core.data.remote.EventMutations
 import page.planr.android.core.data.remote.StaleWriteException
 import page.planr.android.core.data.remote.WorkspaceQueries
+import page.planr.android.core.data.sync.EventChangeObserver
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 import page.planr.android.core.model.EventOverride
 import page.planr.android.core.model.PlannerEvent
@@ -54,6 +56,7 @@ class EventRepository @Inject constructor(
     private val gate: CacheGate,
     private val widgets: WidgetRefreshDispatcher,
     private val coalescer: RefreshCoalescer = RefreshCoalescer(gate, Clock.System),
+    private val changes: EventChangeObserver = EventChangeObserver.None,
 ) {
     private val dao get() = db.eventDao()
 
@@ -120,7 +123,8 @@ class EventRepository @Inject constructor(
      * Returns whether the cache changed: a snapshot identical to what Room
      * holds for the window is not written at all (false), nor is a skipped
      * or dropped one. A change redraws the widgets, whoever asked for the
-     * refresh: the widgets only read Room when asked to.
+     * refresh: the widgets only read Room when asked to. The rows it
+     * replaced are told to [changes] too (the partner-change notifications).
      */
     suspend fun refreshWindow(window: TimeWindow, force: Boolean = false): Boolean {
         val ws = session.requireSession().workspaceId
@@ -128,13 +132,16 @@ class EventRepository @Inject constructor(
         val end = window.end.toEpochMilliseconds()
         return coalescer.refresh(WindowKey(ws, start, end), force) {
             var changed = false
+            var replaced: List<Pair<PlannerEvent?, PlannerEvent>> = emptyList()
             gate.refresh(CacheArea.Events, fetch = { queries.fetchWindow(ws, window) }) { data ->
                 changed = db.withTransaction {
                     val events = data.events.map { it.toEntity() }
                     val overrides = data.overrides.map { it.toEntity() }
-                    val same = sameRows(dao.eventsInWindow(ws, start, end), events) &&
+                    val cachedEvents = dao.eventsInWindow(ws, start, end)
+                    val same = sameRows(cachedEvents, events) &&
                         sameRows(dao.overridesInWindow(ws, start, end), overrides)
                     if (same) return@withTransaction false
+                    if (changes.listening) replaced = replacedRows(cachedEvents, data.events)
                     val stale = dao.idsInWindow(ws, start, end)
                     val touched = (stale + data.events.map { it.id }).distinct()
                     touched.chunked(SQL_CHUNK).forEach { dao.deleteOverridesOf(it) }
@@ -144,8 +151,27 @@ class EventRepository @Inject constructor(
                     true
                 }
             }
-            if (changed) widgets.requestRefresh()
+            if (changed) {
+                if (replaced.isNotEmpty()) changes.eventsChanged(replaced)
+                widgets.requestRefresh()
+            }
             changed
+        }
+    }
+
+    /**
+     * The fetched rows that differ from what was cached, each with its cached
+     * row (looked up by id when it lay outside the window: an event moved
+     * in). None on a window cached empty: a first load, not a change.
+     * Removals aren't reported: a refresh can't tell who removed a row.
+     */
+    private suspend fun replacedRows(cached: List<EventEntity>, fetched: List<PlannerEvent>): List<Pair<PlannerEvent?, PlannerEvent>> {
+        if (cached.isEmpty()) return emptyList()
+        val before = cached.associateBy { it.id }
+        return fetched.mapNotNull { event ->
+            val row = before[event.id] ?: dao.getById(event.id)
+            val old = row?.let { runCatching { it.toModel() }.getOrNull() }
+            if (old == event) null else old to event
         }
     }
 

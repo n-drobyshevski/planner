@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import page.planr.android.core.data.auth.LocalDataCleaner
 import page.planr.android.core.data.health.HealthSleepSync
 import page.planr.android.core.data.notify.NewRequestNotifier
+import page.planr.android.core.data.notify.PartnerChangeNotifier
 import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.reminders.ReminderScheduler
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
@@ -29,6 +30,7 @@ class RoomLocalDataCleaner @Inject constructor(
     private val healthSleep: Lazy<HealthSleepSync>,
     private val reminders: Lazy<ReminderScheduler>,
     private val newRequests: Lazy<NewRequestNotifier>,
+    private val partnerChanges: Lazy<PartnerChangeNotifier>,
 ) : LocalDataCleaner {
     override suspend fun clearAll() {
         gate.wipe { withContext(Dispatchers.IO) { db.clearAllTables() } }
@@ -36,6 +38,7 @@ class RoomLocalDataCleaner @Inject constructor(
         healthSleep.get().clearLocal()
         reminders.get().clearLocal()
         newRequests.get().clearLocal()
+        partnerChanges.get().clearLocal()
         widgets.refreshNow()
     }
 }

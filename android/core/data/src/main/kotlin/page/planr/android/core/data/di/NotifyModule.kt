@@ -23,7 +23,9 @@ import page.planr.android.core.data.notify.DataStoreNotifyPrefs
 import page.planr.android.core.data.notify.NotifyAudience
 import page.planr.android.core.data.notify.NotifyDataStore
 import page.planr.android.core.data.notify.NotifyPrefs
+import page.planr.android.core.data.notify.PartnerChangeNotifier
 import page.planr.android.core.data.notify.ProcessAppForeground
+import page.planr.android.core.data.sync.EventChangeObserver
 
 /**
  * The opt-in notifications (new time requests, the partner's changes): the
@@ -42,6 +44,10 @@ abstract class NotifyModule {
 
     @Binds
     abstract fun bindAppForeground(impl: ProcessAppForeground): AppForeground
+
+    /** The cache's event changes go to the partner-change notifications. */
+    @Binds
+    abstract fun bindEventChangeObserver(impl: PartnerChangeNotifier): EventChangeObserver
 
     companion object {
         @Provides

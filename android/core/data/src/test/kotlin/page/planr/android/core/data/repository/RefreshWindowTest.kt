@@ -43,6 +43,8 @@ import page.planr.android.core.data.remote.SelectPage
 import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.remote.WorkspaceQueries
 import page.planr.android.core.data.remote.decodeAs
+import page.planr.android.core.data.sync.EventChangeObserver
+import page.planr.android.core.data.sync.RowGone
 import page.planr.android.core.data.sync.WidgetRefreshDispatcher
 import page.planr.android.core.data.sync.WidgetRefresher
 import page.planr.android.core.model.PlannerEvent
@@ -94,12 +96,15 @@ class RefreshWindowTest {
             .also { runCurrent() }
     }
 
-    private fun TestScope.events(source: PostgrestGateway = gateway): EventRepository {
+    private fun TestScope.events(
+        source: PostgrestGateway = gateway,
+        changes: EventChangeObserver = EventChangeObserver.None,
+    ): EventRepository {
         val widgets = WidgetRefreshDispatcher(
             Provider { setOf(object : WidgetRefresher { override suspend fun refreshWidgets() = Unit }) },
             backgroundScope,
         )
-        return EventRepository(session(), WorkspaceQueries(source), EventMutations(source), db, gate, widgets)
+        return EventRepository(session(), WorkspaceQueries(source), EventMutations(source), db, gate, widgets, changes = changes)
     }
 
     private val june = TimeWindow(Instant.parse("2026-06-01T00:00:00Z"), Instant.parse("2026-06-08T00:00:00Z"))
@@ -181,5 +186,56 @@ class RefreshWindowTest {
         assertFailsWith<IOException> { events(failing).refreshWindow(june) }
 
         assertEquals(setOf("cached"), cachedWindowIds())
+    }
+
+    @Test
+    fun `the rows a changed snapshot replaced are told, with what was cached`() = runTest {
+        cache(
+            Fixtures.eventRow(id = "same"),
+            Fixtures.eventRow(id = "moved"),
+            // Cached outside the window, moved into it.
+            Fixtures.eventRow(id = "in", start = "2026-07-01T09:00:00+00:00", end = "2026-07-01T10:00:00+00:00"),
+        )
+        gateway.seed(
+            SupabaseTables.EVENTS,
+            Fixtures.eventRow(id = "same"),
+            Fixtures.eventRow(id = "moved", start = "2026-06-02T09:00:00+00:00", end = "2026-06-02T10:00:00+00:00"),
+            Fixtures.eventRow(id = "in", start = "2026-06-03T09:00:00+00:00", end = "2026-06-03T10:00:00+00:00"),
+            Fixtures.eventRow(id = "new"),
+        )
+        val heard = mutableListOf<Pair<PlannerEvent?, PlannerEvent>>()
+
+        events(changes = recorder(heard)).refreshWindow(june)
+
+        assertEquals(
+            mapOf(
+                "moved" to Instant.parse("2026-06-01T09:00:00Z"),
+                "in" to Instant.parse("2026-07-01T09:00:00Z"),
+                "new" to null,
+            ),
+            heard.associate { (before, after) -> after.id to before?.start },
+            "not the unchanged row",
+        )
+    }
+
+    @Test
+    fun `a window cached empty is a first load, not a change`() = runTest {
+        gateway.seed(SupabaseTables.EVENTS, Fixtures.eventRow(id = "new"))
+        val heard = mutableListOf<Pair<PlannerEvent?, PlannerEvent>>()
+
+        events(changes = recorder(heard)).refreshWindow(june)
+
+        assertEquals(setOf("new"), cachedWindowIds())
+        assertEquals(emptyList(), heard)
+    }
+
+    private fun recorder(into: MutableList<Pair<PlannerEvent?, PlannerEvent>>) = object : EventChangeObserver {
+        override val listening = true
+
+        override fun eventsChanged(changes: List<Pair<PlannerEvent?, PlannerEvent>>) {
+            into += changes
+        }
+
+        override fun eventGone(before: PlannerEvent?, gone: RowGone) = Unit
     }
 }

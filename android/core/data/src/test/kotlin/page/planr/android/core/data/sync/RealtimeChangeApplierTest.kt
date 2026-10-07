@@ -21,6 +21,7 @@ import page.planr.android.core.data.local.PlanrDatabase
 import page.planr.android.core.data.local.entity.toModel
 import page.planr.android.core.data.remote.Fixtures
 import page.planr.android.core.data.remote.SupabaseTables
+import page.planr.android.core.model.PlannerEvent
 
 /** Realtime echoes into a real (in-memory) Room: out-of-order rows never revert newer ones. */
 @RunWith(RobolectricTestRunner::class)
@@ -122,6 +123,35 @@ class RealtimeChangeApplierTest {
     }
 
     @Test
+    fun `event upserts and deletes are told with what was cached, for the partner's changes`() = runTest {
+        val heard = RecordingObserver()
+        val applier = RealtimeChangeApplier(db, CacheGate(), heard)
+
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(updatedAt = earlier)))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(updatedAt = later).with("title", "Moved")))
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow(updatedAt = earlier).with("title", "Stale")))
+        val gone = RowGone(SupabaseTables.EVENTS, Fixtures.EVENT_ID, RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER, title = "Moved")
+        applier.apply(gone.table, gone.toDelete())
+
+        assertEquals(listOf(null to "Standup", "Standup" to "Moved"), heard.changed.map { (b, a) -> b?.title to a.title }, "not the stale echo")
+        assertEquals(listOf("Moved" to gone), heard.gone.map { (b, g) -> b?.title to g })
+    }
+
+    @Test
+    fun `a row turned private is not a removal, and nothing is read while nobody listens`() = runTest {
+        val heard = RecordingObserver()
+        val applier = RealtimeChangeApplier(db, CacheGate(), heard)
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow()))
+        val hidden = RowGone(SupabaseTables.EVENTS, Fixtures.EVENT_ID, RowGone.Kind.Hidden, ownerId = PARTNER, actor = PARTNER)
+        applier.apply(hidden.table, hidden.toDelete())
+        assertEquals(emptyList(), heard.gone)
+
+        heard.listening = false
+        applier.apply(SupabaseTables.EVENTS, RowChange.Upsert(Fixtures.eventRow()))
+        assertEquals(1, heard.changed.size)
+    }
+
+    @Test
     fun `a broadcast for a table the app doesn't cache is a no-op`() = runTest {
         val gone = RowGone(SupabaseTables.SLEEP_LOGS, "s1", RowGone.Kind.Delete, ownerId = PARTNER, actor = PARTNER)
 
@@ -137,6 +167,20 @@ class RealtimeChangeApplierTest {
         // No updated_at on the incoming row, or nothing cached: apply.
         assertFalse(RealtimeChangeApplier.isOutdated(incoming = null, cached = t))
         assertFalse(RealtimeChangeApplier.isOutdated(incoming = t, cached = null))
+    }
+
+    private class RecordingObserver : EventChangeObserver {
+        override var listening = true
+        val changed = mutableListOf<Pair<PlannerEvent?, PlannerEvent>>()
+        val gone = mutableListOf<Pair<PlannerEvent?, RowGone>>()
+
+        override fun eventsChanged(changes: List<Pair<PlannerEvent?, PlannerEvent>>) {
+            changed += changes
+        }
+
+        override fun eventGone(before: PlannerEvent?, gone: RowGone) {
+            this.gone += before to gone
+        }
     }
 
     private companion object {
