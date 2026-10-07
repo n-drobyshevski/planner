@@ -124,5 +124,10 @@
     <string name="notify_requests_channel_description">Когда кто-то просит время по твоей ссылке, как задано в настройках.</string>
     <string name="notify_partner_channel_name">Изменения партнёра</string>
     <string name="notify_partner_channel_description">Новые, перенесённые и удалённые партнёром события на ближайшие два дня, как задано в настройках.</string>
-    <string name="notify_more">Ещё %1$d</string>
+    <plurals name="notify_more">
+        <item quantity="one">Ещё %d</item>
+        <item quantity="few">Ещё %d</item>
+        <item quantity="many">Ещё %d</item>
+        <item quantity="other">Ещё %d</item>
+    </plurals>
 </resources>

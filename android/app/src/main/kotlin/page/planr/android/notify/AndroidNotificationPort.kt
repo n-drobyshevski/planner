@@ -76,7 +76,7 @@ class AndroidNotificationPort @Inject constructor(
         if (content.lines.size > 1) {
             val style = NotificationCompat.InboxStyle().setBigContentTitle(content.title)
             content.lines.forEach(style::addLine)
-            if (content.more > 0) style.setSummaryText(context.getString(R.string.notify_more, content.more))
+            if (content.more > 0) style.setSummaryText(context.resources.getQuantityString(R.plurals.notify_more, content.more, content.more))
             builder.setContentText(content.text).setStyle(style)
         } else if (content.text.isNotEmpty()) {
             builder.setContentText(content.text).setStyle(NotificationCompat.BigTextStyle().bigText(content.text))

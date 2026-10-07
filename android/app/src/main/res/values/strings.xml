@@ -124,5 +124,8 @@
     <string name="notify_requests_channel_description">When someone asks for a time through your share link, as set in Settings.</string>
     <string name="notify_partner_channel_name">Partner’s changes</string>
     <string name="notify_partner_channel_description">What your partner added, moved or removed in the next two days, as set in Settings.</string>
-    <string name="notify_more">+%1$d more</string>
+    <plurals name="notify_more">
+        <item quantity="one">+%d more</item>
+        <item quantity="other">+%d more</item>
+    </plurals>
 </resources>
