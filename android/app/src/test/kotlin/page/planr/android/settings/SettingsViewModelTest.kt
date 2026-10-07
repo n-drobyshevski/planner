@@ -342,6 +342,26 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `a setting whose own channel is off stays on, with its blocked line alone`() = runTest {
+        data.channelsOff += NotifyKind.Reminders
+        val vm = subject()
+
+        vm.setReminderLead(ReminderLead.Ten)
+        vm.setPartnerChangesNotify(true)
+        runCurrent()
+
+        assertFalse(vm.state.value.askNotificationPermission, "the permission is granted: nothing to ask")
+        assertEquals(ReminderSettings(ReminderLead.Ten, blocked = true), vm.state.value.reminders)
+        assertEquals(NotifySettings(partnerChanges = true), vm.state.value.notify)
+
+        // Back from the system's settings with the channel on again.
+        data.channelsOff.clear()
+        vm.refreshNotificationAccess()
+        runCurrent()
+        assertFalse(vm.state.value.reminders.blocked)
+    }
+
+    @Test
     fun `a permission answer with nothing pending is ignored`() = runTest {
         val vm = subject()
         vm.onNotificationPermissionResult(granted = false)
@@ -416,6 +436,11 @@ private class FakeSettingsDataSource(members: List<Member>, categories: List<Cat
     }
 
     override fun notificationsAllowed(): Boolean = allowed
+
+    /** Channels turned off in the system's settings. */
+    val channelsOff = mutableSetOf<NotifyKind>()
+
+    override fun canShow(kind: NotifyKind): Boolean = allowed && kind !in channelsOff
 
     override val canRequestNotifications: Boolean get() = canAsk
 

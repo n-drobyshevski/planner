@@ -112,14 +112,15 @@ class SettingsViewModel @Inject constructor(
     private val memberWrites = Mutex()
     private val sleepWrites = Mutex()
 
-    private val notificationsAllowed = MutableStateFlow(data.notificationsAllowed())
+    /** Which settings' notifications can show (the app's allowed and that channel on), as last read. */
+    private val canShow = MutableStateFlow(readCanShow())
     private val askPermission = MutableStateFlow(false)
 
     /** The setting the permission request is for, until it is answered. */
     private var awaiting: OptIn<*>? = null
-    private val reminders = OptIn(ReminderLead.Off, data::setReminderLead)
-    private val newRequests = OptIn(false, data::setNewRequestsNotify)
-    private val partnerChanges = OptIn(false, data::setPartnerChangesNotify)
+    private val reminders = OptIn(NotifyKind.Reminders, ReminderLead.Off, data::setReminderLead)
+    private val newRequests = OptIn(NotifyKind.NewRequests, false, data::setNewRequestsNotify)
+    private val partnerChanges = OptIn(NotifyKind.PartnerChanges, false, data::setPartnerChangesNotify)
     private val deviceZone = data.deviceZone()
 
     private val sleepState = combine(sleepStored, sleepPending) { stored, pending ->
@@ -200,16 +201,18 @@ class SettingsViewModel @Inject constructor(
         askPermission.value = false
         val optIn = awaiting ?: return
         awaiting = null
-        notificationsAllowed.value = data.notificationsAllowed()
+        canShow.value = readCanShow()
         optIn.answered(granted)
     }
 
     /** Back on the screen (e.g. from the system's settings): notifications may have been allowed or blocked meanwhile. */
     fun refreshNotificationAccess() {
-        val allowed = data.notificationsAllowed()
-        notificationsAllowed.value = allowed
-        if (allowed) listOf(reminders, newRequests, partnerChanges).forEach { it.denied.value = false }
+        val shows = readCanShow()
+        canShow.value = shows
+        listOf(reminders, newRequests, partnerChanges).forEach { if (shows.getValue(it.kind)) it.denied.value = false }
     }
+
+    private fun readCanShow(): Map<NotifyKind, Boolean> = NotifyKind.entries.associateWith(data::canShow)
 
     /** The sleep section's "Try again" after a failed load. */
     fun retrySleep() {
@@ -273,9 +276,10 @@ class SettingsViewModel @Inject constructor(
      * once and is saved with [save], one at a time and in order. Turning it
      * on where notifications aren't allowed asks for the permission first
      * (the choice shows meanwhile); refused, or blocked with no way to ask,
-     * it goes back to [off] with the blocked line.
+     * it goes back to [off] with the blocked line. Allowed, but with [kind]'s
+     * channel turned off in the system's settings, it stays on with the line.
      */
-    private inner class OptIn<T : Any>(private val off: T, private val save: suspend (T) -> Unit) {
+    private inner class OptIn<T : Any>(val kind: NotifyKind, private val off: T, private val save: suspend (T) -> Unit) {
         /** The choice shown while the permission is asked for or the write is in flight. */
         private val pending = MutableStateFlow<T?>(null)
 
@@ -285,15 +289,15 @@ class SettingsViewModel @Inject constructor(
 
         /** What the screen shows, from [stored], and whether its blocked line shows. */
         fun shown(stored: Flow<T>): Flow<Pair<T, Boolean>> =
-            combine(stored, pending, notificationsAllowed, denied) { saved, choice, allowed, refused ->
+            combine(stored, pending, canShow, denied) { saved, choice, shows, refused ->
                 val value = choice ?: saved
                 // Not while the permission is being asked for: the answer decides.
-                value to (!allowed && (refused || (choice == null && value != off)))
+                value to (shows[kind] != true && (refused || (choice == null && value != off)))
             }
 
         fun choose(value: T) {
             val allowed = data.notificationsAllowed()
-            notificationsAllowed.value = allowed
+            canShow.value = readCanShow()
             when {
                 value == off || allowed -> {
                     denied.value = false
