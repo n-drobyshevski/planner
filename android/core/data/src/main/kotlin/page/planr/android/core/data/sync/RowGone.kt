@@ -3,6 +3,7 @@ package page.planr.android.core.data.sync
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import page.planr.android.core.data.remote.SupabaseTables
 import page.planr.android.core.data.remote.string
 import page.planr.android.core.model.PostgresInstantSerializer
 
@@ -45,6 +46,14 @@ data class RowGone(
         Kind.Delete -> true
         Kind.Hidden -> memberId == null || ownerId != memberId
     }
+
+    /**
+     * Whether it was one of [memberId]'s timeslot requests (owner-only, kept
+     * out of Room), so their Inbox should refetch. The partner hears of it
+     * too and ignores it; an unknown viewer refetches (nothing, signed out).
+     */
+    fun isRequestOf(memberId: String?): Boolean =
+        table == SupabaseTables.TIMESLOT_REQUESTS && (memberId == null || ownerId == null || ownerId == memberId)
 
     /**
      * The cache change that drops the row: with what the database cascades

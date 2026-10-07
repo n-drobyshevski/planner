@@ -79,8 +79,9 @@ import page.planr.android.core.data.repository.TimeslotRequestRepository
  * was down or the app was in the background (see [refetchOnJoin]).
  *
  * The member's own timeslot requests (owner-only under RLS) aren't cached
- * in Room: a change to one refetches the Inbox's list
- * ([TimeslotRequestRepository]), which the badge and the "New time
+ * in Room: a change to one (a delete arrives as a [RowGone], migration
+ * `20261010000000_broadcast_timeslot_request_deletes`) refetches the Inbox's
+ * list ([TimeslotRequestRepository]), which the badge and the "New time
  * requests" notifications follow.
  */
 @Singleton
@@ -150,10 +151,13 @@ class RealtimeSync @Inject constructor(
                 }
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     sync.broadcastFlow<JsonObject>(RowGone.EVENT).keepingEvery().mapNotNull { RowGone.parse(it) }.collect { gone ->
-                        if (gone.removesFor(session.currentSession?.memberId)) {
+                        val memberId = session.currentSession?.memberId
+                        if (gone.removesFor(memberId)) {
                             val applied = runCatching { applier.apply(gone.table, gone.toDelete(), ticket) }.getOrDefault(false)
                             if (applied) widgets.requestRefresh()
                         }
+                        // A request deleted (its share link deleted, say): never seen by the filtered binding below.
+                        if (gone.isRequestOf(memberId)) launch { refreshRequestsQuietly(force = true) }
                         _rowGone.emit(gone)
                     }
                 }
