@@ -4,11 +4,12 @@ import kotlinx.datetime.LocalDate
 import page.planr.android.feature.agenda.navigation.AgendaRoutes
 
 /**
- * Where an external launch (a widget tap, an .ics file opened in or shared to
- * the app) asked the app to open. MainActivity is exported, so a widget's
- * route is untrusted input: only the shapes the widgets produce are accepted
- * ([parse]), anything else opens the app as is. [Import] is never parsed from
- * a route: the activity sets it once it has read a file.
+ * Where an external launch (a widget or notification tap, an .ics file
+ * opened in or shared to the app) asked the app to open. MainActivity is
+ * exported, so a launch's route is untrusted input: only the shapes the
+ * widgets and notifications produce are accepted ([parse]), anything else
+ * opens the app as is. [Import] is never parsed from a route: the activity
+ * sets it once it has read a file.
  */
 sealed interface LaunchRoute {
     /** The tab the target lives under; the detail (if any) is pushed on top of it. */
@@ -34,6 +35,12 @@ sealed interface LaunchRoute {
         val route get() = AgendaRoutes.IMPORT
     }
 
+    /** The Inbox (a "Time requests" notification), over the agenda as the account menu opens it. */
+    data object Inbox : LaunchRoute {
+        override val tab get() = TopLevelTab.Agenda
+        val route get() = PlanrRoutes.INBOX
+    }
+
     /** A task; [encodedId] stays URI-encoded. */
     data class Task(val encodedId: String) : LaunchRoute {
         override val tab get() = TopLevelTab.Tasks
@@ -47,13 +54,14 @@ sealed interface LaunchRoute {
         private val ISO_DATE = Regex("""\d{4}-\d{2}-\d{2}""")
 
         /**
-         * Parses a widget route (`agenda`, `tasks`, `event/{ref}`, `task/{id}`,
-         * `day/{yyyy-mm-dd}`); null when unknown.
+         * Parses a widget or notification route (`agenda`, `tasks`, `inbox`,
+         * `event/{ref}`, `task/{id}`, `day/{yyyy-mm-dd}`); null when unknown.
          */
         fun parse(route: String?): LaunchRoute? = when {
             route == null -> null
             route == PlanrRoutes.AGENDA -> Tab(TopLevelTab.Agenda)
             route == PlanrRoutes.TASKS -> Tab(TopLevelTab.Tasks)
+            route == PlanrRoutes.INBOX -> Inbox
             route.startsWith(EVENT_PREFIX) -> segment(route, EVENT_PREFIX)?.let(::Event)
             route.startsWith(TASK_PREFIX) -> segment(route, TASK_PREFIX)?.let(::Task)
             route.startsWith(DAY_PREFIX) -> date(route.removePrefix(DAY_PREFIX))?.let(::Day)

@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="sleep_block_title">Сон</string>
+
+    <string name="notify_request_title">Новый запрос на время</string>
+    <plurals name="notify_requests_title">
+        <item quantity="one">%d новый запрос на время</item>
+        <item quantity="few">%d новых запроса на время</item>
+        <item quantity="many">%d новых запросов на время</item>
+        <item quantity="other">%d новых запроса на время</item>
+    </plurals>
+    <string name="notify_request_named">%1$s просит время: %2$s</string>
+    <string name="notify_request_anonymous">Запрос на время: %1$s</string>
 </resources>

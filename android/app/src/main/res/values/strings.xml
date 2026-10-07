@@ -120,4 +120,9 @@
     <string name="reminders_text_now">%1$s · now</string>
     <string name="reminders_text_started">%1$s · started %2$d min ago</string>
     <string name="reminders_snooze">Snooze 10 min</string>
+    <string name="notify_requests_channel_name">Time requests</string>
+    <string name="notify_requests_channel_description">When someone asks for a time through your share link, as set in Settings.</string>
+    <string name="notify_partner_channel_name">Partner’s changes</string>
+    <string name="notify_partner_channel_description">What your partner added, moved or removed in the next two days, as set in Settings.</string>
+    <string name="notify_more">+%1$d more</string>
 </resources>

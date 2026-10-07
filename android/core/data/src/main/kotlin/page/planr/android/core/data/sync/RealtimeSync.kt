@@ -51,6 +51,7 @@ import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.local.CacheGate
 import page.planr.android.core.data.prefs.AppPrefsSync
 import page.planr.android.core.data.remote.SupabaseTables
+import page.planr.android.core.data.repository.TimeslotRequestRepository
 
 /**
  * Live sync while the app is in the foreground (and for [BACKGROUND_LINGER]
@@ -73,6 +74,11 @@ import page.planr.android.core.data.remote.SupabaseTables
  * there). Each time the channels (re)join, the visible window, tasks and
  * reference data are refetched: changes may have been missed while either
  * was down or the app was in the background (see [refetchOnJoin]).
+ *
+ * The member's own timeslot requests (owner-only under RLS) aren't cached
+ * in Room: a change to one refetches the Inbox's list
+ * ([TimeslotRequestRepository]), which the badge and the "New time
+ * requests" notifications follow.
  */
 @Singleton
 class RealtimeSync @Inject constructor(
@@ -81,6 +87,7 @@ class RealtimeSync @Inject constructor(
     private val applier: RealtimeChangeApplier,
     private val cacheGate: CacheGate,
     private val syncRunner: SyncRunner,
+    private val timeslotRequests: TimeslotRequestRepository,
     private val widgets: WidgetRefreshDispatcher,
     private val appPrefs: AppPrefsSync,
     @ApplicationScope private val scope: CoroutineScope,
@@ -150,6 +157,12 @@ class RealtimeSync @Inject constructor(
                         if (change is RowChange.Upsert) runCatching { appPrefs.applyRemote(change.record) }
                     }
                 }
+                // A request made through the member's share link, or resolved elsewhere (RLS: the owner's only).
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    changesOf(channel, SupabaseTables.TIMESLOT_REQUESTS, workspaceId).collect {
+                        refreshRequestsQuietly(force = true)
+                    }
+                }
                 val mainJoined = channel.status.map { it.isJoined() }
                 val syncJoined = sync.status.map { it.isJoined() }
                 launch {
@@ -163,7 +176,10 @@ class RealtimeSync @Inject constructor(
                     // refreshing after it join it instead.
                     refetchOnJoin(mainJoined, syncJoined, SYNC_JOIN_GRACE).collect {
                         cacheGate.outdateSnapshots()
-                        refetchQuietly()
+                        coroutineScope {
+                            launch { refreshRequestsQuietly(force = false) }
+                            refetchQuietly()
+                        }
                     }
                 }
                 launch {
@@ -215,6 +231,16 @@ class RealtimeSync @Inject constructor(
             throw e
         } catch (_: Exception) {
             // Offline or a server hiccup: the next (re)join or periodic sync catches up.
+        }
+    }
+
+    private suspend fun refreshRequestsQuietly(force: Boolean) {
+        try {
+            timeslotRequests.refresh(force)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // As above: the next change, (re)join or periodic sync catches up.
         }
     }
 

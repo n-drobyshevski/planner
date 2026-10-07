@@ -120,4 +120,9 @@
     <string name="reminders_text_now">%1$s · сейчас</string>
     <string name="reminders_text_started">%1$s · началось %2$d мин назад</string>
     <string name="reminders_snooze">Отложить на 10 мин</string>
+    <string name="notify_requests_channel_name">Запросы на время</string>
+    <string name="notify_requests_channel_description">Когда кто-то просит время по твоей ссылке, как задано в настройках.</string>
+    <string name="notify_partner_channel_name">Изменения партнёра</string>
+    <string name="notify_partner_channel_description">Новые, перенесённые и удалённые партнёром события на ближайшие два дня, как задано в настройках.</string>
+    <string name="notify_more">Ещё %1$d</string>
 </resources>

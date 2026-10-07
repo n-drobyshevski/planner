@@ -2,4 +2,13 @@
 <resources>
     <!-- Title of a calendar sleep block created from a Health Connect night (the web's insights.sleep.blockTitle). -->
     <string name="sleep_block_title">Sleep</string>
+
+    <!-- "New time requests" notifications (Settings → Notifications). %2$s / %1$s: "Tue 7 Oct, 14:00–15:00". -->
+    <string name="notify_request_title">New time request</string>
+    <plurals name="notify_requests_title">
+        <item quantity="one">%d new time request</item>
+        <item quantity="other">%d new time requests</item>
+    </plurals>
+    <string name="notify_request_named">%1$s asked for %2$s</string>
+    <string name="notify_request_anonymous">Someone asked for %1$s</string>
 </resources>

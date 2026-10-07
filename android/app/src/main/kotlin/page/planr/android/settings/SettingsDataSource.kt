@@ -1,9 +1,12 @@
 package page.planr.android.settings
 
+import android.content.Context
 import android.os.Build
+import androidx.core.app.NotificationManagerCompat
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.time.ZoneId
 import javax.inject.Inject
@@ -71,6 +74,7 @@ interface SettingsDataSource {
 }
 
 class RepositorySettingsDataSource @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val session: SessionManager,
     private val workspace: WorkspaceRepository,
     private val sleep: SleepPrefsRepository,
@@ -111,7 +115,8 @@ class RepositorySettingsDataSource @Inject constructor(
 
     override suspend fun setPartnerChangesNotify(on: Boolean) = notifyPrefs.setPartnerChanges(on)
 
-    override fun notificationsAllowed(): Boolean = notifier.canPost()
+    // The app's notifications as a whole (what the permission governs), not one channel.
+    override fun notificationsAllowed(): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled()
 
     override val canRequestNotifications: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 

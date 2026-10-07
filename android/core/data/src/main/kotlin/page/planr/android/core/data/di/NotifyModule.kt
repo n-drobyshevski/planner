@@ -17,17 +17,31 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import page.planr.android.core.data.notify.AppForeground
+import page.planr.android.core.data.notify.CacheNotifyAudience
 import page.planr.android.core.data.notify.DataStoreNotifyPrefs
+import page.planr.android.core.data.notify.NotifyAudience
 import page.planr.android.core.data.notify.NotifyDataStore
 import page.planr.android.core.data.notify.NotifyPrefs
+import page.planr.android.core.data.notify.ProcessAppForeground
 
-/** The opt-in notifications (new time requests, the partner's changes): the per-device store. */
+/**
+ * The opt-in notifications (new time requests, the partner's changes): the
+ * per-device store and what the notifiers read. The app supplies the
+ * `NotificationPort` (the channels and the notifications themselves).
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class NotifyModule {
 
     @Binds
     abstract fun bindNotifyPrefs(impl: DataStoreNotifyPrefs): NotifyPrefs
+
+    @Binds
+    abstract fun bindNotifyAudience(impl: CacheNotifyAudience): NotifyAudience
+
+    @Binds
+    abstract fun bindAppForeground(impl: ProcessAppForeground): AppForeground
 
     companion object {
         @Provides
