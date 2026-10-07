@@ -23,6 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -143,7 +145,7 @@ class RealtimeSync @Inject constructor(
                     }
                 }
                 launch(start = CoroutineStart.UNDISPATCHED) {
-                    sync.broadcastFlow<JsonObject>(RowGone.EVENT).mapNotNull { RowGone.parse(it) }.collect { gone ->
+                    sync.broadcastFlow<JsonObject>(RowGone.EVENT).keepingEvery().mapNotNull { RowGone.parse(it) }.collect { gone ->
                         if (gone.removesFor(session.currentSession?.memberId)) {
                             val applied = runCatching { applier.apply(gone.table, gone.toDelete(), ticket) }.getOrDefault(false)
                             if (applied) widgets.requestRefresh()
@@ -214,7 +216,7 @@ class RealtimeSync @Inject constructor(
         channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             this.table = table
             filter("workspace_id", FilterOperator.EQ, workspaceId)
-        }.mapNotNull { action ->
+        }.keepingEvery().mapNotNull { action ->
             val change = when (action) {
                 is PostgresAction.Insert -> RowChange.Upsert(action.record)
                 is PostgresAction.Update -> RowChange.Upsert(action.record)
@@ -304,6 +306,17 @@ internal fun refetchOnJoin(mainJoined: Flow<Boolean>, syncJoined: Flow<Boolean>,
             }
         }
     }
+
+/**
+ * [this] with an unbounded buffer. supabase-kt's `broadcastFlow` and
+ * `postgresChangeFlow` are `callbackFlow`s that `trySend` each message into
+ * the default 64-slot buffer and ignore a failure, so while the collector is
+ * busy (every change waits on the cache's lock and a Room transaction) a
+ * burst past 64 (an .ics import undone, a task subtree deleted, with their
+ * cascades) would be dropped without a trace. Placed right after the
+ * library's flow, it fuses into that `callbackFlow`'s own channel.
+ */
+internal fun <T> Flow<T>.keepingEvery(): Flow<T> = buffer(Channel.UNLIMITED)
 
 /**
  * The workspace whose channel should be open, or null for none: the
