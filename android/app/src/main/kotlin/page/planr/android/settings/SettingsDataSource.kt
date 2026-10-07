@@ -20,6 +20,7 @@ import page.planr.android.core.data.di.ApplicationScope
 import page.planr.android.core.data.health.SleepBlockPrefs
 import page.planr.android.core.data.model.MemberPreferencesPatch
 import page.planr.android.core.data.model.SleepPrefsPatch
+import page.planr.android.core.data.notify.NotifyPrefs
 import page.planr.android.core.data.reminders.ReminderLead
 import page.planr.android.core.data.reminders.ReminderScheduler
 import page.planr.android.core.data.repository.SleepPrefsRepository
@@ -52,6 +53,16 @@ interface SettingsDataSource {
     /** Saves [lead] and re-arms reminders with it. */
     suspend fun setReminderLead(lead: ReminderLead)
 
+    /** "New time requests": this device's own switch, never synced. */
+    val newRequestsNotify: Flow<Boolean>
+
+    suspend fun setNewRequestsNotify(on: Boolean)
+
+    /** "Partner's changes": this device's own switch, never synced. */
+    val partnerChangesNotify: Flow<Boolean>
+
+    suspend fun setPartnerChangesNotify(on: Boolean)
+
     /** Whether the app may post notifications right now. */
     fun notificationsAllowed(): Boolean
 
@@ -65,6 +76,7 @@ class RepositorySettingsDataSource @Inject constructor(
     private val sleep: SleepPrefsRepository,
     private val reminders: ReminderScheduler,
     private val notifier: ReminderNotifier,
+    private val notifyPrefs: NotifyPrefs,
     @ApplicationScope private val appScope: CoroutineScope,
 ) : SettingsDataSource {
     override val currentMemberId: Flow<String?> =
@@ -90,6 +102,14 @@ class RepositorySettingsDataSource @Inject constructor(
         if (lead != ReminderLead.Off) notifier.ensureChannel()
         reminders.setLead(lead)
     }
+
+    override val newRequestsNotify: Flow<Boolean> = notifyPrefs.newRequests
+
+    override suspend fun setNewRequestsNotify(on: Boolean) = notifyPrefs.setNewRequests(on)
+
+    override val partnerChangesNotify: Flow<Boolean> = notifyPrefs.partnerChanges
+
+    override suspend fun setPartnerChangesNotify(on: Boolean) = notifyPrefs.setPartnerChanges(on)
 
     override fun notificationsAllowed(): Boolean = notifier.canPost()
 

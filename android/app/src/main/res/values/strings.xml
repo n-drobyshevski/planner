@@ -64,6 +64,11 @@
     <string name="settings_notifications_title">Notifications</string>
     <string name="settings_success_toasts">Show success notifications</string>
     <string name="settings_success_toasts_description">Brief confirmations after an action (like “Event updated”). Turn off to mute them — errors and anything you can undo always show.</string>
+    <string name="settings_notify_requests">New time requests</string>
+    <string name="settings_notify_requests_description">A notification when someone asks for a time through your share link, while Planr is closed. Set for this phone only.</string>
+    <string name="settings_notify_partner">Partner’s changes</string>
+    <string name="settings_notify_partner_description">A quiet note when your partner adds, moves or removes something in the next two days, while Planr is closed. Set for this phone only.</string>
+    <string name="settings_notify_blocked">Notifications are blocked for Planr, so these can’t show. You can allow them in the system settings.</string>
     <string name="settings_reminders_title">Reminders</string>
     <string name="settings_reminders_description">A quiet notification before your own and shared timed events. Set for this phone only.</string>
     <string name="settings_reminders_lead">Remind me</string>

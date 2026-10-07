@@ -271,6 +271,77 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `the opt-in notifications are off by default and turn on at once where notifications are allowed`() = runTest {
+        val vm = subject()
+        assertEquals(NotifySettings(), vm.state.value.notify)
+
+        vm.setNewRequestsNotify(true)
+        vm.setPartnerChangesNotify(true)
+        runCurrent()
+
+        assertEquals(NotifySettings(newRequests = true, partnerChanges = true), vm.state.value.notify)
+        assertEquals(listOf("requests" to true, "partner" to true), data.notifyWrites)
+        assertFalse(vm.state.value.askNotificationPermission)
+    }
+
+    @Test
+    fun `an opt-in notification goes through the same permission request as reminders`() = runTest {
+        data.allowed = false
+        val vm = subject()
+
+        vm.setPartnerChangesNotify(true)
+        runCurrent()
+        assertTrue(vm.state.value.askNotificationPermission)
+        assertEquals(NotifySettings(partnerChanges = true), vm.state.value.notify, "shown while asking")
+        assertEquals(emptyList(), data.notifyWrites)
+
+        vm.onNotificationPermissionAsked()
+        data.allowed = true
+        vm.onNotificationPermissionResult(granted = true)
+        runCurrent()
+        assertEquals(listOf("partner" to true), data.notifyWrites)
+        assertEquals(NotifySettings(partnerChanges = true), vm.state.value.notify)
+        assertEquals(emptyList(), data.reminderWrites, "the answer was only for this switch")
+    }
+
+    @Test
+    fun `a refused opt-in goes back off with the section's blocked line, leaving reminders alone`() = runTest {
+        data.allowed = false
+        val vm = subject()
+
+        vm.setNewRequestsNotify(true)
+        vm.onNotificationPermissionAsked()
+        vm.onNotificationPermissionResult(granted = false)
+        runCurrent()
+
+        assertEquals(NotifySettings(newRequests = false, blocked = true), vm.state.value.notify)
+        assertEquals(listOf("requests" to false), data.notifyWrites)
+        assertFalse(vm.state.value.reminders.blocked)
+
+        vm.setNewRequestsNotify(false)
+        runCurrent()
+        assertFalse(vm.state.value.notify.blocked, "choosing off clears it")
+    }
+
+    @Test
+    fun `a second switch turned on while the first one waits takes over the request`() = runTest {
+        data.allowed = false
+        val vm = subject()
+
+        vm.setNewRequestsNotify(true)
+        vm.setReminderLead(ReminderLead.Ten)
+        runCurrent()
+        assertEquals(NotifySettings(), vm.state.value.notify, "the first one shows its stored value again")
+        assertEquals(ReminderLead.Ten, vm.state.value.reminders.lead)
+
+        data.allowed = true
+        vm.onNotificationPermissionResult(granted = true)
+        runCurrent()
+        assertEquals(listOf(ReminderLead.Ten), data.reminderWrites)
+        assertEquals(emptyList(), data.notifyWrites)
+    }
+
+    @Test
     fun `a permission answer with nothing pending is ignored`() = runTest {
         val vm = subject()
         vm.onNotificationPermissionResult(granted = false)
@@ -328,6 +399,20 @@ private class FakeSettingsDataSource(members: List<Member>, categories: List<Cat
     override suspend fun setReminderLead(lead: ReminderLead) {
         reminderWrites += lead
         reminderLead.value = lead
+    }
+
+    override val newRequestsNotify = MutableStateFlow(false)
+    override val partnerChangesNotify = MutableStateFlow(false)
+    val notifyWrites = mutableListOf<Pair<String, Boolean>>()
+
+    override suspend fun setNewRequestsNotify(on: Boolean) {
+        notifyWrites += "requests" to on
+        newRequestsNotify.value = on
+    }
+
+    override suspend fun setPartnerChangesNotify(on: Boolean) {
+        notifyWrites += "partner" to on
+        partnerChangesNotify.value = on
     }
 
     override fun notificationsAllowed(): Boolean = allowed
