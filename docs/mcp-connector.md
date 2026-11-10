@@ -37,6 +37,8 @@ page) → Supabase issues the token.
 | `app/[locale]/oauth/consent/page.tsx` | Consent screen |
 | `app/api/oauth/decision/route.ts` | Approve/deny handler |
 | `lib/mcp/tools.ts` | Tool definitions (compact, RLS-backed) |
+| `lib/mcp/projection.ts` | Pure projections for `get_agenda` |
+| `lib/mcp/flows.ts` | Pure projection for `get_flows` (streams and attention) |
 | `lib/mcp/auth.ts` | Token verification + per-tool scoped context |
 | `lib/mcp/client.ts` | Member-scoped Supabase client from a bearer token |
 | `lib/mcp/env.ts` | Feature flag + Redis/issuer/resource config |
@@ -44,10 +46,39 @@ page) → Supabase issues the token.
 ## Tools
 
 Read: `get_workspace`, `list_events`, `list_tasks`, `get_sleep_summary`,
-`get_agenda`. Write: `create_event`, `update_event`, `create_task`,
+`get_agenda`, `get_flows`. Write: `create_event`, `update_event`, `create_task`,
 `update_task`, `complete_task`. Destructive (`delete_event`, `delete_task`)
 require `confirm: true` — called without it they return a preview of what
 would be removed. RLS is the backstop for all of them.
+
+Tags: `list_tasks` returns each task's `tags` (omitted when empty) and takes an
+optional `tag` filter; `create_task` and `update_task` accept `tags: string[]`
+(normalized server-side; `update_task` with `tags: []` clears them);
+`get_workspace` also returns every tag in use (`tags`) and the caller's saved
+streams (`streams`, id and name only).
+
+## Streams and attention
+
+`get_flows` answers "which of my tasks need attention now, stream by stream".
+It runs the same pure pipeline as the web app's Streams view, so the numbers
+match. Input: `date` (required, the caller's local today, `yyyy-MM-dd`),
+`groupBy` (`tag` default, `category`, `collection`, `assignee`, `status`,
+`priority`), `stream` (a saved stream's id or name: its filter, grouping and
+attention mode apply, and explicit `groupBy`/`attention` override them),
+`attention` (`deadline`, `priority`, `combined` default), `mine` (only
+top-level tasks you own or are assigned to; default false, which also includes
+the partner's shared tasks, never their private ones) and `limit` (1..10 tasks
+per stream, default 3). Output: `{ date, groupBy, attention, stream?, streams:
+[{ key, label, open, done, overdue, needsAttention, nextDue?, score, tasks:
+[{ id, title, dueDate?, priority?, score, overdue, tags? }] }], truncated? }`,
+streams most-pressing first; more than 30 streams are cut to the 30 top-ranked
+with `truncated: true`. A task with several tags appears in each tag's stream.
+
+Scoring: urgency is 1 when a task is due today or overdue and falls linearly to
+0 at 14 days out (0 with no deadline), importance is priority/3, and `combined`
+is their mean; a task "needs attention" at a score of 0.5 or more. A stream's
+score is its strongest open task's, a subtask counts toward its parent, and
+finished tasks score 0 (they only appear in the stream's `done` count).
 
 `create_event`/`create_task` accept an optional `clientRequestId` (≤100
 chars): a caller-chosen idempotency key. Re-calling with the same id (same
@@ -114,7 +145,7 @@ The consent screen also shows the client's redirect host, per the MCP auth spec.
   `http://localhost:3000/api/mcp` (needs `MCP_ENABLED=true` + `REDIS_URL`).
 - Cross-member RLS: as member A, confirm `get_sleep_summary` never returns B's
   nights, and that shared events/tasks appear for both.
-- Unit tests: `pnpm test test/mcp/tools.test.ts`.
+- Unit tests: `pnpm test test/mcp`.
 
 ## Machine client: Anchor
 

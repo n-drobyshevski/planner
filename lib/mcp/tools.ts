@@ -8,6 +8,7 @@ import {
   fetchWorkspaceBundle,
   fetchWindow,
   fetchTasks,
+  fetchTaskStreams,
   fetchSleepLogs,
 } from "@/lib/supabase/queries";
 import {
@@ -28,6 +29,12 @@ import {
   dateInputToUtcMs,
 } from "@/lib/datetime/local";
 import { projectAgenda, projectAgendaTasks, type AgendaTaskStatus } from "./projection";
+import {
+  projectFlows,
+  resolveFlowOptions,
+  MCP_FLOWS_GROUP_BYS,
+} from "./flows";
+import { collectTags, normalizeTag } from "@/lib/tasks/tags";
 import type { Board, TaskRow } from "@/lib/types";
 
 // --- helpers ---------------------------------------------------------------
@@ -124,15 +131,20 @@ export function registerTools(server: McpServer): void {
       title: "Get workspace",
       description:
         "List the workspace's members, categories, collections and boards, with " +
-        "their ids. Call this first — other tools take these ids (categoryId, " +
-        "collectionId, boardId, ownerId).",
+        "their ids, plus every tag in use and your saved streams (id and name). " +
+        "Call this first — other tools take these ids (categoryId, " +
+        "collectionId, boardId, ownerId) and tag names.",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (_args, extra) =>
       guard(async () => {
         const { sb, memberId, workspaceId } = mcpContext(extra);
-        const b = await fetchWorkspaceBundle(sb);
+        const [b, tasks, streams] = await Promise.all([
+          fetchWorkspaceBundle(sb),
+          fetchTasks(sb, workspaceId),
+          fetchTaskStreams(sb, workspaceId, memberId),
+        ]);
         return ok({
           workspaceId,
           you: memberId,
@@ -149,6 +161,8 @@ export function registerTools(server: McpServer): void {
             collectionId: bd.collectionId,
             done: bd.isDone,
           })),
+          tags: collectTags(tasks),
+          streams: streams.map((st) => ({ id: st.id, name: st.name })),
         });
       }),
   );
@@ -447,10 +461,15 @@ export function registerTools(server: McpServer): void {
       title: "List tasks",
       description:
         "List tasks (RLS-scoped). Optionally filter by collectionId, boardId, or " +
-        "completion. Returns compact rows; use get_workspace to resolve board names.",
+        "completion or tag. Returns compact rows (with tags); use get_workspace " +
+        "to resolve board names.",
       inputSchema: {
         collectionId: z.string().optional(),
         boardId: z.string().optional(),
+        tag: z
+          .string()
+          .optional()
+          .describe("Only tasks carrying this tag (case-insensitive, '#' optional)."),
         includeCompleted: z
           .boolean()
           .optional()
@@ -469,6 +488,11 @@ export function registerTools(server: McpServer): void {
         if (args.collectionId)
           tasks = tasks.filter((t) => t.collectionId === args.collectionId);
         if (args.boardId) tasks = tasks.filter((t) => t.boardId === args.boardId);
+        if (args.tag !== undefined) {
+          const tag = normalizeTag(args.tag);
+          if (tag === null) return fail("`tag` is empty.");
+          tasks = tasks.filter((t) => t.tags.includes(tag));
+        }
         if (args.includeCompleted === false)
           tasks = tasks.filter((t) => t.completedAt == null);
         if (args.includeSubtasks === false)
@@ -484,8 +508,104 @@ export function registerTools(server: McpServer): void {
             parentId: t.parentId ?? undefined,
             priority: t.priority ?? undefined,
             dueDate: t.dueDate ?? undefined,
+            tags: t.tags?.length ? t.tags : undefined,
           })),
         });
+      }),
+  );
+
+  // -- tasks: streams -----------------------------------------------------
+  server.registerTool(
+    "get_flows",
+    {
+      title: "Get flows (attention by stream)",
+      description:
+        "Which tasks need attention now, stream by stream. Tasks are split into " +
+        "streams by `groupBy` (a task with several tags is in each tag's stream) " +
+        "and each stream is scored from its open tasks' deadlines and priorities " +
+        "(a subtask counts toward its parent). Streams come back most-pressing " +
+        "first, each with its counts and its top `limit` open tasks. Pass `stream` " +
+        "(a saved stream's id or name, see get_workspace) to use its filter, " +
+        "grouping and attention mode; explicit `groupBy`/`attention` override it. " +
+        "Includes the partner's shared tasks (never their private ones) unless " +
+        "`mine: true`. Never returns task descriptions.",
+      inputSchema: {
+        date: z
+          .iso.date()
+          .describe("The caller's local today, yyyy-MM-dd (deadlines are judged against it)."),
+        groupBy: z
+          .enum(MCP_FLOWS_GROUP_BYS)
+          .optional()
+          .describe("How to split tasks into streams. Default: 'tag'."),
+        stream: z
+          .string()
+          .optional()
+          .describe("A saved stream's id or name; supplies filter, groupBy and attention."),
+        attention: z
+          .enum(["deadline", "priority", "combined"])
+          .optional()
+          .describe(
+            "Scoring: 'deadline', 'priority' or 'combined' (default).",
+          ),
+        mine: z
+          .boolean()
+          .optional()
+          .describe("Only top-level tasks you own or are assigned to. Default: false."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .optional()
+          .describe("Tasks returned per stream. Default: 3."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, memberId, workspaceId } = mcpContext(extra);
+        let saved: Awaited<ReturnType<typeof fetchTaskStreams>>[number] | undefined;
+        if (args.stream !== undefined) {
+          const wanted = args.stream.trim().toLowerCase();
+          const streams = await fetchTaskStreams(sb, workspaceId, memberId);
+          saved =
+            streams.find((s) => s.id === args.stream!.trim()) ??
+            streams.find((s) => s.name.trim().toLowerCase() === wanted);
+          if (!saved) {
+            return fail(
+              "No saved stream matches that id or name. Call get_workspace to see your streams.",
+            );
+          }
+        }
+        const opts = resolveFlowOptions(
+          {
+            groupBy: args.groupBy,
+            attention: args.attention,
+          },
+          saved?.definition,
+        );
+        const [bundle, tasks] = await Promise.all([
+          fetchWorkspaceBundle(sb),
+          fetchTasks(sb, workspaceId),
+        ]);
+        return ok(
+          projectFlows({
+            tasks,
+            boards: bundle.boards,
+            categories: bundle.categories,
+            collections: bundle.collections,
+            members: bundle.members,
+            memberId,
+            date: args.date,
+            nowMs: Date.now(),
+            groupBy: opts.groupBy,
+            attention: opts.attention,
+            filter: opts.filter,
+            mine: args.mine ?? false,
+            limit: args.limit ?? 3,
+            streamName: saved?.name,
+          }),
+        );
       }),
   );
 
@@ -505,6 +625,11 @@ export function registerTools(server: McpServer): void {
         parentId: z.string().optional().describe("Make this a subtask of this id."),
         categoryId: z.string().optional(),
         priority: z.number().int().min(0).max(3).optional(),
+        tags: z
+          .array(z.string().max(100))
+          .max(30)
+          .optional()
+          .describe("Free-form labels (normalized: lowercase, '#' dropped, max 12)."),
         dueDate: z
           .iso.date()
           .nullable()
@@ -536,6 +661,7 @@ export function registerTools(server: McpServer): void {
           categoryId: args.categoryId ?? null,
           priority: args.priority ?? null,
           dueDate: args.dueDate ?? null,
+          ...(args.tags !== undefined ? { tags: args.tags } : {}),
           clientRequestId: args.clientRequestId,
         };
         const row = await createTask(sb, input);
@@ -557,6 +683,11 @@ export function registerTools(server: McpServer): void {
         boardId: z.string().nullable().optional(),
         priority: z.number().int().min(0).max(3).nullable().optional(),
         dueDate: z.string().nullable().optional(),
+        tags: z
+          .array(z.string().max(100))
+          .max(30)
+          .optional()
+          .describe("Replace the task's tags (normalized). [] clears them."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
@@ -569,6 +700,7 @@ export function registerTools(server: McpServer): void {
         if (args.boardId !== undefined) patch.boardId = args.boardId;
         if (args.priority !== undefined) patch.priority = args.priority;
         if (args.dueDate !== undefined) patch.dueDate = args.dueDate;
+        if (args.tags !== undefined) patch.tags = args.tags;
         if (Object.keys(patch).length === 0)
           return fail("Provide at least one field to update.");
         const row = await updateTask(sb, args.id, patch);

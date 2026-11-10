@@ -5,6 +5,7 @@ vi.mock("@/lib/supabase/queries", () => ({
   fetchWorkspaceBundle: vi.fn(),
   fetchWindow: vi.fn(),
   fetchTasks: vi.fn(),
+  fetchTaskStreams: vi.fn(),
   fetchSleepLogs: vi.fn(),
 }));
 vi.mock("@/lib/supabase/mutations", () => ({
@@ -67,6 +68,7 @@ describe("MCP tools", () => {
         "update_event",
         "delete_event",
         "list_tasks",
+        "get_flows",
         "create_task",
         "update_task",
         "complete_task",
@@ -383,5 +385,164 @@ describe("get_agenda", () => {
     await call("get_agenda", { date: "2026-09-23", timeZone: "UTC" });
     expect(m.createEvent).not.toHaveBeenCalled();
     expect(m.createTask).not.toHaveBeenCalled();
+  });
+});
+
+describe("tags and streams", () => {
+  const baseTask = {
+    workspaceId: "w1",
+    ownerId: "m1",
+    assigneeId: null,
+    parentId: null,
+    collectionId: null,
+    categoryId: null,
+    description: "PRIVATE NOTE",
+    isPrivate: false,
+    boardId: null,
+    priority: null,
+    dueDate: null,
+    startDate: null,
+    isMilestone: false,
+    position: 0,
+    completedAt: null,
+    attributes: {},
+    createdAt: 1,
+    updatedAt: 1,
+  };
+
+  beforeEach(() => {
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue({
+      members: [{ id: "m1", name: "Me" }],
+      categories: [],
+      collections: [],
+      boards: [],
+    } as never);
+    vi.mocked(q.fetchTaskStreams).mockResolvedValue([]);
+  });
+
+  it("list_tasks returns tags (omitted when empty) and filters by a normalized tag", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      { ...baseTask, id: "t1", title: "A", tags: ["thesis"] },
+      { ...baseTask, id: "t2", title: "B", tags: [] },
+    ] as never);
+    const call = collectTools();
+    const all = await call("list_tasks");
+    expect(all.data.tasks[0].tags).toEqual(["thesis"]);
+    expect(all.data.tasks[1]).not.toHaveProperty("tags");
+    const only = await call("list_tasks", { tag: "  #Thesis " });
+    expect(only.data.tasks.map((t: { id: string }) => t.id)).toEqual(["t1"]);
+    const bad = await call("list_tasks", { tag: " # " });
+    expect(bad.isError).toBe(true);
+  });
+
+  it("create_task and update_task pass tags through; update with [] clears", async () => {
+    vi.mocked(m.createTask).mockResolvedValue({ id: "t1", title: "T" } as never);
+    vi.mocked(m.updateTask).mockResolvedValue({ id: "t1", title: "T" } as never);
+    const call = collectTools();
+    await call("create_task", { title: "T", tags: ["Home", "#home"] });
+    expect(vi.mocked(m.createTask).mock.calls[0][1].tags).toEqual(["Home", "#home"]);
+    await call("create_task", { title: "No tags" });
+    expect(vi.mocked(m.createTask).mock.calls[1][1]).not.toHaveProperty("tags");
+
+    await call("update_task", { id: "t1", tags: [] });
+    expect(vi.mocked(m.updateTask).mock.calls[0][2]).toEqual({ tags: [] });
+    const none = await call("update_task", { id: "t1", title: "x" });
+    expect(none.isError).toBe(false);
+    expect(vi.mocked(m.updateTask).mock.calls[1][2]).not.toHaveProperty("tags");
+  });
+
+  it("get_workspace returns tags in use and saved streams (id and name only)", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      { ...baseTask, id: "t1", title: "A", tags: ["b", "a"] },
+      { ...baseTask, id: "t2", title: "B", tags: ["b"] },
+    ] as never);
+    vi.mocked(q.fetchTaskStreams).mockResolvedValue([
+      { id: "s1", name: "Work", memberId: "m1", definition: {} },
+    ] as never);
+    const call = collectTools();
+    const res = await call("get_workspace");
+    expect(res.data.tags).toEqual(["b", "a"]);
+    expect(res.data.streams).toEqual([{ id: "s1", name: "Work" }]);
+  });
+
+  it("get_flows groups by tag by default and never returns descriptions", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      { ...baseTask, id: "t1", title: "A", tags: ["x"], priority: 3, dueDate: "2020-01-01" },
+      { ...baseTask, id: "t2", title: "B", tags: ["x", "y"] },
+    ] as never);
+    const call = collectTools();
+    const res = await call("get_flows", { date: "2026-07-10" });
+    expect(res.isError).toBe(false);
+    expect(res.data).toMatchObject({ date: "2026-07-10", groupBy: "tag", attention: "combined" });
+    expect(res.data.stream).toBeUndefined();
+    expect(res.data.streams.map((s: { label: string }) => s.label)).toEqual(["x", "y"]);
+    expect(res.data.streams[0].tasks[0]).toMatchObject({ id: "t1", score: 1, overdue: true });
+    expect(JSON.stringify(res.data)).not.toContain("PRIVATE NOTE");
+    expect(q.fetchTaskStreams).not.toHaveBeenCalled();
+  });
+
+  it("get_flows honours mine, limit and attention", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      { ...baseTask, id: "t1", title: "Mine", tags: ["x"], priority: 3 },
+      { ...baseTask, id: "t2", title: "Theirs", ownerId: "m2", tags: ["x"], priority: 3 },
+      { ...baseTask, id: "t3", title: "Mine too", tags: ["x"], priority: 1 },
+    ] as never);
+    const call = collectTools();
+    const res = await call("get_flows", {
+      date: "2026-07-10",
+      mine: true,
+      limit: 1,
+      attention: "priority",
+    });
+    expect(res.data.attention).toBe("priority");
+    expect(res.data.streams[0].open).toBe(2);
+    expect(res.data.streams[0].tasks.map((t: { id: string }) => t.id)).toEqual(["t1"]);
+  });
+
+  it("get_flows applies a saved stream (by name, case-insensitive; by id) and rejects an unknown one", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      { ...baseTask, id: "t1", title: "Hi", tags: ["x"], priority: 3 },
+      { ...baseTask, id: "t2", title: "Lo", tags: ["x"], priority: 1 },
+    ] as never);
+    vi.mocked(q.fetchTaskStreams).mockResolvedValue([
+      {
+        id: "s1",
+        name: "Urgent Work",
+        memberId: "m1",
+        definition: {
+          filter: {
+            boardIds: null,
+            categoryIds: null,
+            priorities: [3],
+            tags: null,
+            assigneeIds: null,
+            done: "all",
+            milestone: "all",
+            privacy: "all",
+          },
+          groupBy: "priority",
+          sortBy: "manual",
+          sortDir: "asc",
+          mode: "streams",
+          attention: "priority",
+          scope: "all",
+        },
+      },
+    ] as never);
+    const call = collectTools();
+    const byName = await call("get_flows", { date: "2026-07-10", stream: " urgent work " });
+    expect(byName.data.stream).toBe("Urgent Work");
+    expect(byName.data.groupBy).toBe("priority");
+    expect(byName.data.attention).toBe("priority");
+    expect(byName.data.streams.map((s: { label: string }) => s.label)).toEqual(["High"]);
+
+    const byId = await call("get_flows", { date: "2026-07-10", stream: "s1", groupBy: "tag" });
+    expect(byId.data.groupBy).toBe("tag");
+    expect(byId.data.streams.map((s: { label: string }) => s.label)).toEqual(["x"]);
+    expect(byId.data.streams[0].open).toBe(1); // the saved filter still applies
+
+    const missing = await call("get_flows", { date: "2026-07-10", stream: "nope" });
+    expect(missing.isError).toBe(true);
+    expect(missing.data).not.toContain("Urgent Work");
   });
 });

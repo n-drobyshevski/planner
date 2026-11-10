@@ -4,7 +4,7 @@ import { allDayDateKey } from "@/lib/datetime/local";
 
 const MAX_TITLE_LEN = 120;
 
-function clipTitle(title: string): string {
+export function clipTitle(title: string): string {
   return title.length > MAX_TITLE_LEN ? title.slice(0, MAX_TITLE_LEN) : title;
 }
 
