@@ -11,6 +11,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useLocale, useTranslations } from "next-intl";
 import {
   ChevronRight,
+  ChevronUp,
+  ChevronsUp,
   CalendarRange,
   CornerDownRight,
   Filter,
@@ -31,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
 import { dateFnsLocale } from "@/lib/datetime/date-locale";
-import { formatTime, formatWeekdayDayMonth } from "@/lib/datetime/format";
+import { formatDayMonthToken, formatTime, formatWeekdayDayMonth } from "@/lib/datetime/format";
 import { ToolbarSlot } from "@/components/toolbar-slots";
 import {
   DAY_MS,
@@ -45,7 +47,9 @@ import {
   type FlowNode,
   type FlowSegment,
   type GroupHeaderRow,
+  type LaneGroup,
   type LaneRow,
+  type StreamRow,
 } from "@/lib/tasks/flows-layout";
 import type { ById } from "@/lib/tasks/tree";
 import {
@@ -55,16 +59,20 @@ import {
   type FlowsDisplay,
   type FlowsDisplayCtx,
 } from "@/lib/tasks/flows-display";
-import { useFlowsDnd } from "@/lib/hooks/use-flows-dnd";
+import { buildStreams, rankStreams, type StreamSummary } from "@/lib/tasks/flows-streams";
+import { attentionReason, type AttentionReason } from "@/lib/tasks/attention-reason";
+import { collectTags } from "@/lib/tasks/tags";
+import { useFlowsDnd, type FlowsDndItem } from "@/lib/hooks/use-flows-dnd";
 import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
 import { FlowTrack } from "./flows/flow-track";
 import { FlowRowMenu } from "./flows/flow-row-menu";
-import { FlowsDisplayMenu } from "./flows/flows-display-menu";
+import { FlowsDisplayMenu, type SavedStreamsApi } from "./flows/flows-display-menu";
 import type { TaskActions } from "./task-actions";
-import { msToDateInput } from "@/lib/datetime/local";
+import { dateInputToUtcMs, msToDateInput } from "@/lib/datetime/local";
 import type {
   Board,
   Category,
+  Collection,
   EventRow,
   Member,
   TaskCheckpoint,
@@ -98,14 +106,22 @@ export interface TaskFlowsProps {
   members: Map<string, Member>;
   currentMemberId: string | null;
   actions: TaskActions;
-  /** the active collection's columns (ordered) — for status grouping + filter */
+  /**
+   * The columns of the collections on screen (ordered) — for status grouping +
+   * filter. With scope "all" these span collections, so their names arrive
+   * already qualified by collection.
+   */
   boards: Board[];
+  /** the collections the viewer can see, in switcher order — for collection grouping */
+  collections: Collection[];
   /** the workspace's categories — for category grouping/filter + swatches */
   categories: Category[];
   /** filter / group / sort settings (owned + persisted by the shell) */
   display: FlowsDisplay;
   onDisplayChange: (next: FlowsDisplay) => void;
   onResetDisplay: () => void;
+  /** the viewer's saved streams (member-private) and their writes; omitted = section hidden */
+  savedStreams?: SavedStreamsApi;
   /** Bumped by the shell after a subtask is added here, to auto-expand its lane. */
   expandLane?: { id: string; key: number } | null;
   /** status-event history still loading (tasks may already be ready) */
@@ -127,10 +143,12 @@ export function TaskFlows({
   currentMemberId,
   actions,
   boards,
+  collections,
   categories,
   display,
   onDisplayChange,
   onResetDisplay,
+  savedStreams,
   expandLane,
   loading,
 }: TaskFlowsProps) {
@@ -182,6 +200,11 @@ export function TaskFlows({
     [tasks, childrenByParent, eventsByTask, blocksByTask, checkpointsByTask, nowMs],
   );
 
+  // The viewer's calendar day ("yyyy-MM-dd" in their zone) — what "due
+  // tomorrow" and "overdue" are measured against.
+  const today = useMemo(() => msToDateInput(nowMs, timeZone), [nowMs, timeZone]);
+  const [expandedStreams, setExpandedStreams] = useState<ReadonlySet<string>>(new Set());
+
   // Lookups + localized bucket labels the grouping needs (pure data; the
   // pipeline stays unit-testable).
   const groupCtx = useMemo<FlowsDisplayCtx>(
@@ -189,20 +212,18 @@ export function TaskFlows({
       boardsById: new Map(boards.map((b) => [b.id, b])),
       boardOrder: new Map(boards.map((b, i) => [b.id, i])),
       categoriesById: new Map(categories.map((c) => [c.id, c])),
-      // TODO(UI pass): wire real collections, the viewer's local day and
-      // the display's attention mode, plus localized labels for the new groupings.
-      collectionsById: new Map(),
-      collectionOrder: new Map(),
+      collectionsById: new Map(collections.map((c) => [c.id, c])),
+      collectionOrder: new Map(collections.map((c, i) => [c.id, i])),
       membersById: members,
       memberOrder: new Map([...members.keys()].map((id, i) => [id, i])),
-      today: new Date(nowMs).toISOString().slice(0, 10),
+      today,
       attention: display.attention,
       labels: {
         noStatus: t("flows.display.noStatus"),
         noCategory: t("flows.display.noCategory"),
-        noTag: "No tag",
-        noCollection: "No collection",
-        unassigned: "Unassigned",
+        noTag: t("flows.display.noTag"),
+        noCollection: t("flows.display.noCollection"),
+        unassigned: t("flows.display.unassigned"),
         priority: {
           0: t("priority.none"),
           1: t("priority.low"),
@@ -211,7 +232,7 @@ export function TaskFlows({
         },
       },
     }),
-    [boards, categories, members, t, nowMs, display.attention],
+    [boards, categories, collections, members, t, today, display.attention],
   );
 
   // filter -> group/sort -> layout. The window derives from the *filtered*
@@ -231,11 +252,44 @@ export function TaskFlows({
     [flowAnchor],
   );
 
-  const groups = useMemo(
-    () =>
-      groupLanes(filtered, display.groupBy, display.sortBy, display.sortDir, groupCtx, manualAnchor),
-    [filtered, display.groupBy, display.sortBy, display.sortDir, groupCtx, manualAnchor],
-  );
+  const streamsMode = display.mode === "streams";
+  // Group, summarize, and (sorting by attention) put the most pressing group
+  // first. Streams mode with no grouping is one stream of everything, which
+  // needs a name the headerless bucket doesn't carry.
+  const { groups, streams } = useMemo(() => {
+    let gs: LaneGroup[] = groupLanes(
+      filtered,
+      display.groupBy,
+      display.sortBy,
+      display.sortDir,
+      groupCtx,
+      manualAnchor,
+    );
+    if (streamsMode) {
+      gs = gs.map((g) => (g.header ? g : { ...g, label: t("flows.streams.all") }));
+    }
+    let ss: StreamSummary[] = buildStreams(gs, { nowMs, today, mode: display.attention });
+    if (display.sortBy === "attention" && gs.length > 1) {
+      const ranked = rankStreams(ss);
+      if (display.sortDir === "asc") ranked.reverse();
+      const byKey = new Map(gs.map((g) => [g.key, g]));
+      gs = ranked.map((r) => byKey.get(r.key)!);
+      ss = ranked;
+    }
+    return { groups: gs, streams: ss };
+  }, [
+    filtered,
+    display.groupBy,
+    display.sortBy,
+    display.sortDir,
+    display.attention,
+    groupCtx,
+    manualAnchor,
+    streamsMode,
+    nowMs,
+    today,
+    t,
+  ]);
 
   // The data window is the meaningful extent; the render window pads each side
   // by half the visible track so any point (incl. "now") can be scrolled to the
@@ -247,27 +301,43 @@ export function TaskFlows({
   const t0 = data.t0 - padMs; // render origin (left pad)
   const t1 = data.t1 + padMs; // render right edge (right pad)
   const { rows, totalHeight } = useMemo(
-    () => layoutRows(groups, expanded),
-    [groups, expanded],
+    () =>
+      layoutRows(groups, expanded, {
+        mode: display.mode,
+        streams,
+        expandedStreams,
+      }),
+    [groups, expanded, display.mode, streams, expandedStreams],
   );
 
-  // Lanes in their current visual order (across groups) — the DnD reorder set.
-  const orderedLanes = useMemo(
-    () => rows.flatMap((r) => (r.kind === "lane" ? [r.lane] : [])),
+  // Lane rows in their current visual order (across groups) — the DnD set.
+  // Keyed by row, not task: a multi-tag task has a row in each tag's group.
+  const dndItems = useMemo<FlowsDndItem[]>(
+    () =>
+      rows.flatMap((r) =>
+        r.kind === "lane"
+          ? [{ key: r.rowKey, lane: r.lane, group: groupKeyOf(r) }]
+          : [],
+      ),
     [rows],
   );
-  // Each lane's group bucket, so a drag reorders only within its own group.
-  const groupByLane = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const g of groups) for (const l of g.lanes) map.set(l.task.id, g.key);
+  // Each lane's attention reason (by task id: it is the same in every group).
+  const reasons = useMemo(() => {
+    const map = new Map<string, AttentionReason>();
+    for (const l of filtered) {
+      const r = attentionReason(l, today, display.attention);
+      if (r) map.set(l.task.id, r);
+    }
     return map;
-  }, [groups]);
+  }, [filtered, today, display.attention]);
+  // Tags in use on the lanes in scope, for the tag filter.
+  const tagOptions = useMemo(() => collectTags(tasks), [tasks]);
+
   // Hand-reordering writes a global `flowPos`, so it works in every grouping —
   // it just needs the manual sort (otherwise the chosen sort owns the order).
   const canReorder = display.sortBy === "manual";
-  const dnd = useFlowsDnd(orderedLanes, {
+  const dnd = useFlowsDnd(dndItems, {
     anchorOf: (id) => flowAnchor.get(id) ?? 0,
-    groupOf: (id) => groupByLane.get(id) ?? "all",
     onReorder: actions.reorderFlow,
     onReparent: actions.reparent,
     treeById,
@@ -374,6 +444,8 @@ export function TaskFlows({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot centering on first layout
   }, [canvasW, rows.length]);
 
+  // Expansion is per TASK, not per row: a multi-tag task opens its subtasks in
+  // every group it appears in, so the two copies never disagree.
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -381,14 +453,80 @@ export function TaskFlows({
       else next.add(id);
       return next;
     });
+  const toggleStream = (key: string) =>
+    setExpandedStreams((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  /** "Needs attention now: due tomorrow · high priority" — the marker's accessible name. */
+  function attentionLabel(r: AttentionReason): string {
+    const parts: string[] = [];
+    if (r.days !== null) parts.push(dueWords(r.days));
+    if (r.priority === 3) parts.push(t("flows.attention.highPriority"));
+    else if (r.priority === 2) parts.push(t("flows.attention.mediumPriority"));
+    return t(r.level === "high" ? "flows.attention.now" : "flows.attention.soon", {
+      reasons: parts.join(" · "),
+    });
+  }
+  /** "due today" / "due tomorrow" / "due in 3 days" / "overdue 2 days". */
+  function dueWords(days: number): string {
+    if (days < 0) return t("flows.attention.overdue", { count: -days });
+    if (days === 0) return t("flows.attention.dueToday");
+    if (days === 1) return t("flows.attention.dueTomorrow");
+    return t("flows.attention.dueIn", { count: days });
+  }
+  /** The marker's visible short text: the deadline if it counts, else the priority. */
+  function attentionShort(r: AttentionReason): string {
+    if (r.days !== null) {
+      if (r.days < 0) return t("flows.attention.shortOverdue", { count: -r.days });
+      if (r.days === 0) return t("flows.attention.shortToday");
+      if (r.days === 1) return t("flows.attention.shortTomorrow");
+      return t("flows.attention.shortIn", { count: r.days });
+    }
+    return t(r.priority === 3 ? "priority.high" : "priority.medium");
+  }
+  const dueDate = (token: string) =>
+    formatWeekdayDayMonth(dateInputToUtcMs(token), "UTC", locale);
+  const shortDue = (token: string) => formatDayMonthToken(token, locale);
+
+  /** Spoken summary of a stream / group: counts, attention and the next deadline. */
+  function streamSummaryLabel(s: StreamSummary): string {
+    const parts = [
+      t("flows.streams.openCount", { count: s.open }),
+      t("flows.streams.doneCount", { count: s.done }),
+    ];
+    if (s.attentionCount > 0)
+      parts.push(t("flows.streams.attentionCount", { count: s.attentionCount }));
+    parts.push(
+      s.nextDue ? t("flows.streams.nextDue", { date: dueDate(s.nextDue) }) : t("flows.streams.noDue"),
+    );
+    return parts.join(", ");
+  }
+
+  /** Tooltip / accessible name for a marker on a collapsed stream line. */
+  function streamNodeLabel(s: StreamSummary, node: FlowNode, count: number): string {
+    const when = formatWeekdayDayMonth(node.ms, node.kind === "due" ? "UTC" : timeZone, locale);
+    const what =
+      node.kind === "done"
+        ? t("flows.streams.nodeDone", { count })
+        : node.overdue
+          ? t("flows.streams.nodeOverdue", { count })
+          : t("flows.streams.nodeDue", { count });
+    return `${s.label}: ${what} · ${when}`;
+  }
 
   /** Localized tooltip / accessible name for a node. */
   function nodeLabel(node: FlowNode, task: TaskRow): string {
     const kindKey =
       node.kind === "due" ? (node.overdue ? "overdue" : "due") : node.kind;
+    // A due marker sits at the date token's UTC midnight, so it is formatted
+    // in UTC to name the same calendar day in every zone.
     const when =
       node.kind === "due"
-        ? formatWeekdayDayMonth(node.ms, timeZone, locale)
+        ? formatWeekdayDayMonth(node.ms, "UTC", locale)
         : `${formatWeekdayDayMonth(node.ms, timeZone, locale)} · ${formatTime(node.ms, timeZone)}`;
     return `${task.title}: ${t(`flows.node.${kindKey}`)} · ${when}`;
   }
@@ -450,15 +588,19 @@ export function TaskFlows({
         onReset={onResetDisplay}
         boards={boards}
         categories={categories}
+        collections={collections}
+        members={[...members.values()]}
+        tags={tagOptions}
         totalCount={tasks.length}
-        filteredCount={orderedLanes.length}
+        filteredCount={filtered.length}
+        savedStreams={savedStreams}
       />
     </ToolbarSlot>
   );
 
   // Tasks exist, but the filters hide them all — keep the Display menu reachable
   // so the user can clear the filter without leaving the view.
-  if (orderedLanes.length === 0) {
+  if (filtered.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-8">
         {displayMenu}
@@ -567,12 +709,30 @@ export function TaskFlows({
               <SortableContext items={dnd.ids} strategy={verticalListSortingStrategy}>
                 {rows.map((row) =>
                   row.kind === "group" ? (
-                    <GutterGroupHeader key={`group-${row.key}`} row={row} />
-                  ) : row.kind === "lane" ? (
-                    <GutterLaneRow
-                      key={row.lane.task.id}
+                    <GutterGroupHeader
+                      key={`group-${row.key}`}
                       row={row}
-                      nesting={dnd.nestTargetId === row.lane.task.id}
+                      t={t}
+                      summaryLabel={row.summary ? streamSummaryLabel(row.summary) : null}
+                      dueDate={shortDue}
+                    />
+                  ) : row.kind === "stream" ? (
+                    <GutterStreamRow
+                      key={`stream-${row.key}`}
+                      row={row}
+                      t={t}
+                      summaryLabel={streamSummaryLabel(row.stream)}
+                      dueDate={shortDue}
+                      onToggle={() => toggleStream(row.key)}
+                    />
+                  ) : (
+                    <GutterLaneRow
+                      key={row.rowKey}
+                      row={row}
+                      nesting={dnd.nestTargetId === row.rowKey}
+                      attention={reasons.get(row.lane.task.id) ?? null}
+                      attentionLabel={attentionLabel}
+                      attentionShort={attentionShort}
                       ownerColor={
                         members.get(row.lane.task.ownerId)?.color ?? colorOf(row.lane.task)
                       }
@@ -587,7 +747,7 @@ export function TaskFlows({
                       expandAll={expandAll}
                       collapseAll={collapseAll}
                     />
-                  ) : null, // TODO(UI pass): render stream rows
+                  ),
                 )}
               </SortableContext>
               <DragOverlay>
@@ -648,6 +808,8 @@ export function TaskFlows({
             nodeLabel={nodeLabel}
             segmentLabel={segmentLabel}
             checkpointLabel={checkpointLabel}
+            streamNodeLabel={streamNodeLabel}
+            onToggleStream={toggleStream}
             onOpenTask={actions.open}
             onOpenCheckpoint={(cp) => actions.openCheckpoint(cp.id)}
             onCanvasPlace={(taskId, atDate) => {
@@ -663,12 +825,72 @@ export function TaskFlows({
 
 type Translator = ReturnType<typeof useTranslations>;
 
+/** The row's group key: `rowKey` is `${groupKey}:${taskId}` (a tag key may itself hold a colon). */
+function groupKeyOf(row: LaneRow): string {
+  return row.rowKey.slice(0, row.rowKey.length - row.lane.task.id.length - 1);
+}
+
+/**
+ * A quiet "needs attention" mark: a chevron (one = soon, two = now) plus a
+ * short text, so the level never rests on colour; overdue also turns the text
+ * destructive and says "late" in words. The full reason is the accessible name.
+ */
+function AttentionMark({
+  level,
+  text,
+  label,
+  overdue,
+}: {
+  level: "high" | "medium";
+  text: string;
+  label: string;
+  overdue?: boolean;
+}) {
+  const Icon = level === "high" ? ChevronsUp : ChevronUp;
+  return (
+    <span
+      title={label}
+      className={cn(
+        "inline-flex h-5 shrink-0 items-center gap-0.5 rounded-md pr-1.5 pl-0.5 text-[11px] leading-none tabular-nums",
+        level === "high"
+          ? "font-semibold text-foreground ring-1 ring-foreground/25 ring-inset"
+          : "font-medium text-muted-foreground",
+        overdue && "text-destructive ring-destructive/40",
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <span aria-hidden>{text}</span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
+/** Attention level of a stream / group summary, when it reaches the bar. */
+function summaryLevel(s: StreamSummary): "high" | "medium" | null {
+  if (s.attentionCount === 0) return null;
+  return s.attention.level === "high" ? "high" : "medium";
+}
+
 /** A group-by section header band in the gutter (mirrors the canvas band). */
-function GutterGroupHeader({ row }: { row: GroupHeaderRow }) {
+function GutterGroupHeader({
+  row,
+  t,
+  summaryLabel,
+  dueDate,
+}: {
+  row: GroupHeaderRow;
+  t: Translator;
+  /** the group's spoken summary, when streams were built for it */
+  summaryLabel: string | null;
+  dueDate: (token: string) => string;
+}) {
+  const s = row.summary;
+  const level = s ? summaryLevel(s) : null;
   return (
     <div
       className="absolute flex items-center gap-2 border-b border-border bg-muted/40 px-2"
       style={{ left: 0, top: row.top, width: G.gutterWidth, height: G.groupHeaderHeight }}
+      title={summaryLabel ?? undefined}
     >
       {row.color && (
         <span
@@ -680,9 +902,121 @@ function GutterGroupHeader({ row }: { row: GroupHeaderRow }) {
       <span className="min-w-0 flex-1 truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
         {row.label}
       </span>
-      <span className="shrink-0 text-[11px] font-medium text-muted-foreground/70 tabular-nums">
-        {row.count}
-      </span>
+      {s ? (
+        <>
+          <span
+            className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-muted-foreground tabular-nums"
+            aria-hidden
+          >
+            <span>{t("flows.streams.openCount", { count: s.open })}</span>
+            {level && (
+              <span
+                className={cn(
+                  "inline-flex items-center",
+                  level === "high" && "font-semibold text-foreground",
+                )}
+              >
+                {level === "high" ? (
+                  <ChevronsUp className="size-3.5" />
+                ) : (
+                  <ChevronUp className="size-3.5" />
+                )}
+                {s.attentionCount}
+              </span>
+            )}
+            {s.nextDue && <span>{dueDate(s.nextDue)}</span>}
+          </span>
+          <span className="sr-only">{summaryLabel}</span>
+        </>
+      ) : (
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground tabular-nums">
+          {t("flows.streams.openCount", { count: row.count })}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A collapsed stream in the gutter: name (with its swatch where it has one),
+ * counts, the attention mark and the next deadline. The whole row is the
+ * expand control; its lanes follow beneath when open.
+ */
+function GutterStreamRow({
+  row,
+  t,
+  summaryLabel,
+  dueDate,
+  onToggle,
+}: {
+  row: StreamRow;
+  t: Translator;
+  summaryLabel: string;
+  dueDate: (token: string) => string;
+  onToggle: () => void;
+}) {
+  const s = row.stream;
+  const level = summaryLevel(s);
+  return (
+    <div
+      className="absolute border-b border-border bg-muted/25"
+      style={{ left: 0, top: row.top, width: G.gutterWidth, height: G.streamHeight }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={row.isExpanded}
+        aria-label={`${t(row.isExpanded ? "flows.streams.collapse" : "flows.streams.expand", {
+          name: row.label,
+        })}. ${summaryLabel}`}
+        title={summaryLabel}
+        className="flex size-full items-start gap-1.5 px-2 pt-2 text-left focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset hover:bg-muted/50"
+      >
+        <span className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground">
+          <ChevronRight
+            className={cn(
+              "size-4 transition-transform motion-reduce:transition-none",
+              row.isExpanded && "rotate-90",
+            )}
+            aria-hidden
+          />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5" aria-hidden>
+          <span className="flex h-5 min-w-0 items-center gap-1.5">
+            {row.color && (
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: toPaletteStroke(row.color) }}
+              />
+            )}
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.label}</span>
+            {level && (
+              <AttentionMark
+                level={level}
+                text={String(s.attentionCount)}
+                label={t("flows.streams.attentionCount", { count: s.attentionCount })}
+                overdue={s.overdue > 0}
+              />
+            )}
+          </span>
+          <span className="truncate text-xs text-muted-foreground tabular-nums">
+            {t("flows.streams.openCount", { count: s.open })}
+            {/* Done counts only lead when nothing is open; otherwise the done
+                marks on the line (and the spoken summary) carry them, which keeps
+                the next deadline on screen in Russian too. */}
+            {s.open === 0 && s.done > 0 && (
+              <> · {t("flows.streams.doneCount", { count: s.done })}</>
+            )}
+            {s.overdue > 0 && (
+              <span className="text-destructive">
+                {" "}
+                · {t("flows.streams.overdueCount", { count: s.overdue })}
+              </span>
+            )}
+            {s.nextDue && <> · {t("flows.streams.nextDueShort", { date: dueDate(s.nextDue) })}</>}
+          </span>
+        </span>
+      </button>
     </div>
   );
 }
@@ -697,6 +1031,9 @@ function GutterGroupHeader({ row }: { row: GroupHeaderRow }) {
 function GutterLaneRow({
   row,
   nesting,
+  attention,
+  attentionLabel,
+  attentionShort,
   ownerColor,
   t,
   actions,
@@ -709,6 +1046,10 @@ function GutterLaneRow({
 }: {
   row: LaneRow;
   nesting: boolean;
+  /** why this lane needs attention now, or null */
+  attention: AttentionReason | null;
+  attentionLabel: (r: AttentionReason) => string;
+  attentionShort: (r: AttentionReason) => string;
   ownerColor: string;
   t: Translator;
   actions: TaskActions;
@@ -721,12 +1062,13 @@ function GutterLaneRow({
 }) {
   const { lane, top, isExpanded, branchRows } = row;
   const hasChildren = lane.branches.length > 0;
+  // Row-keyed (not task-keyed): a multi-tag task has one row per tag group.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: lane.task.id,
+    id: row.rowKey,
   });
   // A second droppable over the lane row, so the centre-band collision can resolve
   // a nest without the sortable reorder reflow sliding the target away.
-  const { setNodeRef: setNestRef } = useDroppable({ id: `${NEST_PREFIX}${lane.task.id}` });
+  const { setNodeRef: setNestRef } = useDroppable({ id: `${NEST_PREFIX}${row.rowKey}` });
   const setRefs = (node: HTMLDivElement | null) => {
     setNodeRef(node);
     setNestRef(node);
@@ -811,6 +1153,14 @@ function GutterLaneRow({
             {lane.task.title}
           </button>
         </FlowRowMenu>
+        {attention && attention.level !== "none" && attention.level !== "low" && (
+          <AttentionMark
+            level={attention.level}
+            text={attentionShort(attention)}
+            label={attentionLabel(attention)}
+            overdue={attention.days !== null && attention.days < 0}
+          />
+        )}
         {nesting && (
           <CornerDownRight className="size-4 shrink-0 text-primary" aria-hidden />
         )}

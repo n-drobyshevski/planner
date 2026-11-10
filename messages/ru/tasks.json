@@ -20,7 +20,8 @@
     "scheduledAt": "Запланировано {when}",
     "more": "Ещё",
     "changeColor": "Изменить цвет",
-    "moveToColumn": "Переместить в колонку"
+    "moveToColumn": "Переместить в колонку",
+    "tags": "Теги"
   },
   "toolbar": {
     "view": "Вид",
@@ -91,7 +92,35 @@
       "noStatus": "Без статуса",
       "noCategory": "Без категории",
       "count": "{shown} из {total}",
-      "reset": "Сбросить"
+      "reset": "Сбросить",
+      "tag": "Тегу",
+      "collection": "Коллекции",
+      "assignee": "Исполнителю",
+      "noTag": "Без тега",
+      "noCollection": "Без коллекции",
+      "unassigned": "Без исполнителя",
+      "view": "Вид",
+      "mode": "Дорожки",
+      "modeTasks": "Задачи",
+      "modeStreams": "Направления",
+      "modeTasksHint": "По дорожке на задачу.",
+      "modeStreamsHint": "По дорожке на группу; раскрой направление, чтобы увидеть задачи.",
+      "scope": "Коллекции",
+      "scopeCollection": "Эта коллекция",
+      "scopeAll": "Все коллекции",
+      "attention": "Срочность по",
+      "attentionMode": {
+        "deadline": "Сроку",
+        "priority": "Приоритету",
+        "combined": "Обоим"
+      },
+      "attentionHint": {
+        "deadline": "Чем ближе срок, тем раньше задача просит внимания.",
+        "priority": "Чем выше приоритет, тем раньше задача просит внимания.",
+        "combined": "Срок и приоритет вместе."
+      },
+      "attentionDesc": "Сначала срочные",
+      "attentionAsc": "Сначала спокойные"
     },
     "filter": {
       "priority": "Приоритет",
@@ -104,7 +133,10 @@
       "milestoneExclude": "Без вех",
       "privacy": "Приватность",
       "private": "Приватные",
-      "shared": "Общие"
+      "shared": "Общие",
+      "status": "Статус",
+      "tags": "Теги",
+      "assignee": "Исполнитель"
     },
     "sort": {
       "manual": "Вручную",
@@ -112,7 +144,8 @@
       "due": "Сроку",
       "title": "Названию",
       "priority": "Приоритету",
-      "created": "Дате создания"
+      "created": "Дате создания",
+      "attention": "Срочности"
     },
     "dnd": {
       "handle": "Переместить «{title}»",
@@ -122,6 +155,51 @@
       "emptyTitle": "Нет подходящих задач",
       "emptyBody": "Под текущие фильтры не подходит ни одна задача.",
       "clear": "Сбросить фильтры"
+    },
+    "attention": {
+      "now": "Нужно внимание сейчас: {reasons}",
+      "soon": "Скоро нужно внимание: {reasons}",
+      "dueToday": "срок сегодня",
+      "dueTomorrow": "срок завтра",
+      "dueIn": "срок через {count, plural, one {# день} few {# дня} many {# дней} other {# дня}}",
+      "overdue": "просрочено на {count, plural, one {# день} few {# дня} many {# дней} other {# дня}}",
+      "highPriority": "высокий приоритет",
+      "mediumPriority": "средний приоритет",
+      "shortToday": "Сегодня",
+      "shortTomorrow": "Завтра",
+      "shortIn": "{count} дн.",
+      "shortOverdue": "−{count} дн."
+    },
+    "streams": {
+      "all": "Все задачи",
+      "expand": "Показать задачи направления «{name}»",
+      "collapse": "Скрыть задачи направления «{name}»",
+      "openCount": "открыто: {count}",
+      "doneCount": "готово: {count}",
+      "overdueCount": "просрочено: {count}",
+      "attentionCount": "нужно внимание: {count}",
+      "nextDue": "ближайший срок {date}",
+      "nextDueShort": "срок {date}",
+      "noDue": "без срока",
+      "nodeDue": "{count, plural, one {Срок} other {Сроков: #}}",
+      "nodeOverdue": "{count, plural, one {Просрочено} other {Просрочено: #}}",
+      "nodeDone": "{count, plural, one {Готово} other {Готово: #}}"
+    },
+    "saved": {
+      "title": "Сохранённые направления",
+      "empty": "Сохрани группировку, фильтры и сортировку, к которым возвращаешься, — «Диплом», «Дом в этом месяце»… Направления видишь только ты, партнёр их не видит.",
+      "private": "Сохранённые направления видишь только ты.",
+      "save": "Сохранить как направление…",
+      "nameLabel": "Название текущего вида",
+      "namePlaceholder": "Назови направление…",
+      "rename": "Переименовать «{name}»",
+      "renameLabel": "Новое название для «{name}»",
+      "renameAction": "Сохранить название",
+      "delete": "Удалить сохранённое направление «{name}»",
+      "nameRequired": "Назови направление.",
+      "nameTooLong": "Название — не длиннее {max} символов.",
+      "nameTaken": "Направление с таким названием у тебя уже есть.",
+      "saveFailed": "Не получилось сохранить направление. Попробуй ещё раз."
     }
   },
   "checkpointDialog": {
@@ -237,7 +315,16 @@
     "privateHint": "Эту задачу видишь только ты.",
     "optimizationDetails": "Детали для оптимизации",
     "deleteTitle": "Удалить эту задачу?",
-    "deleteDescription": "Это удалит задачу, её подзадачи и все блоки, которые она поставила в календарь."
+    "deleteDescription": "Это удалит задачу, её подзадачи и все блоки, которые она поставила в календарь.",
+    "tagsLabel": "Теги",
+    "tagsPlaceholder": "Добавь тег",
+    "tagsHint": "Enter или запятая добавляют тег, Backspace убирает последний. Задачи с общим тегом складываются в направление в «Потоках».",
+    "tagsMax": "Не больше {max} тегов.",
+    "tagRemove": "Убрать тег {tag}",
+    "tagAdded": "Тег {tag} добавлен.",
+    "tagRemoved": "Тег {tag} убран.",
+    "tagSuggestions": "Теги в работе",
+    "tagNew": "Добавить «{tag}»"
   },
   "boardEditor": {
     "createTitle": "Новая колонка",

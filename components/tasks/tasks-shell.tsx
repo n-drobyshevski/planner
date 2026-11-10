@@ -27,6 +27,14 @@ import { useTaskDependencies } from "@/lib/hooks/use-task-dependencies";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { useTaskDialogs } from "@/lib/hooks/use-task-dialogs";
 import { useFlowsDisplay } from "@/lib/hooks/use-flows-display";
+import {
+  useCreateTaskStream,
+  useDeleteTaskStream,
+  useTaskStreams,
+  useTaskStreamsRealtime,
+  useUpdateTaskStream,
+} from "@/lib/hooks/use-task-streams";
+import { collectTags } from "@/lib/tasks/tags";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent, indexById, progressDeep, subtreeIds } from "@/lib/tasks/tree";
 import { dependencyBlockedIds } from "@/lib/tasks/blocking";
@@ -47,7 +55,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { TaskActions } from "./task-actions";
-import type { EventRow, TaskCheckpoint, TaskRow, TaskStatusEvent } from "@/lib/types";
+import type {
+  Board,
+  EventRow,
+  TaskCheckpoint,
+  TaskRow,
+  TaskStatusEvent,
+} from "@/lib/types";
+import type { SavedStreamsApi } from "./flows/flows-display-menu";
 
 // Defer the task/schedule dialogs out of the initial /tasks JS (both portaled →
 // null fallback, no layout cost). Warmed on idle via useIdlePreload so the
@@ -245,6 +260,78 @@ export function TasksShell({
     () => groupByParent(collectionTasks),
     [collectionTasks],
   );
+  // Whole-workspace parent -> children, for reparent's landing position (a
+  // Flows drop in scope "all" can target a parent outside the active collection).
+  const allChildrenByParent = useMemo(() => groupByParent(tasks), [tasks]);
+
+  // Flows scope "all": every collection the viewer can see, instead of only the
+  // active one. Status events, blocks and checkpoints are fetched per workspace
+  // and looked up by task id, so they already cover every collection; colorOf
+  // and lineStyleOf resolve per task (lineStyleOf from all boards). Board and
+  // List keep reading the collection-scoped maps above.
+  const flowsAll = flowsDisplay.scope === "all";
+  const visibleCollectionIds = useMemo(
+    () => new Set(collections.map((c) => c.id)),
+    [collections],
+  );
+  const flowsTasks = useMemo(
+    () =>
+      flowsAll
+        ? // Tasks filed under no collection are the viewer's too (RLS returned them).
+          tasks.filter((t) => t.collectionId === null || visibleCollectionIds.has(t.collectionId))
+        : collectionTasks,
+    [flowsAll, tasks, visibleCollectionIds, collectionTasks],
+  );
+  const flowsChildrenByParent = useMemo(
+    () => (flowsAll ? groupByParent(flowsTasks) : childrenByParent),
+    [flowsAll, flowsTasks, childrenByParent],
+  );
+  const flowsTreeById = useMemo(
+    () => (flowsAll ? indexById(flowsTasks) : null),
+    [flowsAll, flowsTasks],
+  );
+  // The columns Flows groups and filters by status: the active collection's, or
+  // (scope "all") every visible collection's in switcher order, each named with
+  // its collection so two "To Do" columns stay tellable apart.
+  const flowsBoards = useMemo<Board[]>(() => {
+    if (!flowsAll) return activeBoards;
+    const order = new Map(collections.map((c, i) => [c.id, i]));
+    const nameOf = new Map(collections.map((c) => [c.id, c.name]));
+    return allBoards
+      .filter((b) => order.has(b.collectionId))
+      .sort(
+        (a, b) =>
+          (order.get(a.collectionId) ?? 0) - (order.get(b.collectionId) ?? 0) ||
+          a.position - b.position,
+      )
+      .map((b) =>
+        collections.length > 1 ? { ...b, name: `${b.name} · ${nameOf.get(b.collectionId)}` } : b,
+      );
+  }, [flowsAll, activeBoards, allBoards, collections]);
+  // Every tag in use in the workspace, for the task dialog's suggestions.
+  const tagSuggestions = useMemo(() => collectTags(tasks), [tasks]);
+
+  // Saved Flows streams (member-private). The realtime channel is opened once,
+  // here, and only while the Flows view is on screen.
+  const currentMemberId = workspace.data?.currentMember?.id;
+  const flowsOn = view === "flows" && !isMobile;
+  useTaskStreamsRealtime(flowsOn ? workspaceId : undefined, currentMemberId);
+  const { streams: savedStreamRows } = useTaskStreams(
+    flowsOn ? workspaceId : undefined,
+    currentMemberId,
+  );
+  const createStream = useCreateTaskStream(workspaceId, currentMemberId);
+  const updateStream = useUpdateTaskStream(workspaceId, currentMemberId);
+  const deleteStream = useDeleteTaskStream(workspaceId, currentMemberId);
+  const savedStreams = useMemo<SavedStreamsApi>(
+    () => ({
+      streams: savedStreamRows,
+      onSave: (name, definition) => createStream(name, definition),
+      onRename: (id, name) => updateStream(id, { name }),
+      onDelete: (id) => deleteStream(id),
+    }),
+    [savedStreamRows, createStream, updateStream, deleteStream],
+  );
   // Whole-tree id lookup for the views' drag-to-nest cycle/depth checks.
   const collectionById = useMemo(() => indexById(collectionTasks), [collectionTasks]);
   const topLevel = childrenByParent.get(null) ?? [];
@@ -341,7 +428,7 @@ export function TasksShell({
     // Drag-to-nest: append the child after the parent's existing subtasks, and
     // nudge Flows to expand the parent so the new branch is visible at once.
     reparent: (child, parentId) => {
-      const siblings = childrenByParent.get(parentId) ?? [];
+      const siblings = allChildrenByParent.get(parentId) ?? [];
       const last = siblings[siblings.length - 1];
       void mutations.reparent(child, parentId, positionBetween(last?.position ?? null, null));
       setExpandLane((prev) => ({ id: parentId, key: (prev?.key ?? 0) + 1 }));
@@ -453,9 +540,9 @@ export function TasksShell({
               >
                 {view === "flows" && !isMobile ? (
                   <TaskFlows
-                    tasks={topLevel}
-                    childrenByParent={childrenByParent}
-                    treeById={collectionById}
+                    tasks={flowsChildrenByParent.get(null) ?? []}
+                    childrenByParent={flowsChildrenByParent}
+                    treeById={flowsTreeById ?? collectionById}
                     eventsByTask={eventsByTask}
                     blocksByTask={blocksByTask}
                     checkpointsByTask={checkpointsByTask}
@@ -464,11 +551,13 @@ export function TasksShell({
                     members={memberMap}
                     currentMemberId={workspace.data?.currentMember?.id ?? null}
                     actions={actions}
-                    boards={activeBoards}
+                    boards={flowsBoards}
+                    collections={collections}
                     categories={categories}
                     display={flowsDisplay}
                     onDisplayChange={setFlowsDisplay}
                     onResetDisplay={resetFlowsDisplay}
+                    savedStreams={savedStreams}
                     expandLane={expandLane}
                     loading={eventsLoading || blocksLoading}
                   />
@@ -525,6 +614,7 @@ export function TasksShell({
             dependencies={dependencies}
             dependencyBlocked={dependencyBlocked}
             dependencyCandidates={collectionTasks}
+            tagSuggestions={tagSuggestions}
             createParent={
               dialogs.editor.mode === "create" ? creatingParent : null
             }

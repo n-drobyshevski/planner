@@ -20,7 +20,8 @@
     "scheduledAt": "Scheduled {when}",
     "more": "More",
     "changeColor": "Change color",
-    "moveToColumn": "Move to column"
+    "moveToColumn": "Move to column",
+    "tags": "Tags"
   },
   "toolbar": {
     "view": "View",
@@ -91,7 +92,35 @@
       "noStatus": "No status",
       "noCategory": "No category",
       "count": "{shown} of {total}",
-      "reset": "Reset"
+      "reset": "Reset",
+      "tag": "Tag",
+      "collection": "Collection",
+      "assignee": "Assignee",
+      "noTag": "No tag",
+      "noCollection": "No collection",
+      "unassigned": "Unassigned",
+      "view": "View",
+      "mode": "Lanes",
+      "modeTasks": "Tasks",
+      "modeStreams": "Streams",
+      "modeTasksHint": "One lane per task.",
+      "modeStreamsHint": "One lane per group; open a stream to see its tasks.",
+      "scope": "Collections",
+      "scopeCollection": "This collection",
+      "scopeAll": "All collections",
+      "attention": "Needs attention by",
+      "attentionMode": {
+        "deadline": "Deadline",
+        "priority": "Priority",
+        "combined": "Both"
+      },
+      "attentionHint": {
+        "deadline": "The closer the due date, the sooner it asks.",
+        "priority": "The higher the priority, the sooner it asks.",
+        "combined": "Due date and priority, weighed together."
+      },
+      "attentionDesc": "Most pressing first",
+      "attentionAsc": "Least pressing first"
     },
     "filter": {
       "priority": "Priority",
@@ -104,7 +133,10 @@
       "milestoneExclude": "Exclude",
       "privacy": "Privacy",
       "private": "Private",
-      "shared": "Shared"
+      "shared": "Shared",
+      "status": "Status",
+      "tags": "Tags",
+      "assignee": "Assignee"
     },
     "sort": {
       "manual": "Manual",
@@ -112,7 +144,8 @@
       "due": "Due date",
       "title": "Title",
       "priority": "Priority",
-      "created": "Created"
+      "created": "Created",
+      "attention": "Attention"
     },
     "dnd": {
       "handle": "Move {title}",
@@ -122,6 +155,51 @@
       "emptyTitle": "No matching tasks",
       "emptyBody": "No tasks match the current filters.",
       "clear": "Clear filters"
+    },
+    "attention": {
+      "now": "Needs attention now: {reasons}",
+      "soon": "Needs attention soon: {reasons}",
+      "dueToday": "due today",
+      "dueTomorrow": "due tomorrow",
+      "dueIn": "due in {count, plural, one {# day} other {# days}}",
+      "overdue": "overdue {count, plural, one {# day} other {# days}}",
+      "highPriority": "high priority",
+      "mediumPriority": "medium priority",
+      "shortToday": "Today",
+      "shortTomorrow": "Tomorrow",
+      "shortIn": "{count}d",
+      "shortOverdue": "{count}d late"
+    },
+    "streams": {
+      "all": "All tasks",
+      "expand": "Show the tasks in {name}",
+      "collapse": "Hide the tasks in {name}",
+      "openCount": "{count} open",
+      "doneCount": "{count} done",
+      "overdueCount": "{count} overdue",
+      "attentionCount": "needs attention: {count}",
+      "nextDue": "next due {date}",
+      "nextDueShort": "next {date}",
+      "noDue": "no deadline",
+      "nodeDue": "{count, plural, one {Due} other {# due}}",
+      "nodeOverdue": "{count, plural, one {Overdue} other {# overdue}}",
+      "nodeDone": "{count, plural, one {Done} other {# done}}"
+    },
+    "saved": {
+      "title": "Saved streams",
+      "empty": "Save the grouping, filters and sort you keep coming back to — “Thesis”, “Home this month”… Streams are yours alone; your partner doesn't see them.",
+      "private": "Only you see your saved streams.",
+      "save": "Save as stream…",
+      "nameLabel": "Name for the current display",
+      "namePlaceholder": "Name this stream…",
+      "rename": "Rename {name}",
+      "renameLabel": "New name for {name}",
+      "renameAction": "Save name",
+      "delete": "Delete the saved stream {name}",
+      "nameRequired": "Please name the stream.",
+      "nameTooLong": "Keep the name under {max} characters.",
+      "nameTaken": "You already have a stream with that name.",
+      "saveFailed": "Couldn't save the stream. Try again."
     }
   },
   "checkpointDialog": {
@@ -237,7 +315,16 @@
     "privateHint": "Only you can see this task.",
     "optimizationDetails": "Optimization details",
     "deleteTitle": "Delete this task?",
-    "deleteDescription": "This removes the task, its subtasks, and any blocks it placed on the calendar."
+    "deleteDescription": "This removes the task, its subtasks, and any blocks it placed on the calendar.",
+    "tagsLabel": "Tags",
+    "tagsPlaceholder": "Add a tag",
+    "tagsHint": "Enter or comma adds a tag; Backspace removes the last. Tasks that share a tag form a stream in Flows.",
+    "tagsMax": "Up to {max} tags.",
+    "tagRemove": "Remove tag {tag}",
+    "tagAdded": "Tag {tag} added.",
+    "tagRemoved": "Tag {tag} removed.",
+    "tagSuggestions": "Tags in use",
+    "tagNew": "Add “{tag}”"
   },
   "boardEditor": {
     "createTitle": "New column",

@@ -88,6 +88,8 @@ export const taskFormSchema = z.object({
   // "" = the collection's default (first) board; otherwise a board id.
   boardId: z.string(),
   attributes: itemAttributesSchema,
+  // Already normalized by the tag field; the write schema normalizes again.
+  tags: z.array(z.string()).max(MAX_TAGS),
 });
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
 

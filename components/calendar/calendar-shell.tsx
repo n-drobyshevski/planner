@@ -31,6 +31,7 @@ import { useWorkspace } from "@/lib/hooks/use-workspace";
 import { useWindowEvents, useWorkspaceRealtime } from "@/lib/hooks/use-window-events";
 import { useEventMutations } from "@/lib/hooks/use-event-mutations";
 import { useTasks } from "@/lib/hooks/use-tasks";
+import { collectTags } from "@/lib/tasks/tags";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { qk } from "@/lib/supabase/query-keys";
 import { fetchWindow, type WindowData } from "@/lib/supabase/queries";
@@ -393,6 +394,8 @@ export function CalendarShell({
 
   // --- Tasks (for calendar blocks + backlog rail) ---
   const { tasks } = useTasks(workspace.data?.workspaceId);
+  // Tags in use across the workspace, offered by the task dialog's tag field.
+  const tagSuggestions = useMemo(() => collectTags(tasks), [tasks]);
   const taskMutations = useTaskMutations(workspace.data?.workspaceId);
   const tasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   // A block scheduled from a task follows that task's color, so a recolor in any
@@ -1306,6 +1309,7 @@ export function CalendarShell({
           categories={workspace.data.categories}
           task={editingTask}
           subtasks={childrenByParent.get(editingTask.id) ?? []}
+          tagSuggestions={tagSuggestions}
         />
       )}
 
@@ -1328,6 +1332,7 @@ export function CalendarShell({
             categories={workspace.data.categories}
             members={workspace.data.members}
             defaultSchedule={{ start: editor.defaultStart, end: editor.defaultEnd }}
+            tagSuggestions={tagSuggestions}
             defaultTitle={editor.title}
             onKindChange={onCreateKindChange}
             onCreated={() => setEditor(null)}

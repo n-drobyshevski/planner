@@ -20,7 +20,9 @@ import type {
   FlowNode,
   FlowRow,
   FlowSegment,
+  StreamRow,
 } from "@/lib/tasks/flows-layout";
+import type { StreamSummary } from "@/lib/tasks/flows-streams";
 import { FLOW_GEOM, xForTime, timeForX } from "@/lib/tasks/flows-layout";
 import {
   lineStyleStroke,
@@ -59,6 +61,10 @@ export interface FlowTrackProps {
   segmentLabel: (seg: FlowSegment) => string;
   /** localized tooltip / aria text for a checkpoint marker */
   checkpointLabel: (cp: FlowCheckpoint, task: TaskRow) => string;
+  /** localized tooltip / aria text for a (possibly stacked) marker on a stream line */
+  streamNodeLabel: (stream: StreamSummary, node: FlowNode, count: number) => string;
+  /** expand / collapse a stream's lanes (a stream marker's click) */
+  onToggleStream: (key: string) => void;
   onOpenTask: (t: TaskRow) => void;
   /** open the checkpoint editor for an existing marker */
   onOpenCheckpoint: (cp: FlowCheckpoint) => void;
@@ -88,6 +94,8 @@ export function FlowTrack({
   nodeLabel,
   segmentLabel,
   checkpointLabel,
+  streamNodeLabel,
+  onToggleStream,
   onOpenTask,
   onOpenCheckpoint,
   onCanvasPlace,
@@ -167,8 +175,18 @@ export function FlowTrack({
               </g>
             );
           }
-          // A collapsed stream line is drawn by the streams pass (not yet wired).
-          if (row.kind === "stream") return null;
+          if (row.kind === "stream") {
+            return (
+              <StreamLine
+                key={`stream-${row.key}`}
+                row={row}
+                x={x}
+                nowMs={nowMs}
+                t1={t1}
+                trackWidth={trackWidth}
+              />
+            );
+          }
           const { lane, top, branchRows } = row;
           // Theme-mapped, stroke-legible color — feeds every trunk/branch/node
           // stroke and the checkpoint lane fallback below, so the whole lane
@@ -199,7 +217,7 @@ export function FlowTrack({
               ? lane.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
               : lane.nodes;
           return (
-            <g key={lane.task.id} opacity={lane.done ? 0.55 : 1}>
+            <g key={row.rowKey} opacity={lane.done ? 0.55 : 1}>
               {lane.milestone ? (
                 <>
                   {!lane.done && (
@@ -350,24 +368,43 @@ export function FlowTrack({
 
       {/* interactive hit-targets (focus ring + tooltip + open) */}
       {rows.map((row) => {
+        if (row.kind === "stream") {
+          const y = row.top + G.streamHeight / 2;
+          return stackNodes(row.stream.nodes).map(({ node, count }) =>
+            hitButton(
+              `stream-${row.key}-${node.kind}-${node.ms}`,
+              streamNodeLabel(row.stream, node, count),
+              x(node.ms),
+              y,
+              () => onToggleStream(row.key),
+              row.isExpanded,
+            ),
+          );
+        }
         if (row.kind !== "lane") return null;
         const { lane, top, branchRows } = row;
+        // Keys carry the row key: a multi-tag task has a row in each group.
+        const rk = row.rowKey;
         const trunkY = top + G.laneHeight / 2;
         const hits: ReactNode[] = [];
         const planned = !lane.milestone && lane.startMs > nowMs && lane.endMs === null;
         if (lane.milestone || planned) {
-          hits.push(renderHitAt(lane.task, segmentLabel(lane), x(lane.startMs), trunkY, "marker"));
+          hits.push(
+            renderHitAt(lane.task, segmentLabel(lane), x(lane.startMs), trunkY, `${rk}-marker`),
+          );
         }
         const trunkNodes =
           lane.milestone || planned
             ? lane.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
             : lane.nodes;
-        trunkNodes.forEach((n, i) => hits.push(renderHit(lane.task, n, x(n.ms), trunkY, i)));
+        trunkNodes.forEach((n, i) =>
+          hits.push(renderHit(lane.task, n, x(n.ms), trunkY, `${rk}-${i}`)),
+        );
         // Checkpoint hits last so a marker co-located with a status node wins
         // the click (it opens the checkpoint editor, not the task).
         lane.checkpoints.forEach((cp) =>
           hits.push(
-            hitButton(`cp-${cp.id}`, checkpointLabel(cp, lane.task), x(cp.ms), trunkY, () =>
+            hitButton(`${rk}-cp-${cp.id}`, checkpointLabel(cp, lane.task), x(cp.ms), trunkY, () =>
               onOpenCheckpoint(cp),
             ),
           ),
@@ -378,13 +415,17 @@ export function FlowTrack({
           if (branch.milestone || bPlanned) {
             // marker sits just past the diverge elbow (see <Branch>)
             const mx = x(branch.startMs) + ELBOW;
-            hits.push(renderHitAt(branch.task, segmentLabel(branch), mx, subY, "marker"));
+            hits.push(
+              renderHitAt(branch.task, segmentLabel(branch), mx, subY, `${rk}-marker`),
+            );
           }
           const bNodes =
             branch.milestone || bPlanned
               ? branch.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
               : branch.nodes;
-          bNodes.forEach((n, i) => hits.push(renderHit(branch.task, n, x(n.ms), subY, i)));
+          bNodes.forEach((n, i) =>
+            hits.push(renderHit(branch.task, n, x(n.ms), subY, `${rk}-${i}`)),
+          );
         });
         return hits;
       })}
@@ -406,7 +447,7 @@ export function FlowTrack({
     node: FlowNode,
     cx: number,
     cy: number,
-    key: number,
+    key: string,
   ) {
     return renderHitAt(task, nodeLabel(node, task), cx, cy, `${node.kind}-${key}`);
   }
@@ -428,12 +469,15 @@ export function FlowTrack({
     cx: number,
     cy: number,
     onClick: () => void,
+    /** a stream marker toggles its stream: report the state like a disclosure */
+    expanded?: boolean,
   ) {
     return (
       <button
         key={key}
         type="button"
         aria-label={text}
+        aria-expanded={expanded}
         title={text}
         onClick={onClick}
         onMouseEnter={() => setHover({ x: cx, y: cy, text })}
@@ -555,6 +599,127 @@ function Branch({
         open && <OpenCap x={mergeX} y={subY} color={color} mine={mine} small />
       )}
     </>
+  );
+}
+
+/**
+ * Markers on a stream line, stacked: same kind, same day, same overdue state
+ * collapse into one marker with a count, so a week with three deadlines reads
+ * as "3" at that day rather than three overlapping diamonds.
+ */
+function stackNodes(nodes: FlowNode[]): { node: FlowNode; count: number }[] {
+  const out: { node: FlowNode; count: number }[] = [];
+  const seen = new Map<string, { node: FlowNode; count: number }>();
+  for (const n of nodes) {
+    const k = `${n.kind}:${n.ms}:${n.overdue ? 1 : 0}`;
+    const hit = seen.get(k);
+    if (hit) hit.count++;
+    else {
+      const entry = { node: n, count: 1 };
+      seen.set(k, entry);
+      out.push(entry);
+    }
+  }
+  return out;
+}
+
+/**
+ * One collapsed stream: a single line from the stream's first start to now
+ * (or to its last finish once every lane is done), then the dotted "planned"
+ * continuation out to its furthest open deadline. On it sit the open lanes' due
+ * diamonds and the finished lanes' done marks; done marks are drawn small and
+ * faded so the cluster of deadlines ahead of the now-line is what reads first.
+ */
+function StreamLine({
+  row,
+  x,
+  nowMs,
+  t1,
+  trackWidth,
+}: {
+  row: StreamRow;
+  x: (ms: number) => number;
+  nowMs: number;
+  t1: number;
+  trackWidth: number;
+}) {
+  const s = row.stream;
+  const y = row.top + G.streamHeight / 2;
+  const color = row.color ? toPaletteStroke(row.color) : "var(--muted-foreground)";
+  const open = s.endMs === null;
+  const startX = x(s.startMs);
+  const endX = x(open ? Math.min(nowMs, t1) : (s.endMs as number));
+  let reach = nowMs;
+  for (const n of s.nodes) if (n.kind === "due" && n.ms > reach) reach = n.ms;
+  const stacks = stackNodes(s.nodes);
+  return (
+    <g aria-hidden>
+      <rect
+        x={0}
+        y={row.top}
+        width={trackWidth}
+        height={row.height}
+        fill="var(--muted)"
+        opacity={0.25}
+      />
+      <line
+        x1={0}
+        y1={row.top + row.height}
+        x2={trackWidth}
+        y2={row.top + row.height}
+        stroke="var(--border)"
+      />
+      <g opacity={open ? 1 : 0.55}>
+        {endX - startX > 0.5 && (
+          <line
+            x1={startX}
+            y1={y}
+            x2={endX}
+            y2={y}
+            stroke={color}
+            strokeWidth={G.trunkWidth + 1}
+            strokeOpacity={0.8}
+            strokeLinecap="round"
+          />
+        )}
+        {open && reach > nowMs && (
+          <FutureExtension
+            x1={x(Math.min(nowMs, t1))}
+            x2={x(Math.min(reach, t1))}
+            y={y}
+            color={color}
+            mine
+            width={G.trunkWidth + 1}
+          />
+        )}
+        {open && reach <= nowMs && <OpenCap x={endX} y={y} color={color} mine />}
+        {/* done marks first (underneath), then the deadlines on top */}
+        {[...stacks]
+          .sort((a, b) => (a.node.kind === "done" ? 0 : 1) - (b.node.kind === "done" ? 0 : 1))
+          .map(({ node, count }) => {
+            const cx = x(node.ms);
+            const done = node.kind === "done";
+            return (
+              <g key={`${node.kind}-${node.ms}-${node.overdue ? 1 : 0}`} opacity={done ? 0.6 : 1}>
+                <NodeShape node={node} cx={cx} cy={y} color={color} small={done} />
+                {count > 1 && (
+                  <text
+                    x={cx}
+                    y={y - G.nodeRadius - 5}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fontWeight={600}
+                    fill={node.overdue ? "var(--destructive)" : "var(--foreground)"}
+                    className="tabular-nums"
+                  >
+                    {count}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+      </g>
+    </g>
   );
 }
 
