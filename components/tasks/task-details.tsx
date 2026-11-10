@@ -310,6 +310,22 @@ export function TaskDetails({
               )}
             </div>
 
+            {/* Tags (what groups the task into Flows streams), read-only. */}
+            {task.tags.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5" aria-label={t("details.tags")}>
+                {task.tags.map((tag) => (
+                  <li key={tag}>
+                    <Badge variant="outline" className="font-normal text-foreground">
+                      <span aria-hidden className="text-muted-foreground">
+                        #
+                      </span>
+                      {tag}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             {/* Subtask progress. */}
             {progress?.total ? (
               <div className="flex flex-col gap-1.5">

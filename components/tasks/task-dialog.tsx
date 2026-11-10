@@ -51,9 +51,11 @@ import { PendingIcon } from "@/components/ui/pending-icon";
 import { CreateContextDialog } from "@/components/shared/create-context-dialog";
 import { SubtaskEditor } from "./subtask-editor";
 import { TaskDependenciesField } from "./task-dependencies-field";
+import { TagField } from "./tag-field";
 import { AttributeFields } from "@/components/shared/attribute-fields";
 import { useTaskMutations } from "@/lib/hooks/use-task-mutations";
 import { taskFormSchema, type TaskFormValues } from "@/lib/tasks/schemas";
+import { normalizeTags } from "@/lib/tasks/tags";
 import {
   ATTRIBUTE_KEYS,
   parseAttributes,
@@ -134,6 +136,8 @@ export interface TaskDialogProps {
   onOpenSubtask?: (taskId: string) => void;
   /** create mode: fired after the new task is successfully inserted. */
   onCreated?: () => void;
+  /** tags already in use in the workspace (most used first), offered as suggestions */
+  tagSuggestions?: readonly string[];
 }
 
 export function TaskDialog(props: TaskDialogProps) {
@@ -218,6 +222,7 @@ export function TaskDialog(props: TaskDialogProps) {
       startDate: values.startDate || null,
       isMilestone: values.isMilestone,
       attributes: values.attributes,
+      tags: normalizeTags(values.tags),
     };
   }
 
@@ -273,7 +278,11 @@ export function TaskDialog(props: TaskDialogProps) {
     if (!task) return;
     const completedAt = done ? task.completedAt ?? Date.now() : null;
     // The payload is TaskRow-shaped, so it doubles as the optimistic row patch.
-    const rowPatch = { ...payload, boardId, completedAt };
+    // Unchanged tags stay out of the patch, so an edit that doesn't touch them
+    // never names the column (mirrors the create path in taskInputToRow).
+    const { tags, ...rest } = payload;
+    const tagsChanged = tags.join("\u0000") !== task.tags.join("\u0000");
+    const rowPatch = { ...rest, ...(tagsChanged ? { tags } : {}), boardId, completedAt };
     close();
     void mutations.update(task.id, rowPatch, undefined, rowPatch);
   }
@@ -452,6 +461,28 @@ export function TaskDialog(props: TaskDialogProps) {
                         clearable
                         aria-label={t("taskDialog.dueDateLabel")}
                       />
+                    </Field>
+                  )}
+                </form.Field>
+
+                {/* Tags: what groups a task into a stream in Flows. */}
+                <form.Field name="tags">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel id="task-tags-label" htmlFor="task-tags">
+                        {t("taskDialog.tagsLabel")}
+                      </FieldLabel>
+                      <TagField
+                        id="task-tags"
+                        labelId="task-tags-label"
+                        describedById="task-tags-hint"
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        suggestions={props.tagSuggestions ?? []}
+                      />
+                      <FieldDescription id="task-tags-hint">
+                        {t("taskDialog.tagsHint")}
+                      </FieldDescription>
                     </Field>
                   )}
                 </form.Field>
@@ -896,6 +927,7 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
       isMilestone: task.isMilestone,
       boardId: task.boardId ?? "",
       attributes: parseAttributes(task.attributes),
+      tags: [...task.tags],
     };
   }
   // A subtask inherits its parent's assignee, context, and privacy (matching
@@ -912,5 +944,6 @@ function buildInitial(props: TaskDialogProps): TaskFormValues {
     isMilestone: false,
     boardId: createParent?.boardId ?? defaultBoardId ?? "",
     attributes: {},
+    tags: [],
   };
 }

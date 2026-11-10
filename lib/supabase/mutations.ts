@@ -4,6 +4,7 @@ import type {
   EventRow,
   InsightsPrefs,
   InsightsView,
+  TaskStream,
   SleepLog,
   MemberSleepPrefs,
   TaskRow,
@@ -22,6 +23,7 @@ import {
   mapEvent,
   mapInsightsPrefs,
   mapInsightsView,
+  mapTaskStream,
   mapSleepLog,
   mapMemberSleepPrefs,
   mapTask,
@@ -33,6 +35,8 @@ import {
   eventInputToRow,
   eventPatchToRow,
   insightsViewInputToRow,
+  taskStreamInputToRow,
+  taskStreamPatchToRow,
   sleepLogInputToRow,
   memberSleepPrefsInputToRow,
   taskInputToRow,
@@ -44,6 +48,8 @@ import {
   type CategoryGoalInput,
   type EventInput,
   type InsightsViewInput,
+  type TaskStreamInput,
+  type TaskStreamPatch,
   type SleepLogInput,
   type MemberSleepPrefsInput,
   type TaskInput,
@@ -67,6 +73,7 @@ import {
   boardPatchSchema,
   checkpointInputSchema,
   checkpointPatchSchema,
+  taskStreamNameSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
 import type { ItemAttributes } from "@/lib/attributes/schema";
@@ -98,9 +105,30 @@ function guardUpdatedAt<Q extends { gte: (c: string, v: string) => Q; lt: (c: st
   return q.gte("updated_at", toIso(expectedUpdatedAt)).lt("updated_at", toIso(expectedUpdatedAt + 1));
 }
 
+/** Postgres unique_violation — see supabase/migrations/*_client_request_id.sql. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * True when an insert failed on the idempotency index itself, not on some
+ * other unique constraint (a caller-chosen id that already exists, say): only
+ * then is "return the row already created for this key" the right answer.
+ */
+function isClientRequestReplay(error: { code?: string; message?: string; details?: string }): boolean {
+  return (
+    error.code === UNIQUE_VIOLATION &&
+    `${error.message ?? ""} ${error.details ?? ""}`.includes("client_request_id")
+  );
+}
+
 /**
  * Insert an event and return the stored row. Pass `id` to choose the new
  * row's id up front, so an insert whose answer is lost can still be undone.
+ *
+ * When `input.clientRequestId` is set and a prior call already created an
+ * event for it (same owner), the unique index on
+ * `(owner_id, client_request_id)` rejects the duplicate insert and we return
+ * that existing row instead of erroring — safe to retry after a dropped
+ * response or a replayed job.
  */
 export async function createEvent(
   sb: SupabaseClient,
@@ -112,6 +140,26 @@ export async function createEvent(
     .from("events")
     .insert(id === undefined ? row : { ...row, id })
     .select()
+    .single();
+  if (error) {
+    if (isClientRequestReplay(error) && input.clientRequestId) {
+      return fetchEventByClientRequestId(sb, input.ownerId, input.clientRequestId);
+    }
+    throw error;
+  }
+  return mapEvent(data);
+}
+
+async function fetchEventByClientRequestId(
+  sb: SupabaseClient,
+  ownerId: string,
+  clientRequestId: string,
+): Promise<EventRow> {
+  const { data, error } = await sb
+    .from("events")
+    .select()
+    .eq("owner_id", ownerId)
+    .eq("client_request_id", clientRequestId)
     .single();
   if (error) throw error;
   return mapEvent(data);
@@ -1246,6 +1294,61 @@ export async function deleteInsightsView(
   if (error) throw error;
 }
 
+/** Postgres unique_violation: the (member_id, lower(name)) index. */
+function streamWriteError(error: { code?: string }): unknown {
+  return error.code === "23505"
+    ? new Error("You already have a stream with that name.")
+    : error;
+}
+
+/** Save a new stream. The name is trimmed and validated (1..60). */
+export async function createTaskStream(
+  sb: SupabaseClient,
+  input: TaskStreamInput,
+): Promise<TaskStream> {
+  const name = parseInput(taskStreamNameSchema, input.name);
+  const { data, error } = await sb
+    .from("task_streams")
+    .insert(taskStreamInputToRow({ ...input, name }))
+    .select()
+    .single();
+  if (error) throw streamWriteError(error);
+  return mapTaskStream(data);
+}
+
+/**
+ * Rename a stream and/or replace its definition. A provided name is trimmed
+ * and validated; an empty patch is a no-op read-back of the row.
+ */
+export async function updateTaskStream(
+  sb: SupabaseClient,
+  streamId: string,
+  patch: TaskStreamPatch,
+): Promise<TaskStream> {
+  const row = taskStreamPatchToRow({
+    ...patch,
+    name:
+      patch.name === undefined
+        ? undefined
+        : parseInput(taskStreamNameSchema, patch.name),
+  });
+  const query =
+    Object.keys(row).length === 0
+      ? sb.from("task_streams").select().eq("id", streamId)
+      : sb.from("task_streams").update(row).eq("id", streamId).select();
+  const { data, error } = await query.single();
+  if (error) throw streamWriteError(error);
+  return mapTaskStream(data);
+}
+
+export async function deleteTaskStream(
+  sb: SupabaseClient,
+  streamId: string,
+): Promise<void> {
+  const { error } = await sb.from("task_streams").delete().eq("id", streamId);
+  if (error) throw error;
+}
+
 /**
  * Merge a partial prefs change into the member's single row (insert-or-update
  * on the member_id PK). Only the provided fields change; `updated_at` bumps so
@@ -1277,14 +1380,42 @@ export async function upsertInsightsPrefs(
 
 // --- Tasks -----------------------------------------------------------------
 
+/**
+ * Create a task. When `input.clientRequestId` is set and a prior call already
+ * created a task for it (same owner), the unique index on
+ * `(owner_id, client_request_id)` rejects the duplicate insert and we return
+ * that existing row instead of erroring — safe to retry after a dropped
+ * response or a replayed job.
+ */
 export async function createTask(
   sb: SupabaseClient,
   input: TaskInput,
 ): Promise<TaskRow> {
+  const parsed = parseInput(taskInputSchema, input);
   const { data, error } = await sb
     .from("tasks")
-    .insert(taskInputToRow(parseInput(taskInputSchema, input)))
+    .insert(taskInputToRow(parsed))
     .select()
+    .single();
+  if (error) {
+    if (isClientRequestReplay(error) && parsed.clientRequestId) {
+      return fetchTaskByClientRequestId(sb, parsed.ownerId, parsed.clientRequestId);
+    }
+    throw error;
+  }
+  return mapTask(data);
+}
+
+async function fetchTaskByClientRequestId(
+  sb: SupabaseClient,
+  ownerId: string,
+  clientRequestId: string,
+): Promise<TaskRow> {
+  const { data, error } = await sb
+    .from("tasks")
+    .select()
+    .eq("owner_id", ownerId)
+    .eq("client_request_id", clientRequestId)
     .single();
   if (error) throw error;
   return mapTask(data);

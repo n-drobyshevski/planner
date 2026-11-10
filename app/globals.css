@@ -1033,3 +1033,17 @@
   animation-duration: var(--dur-slow);
   animation-timing-function: var(--ease-out-quint);
 }
+
+/* ---- Flows runways: ink for a title inside a bar ----
+   A runway's empty part is a faint tint of its lane colour over the card; this
+   ink is the foreground pushed one step further from the card (darker in light
+   themes, lighter in dark ones), so a title on the tint keeps AAA (7:1) even in
+   palettes whose own foreground only just clears 7:1 on a bare card (Latte,
+   Frappé). Over the solid progress fill the title is white, on a fill whose
+   lightness is capped low enough for white to clear 7:1 (flow-track.tsx). */
+:root {
+  --runway-ink: oklch(from var(--foreground) min(l, 0.26) c h);
+}
+.dark {
+  --runway-ink: oklch(from var(--foreground) max(l, 0.95) min(c, 0.02) h);
+}

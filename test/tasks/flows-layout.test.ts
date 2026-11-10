@@ -8,6 +8,7 @@ import {
   timeForX,
   FLOW_GEOM,
 } from "@/lib/tasks/flows-layout";
+import { buildStreams } from "@/lib/tasks/flows-streams";
 import type { EventRow, TaskCheckpoint, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 const T0 = Date.UTC(2026, 5, 1); // Mon 1 Jun 2026 UTC
@@ -35,6 +36,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     sequential: false,
     completedAt: null,
     attributes: {},
+    tags: [],
     createdAt: T0,
     updatedAt: T0,
     updatedBy: null,
@@ -451,5 +453,85 @@ describe("buildFlowLanes — deep nesting", () => {
     expect(lane.branchRows[0].subTop).toBe(FLOW_GEOM.laneHeight);
     expect(lane.branchRows[1].subTop).toBe(FLOW_GEOM.laneHeight + FLOW_GEOM.subRowHeight);
     expect(totalHeight).toBe(FLOW_GEOM.laneHeight + 2 * FLOW_GEOM.subRowHeight);
+  });
+});
+
+describe("layoutRows — rowKey, summaries and streams mode", () => {
+  const mk = (ids: string[]) =>
+    buildFlowLanes({
+      topLevel: ids.map((id) => task({ id })),
+      childrenByParent: new Map(),
+      eventsByTask: new Map(),
+      nowMs: now,
+    });
+  const opts = { nowMs: now, today: "2026-06-11", mode: "combined" as const };
+
+  it("gives every lane row a rowKey, distinct when a lane sits in two groups", () => {
+    const [a, b] = mk(["a", "b"]);
+    const groups = [
+      { key: "tag:x", label: "x", lanes: [a, b], header: true },
+      { key: "tag:y", label: "y", lanes: [a], header: true },
+    ];
+    const { rows } = layoutRows(groups, new Set());
+    const keys = rows.flatMap((r) => (r.kind === "lane" ? [r.rowKey] : []));
+    expect(keys).toEqual(["tag:x:a", "tag:x:b", "tag:y:a"]);
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it("default call is unchanged: no summary, no stream rows", () => {
+    const lanes = mk(["a"]);
+    const { rows, totalHeight } = layoutRows([{ key: "g", label: "G", lanes, header: true }], new Set());
+    expect(rows.map((r) => r.kind)).toEqual(["group", "lane"]);
+    expect("summary" in rows[0]).toBe(false);
+    expect(totalHeight).toBe(FLOW_GEOM.groupHeaderHeight + FLOW_GEOM.laneHeight);
+  });
+
+  it("attaches summaries to headers in tasks mode when streams are supplied", () => {
+    const groups = [{ key: "g", label: "G", lanes: mk(["a"]), header: true }];
+    const streams = buildStreams(groups, opts);
+    const { rows } = layoutRows(groups, new Set(), { streams });
+    const h = rows[0];
+    expect(h.kind === "group" && h.summary).toBe(streams[0]);
+  });
+
+  it("streams mode emits one collapsed row per group, no headers", () => {
+    const l = mk(["a", "b", "c"]);
+    const groups = [
+      { key: "g1", label: "One", lanes: [l[0], l[1]], header: true },
+      { key: "g2", label: "Two", lanes: [l[2]], header: true },
+    ];
+    const streams = buildStreams(groups, opts);
+    const { rows, totalHeight } = layoutRows(groups, new Set(), { mode: "streams", streams });
+    expect(rows.map((r) => r.kind)).toEqual(["stream", "stream"]);
+    expect(rows[1].top).toBe(FLOW_GEOM.streamHeight);
+    expect(totalHeight).toBe(2 * FLOW_GEOM.streamHeight);
+    const r0 = rows[0];
+    if (r0.kind === "stream") {
+      expect(r0.isExpanded).toBe(false);
+      expect(r0.stream).toBe(streams[0]);
+      expect(r0.label).toBe("One");
+    }
+  });
+
+  it("expanding a stream reveals only its own lane rows beneath it", () => {
+    const l = mk(["a", "b", "c"]);
+    const groups = [
+      { key: "g1", label: "One", lanes: [l[0], l[1]], header: true },
+      { key: "g2", label: "Two", lanes: [l[2]], header: true },
+    ];
+    const streams = buildStreams(groups, opts);
+    const { rows, totalHeight } = layoutRows(groups, new Set(), {
+      mode: "streams",
+      streams,
+      expandedStreams: new Set(["g1"]),
+    });
+    expect(rows.map((r) => r.kind)).toEqual(["stream", "lane", "lane", "stream"]);
+    expect(rows[1].top).toBe(FLOW_GEOM.streamHeight);
+    expect(rows[3].top).toBe(FLOW_GEOM.streamHeight + 2 * FLOW_GEOM.laneHeight);
+    expect(totalHeight).toBe(2 * FLOW_GEOM.streamHeight + 2 * FLOW_GEOM.laneHeight);
+    const first = rows[0];
+    if (first.kind === "stream") expect(first.isExpanded).toBe(true);
+    const lane1 = rows[1];
+    if (lane1.kind === "lane") expect(lane1.rowKey).toBe("g1:a");
   });
 });

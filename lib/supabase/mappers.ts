@@ -3,6 +3,8 @@
 
 import { parseAttributes, type ItemAttributes } from "@/lib/attributes/schema";
 import { asFlowLineStyle } from "@/lib/tasks/flow-line-styles";
+import { coerceFlowsDisplay, type FlowsDisplay } from "@/lib/tasks/flows-display";
+import { normalizeTags } from "@/lib/tasks/tags";
 import type {
   EventRow,
   EventStatus,
@@ -12,6 +14,7 @@ import type {
   CategoryGoal,
   InsightsPrefs,
   InsightsView,
+  TaskStream,
   Collection,
   Board,
   SleepLog,
@@ -232,6 +235,53 @@ export function insightsViewInputToRow(input: InsightsViewInput): Row {
   };
 }
 
+export function mapTaskStream(r: Row): TaskStream {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    memberId: r.member_id as string,
+    name: r.name as string,
+    // Lenient: a row written by an older/newer client (or hand-edited) falls
+    // back to defaults field by field instead of throwing.
+    definition: coerceFlowsDisplay(r.definition),
+    position: (r.position as number) ?? 0,
+    createdAt: toMs(r.created_at),
+    updatedAt: toMs(r.updated_at),
+  };
+}
+
+/** Insert payload for a saved stream. `name` is expected already trimmed. */
+export interface TaskStreamInput {
+  workspaceId: string;
+  memberId: string;
+  name: string;
+  definition: FlowsDisplay;
+  position?: number;
+}
+
+export function taskStreamInputToRow(input: TaskStreamInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    member_id: input.memberId,
+    name: input.name,
+    definition: input.definition,
+    position: input.position ?? 0,
+  };
+}
+
+/** Update payload: rename and/or replace the definition. */
+export interface TaskStreamPatch {
+  name?: string;
+  definition?: FlowsDisplay;
+}
+
+export function taskStreamPatchToRow(patch: TaskStreamPatch): Row {
+  const row: Row = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.definition !== undefined) row.definition = patch.definition;
+  return row;
+}
+
 /** Lenient read of the prefs `dashboard` jsonb: junk degrades to {}. */
 function mapDashboard(value: unknown): InsightsPrefs["dashboard"] {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
@@ -350,6 +400,8 @@ export function mapTask(r: Row): TaskRow {
     sequential: Boolean(r.sequential),
     completedAt: toMsOrNull(r.completed_at),
     attributes: parseAttributes(r.attributes),
+    // Absent before the tags migration lands, and never trusted to be clean.
+    tags: Array.isArray(r.tags) ? normalizeTags(r.tags) : [],
     createdAt: toMs(r.created_at),
     updatedAt: toMs(r.updated_at),
     updatedBy: (r.updated_by as string | null) ?? null,
@@ -487,6 +539,8 @@ export interface EventInput {
   taskId?: string | null;
   /** whole-object write; callers start from the parsed full bag so unknown keys survive */
   attributes?: ItemAttributes;
+  /** caller-chosen idempotency key (e.g. an MCP client's), scoped per owner */
+  clientRequestId?: string;
 }
 
 export function eventInputToRow(input: EventInput): Row {
@@ -512,6 +566,11 @@ export function eventInputToRow(input: EventInput): Row {
     recurrence_ends_at: toIsoOrNull(input.recurrenceEndsAt ?? null),
     task_id: input.taskId ?? null,
     attributes: input.attributes ?? {},
+    // Only set when the caller passes one — omitting the key (rather than
+    // `?? null`) means this insert/update still works against a DB that
+    // hasn't run the client_request_id migration yet, as long as no caller
+    // passes one (see supabase/migrations/*_client_request_id.sql).
+    ...(input.clientRequestId ? { client_request_id: input.clientRequestId } : {}),
   };
 }
 
@@ -569,6 +628,10 @@ export interface TaskInput {
   completedAt?: number | null;
   /** whole-object write; callers start from the parsed full bag so unknown keys survive */
   attributes?: ItemAttributes;
+  /** free-form labels; normalized on write (lib/tasks/tags.ts) */
+  tags?: string[];
+  /** caller-chosen idempotency key (e.g. an MCP client's), scoped per owner */
+  clientRequestId?: string;
 }
 
 export function taskInputToRow(input: TaskInput): Row {
@@ -592,6 +655,12 @@ export function taskInputToRow(input: TaskInput): Row {
     sequential: input.sequential ?? false,
     completed_at: toIsoOrNull(input.completedAt ?? null),
     attributes: input.attributes ?? {},
+    // See eventInputToRow: omit rather than null so writes still work before
+    // the client_request_id migration lands, as long as nothing sets one.
+    ...(input.clientRequestId ? { client_request_id: input.clientRequestId } : {}),
+    // Same reasoning: an untagged create never names the column, so it still
+    // works if the app deploys before the tags migration.
+    ...(input.tags && input.tags.length > 0 ? { tags: normalizeTags(input.tags) } : {}),
   };
 }
 
@@ -615,6 +684,7 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("sequential" in patch) row.sequential = patch.sequential;
   if ("completedAt" in patch) row.completed_at = toIsoOrNull(patch.completedAt ?? null);
   if ("attributes" in patch) row.attributes = patch.attributes ?? {};
+  if ("tags" in patch) row.tags = normalizeTags(patch.tags ?? []);
   return row;
 }
 

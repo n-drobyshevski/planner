@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { itemAttributesSchema } from "@/lib/attributes/schema";
 import { flowLineStyleSchema } from "@/lib/tasks/flow-line-styles";
+import { MAX_TAGS, MAX_TAG_LENGTH, normalizeTags } from "@/lib/tasks/tags";
 
 const nullableUuid = z.uuid().nullable();
 
@@ -17,6 +18,15 @@ const titleSchema = z
   .min(1, "Please add a title.")
   .max(500, "Keep the title under 500 characters.");
 const descriptionSchema = z.string().max(10_000, "Keep the description under 10,000 characters.");
+
+/**
+ * Tags are forgiving on the way in ("#Work", " work ") and normalized by the
+ * schema, so every writer stores the same form the DB CHECK expects.
+ */
+export const tagsSchema = z
+  .array(z.string().max(MAX_TAG_LENGTH * 2))
+  .max(MAX_TAGS * 2)
+  .transform((tags) => normalizeTags(tags));
 
 const taskInputBase = z.object({
   workspaceId: z.uuid(),
@@ -39,6 +49,8 @@ const taskInputBase = z.object({
   sequential: z.boolean().optional(),
   completedAt: z.number().int().nullable().optional(),
   attributes: itemAttributesSchema.optional(),
+  tags: tagsSchema.optional(),
+  clientRequestId: z.string().min(1).max(100).optional(),
 });
 
 /**
@@ -76,6 +88,8 @@ export const taskFormSchema = z.object({
   // "" = the collection's default (first) board; otherwise a board id.
   boardId: z.string(),
   attributes: itemAttributesSchema,
+  // Already normalized by the tag field; the write schema normalizes again.
+  tags: z.array(z.string()).max(MAX_TAGS),
 });
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
 
@@ -194,6 +208,18 @@ export type CollectionFormValues = z.infer<typeof collectionFormSchema>;
 export const collectionPatchSchema = collectionInputSchema
   .pick({ name: true, color: true, sortOrder: true })
   .partial();
+
+/**
+ * A saved stream's name (task_streams.name). Trimmed, 1..60 characters, the
+ * same bounds as the DB CHECK; uniqueness (per member, ignoring case) is the
+ * unique index's job.
+ */
+export const TASK_STREAM_NAME_MAX = 60;
+export const taskStreamNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Please name the stream.")
+  .max(TASK_STREAM_NAME_MAX, `Keep the name under ${TASK_STREAM_NAME_MAX} characters.`);
 
 /**
  * Parse with a plain Error carrying the first issue's message, so the existing

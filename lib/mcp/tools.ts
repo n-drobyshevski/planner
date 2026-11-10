@@ -8,6 +8,7 @@ import {
   fetchWorkspaceBundle,
   fetchWindow,
   fetchTasks,
+  fetchTaskStreams,
   fetchSleepLogs,
 } from "@/lib/supabase/queries";
 import {
@@ -21,6 +22,26 @@ import {
 } from "@/lib/supabase/mutations";
 import { expandEvents } from "@/lib/recurrence/expand";
 import type { EventInput, TaskInput } from "@/lib/supabase/mappers";
+import {
+  dateInputToMs,
+  dayStartOffset,
+  dateKeyInZone,
+  dateInputToUtcMs,
+} from "@/lib/datetime/local";
+import { projectAgenda, projectAgendaTasks, type AgendaTaskStatus } from "./projection";
+import {
+  projectFlows,
+  resolveFlowOptions,
+  MCP_FLOWS_GROUP_BYS,
+  landingBoardId,
+  projectTaskDetail,
+  subtreeInOrder,
+  type FlowsOut,
+  type McpFlowsGroupBy,
+} from "./flows";
+import { registerFlowsApp } from "./app/register";
+import { MAX_TAGS, MAX_TAG_LENGTH, collectTags, normalizeTag } from "@/lib/tasks/tags";
+import type { Board, TaskRow } from "@/lib/types";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -30,6 +51,43 @@ const toMs = (iso: string): number => {
   return ms;
 };
 const toIso = (ms: number): string => new Date(ms).toISOString();
+
+/** Whether `Intl` accepts `tz` as an IANA time zone identifier. */
+function isValidTimeZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Normalize an all-day [start, end) pair to zone-independent UTC-midnight
+ * calendar-date boundaries, the way `allDayDateKey` reads them back. Without
+ * this, an all-day range sent as local midnight in a non-UTC zone (as a
+ * machine client naturally would) is stored one day early or spanning two
+ * days — see `lib/datetime/local.ts` (`dateInputToUtcMs` / `allDayDateKey`).
+ *
+ * A range already on UTC-midnight boundaries is taken as floating dates and
+ * kept as is (Anchor sends that, and so do most clients writing `…T00:00Z`);
+ * re-reading it in a zone west of UTC would shift it a day early.
+ */
+function allDayRange(
+  start: number,
+  end: number,
+  timeZone: string,
+): { start: number; end: number } {
+  if (start % DAY_MS === 0 && end % DAY_MS === 0 && end > start) return { start, end };
+  const first = dateInputToUtcMs(dateKeyInZone(start, timeZone));
+  const last = dateInputToUtcMs(dateKeyInZone(end, timeZone));
+  // The stored end is exclusive. A caller that gives an inclusive end on the
+  // last day (09:00 to 23:59, or the same instant twice) lands both ends on
+  // one date; that is a one-day event, never a zero-length one.
+  return { start: first, end: last > first ? last : first + DAY_MS };
+}
 
 /** Wrap data as a compact text tool result (no outputSchema → text content). */
 function ok(data: unknown): CallToolResult {
@@ -62,6 +120,94 @@ async function guard(fn: () => Promise<CallToolResult>): Promise<CallToolResult>
   }
 }
 
+/** `get_flows` / `show_flows` input: one shape, so the tool and its view agree. */
+const flowsInputShape = {
+    date: z
+      .iso.date()
+      .describe("The caller's local today, yyyy-MM-dd (deadlines are judged against it)."),
+    groupBy: z
+      .enum(MCP_FLOWS_GROUP_BYS)
+      .optional()
+      .describe("How to split tasks into streams. Default: 'tag'."),
+    stream: z
+      .string()
+      .optional()
+      .describe("A saved stream's id or name; supplies filter, groupBy and attention."),
+    attention: z
+      .enum(["deadline", "priority", "combined"])
+      .optional()
+      .describe(
+        "Scoring: 'deadline', 'priority' or 'combined' (default).",
+      ),
+    mine: z
+      .boolean()
+      .optional()
+      .describe("Only top-level tasks you own or are assigned to. Default: false."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .optional()
+      .describe("Tasks returned per stream. Default: 3."),
+};
+
+interface FlowsArgs {
+  date: string;
+  groupBy?: McpFlowsGroupBy;
+  stream?: string;
+  attention?: "deadline" | "priority" | "combined";
+  mine?: boolean;
+  limit?: number;
+}
+
+/**
+ * The streams for one `get_flows` / `show_flows` call, under the caller's RLS.
+ * Returns a message instead when the named saved stream does not exist (it
+ * lists no names: a stream is private to its member).
+ */
+async function loadFlows(args: FlowsArgs, extra: Parameters<typeof mcpContext>[0]): Promise<FlowsOut | string> {
+  const { sb, memberId, workspaceId } = mcpContext(extra);
+  let saved: Awaited<ReturnType<typeof fetchTaskStreams>>[number] | undefined;
+  if (args.stream !== undefined) {
+    const wanted = args.stream.trim().toLowerCase();
+    const streams = await fetchTaskStreams(sb, workspaceId, memberId);
+    saved =
+      streams.find((s) => s.id === args.stream!.trim()) ??
+      streams.find((s) => s.name.trim().toLowerCase() === wanted);
+    if (!saved) {
+      return "No saved stream matches that id or name. Call get_workspace to see your streams.";
+    }
+  }
+  const opts = resolveFlowOptions(
+    {
+      groupBy: args.groupBy,
+      attention: args.attention,
+    },
+    saved?.definition,
+  );
+  const [bundle, tasks] = await Promise.all([
+    fetchWorkspaceBundle(sb),
+    fetchTasks(sb, workspaceId),
+  ]);
+  return projectFlows({
+    tasks,
+    boards: bundle.boards,
+    categories: bundle.categories,
+    collections: bundle.collections,
+    members: bundle.members,
+    memberId,
+    date: args.date,
+    nowMs: Date.now(),
+    groupBy: opts.groupBy,
+    attention: opts.attention,
+    filter: opts.filter,
+    mine: args.mine ?? false,
+    limit: args.limit ?? 3,
+    streamName: saved?.name,
+  });
+}
+
 // --- registration ----------------------------------------------------------
 
 /**
@@ -81,15 +227,20 @@ export function registerTools(server: McpServer): void {
       title: "Get workspace",
       description:
         "List the workspace's members, categories, collections and boards, with " +
-        "their ids. Call this first — other tools take these ids (categoryId, " +
-        "collectionId, boardId, ownerId).",
+        "their ids, plus every tag in use and your saved streams (id and name). " +
+        "Call this first — other tools take these ids (categoryId, " +
+        "collectionId, boardId, ownerId) and tag names.",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (_args, extra) =>
       guard(async () => {
         const { sb, memberId, workspaceId } = mcpContext(extra);
-        const b = await fetchWorkspaceBundle(sb);
+        const [b, tasks, streams] = await Promise.all([
+          fetchWorkspaceBundle(sb),
+          fetchTasks(sb, workspaceId),
+          fetchTaskStreams(sb, workspaceId, memberId),
+        ]);
         return ok({
           workspaceId,
           you: memberId,
@@ -106,7 +257,101 @@ export function registerTools(server: McpServer): void {
             collectionId: bd.collectionId,
             done: bd.isDone,
           })),
+          tags: collectTags(tasks),
+          streams: streams.map((st) => ({ id: st.id, name: st.name })),
         });
+      }),
+  );
+
+  // -- agenda ---------------------------------------------------------------
+  server.registerTool(
+    "get_agenda",
+    {
+      title: "Get agenda",
+      description:
+        "A compact agenda for one local day (or two, with `days: 2`): your own " +
+        "events plus the partner's (per `partner`), and your own open tasks due " +
+        "in the window. The window is the local day(s) of `date` in `timeZone`, " +
+        "DST-correct — not a UTC day. Built for a machine client (e.g. a daily " +
+        "digest bot), not for browsing; use list_events/list_tasks for that.",
+      inputSchema: {
+        date: z.iso
+          .date()
+          .describe("Local calendar date, yyyy-MM-dd — the window's first day."),
+        timeZone: z
+          .string()
+          .refine(isValidTimeZone, "Not a valid IANA time zone.")
+          .describe("IANA time zone, e.g. 'Europe/Berlin'."),
+        days: z
+          .union([z.literal(1), z.literal(2)])
+          .optional()
+          .describe("Window length in local days. Default: 1."),
+        partner: z
+          .enum(["none", "busy", "shared"])
+          .optional()
+          .describe(
+            "Partner visibility: 'none' (default, no partner items), 'busy' " +
+              "(times only, no titles), 'shared' (the partner's non-private " +
+              "titles too — never a private event, and never an id).",
+          ),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, memberId, workspaceId } = mcpContext(extra);
+        const days = args.days ?? 1;
+        const partnerMode = args.partner ?? "none";
+
+        const start = dateInputToMs(args.date, args.timeZone);
+        const end = dayStartOffset(start, days, args.timeZone);
+        const lastDay = dateKeyInZone(end - 1, args.timeZone);
+
+        // Fetched up front (not just for board state below) so its
+        // categories give `expandEvents` the shared-category ids: without
+        // them a joint event's `isShared` never comes out true and
+        // `projectAgenda` can't recognize it as also the caller's own.
+        const bundle = await fetchWorkspaceBundle(sb);
+        const sharedCategoryIds = new Set(
+          bundle.categories.filter((c) => c.ownerId === null).map((c) => c.id),
+        );
+
+        const { events: eventRows, overrides } = await fetchWindow(sb, workspaceId, {
+          start,
+          end,
+        });
+        const occurrences = expandEvents(eventRows, overrides, { start, end }, sharedCategoryIds);
+        const events = projectAgenda(occurrences, memberId, partnerMode, args.date, lastDay);
+
+        // Board state -> a rough todo/in_progress/done status per task, so
+        // `projectAgendaTasks` can include a due-less task that's in flight.
+        const boardsByCollection = new Map<string, Board[]>();
+        for (const b of bundle.boards) {
+          const list = boardsByCollection.get(b.collectionId) ?? [];
+          list.push(b);
+          boardsByCollection.set(b.collectionId, list);
+        }
+        for (const list of boardsByCollection.values()) {
+          list.sort((a, b) => a.position - b.position);
+        }
+        const statusOf = (t: TaskRow): AgendaTaskStatus => {
+          const cols = t.collectionId ? boardsByCollection.get(t.collectionId) : undefined;
+          const board = t.boardId ? cols?.find((b) => b.id === t.boardId) : undefined;
+          if (!board) return "todo";
+          if (board.isDone) return "done";
+          const firstOpen = cols!.find((b) => !b.isDone);
+          return firstOpen && firstOpen.id === board.id ? "todo" : "in_progress";
+        };
+
+        const allTasks = await fetchTasks(sb, workspaceId);
+        const tasks = projectAgendaTasks(
+          allTasks.map((t) => ({ ...t, status: statusOf(t) })),
+          memberId,
+          args.date,
+          lastDay,
+        );
+
+        return ok({ date: args.date, timeZone: args.timeZone, days, events, tasks });
       }),
   );
 
@@ -181,27 +426,44 @@ export function registerTools(server: McpServer): void {
         location: z.string().max(1000).optional(),
         categoryId: z.string().optional().describe("From get_workspace."),
         rrule: z.string().optional().describe("RFC 5545 RRULE for recurrence."),
+        isPrivate: z
+          .boolean()
+          .optional()
+          .describe("Only you can see it. Default: false (shared, unchanged)."),
+        clientRequestId: z
+          .string()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            "Caller-chosen idempotency key. Re-calling with the same id returns " +
+              "the event already created for it instead of making a duplicate.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     (args, extra) =>
       guard(async () => {
         const { sb, memberId, workspaceId } = mcpContext(extra);
-        const start = toMs(args.start);
-        const end = toMs(args.end);
+        let start = toMs(args.start);
+        let end = toMs(args.end);
         if (end < start) return fail("`end` must be at or after `start`.");
+        const timeZone = args.timeZone ?? "UTC";
+        if (args.allDay) ({ start, end } = allDayRange(start, end, timeZone));
         const input: EventInput = {
           workspaceId,
           ownerId: memberId,
           title: args.title,
           start,
           end,
-          timeZone: args.timeZone ?? "UTC",
+          timeZone,
           allDay: args.allDay ?? false,
           description: args.description ?? null,
           location: args.location ?? null,
           categoryId: args.categoryId ?? null,
           rrule: args.rrule ?? null,
+          isPrivate: args.isPrivate ?? false,
+          clientRequestId: args.clientRequestId,
         };
         const row = await createEvent(sb, input);
         return ok({ id: row.id, title: row.title, start: toIso(row.start) });
@@ -295,10 +557,15 @@ export function registerTools(server: McpServer): void {
       title: "List tasks",
       description:
         "List tasks (RLS-scoped). Optionally filter by collectionId, boardId, or " +
-        "completion. Returns compact rows; use get_workspace to resolve board names.",
+        "completion or tag. Returns compact rows (with tags); use get_workspace " +
+        "to resolve board names.",
       inputSchema: {
         collectionId: z.string().optional(),
         boardId: z.string().optional(),
+        tag: z
+          .string()
+          .optional()
+          .describe("Only tasks carrying this tag (case-insensitive, '#' optional)."),
         includeCompleted: z
           .boolean()
           .optional()
@@ -307,18 +574,28 @@ export function registerTools(server: McpServer): void {
           .boolean()
           .optional()
           .describe("Include subtasks (parentId set). Default: true."),
+        mine: z
+          .boolean()
+          .optional()
+          .describe("Only tasks you own (created). Default: false."),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (args, extra) =>
       guard(async () => {
-        const { sb, workspaceId } = mcpContext(extra);
+        const { sb, workspaceId, memberId } = mcpContext(extra);
         let tasks = await fetchTasks(sb, workspaceId);
         if (args.collectionId)
           tasks = tasks.filter((t) => t.collectionId === args.collectionId);
         if (args.boardId) tasks = tasks.filter((t) => t.boardId === args.boardId);
+        if (args.tag !== undefined) {
+          const tag = normalizeTag(args.tag);
+          if (tag === null) return fail("`tag` is empty.");
+          tasks = tasks.filter((t) => t.tags.includes(tag));
+        }
         if (args.includeCompleted === false)
           tasks = tasks.filter((t) => t.completedAt == null);
+        if (args.mine === true) tasks = tasks.filter((t) => t.ownerId === memberId);
         if (args.includeSubtasks === false)
           tasks = tasks.filter((t) => t.parentId == null);
         return ok({
@@ -332,8 +609,66 @@ export function registerTools(server: McpServer): void {
             parentId: t.parentId ?? undefined,
             priority: t.priority ?? undefined,
             dueDate: t.dueDate ?? undefined,
+            tags: t.tags?.length ? t.tags : undefined,
           })),
         });
+      }),
+  );
+
+  // -- tasks: streams -----------------------------------------------------
+  server.registerTool(
+    "get_flows",
+    {
+      title: "Get flows (attention by stream)",
+      description:
+        "Which tasks need attention now, stream by stream. Tasks are split into " +
+        "streams by `groupBy` (a task with several tags is in each tag's stream) " +
+        "and each stream is scored from its open tasks' deadlines and priorities " +
+        "(a subtask counts toward its parent). Streams come back most-pressing " +
+        "first, each with its counts and its top `limit` open tasks. Pass `stream` " +
+        "(a saved stream's id or name, see get_workspace) to use its filter, " +
+        "grouping and attention mode; explicit `groupBy`/`attention` override it. " +
+        "Includes the partner's shared tasks (never their private ones) unless " +
+        "`mine: true`. Never returns task descriptions.",
+      inputSchema: flowsInputShape,
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const flows = await loadFlows(args, extra);
+        return typeof flows === "string" ? fail(flows) : ok(flows);
+      }),
+  );
+
+  // The same streams as a view: an MCP App the host renders in the chat.
+  registerFlowsApp(server, flowsInputShape, async (args, extra) => {
+    try {
+      const flows = await loadFlows(args, extra);
+      if (typeof flows === "string") return fail(flows);
+      return { ...ok(flows), structuredContent: flows as unknown as Record<string, unknown> };
+    } catch (err) {
+      return errorResult(err);
+    }
+  });
+
+  server.registerTool(
+    "get_task",
+    {
+      title: "Get task",
+      description:
+        "One task by id with its editable fields and its whole subtask tree " +
+        "(flattened, parent before child, each with its depth). RLS-scoped. " +
+        "Never returns descriptions.",
+      inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, workspaceId } = mcpContext(extra);
+        const tasks = await fetchTasks(sb, workspaceId);
+        const task = tasks.find((t) => t.id === args.id);
+        if (!task) return fail(`No task with id ${args.id} is visible to you.`);
+        return ok(projectTaskDetail(task, tasks));
       }),
   );
 
@@ -353,24 +688,70 @@ export function registerTools(server: McpServer): void {
         parentId: z.string().optional().describe("Make this a subtask of this id."),
         categoryId: z.string().optional(),
         priority: z.number().int().min(0).max(3).optional(),
-        dueDate: z.string().optional().describe("Calendar date, yyyy-MM-dd."),
+        tags: z
+          .array(z.string().max(MAX_TAG_LENGTH * 2))
+          .max(MAX_TAGS * 2)
+          .optional()
+          .describe("Free-form labels (normalized: lowercase, '#' dropped, max 12)."),
+        dueDate: z
+          .iso.date()
+          .nullable()
+          .optional()
+          .describe("Calendar date, yyyy-MM-dd, or null for none."),
+        startDate: z
+          .iso.date()
+          .nullable()
+          .optional()
+          .describe("Planned start, yyyy-MM-dd, or null for none."),
+        clientRequestId: z
+          .string()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            "Caller-chosen idempotency key. Re-calling with the same id returns " +
+              "the task already created for it instead of making a duplicate.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     (args, extra) =>
       guard(async () => {
         const { sb, memberId, workspaceId } = mcpContext(extra);
+        // A subtask lives where its parent lives: same collection, same
+        // privacy (the web app does the same), unless the caller says otherwise.
+        let parent: TaskRow | undefined;
+        if (args.parentId) {
+          parent = (await fetchTasks(sb, workspaceId)).find((t) => t.id === args.parentId);
+          if (!parent) return fail(`No task with id ${args.parentId} is visible to you.`);
+        }
+        // A task in a collection sits in one of its columns: without one named,
+        // the first open column, as when the web app creates it.
+        const collectionId = args.collectionId ?? parent?.collectionId ?? null;
+        let boardId = args.boardId ?? null;
+        if (collectionId && !boardId) {
+          const bundle = await fetchWorkspaceBundle(sb);
+          // Only a collection the caller named is checked: an inherited one is
+          // the parent's, and the parent was already found.
+          if (args.collectionId && !bundle.collections.some((c) => c.id === collectionId))
+            return fail(`No collection with id ${collectionId} is visible to you.`);
+          boardId = landingBoardId(bundle.boards, collectionId, false);
+        }
         const input: TaskInput = {
           workspaceId,
           ownerId: memberId,
           title: args.title,
           description: args.description ?? null,
-          collectionId: args.collectionId ?? null,
-          boardId: args.boardId ?? null,
+          collectionId,
+          boardId,
           parentId: args.parentId ?? null,
           categoryId: args.categoryId ?? null,
           priority: args.priority ?? null,
           dueDate: args.dueDate ?? null,
+          startDate: args.startDate ?? null,
+          ...(parent ? { isPrivate: parent.isPrivate } : {}),
+          ...(args.tags !== undefined ? { tags: args.tags } : {}),
+          clientRequestId: args.clientRequestId,
         };
         const row = await createTask(sb, input);
         return ok({ id: row.id, title: row.title });
@@ -391,6 +772,21 @@ export function registerTools(server: McpServer): void {
         boardId: z.string().nullable().optional(),
         priority: z.number().int().min(0).max(3).nullable().optional(),
         dueDate: z.string().nullable().optional(),
+        startDate: z.iso.date().nullable().optional().describe("Planned start, yyyy-MM-dd, or null."),
+        collectionId: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            "Move the task, with its whole subtask tree, to this collection (null = " +
+              "no collection). Each lands in that collection's first open column, or " +
+              "its done column if finished.",
+          ),
+        tags: z
+          .array(z.string().max(MAX_TAG_LENGTH * 2))
+          .max(MAX_TAGS * 2)
+          .optional()
+          .describe("Replace the task's tags (normalized). [] clears them."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
@@ -403,10 +799,48 @@ export function registerTools(server: McpServer): void {
         if (args.boardId !== undefined) patch.boardId = args.boardId;
         if (args.priority !== undefined) patch.priority = args.priority;
         if (args.dueDate !== undefined) patch.dueDate = args.dueDate;
-        if (Object.keys(patch).length === 0)
-          return fail("Provide at least one field to update.");
-        const row = await updateTask(sb, args.id, patch);
-        return ok({ id: row.id, title: row.title });
+        if (args.startDate !== undefined) patch.startDate = args.startDate;
+        if (args.tags !== undefined) patch.tags = args.tags;
+        if (args.collectionId === undefined) {
+          if (Object.keys(patch).length === 0)
+            return fail("Provide at least one field to update.");
+          const row = await updateTask(sb, args.id, patch);
+          return ok({ id: row.id, title: row.title });
+        }
+
+        // A move. Subtasks live where their parent lives, and a column belongs
+        // to one collection, so the whole subtree moves and each task takes a
+        // column of the new collection. Parents go before children and siblings
+        // in order, so a "do in order" parent never sees a later subtask land
+        // in a done column before an earlier one.
+        const { workspaceId } = mcpContext(extra);
+        const [tasks, bundle] = await Promise.all([fetchTasks(sb, workspaceId), fetchWorkspaceBundle(sb)]);
+        const task = tasks.find((t) => t.id === args.id);
+        if (!task) return fail(`No task with id ${args.id} is visible to you.`);
+        const target = args.collectionId;
+        if (target !== null && !bundle.collections.some((c) => c.id === target))
+          return fail(`No collection with id ${target} is visible to you.`);
+        if (task.parentId && target !== task.collectionId)
+          return fail("A subtask stays in its parent's collection. Move the parent instead.");
+        if (target === task.collectionId) {
+          if (Object.keys(patch).length === 0) return ok({ id: task.id, title: task.title, moved: 0 });
+          const row = await updateTask(sb, args.id, patch);
+          return ok({ id: row.id, title: row.title, moved: 0 });
+        }
+        const moving = subtreeInOrder(task, tasks);
+        let moved = 0;
+        let title = task.title;
+        for (const item of moving) {
+          const step: Partial<TaskInput> = {
+            ...(item.id === task.id ? patch : {}),
+            collectionId: target,
+            boardId: landingBoardId(bundle.boards, target, item.completedAt != null),
+          };
+          const row = await updateTask(sb, item.id, step);
+          if (item.id === task.id) title = row.title;
+          moved++;
+        }
+        return ok({ id: task.id, title, moved });
       }),
   );
 

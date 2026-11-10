@@ -69,6 +69,7 @@ function task(over: Partial<TaskRow> = {}): TaskRow {
     sequential: false,
     completedAt: NOW - HOUR,
     attributes: {},
+    tags: [],
     createdAt: NOW - DAY,
     updatedAt: NOW - HOUR,
     updatedBy: null,
