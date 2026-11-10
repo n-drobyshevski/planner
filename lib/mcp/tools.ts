@@ -152,6 +152,9 @@ const flowsInputShape = {
       .describe("Tasks returned per stream. Default: 3."),
 };
 
+/** Open tasks per stream `show_flows` hands its view (not the model). */
+const SHOW_FLOWS_TASKS = 50;
+
 interface FlowsArgs {
   date: string;
   groupBy?: McpFlowsGroupBy;
@@ -641,11 +644,19 @@ export function registerTools(server: McpServer): void {
   );
 
   // The same streams as a view: an MCP App the host renders in the chat.
+  // The view gets every stream's open tasks (up to SHOW_FLOWS_TASKS) so the
+  // user can expand a stream in place; the model's text keeps `limit` per
+  // stream, as get_flows would answer.
   registerFlowsApp(server, flowsInputShape, async (args, extra) => {
     try {
-      const flows = await loadFlows(args, extra);
+      const flows = await loadFlows({ ...args, limit: SHOW_FLOWS_TASKS }, extra);
       if (typeof flows === "string") return fail(flows);
-      return { ...ok(flows), structuredContent: flows as unknown as Record<string, unknown> };
+      const perStream = args.limit ?? 3;
+      const forModel: FlowsOut = {
+        ...flows,
+        streams: flows.streams.map((st) => ({ ...st, tasks: st.tasks.slice(0, perStream) })),
+      };
+      return { ...ok(forModel), structuredContent: flows as unknown as Record<string, unknown> };
     } catch (err) {
       return errorResult(err);
     }
