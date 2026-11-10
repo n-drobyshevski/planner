@@ -16,7 +16,9 @@
     "fixtures:insights": "tsx scripts/export-insights-fixtures.ts",
     "fixtures:ics": "tsx scripts/export-ics-fixtures.ts",
     "supabase": "supabase",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "build:mcp-app": "node scripts/build-mcp-app.mjs",
+    "prebuild": "node scripts/build-mcp-app.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -26,6 +28,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",
@@ -72,6 +75,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
     "babel-plugin-react-compiler": "^1.0.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",

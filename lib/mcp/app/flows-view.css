@@ -1,0 +1,59 @@
+/* The Flows MCP App. Colours fall back to the planner's warm paper palette and
+   pick up the host's own variables when it sends them. light-dark() follows
+   the color-scheme the SDK sets from the host theme. */
+:root {
+  color-scheme: light dark;
+  --bg: var(--color-background-primary, light-dark(#faf8f4, #1c1917));
+  --surface: var(--color-background-secondary, light-dark(#f3efe8, #292524));
+  --text: var(--color-text-primary, light-dark(#1c1917, #f5f2ec));
+  --muted: var(--color-text-secondary, light-dark(#57504a, #b8b0a6));
+  --line: var(--color-border-primary, light-dark(#d9d2c7, #44403c));
+  --late: light-dark(#8f1d1d, #ffb4ab);
+  --accent: light-dark(#44403c, #e7e2da);
+  font: 14px/1.45 var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+#root { padding: 12px 14px 16px; max-width: 760px; margin: 0 auto; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; justify-content: space-between; }
+.title { font-size: 16px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; }
+.field { display: grid; gap: 2px; }
+.field-label { font-size: 11px; color: var(--muted); }
+select, button { font: inherit; color: inherit; }
+select { min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.check { display: inline-flex; gap: 6px; align-items: center; min-height: 32px; }
+.ghost { min-height: 32px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; cursor: pointer; }
+.ghost:hover:not(:disabled) { background: var(--surface); }
+button:disabled { opacity: 0.55; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.notice { min-height: 1.45em; margin: 6px 0 2px; color: var(--muted); font-size: 12px; }
+.streams { display: grid; gap: 8px; }
+.streams.stale { opacity: 0.6; }
+.stream { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.stream-head { display: grid; gap: 2px; width: 100%; padding: 10px 12px 6px; border: 0; background: transparent; text-align: start; cursor: pointer; }
+.stream-head:disabled { cursor: default; opacity: 1; }
+.stream-names { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.caret { width: 1em; color: var(--muted); }
+.stream-label { font-weight: 600; overflow-wrap: anywhere; }
+.summary { padding-inline-start: calc(1em + 8px); color: var(--muted); font-size: 12px; }
+.late { color: var(--late); }
+.chip { margin-inline-start: auto; padding: 0 7px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip-now { border: 2px solid var(--late); color: var(--late); font-weight: 600; }
+.strip { position: relative; height: 18px; margin: 0 12px 8px calc(12px + 1em + 8px); }
+.strip-line { position: absolute; inset: 8px 0 auto 0; height: 2px; border-radius: 1px; background: var(--line); }
+.strip-now { position: absolute; top: 2px; width: 2px; height: 14px; margin-left: -1px; background: var(--text); }
+.mark { position: absolute; top: 4px; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); border: 2px solid var(--text); background: var(--bg); }
+.mark-late { border-color: var(--late); background: var(--late); }
+.mark-count { position: absolute; top: -13px; left: 7px; transform: rotate(-45deg); font-size: 10px; color: var(--muted); }
+.tasks { list-style: none; margin: 0; padding: 0 12px 8px calc(12px + 1em + 8px); display: grid; gap: 2px; }
+.task { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); }
+.task-text { display: grid; min-width: 0; }
+.task-title { overflow-wrap: anywhere; }
+.task-now .task-title { font-weight: 600; }
+.task-detail { font-size: 12px; color: var(--muted); }
+.task-detail.late { color: var(--late); }
+.done { flex: none; }
+.more, .footnote, .empty { color: var(--muted); font-size: 12px; }
+.empty { padding: 16px 4px; }
+@media (prefers-reduced-motion: no-preference) { .streams { transition: opacity 120ms; } }

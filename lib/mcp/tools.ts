@@ -33,7 +33,10 @@ import {
   projectFlows,
   resolveFlowOptions,
   MCP_FLOWS_GROUP_BYS,
+  type FlowsOut,
+  type McpFlowsGroupBy,
 } from "./flows";
+import { registerFlowsApp } from "./app/register";
 import { MAX_TAGS, MAX_TAG_LENGTH, collectTags, normalizeTag } from "@/lib/tasks/tags";
 import type { Board, TaskRow } from "@/lib/types";
 
@@ -112,6 +115,94 @@ async function guard(fn: () => Promise<CallToolResult>): Promise<CallToolResult>
   } catch (err) {
     return errorResult(err);
   }
+}
+
+/** `get_flows` / `show_flows` input: one shape, so the tool and its view agree. */
+const flowsInputShape = {
+    date: z
+      .iso.date()
+      .describe("The caller's local today, yyyy-MM-dd (deadlines are judged against it)."),
+    groupBy: z
+      .enum(MCP_FLOWS_GROUP_BYS)
+      .optional()
+      .describe("How to split tasks into streams. Default: 'tag'."),
+    stream: z
+      .string()
+      .optional()
+      .describe("A saved stream's id or name; supplies filter, groupBy and attention."),
+    attention: z
+      .enum(["deadline", "priority", "combined"])
+      .optional()
+      .describe(
+        "Scoring: 'deadline', 'priority' or 'combined' (default).",
+      ),
+    mine: z
+      .boolean()
+      .optional()
+      .describe("Only top-level tasks you own or are assigned to. Default: false."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .optional()
+      .describe("Tasks returned per stream. Default: 3."),
+};
+
+interface FlowsArgs {
+  date: string;
+  groupBy?: McpFlowsGroupBy;
+  stream?: string;
+  attention?: "deadline" | "priority" | "combined";
+  mine?: boolean;
+  limit?: number;
+}
+
+/**
+ * The streams for one `get_flows` / `show_flows` call, under the caller's RLS.
+ * Returns a message instead when the named saved stream does not exist (it
+ * lists no names: a stream is private to its member).
+ */
+async function loadFlows(args: FlowsArgs, extra: Parameters<typeof mcpContext>[0]): Promise<FlowsOut | string> {
+  const { sb, memberId, workspaceId } = mcpContext(extra);
+  let saved: Awaited<ReturnType<typeof fetchTaskStreams>>[number] | undefined;
+  if (args.stream !== undefined) {
+    const wanted = args.stream.trim().toLowerCase();
+    const streams = await fetchTaskStreams(sb, workspaceId, memberId);
+    saved =
+      streams.find((s) => s.id === args.stream!.trim()) ??
+      streams.find((s) => s.name.trim().toLowerCase() === wanted);
+    if (!saved) {
+      return "No saved stream matches that id or name. Call get_workspace to see your streams.";
+    }
+  }
+  const opts = resolveFlowOptions(
+    {
+      groupBy: args.groupBy,
+      attention: args.attention,
+    },
+    saved?.definition,
+  );
+  const [bundle, tasks] = await Promise.all([
+    fetchWorkspaceBundle(sb),
+    fetchTasks(sb, workspaceId),
+  ]);
+  return projectFlows({
+    tasks,
+    boards: bundle.boards,
+    categories: bundle.categories,
+    collections: bundle.collections,
+    members: bundle.members,
+    memberId,
+    date: args.date,
+    nowMs: Date.now(),
+    groupBy: opts.groupBy,
+    attention: opts.attention,
+    filter: opts.filter,
+    mine: args.mine ?? false,
+    limit: args.limit ?? 3,
+    streamName: saved?.name,
+  });
 }
 
 // --- registration ----------------------------------------------------------
@@ -531,85 +622,26 @@ export function registerTools(server: McpServer): void {
         "grouping and attention mode; explicit `groupBy`/`attention` override it. " +
         "Includes the partner's shared tasks (never their private ones) unless " +
         "`mine: true`. Never returns task descriptions.",
-      inputSchema: {
-        date: z
-          .iso.date()
-          .describe("The caller's local today, yyyy-MM-dd (deadlines are judged against it)."),
-        groupBy: z
-          .enum(MCP_FLOWS_GROUP_BYS)
-          .optional()
-          .describe("How to split tasks into streams. Default: 'tag'."),
-        stream: z
-          .string()
-          .optional()
-          .describe("A saved stream's id or name; supplies filter, groupBy and attention."),
-        attention: z
-          .enum(["deadline", "priority", "combined"])
-          .optional()
-          .describe(
-            "Scoring: 'deadline', 'priority' or 'combined' (default).",
-          ),
-        mine: z
-          .boolean()
-          .optional()
-          .describe("Only top-level tasks you own or are assigned to. Default: false."),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(10)
-          .optional()
-          .describe("Tasks returned per stream. Default: 3."),
-      },
+      inputSchema: flowsInputShape,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (args, extra) =>
       guard(async () => {
-        const { sb, memberId, workspaceId } = mcpContext(extra);
-        let saved: Awaited<ReturnType<typeof fetchTaskStreams>>[number] | undefined;
-        if (args.stream !== undefined) {
-          const wanted = args.stream.trim().toLowerCase();
-          const streams = await fetchTaskStreams(sb, workspaceId, memberId);
-          saved =
-            streams.find((s) => s.id === args.stream!.trim()) ??
-            streams.find((s) => s.name.trim().toLowerCase() === wanted);
-          if (!saved) {
-            return fail(
-              "No saved stream matches that id or name. Call get_workspace to see your streams.",
-            );
-          }
-        }
-        const opts = resolveFlowOptions(
-          {
-            groupBy: args.groupBy,
-            attention: args.attention,
-          },
-          saved?.definition,
-        );
-        const [bundle, tasks] = await Promise.all([
-          fetchWorkspaceBundle(sb),
-          fetchTasks(sb, workspaceId),
-        ]);
-        return ok(
-          projectFlows({
-            tasks,
-            boards: bundle.boards,
-            categories: bundle.categories,
-            collections: bundle.collections,
-            members: bundle.members,
-            memberId,
-            date: args.date,
-            nowMs: Date.now(),
-            groupBy: opts.groupBy,
-            attention: opts.attention,
-            filter: opts.filter,
-            mine: args.mine ?? false,
-            limit: args.limit ?? 3,
-            streamName: saved?.name,
-          }),
-        );
+        const flows = await loadFlows(args, extra);
+        return typeof flows === "string" ? fail(flows) : ok(flows);
       }),
   );
+
+  // The same streams as a view: an MCP App the host renders in the chat.
+  registerFlowsApp(server, flowsInputShape, async (args, extra) => {
+    try {
+      const flows = await loadFlows(args, extra);
+      if (typeof flows === "string") return fail(flows);
+      return { ...ok(flows), structuredContent: flows as unknown as Record<string, unknown> };
+    } catch (err) {
+      return errorResult(err);
+    }
+  });
 
   // -- tasks: write -------------------------------------------------------
   server.registerTool(

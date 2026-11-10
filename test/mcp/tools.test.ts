@@ -35,6 +35,7 @@ function collectTools() {
     registerTool(name: string, _config: unknown, cb: (args: unknown, extra: unknown) => unknown) {
       handlers.set(name, cb as never);
     },
+    registerResource() {},
   };
   registerTools(server as never);
   return async (name: string, args: unknown = {}) => {
@@ -58,7 +59,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("MCP tools", () => {
   it("registers the expected tool surface", () => {
     const names: string[] = [];
-    registerTools({ registerTool: (n: string) => names.push(n) } as never);
+    registerTools({ registerTool: (n: string) => names.push(n), registerResource() {} } as never);
     expect(names).toEqual(
       expect.arrayContaining([
         "get_workspace",
@@ -69,6 +70,7 @@ describe("MCP tools", () => {
         "delete_event",
         "list_tasks",
         "get_flows",
+        "show_flows",
         "create_task",
         "update_task",
         "complete_task",

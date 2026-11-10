@@ -45,7 +45,7 @@ page) → Supabase issues the token.
 
 ## Tools
 
-Read: `get_workspace`, `list_events`, `list_tasks`, `get_sleep_summary`,
+Read: `show_flows` (the same streams as `get_flows`, with a view: see [The Flows app](#the-flows-app-mcp-app)), `get_workspace`, `list_events`, `list_tasks`, `get_sleep_summary`,
 `get_agenda`, `get_flows`. Write: `create_event`, `update_event`, `create_task`,
 `update_task`, `complete_task`. Destructive (`delete_event`, `delete_task`)
 require `confirm: true` — called without it they return a preview of what
@@ -92,6 +92,41 @@ retries after a dropped response.
 > `clientRequestId`) can't be broken by deploying the app before running
 > `supabase/migrations/*_client_request_id.sql`. Still, run the migration
 > first — don't rely on this as your deploy order.
+
+
+## The Flows app (MCP App)
+
+`show_flows` is `get_flows` with a view. A host that supports
+MCP Apps (claude.ai,
+Claude Desktop) renders it in the chat: one card per stream with its open and
+overdue counts, an attention chip, and a small timeline of the next two weeks
+with a mark per deadline. In the view the member can regroup, switch the
+attention rule, show only their own tasks, and mark a task done. Any other
+host sees an ordinary tool with the same JSON text as `get_flows`.
+
+| Path | Role |
+| --- | --- |
+| `lib/mcp/app/register.ts` | The `show_flows` tool and the `ui://planner/flows.html` resource |
+| `lib/mcp/app/flows-view.ts`, `flows-view.css` | The view (browser code, no framework) |
+| `lib/mcp/app/view-model.ts` | Its pure helpers: labels, the timeline's marks |
+| `lib/mcp/app/flows-app.generated.ts` | The built view: one self-contained HTML document |
+| `scripts/build-mcp-app.mjs` | Builds it (`pnpm build:mcp-app`; also runs before `pnpm build`) |
+
+How it stays inside the member's permissions:
+
+- The view runs in the host's sandboxed iframe. It is one document with its
+  script and styles inline, declares no CSP domains and fetches nothing.
+- It holds no token and no session. It gets its data as the tool's
+  `structuredContent`, and acts by asking the host to call this server's tools
+  (`show_flows` to refetch, `complete_task` to tick a task off). The host sends
+  those with the member's own bearer token, so RLS decides exactly as it does
+  for a call the model makes.
+- Titles and tag names are set as text, never parsed as markup.
+
+After changing the view, run `pnpm build:mcp-app` and commit the generated
+file; `test/mcp/app-register.test.ts` fails if it is stale. If a host keeps
+showing an old view, change `FLOWS_APP_URI` (hosts may cache a resource by
+its URI).
 
 ## Enabling it (one-time setup)
 
