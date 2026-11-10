@@ -65,3 +65,34 @@ export function isTaskBlocked(
 ): boolean {
   return sequentialBlocked.has(taskId) || dependencyBlocked.has(taskId);
 }
+
+/**
+ * The unfinished tasks `taskId` waits on, most pressing first: the earliest
+ * due date first (undated last), then the higher priority, then the title.
+ * Blockers the caller can't see (absent from `byId`) are skipped.
+ */
+export function openBlockersOf(
+  taskId: string,
+  deps: readonly { taskId: string; dependsOnTaskId: string }[],
+  byId: ReadonlyMap<string, TaskRow>,
+): TaskRow[] {
+  const out: TaskRow[] = [];
+  const seen = new Set<string>();
+  for (const d of deps) {
+    if (d.taskId !== taskId || seen.has(d.dependsOnTaskId)) continue;
+    seen.add(d.dependsOnTaskId);
+    const blocker = byId.get(d.dependsOnTaskId);
+    if (blocker && blocker.completedAt == null) out.push(blocker);
+  }
+  return out.sort((a, b) => {
+    if (a.dueDate !== b.dueDate) {
+      if (a.dueDate == null) return 1;
+      if (b.dueDate == null) return -1;
+      return a.dueDate < b.dueDate ? -1 : 1;
+    }
+    const pa = a.priority ?? 0;
+    const pb = b.priority ?? 0;
+    if (pa !== pb) return pb - pa;
+    return a.title.localeCompare(b.title);
+  });
+}

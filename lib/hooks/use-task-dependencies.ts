@@ -29,7 +29,10 @@ export function useTaskDependencies(workspaceId: string | undefined): {
       sb,
       workspaceId,
       (change) => {
-        if (change.table !== "task_dependencies") return;
+        // A task deleted or turned private takes its edges out of view (a
+        // cascade's own row_gone may race it): refetch the set either way.
+        const taskGone = change.table === "tasks" && change.eventType === "DELETE";
+        if (change.table !== "task_dependencies" && !taskGone) return;
         void qc.invalidateQueries({ queryKey: qk.taskDependencies(workspaceId) });
       },
       "task-dependencies",

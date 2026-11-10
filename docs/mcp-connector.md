@@ -57,6 +57,24 @@ optional `tag` filter; `create_task` and `update_task` accept `tags: string[]`
 `get_workspace` also returns every tag in use (`tags`) and the caller's saved
 streams (`streams`, id and name only).
 
+Dependencies (blocks / blocked-by, the `task_dependencies` table): a task can
+wait for other tasks. `list_tasks` rows carry `position` (order among
+siblings) and `blockedBy` (ids of the tasks it waits for, omitted when none).
+`create_task` takes `blockedBy: string[]` (max 20), added once the task exists.
+`update_task` takes `blockedBy: string[]` that REPLACES the set (adds what's
+missing, removes the rest; `[]` clears) and returns the final `blockedBy`.
+Every id must be a task the caller can see; a task can't wait for itself;
+only the blocked task's owner can change its blockers; and a loop is refused
+with "That would make a dependency loop: …" (checked over the visible edges
+first, and by the database's acyclic trigger for chains through tasks the
+caller can't see; a refused replace undoes the adds it made). `get_task`
+returns `sequential` (its subtasks are "do in order"), `blockedBy` and
+`blocks` (each `{ id, title, done }`: what it waits for, and what waits for
+it), and each subtask row adds `sequential`, `blocked` (open and waiting on an
+unfinished dependency or an earlier sibling under a "do in order" parent),
+`start?`, `due?` and `blockedBy?` (ids). Blocking is soft: completing a
+blocked task is allowed (the web app says what it was still waiting for).
+
 ## Streams and attention
 
 `get_flows` answers "which of my tasks need attention now, stream by stream".
@@ -70,9 +88,14 @@ top-level tasks you own or are assigned to; default false, which also includes
 the partner's shared tasks, never their private ones) and `limit` (1..10 tasks
 per stream, default 3). Output: `{ date, groupBy, attention, stream?, streams:
 [{ key, label, open, done, overdue, needsAttention, nextDue?, score, tasks:
-[{ id, title, dueDate?, priority?, score, overdue, tags? }] }], truncated? }`,
+[{ id, title, start?, dueDate?, progress?, priority?, score, overdue, tags?,
+blocked?, waitingOn?, holds? }] }], truncated? }`,
 streams most-pressing first; more than 30 streams are cut to the 30 top-ranked
 with `truncated: true`. A task with several tags appears in each tag's stream.
+`blocked: true` marks a task waiting for an unfinished dependency,
+`waitingOn` names those blockers (`{ id, title }`, at most 3, earliest due
+first) and `holds` counts the open tasks waiting for it (each omitted when
+empty).
 
 Scoring: urgency is 1 when a task is due today or overdue and falls linearly to
 0 at 14 days out (0 with no deadline), importance is priority/3, and `combined`
@@ -139,7 +162,12 @@ as `get_flows`.
 For the runways, each task in the output also carries `start` (its planned
 start, else its first activity, `yyyy-MM-dd`) and, when it has subtasks,
 `progress: { done, total }` over its whole subtree. `get_flows` returns them
-too.
+too. Only `show_flows`' structured content (the view's data, not the model's
+text) adds each task's `subtasks`: its whole subtask tree, flattened
+pre-order, done ones included, at most 100 per task and never deeper than
+`MAX_DEPTH`, each `{ id, title, parentId, depth (1 = direct child), done,
+start?, due?, blocked?, waitingOn? }` (`blocked` here also covers a "do in
+order" sibling still waiting its turn).
 
 | Path | Role |
 | --- | --- |

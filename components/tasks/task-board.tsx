@@ -36,6 +36,8 @@ export interface TaskBoardProps {
   colorOf: (t: TaskRow) => string;
   members: Map<string, Member>;
   progressOf?: (t: TaskRow) => { done: number; total: number } | null;
+  /** Ids of tasks waiting on an unfinished dependency (the card's "Blocked" badge). */
+  blockedIds?: ReadonlySet<string>;
   /** Whole-tree maps (all collection tasks) for drag-to-nest cycle/depth checks. */
   treeById: ById;
   treeByParent: Map<string | null, TaskRow[]>;
@@ -50,6 +52,7 @@ export function TaskBoard({
   colorOf,
   members,
   progressOf,
+  blockedIds,
   treeById,
   treeByParent,
   actions,
@@ -122,6 +125,7 @@ export function TaskBoard({
                 assignee={task.assigneeId ? members.get(task.assigneeId) ?? null : null}
                 progress={progressOf?.(task) ?? null}
                 nesting={nestTargetId === id}
+                blocked={blockedIds?.has(id) ?? false}
                 onOpen={() => actions.open(task)}
                 onToggleDone={() => actions.toggleDone(task)}
                 onChangeColor={(c) => actions.changeColor(task, c)}
@@ -210,6 +214,7 @@ export function TaskBoard({
                 activeTask.assigneeId ? members.get(activeTask.assigneeId) ?? null : null
               }
               progress={progressOf?.(activeTask) ?? null}
+              blocked={blockedIds?.has(activeTask.id) ?? false}
               onOpen={() => {}}
               onToggleDone={() => {}}
               showHandle

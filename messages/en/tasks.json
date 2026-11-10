@@ -446,6 +446,8 @@
     "remove": "Remove blocker {title}",
     "unknownTask": "Another task",
     "blocked": "Blocked",
-    "blockedTitle": "Waiting on another task"
+    "blockedTitle": "Waiting on another task",
+    "stillWaitingFor": "Still waiting for: {titles}{more, plural, =0 {} one { and # more} other { and # more}}",
+    "stillWaitingForCount": "Still waiting for {count, plural, one {# task} other {# tasks}}"
   }
 }

@@ -6,6 +6,7 @@ vi.mock("@/lib/supabase/queries", () => ({
   fetchWindow: vi.fn(),
   fetchTasks: vi.fn(),
   fetchTaskStreams: vi.fn(),
+  fetchTaskDependencies: vi.fn(async () => []),
   fetchSleepLogs: vi.fn(),
 }));
 vi.mock("@/lib/supabase/mutations", () => ({
@@ -15,6 +16,8 @@ vi.mock("@/lib/supabase/mutations", () => ({
   createTask: vi.fn(),
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
+  addDependency: vi.fn(),
+  removeDependency: vi.fn(async () => undefined),
   StaleWriteError: class StaleWriteError extends Error {},
 }));
 vi.mock("@/lib/recurrence/expand", () => ({ expandEvents: vi.fn(() => []) }));
@@ -568,6 +571,7 @@ describe("task editing tools (the Flows app's writes)", () => {
       startDate: null,
       isMilestone: false,
       position: 0,
+      sequential: false,
       completedAt: null,
       attributes: {},
       tags: [],
@@ -585,7 +589,10 @@ describe("task editing tools (the Flows app's writes)", () => {
     const res = await call("get_task", { id: "p" });
     expect(res.isError).toBe(false);
     expect(res.data).toMatchObject({ id: "p", startDate: "2026-11-01", tags: ["x"] });
-    expect(res.data.subtasks).toEqual([{ id: "c", title: "Child", done: false, depth: 1 }]);
+    expect(res.data.subtasks).toEqual([
+      { id: "c", title: "Child", done: false, depth: 1, sequential: false, blocked: false },
+    ]);
+    expect(res.data).toMatchObject({ sequential: false, blockedBy: [], blocks: [] });
     expect(JSON.stringify(res.data)).not.toContain("PRIVATE");
     expect((await call("get_task", { id: "missing" })).isError).toBe(true);
   });
@@ -717,6 +724,127 @@ describe("task editing tools (the Flows app's writes)", () => {
     expect(m.updateTask).not.toHaveBeenCalled();
     await call("update_task", { id: "p", collectionId: "col-1", title: "New" });
     expect(vi.mocked(m.updateTask).mock.calls[0][2]).toEqual({ title: "New" });
+  });
+
+  const edge = (taskId: string, dependsOnTaskId: string) => ({
+    id: `d-${taskId}-${dependsOnTaskId}`,
+    workspaceId: "w1",
+    taskId,
+    dependsOnTaskId,
+    createdAt: 1,
+  });
+
+  it("list_tasks returns position and blockedBy (omitted when empty)", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "a", position: 3 }),
+      row({ id: "b", position: 1 }),
+      row({ id: "c", position: 2 }),
+    ]);
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValueOnce([edge("a", "b"), edge("a", "c")]);
+    const call = collectTools();
+    const res = await call("list_tasks");
+    expect(res.data.tasks[0]).toMatchObject({ id: "a", position: 3, blockedBy: ["b", "c"] });
+    expect(res.data.tasks[1]).toMatchObject({ id: "b", position: 1 });
+    expect(res.data.tasks[1]).not.toHaveProperty("blockedBy");
+  });
+
+  it("update_task blockedBy replaces the set: adds what's missing, removes the extra", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "t", title: "Task" }),
+      row({ id: "keep" }),
+      row({ id: "drop" }),
+      row({ id: "new" }),
+    ]);
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValueOnce([edge("t", "keep"), edge("t", "drop")]);
+    vi.mocked(m.addDependency).mockImplementation(async (_sb, input) => ({ id: "d-new", createdAt: 1, ...input }));
+    const call = collectTools();
+    const res = await call("update_task", { id: "t", blockedBy: ["keep", "new", "new"] });
+    expect(res.isError).toBe(false);
+    expect(res.data).toEqual({ id: "t", title: "Task", blockedBy: ["keep", "new"] });
+    expect(vi.mocked(m.addDependency).mock.calls.map((c) => c[1])).toEqual([
+      { workspaceId: "w1", taskId: "t", dependsOnTaskId: "new" },
+    ]);
+    expect(vi.mocked(m.removeDependency).mock.calls.map((c) => c[1])).toEqual(["d-t-drop"]);
+    expect(m.updateTask).not.toHaveBeenCalled(); // nothing else asked
+
+    // [] clears it, alongside an ordinary field.
+    vi.clearAllMocks();
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValueOnce([edge("t", "keep")]);
+    vi.mocked(m.updateTask).mockResolvedValue({ id: "t", title: "Renamed" } as never);
+    const cleared = await call("update_task", { id: "t", title: "Renamed", blockedBy: [] });
+    expect(cleared.data).toEqual({ id: "t", title: "Renamed", blockedBy: [] });
+    expect(vi.mocked(m.removeDependency).mock.calls.map((c) => c[1])).toEqual(["d-t-keep"]);
+    expect(m.addDependency).not.toHaveBeenCalled();
+  });
+
+  it("update_task refuses a loop, itself, an unseen task and a task you don't own, writing nothing", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "a", title: "Write" }),
+      row({ id: "b", title: "Review" }),
+      row({ id: "c", title: "Publish" }),
+      row({ id: "theirs", ownerId: "m2" }),
+    ]);
+    // c waits for b, b waits for a: a waiting for c closes the loop.
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValue([edge("c", "b"), edge("b", "a")]);
+    const call = collectTools();
+
+    const loop = await call("update_task", { id: "a", blockedBy: ["c"] });
+    expect(loop.isError).toBe(true);
+    expect(loop.data).toBe(
+      'That would make a dependency loop: "Write" waits for "Publish" waits for "Review" waits for "Write". ' +
+        "Remove one of those links first.",
+    );
+    expect((await call("update_task", { id: "a", blockedBy: ["a"] })).data).toMatch(/itself/);
+    expect((await call("update_task", { id: "a", blockedBy: ["ghost"] })).data).toMatch(/No task with id ghost/);
+    expect((await call("update_task", { id: "theirs", blockedBy: ["a"] })).data).toMatch(/owner/);
+    expect((await call("update_task", { id: "gone", blockedBy: [] })).isError).toBe(true);
+    expect((await call("update_task", { id: "a", title: "x", blockedBy: ["c"] })).isError).toBe(true);
+    expect(m.addDependency).not.toHaveBeenCalled();
+    expect(m.removeDependency).not.toHaveBeenCalled();
+    expect(m.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("update_task turns the database's loop guard into a clear error and undoes its partial adds", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "a" }), row({ id: "b" }), row({ id: "c" })]);
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValueOnce([edge("a", "old")]);
+    vi.mocked(m.addDependency)
+      .mockResolvedValueOnce({ id: "d-added", workspaceId: "w1", taskId: "a", dependsOnTaskId: "b", createdAt: 1 })
+      .mockRejectedValueOnce(new Error("That dependency would create a cycle"));
+    const call = collectTools();
+    const res = await call("update_task", { id: "a", blockedBy: ["b", "c"] });
+    expect(res.isError).toBe(true);
+    expect(res.data).toMatch(/^That would make a dependency loop: /);
+    // The add that went through is taken back; the old edge stays.
+    expect(vi.mocked(m.removeDependency).mock.calls.map((c) => c[1])).toEqual(["d-added"]);
+  });
+
+  it("create_task adds its blockers after creating, and checks them first", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "b1" }), row({ id: "b2" })]);
+    vi.mocked(m.createTask).mockResolvedValue(row({ id: "new", title: "New" }));
+    vi.mocked(m.addDependency).mockImplementation(async (_sb, input) => ({ id: "d", createdAt: 1, ...input }));
+    const call = collectTools();
+    const res = await call("create_task", { title: "New", blockedBy: ["b1", "b2"] });
+    expect(res.data).toEqual({ id: "new", title: "New", blockedBy: ["b1", "b2"] });
+    expect(vi.mocked(m.addDependency).mock.calls.map((c) => c[1].dependsOnTaskId)).toEqual(["b1", "b2"]);
+
+    vi.clearAllMocks();
+    const hidden = await call("create_task", { title: "New", blockedBy: ["b1", "ghost"] });
+    expect(hidden.data).toBe("No task with id ghost is visible to you.");
+    expect(m.createTask).not.toHaveBeenCalled();
+    expect(m.addDependency).not.toHaveBeenCalled();
+  });
+
+  it("get_task lists blockedBy and blocks", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "t", title: "Task" }),
+      row({ id: "up", title: "Up", completedAt: 5 }),
+      row({ id: "down", title: "Down" }),
+    ]);
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValueOnce([edge("t", "up"), edge("down", "t")]);
+    const call = collectTools();
+    const res = await call("get_task", { id: "t" });
+    expect(res.data.blockedBy).toEqual([{ id: "up", title: "Up", done: true }]);
+    expect(res.data.blocks).toEqual([{ id: "down", title: "Down", done: false }]);
   });
 
   it("list_tasks with mine keeps only the tasks the caller created", async () => {

@@ -27,7 +27,7 @@ export interface TaskCardProps {
   assignee: Member | null;
   /** done/total of this task's subtasks, if any */
   progress?: { done: number; total: number } | null;
-  /** sequential subtask waiting on a predecessor */
+  /** waiting on an unfinished dependency or a sequential predecessor (never shown once done) */
   blocked?: boolean;
   /** another task is hovering this one's centre, about to nest under it */
   nesting?: boolean;
@@ -67,6 +67,7 @@ export const TaskCard = forwardRef<
   const t = useTranslations("tasks");
   const locale = useLocale();
   const done = task.completedAt != null;
+  const showBlocked = !!blocked && !done;
   const maskTitles = useUiStore((s) => s.maskTitles);
   const timeZone = useViewerTimeZone();
   const overdue =
@@ -125,9 +126,9 @@ export const TaskCard = forwardRef<
           {task.title}
         </span>
 
-        {(task.dueDate != null || prio || progress?.total || blocked || task.isPrivate) && (
+        {(task.dueDate != null || prio || progress?.total || showBlocked || task.isPrivate) && (
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            {blocked && (
+            {showBlocked && (
               <Badge variant="outline" className="gap-1 text-muted-foreground">
                 <Lock /> {t("card.blocked")}
               </Badge>
