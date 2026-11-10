@@ -236,6 +236,8 @@ export interface TaskDetailOut {
   dueDate?: string;
   startDate?: string;
   priority?: number;
+  /** absent = the task is in no collection */
+  collectionId?: string;
   tags: string[];
   /** the whole subtree, parent before child, siblings in their stored order */
   subtasks: TaskDetailSubtask[];
@@ -271,7 +273,40 @@ export function projectTaskDetail(task: TaskRow, all: TaskRow[]): TaskDetailOut 
     ...(task.dueDate ? { dueDate: task.dueDate } : {}),
     ...(task.startDate ? { startDate: task.startDate } : {}),
     ...(task.priority != null ? { priority: task.priority } : {}),
+    ...(task.collectionId ? { collectionId: task.collectionId } : {}),
     tags: task.tags,
     subtasks,
   };
+}
+
+/**
+ * The column a task lands in when it enters `collectionId`: the collection's
+ * done column for a finished task, else its first open one. Null for no
+ * collection, or a collection with no such column.
+ */
+export function landingBoardId(
+  boards: readonly Board[],
+  collectionId: string | null,
+  done: boolean,
+): string | null {
+  if (!collectionId) return null;
+  const cols = boards
+    .filter((b) => b.collectionId === collectionId)
+    .sort((a, b) => a.position - b.position);
+  return (cols.find((b) => b.isDone === done) ?? null)?.id ?? null;
+}
+
+/** A task and its whole subtree, parents before children, siblings in order. */
+export function subtreeInOrder(root: TaskRow, all: TaskRow[]): TaskRow[] {
+  const byParent = groupByParent(all);
+  const out: TaskRow[] = [];
+  const seen = new Set<string>();
+  const walk = (task: TaskRow) => {
+    if (seen.has(task.id)) return;
+    seen.add(task.id);
+    out.push(task);
+    for (const kid of [...(byParent.get(task.id) ?? [])].sort((a, b) => a.position - b.position)) walk(kid);
+  };
+  walk(root);
+  return out;
 }

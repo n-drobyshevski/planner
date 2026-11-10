@@ -124,9 +124,16 @@ first only arms the button, and for a task with subtasks says how many go with
 it. Every change is one call to an ordinary tool (`create_task`, `update_task`,
 `complete_task`, `delete_task`), after which the view refetches; a change that
 fails says so and leaves the view as it was. Save sends only the fields that
-changed. A task created here has no collection, like one Claude creates without
-naming one; a subtask is created in its parent's collection, with its parent's
-privacy. Any other host sees an ordinary tool with the same JSON text
+changed. The editor also has a Collection choice (the member's collections, from
+`get_workspace`, plus "No collection"). A new task starts in the first
+collection and lands in its first open column. Changing the collection of an
+existing task is a move: `update_task` with `collectionId` moves the task and
+its whole subtask tree, parents first, each into the new collection's first
+open column, or its done column if it is finished; the editor says how many
+subtasks go along. The move is one update per task, not one transaction: if a
+call fails midway the tool reports the error and the tasks already moved stay
+moved. A subtask is created in its parent's collection, with its parent's
+privacy, and cannot be moved on its own. Any other host sees an ordinary tool with the same JSON text
 as `get_flows`.
 
 For the runways, each task in the output also carries `start` (its planned

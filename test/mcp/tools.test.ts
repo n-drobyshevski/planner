@@ -592,12 +592,19 @@ describe("task editing tools (the Flows app's writes)", () => {
 
   it("a subtask is created in its parent's collection, with its privacy", async () => {
     vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "p", collectionId: "col-1", isPrivate: true })]);
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue({
+      members: [],
+      categories: [],
+      collections: [],
+      boards: [{ id: "b1-todo", collectionId: "col-1", position: 0, isDone: false }],
+    } as never);
     vi.mocked(m.createTask).mockResolvedValue({ id: "new", title: "Sub" } as never);
     const call = collectTools();
     await call("create_task", { title: "Sub", parentId: "p" });
     expect(vi.mocked(m.createTask).mock.calls[0][1]).toMatchObject({
       parentId: "p",
       collectionId: "col-1",
+      boardId: "b1-todo",
       isPrivate: true,
     });
   });
@@ -630,5 +637,85 @@ describe("task editing tools (the Flows app's writes)", () => {
       { startDate: null },
     ]);
   });
-});
 
+  const bundle = {
+    members: [{ id: "m1", name: "Me" }],
+    categories: [],
+    collections: [
+      { id: "col-1", name: "Personal" },
+      { id: "col-2", name: "Work" },
+    ],
+    boards: [
+      { id: "b1-done", collectionId: "col-1", position: 2, isDone: true },
+      { id: "b1-todo", collectionId: "col-1", position: 0, isDone: false },
+      { id: "b2-doing", collectionId: "col-2", position: 1, isDone: false },
+      { id: "b2-todo", collectionId: "col-2", position: 0, isDone: false },
+      { id: "b2-done", collectionId: "col-2", position: 2, isDone: true },
+    ],
+  } as never;
+
+  it("a task created in a collection lands in its first open column", async () => {
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue(bundle);
+    vi.mocked(m.createTask).mockResolvedValue({ id: "new", title: "T" } as never);
+    const call = collectTools();
+    await call("create_task", { title: "T", collectionId: "col-2" });
+    expect(vi.mocked(m.createTask).mock.calls[0][1]).toMatchObject({ collectionId: "col-2", boardId: "b2-todo" });
+    const hidden = await call("create_task", { title: "T", collectionId: "col-x" });
+    expect(hidden.isError).toBe(true);
+    expect(m.createTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("moving a task moves its whole subtree, parents first, each into a fitting column", async () => {
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue(bundle);
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "kid2", parentId: "p", collectionId: "col-1", position: 2 }),
+      row({ id: "p", title: "Parent", collectionId: "col-1", boardId: "b1-todo" }),
+      row({ id: "kid1", parentId: "p", collectionId: "col-1", position: 1, completedAt: 5 }),
+      row({ id: "grand", parentId: "kid1", collectionId: "col-1" }),
+      row({ id: "other", collectionId: "col-1" }),
+    ]);
+    vi.mocked(m.updateTask).mockImplementation(async (_sb, id) => ({ id, title: "Renamed" }) as never);
+    const call = collectTools();
+    const res = await call("update_task", { id: "p", title: "Renamed", collectionId: "col-2" });
+    expect(res.data).toEqual({ id: "p", title: "Renamed", moved: 4 });
+    expect(vi.mocked(m.updateTask).mock.calls.map((c) => [c[1], c[2]])).toEqual([
+      ["p", { title: "Renamed", collectionId: "col-2", boardId: "b2-todo" }],
+      ["kid1", { collectionId: "col-2", boardId: "b2-done" }],
+      ["grand", { collectionId: "col-2", boardId: "b2-todo" }],
+      ["kid2", { collectionId: "col-2", boardId: "b2-todo" }],
+    ]);
+  });
+
+  it("moving out of every collection clears the column", async () => {
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue(bundle);
+    vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "p", collectionId: "col-1", boardId: "b1-todo" })]);
+    vi.mocked(m.updateTask).mockResolvedValue({ id: "p", title: "Task" } as never);
+    const call = collectTools();
+    await call("update_task", { id: "p", collectionId: null });
+    expect(vi.mocked(m.updateTask).mock.calls[0][2]).toEqual({ collectionId: null, boardId: null });
+  });
+
+  it("refuses a move to a collection you cannot see, a subtask's move, and writes nothing", async () => {
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue(bundle);
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "p", collectionId: "col-1" }),
+      row({ id: "kid", parentId: "p", collectionId: "col-1" }),
+    ]);
+    const call = collectTools();
+    expect((await call("update_task", { id: "p", collectionId: "col-x" })).isError).toBe(true);
+    expect((await call("update_task", { id: "kid", collectionId: "col-2" })).isError).toBe(true);
+    expect((await call("update_task", { id: "gone", collectionId: "col-2" })).isError).toBe(true);
+    expect(m.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("naming the collection a task is already in is not a move", async () => {
+    vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue(bundle);
+    vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "p", collectionId: "col-1", boardId: "b1-done" })]);
+    vi.mocked(m.updateTask).mockResolvedValue({ id: "p", title: "New" } as never);
+    const call = collectTools();
+    expect((await call("update_task", { id: "p", collectionId: "col-1" })).data).toMatchObject({ moved: 0 });
+    expect(m.updateTask).not.toHaveBeenCalled();
+    await call("update_task", { id: "p", collectionId: "col-1", title: "New" });
+    expect(vi.mocked(m.updateTask).mock.calls[0][2]).toEqual({ title: "New" });
+  });
+});

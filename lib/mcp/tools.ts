@@ -33,7 +33,9 @@ import {
   projectFlows,
   resolveFlowOptions,
   MCP_FLOWS_GROUP_BYS,
+  landingBoardId,
   projectTaskDetail,
+  subtreeInOrder,
   type FlowsOut,
   type McpFlowsGroupBy,
 } from "./flows";
@@ -718,13 +720,25 @@ export function registerTools(server: McpServer): void {
           parent = (await fetchTasks(sb, workspaceId)).find((t) => t.id === args.parentId);
           if (!parent) return fail(`No task with id ${args.parentId} is visible to you.`);
         }
+        // A task in a collection sits in one of its columns: without one named,
+        // the first open column, as when the web app creates it.
+        const collectionId = args.collectionId ?? parent?.collectionId ?? null;
+        let boardId = args.boardId ?? null;
+        if (collectionId && !boardId) {
+          const bundle = await fetchWorkspaceBundle(sb);
+          // Only a collection the caller named is checked: an inherited one is
+          // the parent's, and the parent was already found.
+          if (args.collectionId && !bundle.collections.some((c) => c.id === collectionId))
+            return fail(`No collection with id ${collectionId} is visible to you.`);
+          boardId = landingBoardId(bundle.boards, collectionId, false);
+        }
         const input: TaskInput = {
           workspaceId,
           ownerId: memberId,
           title: args.title,
           description: args.description ?? null,
-          collectionId: args.collectionId ?? parent?.collectionId ?? null,
-          boardId: args.boardId ?? null,
+          collectionId,
+          boardId,
           parentId: args.parentId ?? null,
           categoryId: args.categoryId ?? null,
           priority: args.priority ?? null,
@@ -754,6 +768,15 @@ export function registerTools(server: McpServer): void {
         priority: z.number().int().min(0).max(3).nullable().optional(),
         dueDate: z.string().nullable().optional(),
         startDate: z.iso.date().nullable().optional().describe("Planned start, yyyy-MM-dd, or null."),
+        collectionId: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            "Move the task, with its whole subtask tree, to this collection (null = " +
+              "no collection). Each lands in that collection's first open column, or " +
+              "its done column if finished.",
+          ),
         tags: z
           .array(z.string().max(MAX_TAG_LENGTH * 2))
           .max(MAX_TAGS * 2)
@@ -773,10 +796,46 @@ export function registerTools(server: McpServer): void {
         if (args.dueDate !== undefined) patch.dueDate = args.dueDate;
         if (args.startDate !== undefined) patch.startDate = args.startDate;
         if (args.tags !== undefined) patch.tags = args.tags;
-        if (Object.keys(patch).length === 0)
-          return fail("Provide at least one field to update.");
-        const row = await updateTask(sb, args.id, patch);
-        return ok({ id: row.id, title: row.title });
+        if (args.collectionId === undefined) {
+          if (Object.keys(patch).length === 0)
+            return fail("Provide at least one field to update.");
+          const row = await updateTask(sb, args.id, patch);
+          return ok({ id: row.id, title: row.title });
+        }
+
+        // A move. Subtasks live where their parent lives, and a column belongs
+        // to one collection, so the whole subtree moves and each task takes a
+        // column of the new collection. Parents go before children and siblings
+        // in order, so a "do in order" parent never sees a later subtask land
+        // in a done column before an earlier one.
+        const { workspaceId } = mcpContext(extra);
+        const [tasks, bundle] = await Promise.all([fetchTasks(sb, workspaceId), fetchWorkspaceBundle(sb)]);
+        const task = tasks.find((t) => t.id === args.id);
+        if (!task) return fail(`No task with id ${args.id} is visible to you.`);
+        const target = args.collectionId;
+        if (target !== null && !bundle.collections.some((c) => c.id === target))
+          return fail(`No collection with id ${target} is visible to you.`);
+        if (task.parentId && target !== task.collectionId)
+          return fail("A subtask stays in its parent's collection. Move the parent instead.");
+        if (target === task.collectionId) {
+          if (Object.keys(patch).length === 0) return ok({ id: task.id, title: task.title, moved: 0 });
+          const row = await updateTask(sb, args.id, patch);
+          return ok({ id: row.id, title: row.title, moved: 0 });
+        }
+        const moving = subtreeInOrder(task, tasks);
+        let moved = 0;
+        let title = task.title;
+        for (const item of moving) {
+          const step: Partial<TaskInput> = {
+            ...(item.id === task.id ? patch : {}),
+            collectionId: target,
+            boardId: landingBoardId(bundle.boards, target, item.completedAt != null),
+          };
+          const row = await updateTask(sb, item.id, step);
+          if (item.id === task.id) title = row.title;
+          moved++;
+        }
+        return ok({ id: task.id, title, moved });
       }),
   );
 

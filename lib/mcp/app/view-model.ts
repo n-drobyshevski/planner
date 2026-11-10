@@ -48,6 +48,9 @@ export const STRINGS = {
     fStart: "Start",
     fPriority: "Priority",
     fTags: "Tags",
+    fCollection: "Collection",
+    noCollection: "No collection",
+    movedWith: (n: number) => `Its ${n} subtask${n === 1 ? "" : "s"} move with it.`,
     tagsHint: "separate with commas",
     priorityNone: "None",
     subtasksTitle: "Subtasks",
@@ -126,6 +129,9 @@ export const STRINGS = {
     fStart: "Начало",
     fPriority: "Приоритет",
     fTags: "Теги",
+    fCollection: "Коллекция",
+    noCollection: "Без коллекции",
+    movedWith: (n: number) => `Подзадачи переедут вместе с ней: ${n}.`,
     tagsHint: "через запятую",
     priorityNone: "Нет",
     subtasksTitle: "Подзадачи",
@@ -459,15 +465,25 @@ export interface TaskDraft {
   priority: string;
   /** as typed: comma-separated */
   tags: string;
+  /** "" = no collection, else a collection id */
+  collection: string;
 }
 
-export const EMPTY_DRAFT: TaskDraft = { title: "", dueDate: "", startDate: "", priority: "", tags: "" };
+export const EMPTY_DRAFT: TaskDraft = {
+  title: "",
+  dueDate: "",
+  startDate: "",
+  priority: "",
+  tags: "",
+  collection: "",
+};
 
 interface DraftSource {
   title: string;
   dueDate?: string;
   startDate?: string;
   priority?: number;
+  collectionId?: string;
   tags: readonly string[];
 }
 
@@ -478,6 +494,7 @@ export function draftOf(task: DraftSource): TaskDraft {
     startDate: task.startDate ?? "",
     priority: task.priority ? String(task.priority) : "",
     tags: task.tags.join(", "),
+    collection: task.collectionId ?? "",
   };
 }
 
@@ -505,6 +522,8 @@ export function createArgs(draft: TaskDraft, parentId?: string): Record<string, 
     ...(dateOrNull(draft.dueDate) ? { dueDate: draft.dueDate } : {}),
     ...(dateOrNull(draft.startDate) ? { startDate: draft.startDate } : {}),
     ...(draft.priority ? { priority: Number(draft.priority) } : {}),
+    // A subtask names no collection: it goes where its parent is.
+    ...(draft.collection && !parentId ? { collectionId: draft.collection } : {}),
     ...(tags.length ? { tags } : {}),
   };
 }
@@ -525,5 +544,6 @@ export function updateArgs(original: DraftSource, draft: TaskDraft): Record<stri
   if (draft.priority !== before.priority) patch.priority = draft.priority ? Number(draft.priority) : null;
   const tags = draftTags(draft);
   if (tags.join(",") !== original.tags.join(",")) patch.tags = tags;
+  if (draft.collection !== before.collection) patch.collectionId = draft.collection || null;
   return patch;
 }

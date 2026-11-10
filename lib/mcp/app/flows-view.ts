@@ -69,6 +69,8 @@ interface State {
   events: CalendarEventIn[] | null;
   eventsStatus: "idle" | "loading" | "error";
   editor: Editor | null;
+  /** the member's collections, for the editor; null until first asked for */
+  collections: { id: string; name: string }[] | null;
 }
 
 /** The task being edited (or created). Field values live here, not in the DOM, so a repaint keeps them. */
@@ -79,6 +81,8 @@ interface Editor {
   failed: boolean;
   draft: TaskDraft;
   newSubtask: string;
+  /** the member picked a collection themselves, so loading must not overwrite it */
+  collectionTouched: boolean;
   /** the id whose delete button was pressed once and waits for a second press */
   confirmDelete: string | null;
   busy: boolean;
@@ -98,6 +102,7 @@ const state: State = {
   events: null,
   eventsStatus: "idle",
   editor: null,
+  collections: null,
 };
 
 const app = new App({ name: "Planner flows", version: "1.1.0" });
@@ -244,6 +249,30 @@ function isDetail(value: unknown): value is TaskDetailOut {
   return typeof d === "object" && d !== null && typeof d.id === "string" && Array.isArray(d.subtasks) && Array.isArray(d.tags);
 }
 
+let collectionsAsked = false;
+
+/** The member's collections, once, through `get_workspace`. A failure just leaves the choice out. */
+async function loadCollections() {
+  if (collectionsAsked) return;
+  collectionsAsked = true;
+  try {
+    const workspace = (await call("get_workspace", {})) as { collections?: unknown };
+    const list = Array.isArray(workspace.collections) ? workspace.collections : [];
+    state.collections = list.filter(
+      (c): c is { id: string; name: string } =>
+        typeof c === "object" && c !== null && typeof (c as { id?: unknown }).id === "string" && typeof (c as { name?: unknown }).name === "string",
+    );
+    // A new task starts in the first collection, as it would in the planner.
+    const editor = state.editor;
+    if (editor?.mode === "create" && !editor.draft.collection && state.collections[0]) {
+      editor.draft.collection = state.collections[0].id;
+    }
+    render();
+  } catch {
+    collectionsAsked = false;
+  }
+}
+
 async function loadDetail(id: string, keepDraft = false) {
   try {
     const detail = await call("get_task", { id });
@@ -253,6 +282,10 @@ async function loadDetail(id: string, keepDraft = false) {
     editor.detail = detail;
     editor.failed = false;
     if (!keepDraft) editor.draft = draftOf(detail);
+    // Kept drafts were made before the task loaded: they do not know its collection yet.
+    else if (editor.draft.collection === "" && detail.collectionId && !editor.collectionTouched) {
+      editor.draft.collection = detail.collectionId;
+    }
   } catch {
     if (state.editor && state.selected === id) state.editor.failed = true;
   }
@@ -261,17 +294,20 @@ async function loadDetail(id: string, keepDraft = false) {
 
 function openEditor(id: string) {
   state.selected = id;
-  state.editor = { mode: "edit", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", confirmDelete: null, busy: false };
+  state.editor = { mode: "edit", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", collectionTouched: false, confirmDelete: null, busy: false };
   const known = findTask(id);
   if (known) state.editor.draft = draftOf({ ...known, tags: known.tags ?? [] });
   render();
+  void loadCollections();
   void loadDetail(id);
 }
 
 function openCreate() {
   state.selected = null;
-  state.editor = { mode: "create", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", confirmDelete: null, busy: false };
+  state.editor = { mode: "create", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", collectionTouched: false, confirmDelete: null, busy: false };
+  if (state.collections?.[0]) state.editor.draft.collection = state.collections[0].id;
   render();
+  void loadCollections();
   document.getElementById("f-title")?.focus();
 }
 
@@ -330,7 +366,7 @@ async function saveEditor() {
       state.editor = null;
       if (typeof made.id === "string") {
         state.selected = made.id;
-        state.editor = { mode: "edit", detail: null, failed: false, draft: { ...editor.draft }, newSubtask: "", confirmDelete: null, busy: false };
+        state.editor = { mode: "edit", detail: null, failed: false, draft: { ...editor.draft }, newSubtask: "", collectionTouched: false, confirmDelete: null, busy: false };
       }
       return s.created(String(args.title));
     }, `The user created the task "${String(args.title)}" in the Flows view.`);
@@ -654,7 +690,28 @@ function editorPanel(s: Strings): HTMLElement | null {
   const tags = textInput(draft.tags, (v) => (draft.tags = v));
   tags.placeholder = s.tagsHint;
   grid.append(field(s.fTags, tags, "f-tags"));
+  if (state.collections && state.collections.length > 0) {
+    const collection = el("select");
+    for (const [value, name] of [["", s.noCollection], ...state.collections.map((c) => [c.id, c.name])]) {
+      const option = el("option", undefined, name);
+      option.value = value;
+      option.selected = draft.collection === value;
+      collection.append(option);
+    }
+    collection.addEventListener("change", () => {
+      draft.collection = collection.value;
+      editor.collectionTouched = true;
+      render();
+    });
+    grid.append(field(s.fCollection, collection, "f-collection"));
+  }
   panel.append(grid);
+  const moving =
+    editor.mode === "edit" &&
+    editor.detail &&
+    draft.collection !== (editor.detail.collectionId ?? "") &&
+    editor.detail.subtasks.length > 0;
+  if (moving && editor.detail) panel.append(el("p", "hint", s.movedWith(editor.detail.subtasks.length)));
 
   if (editor.mode === "edit") {
     const detail = editor.detail;

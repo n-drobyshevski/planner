@@ -267,6 +267,7 @@ describe("editing drafts", () => {
       startDate: "",
       priority: "2",
       tags: "thesis, writing",
+      collection: "",
     });
     expect(draftOf({ title: "Bare", tags: [], priority: 0 })).toEqual({ ...EMPTY_DRAFT, title: "Bare" });
   });
@@ -278,8 +279,16 @@ describe("editing drafts", () => {
   it("builds create arguments with only what was filled in", () => {
     expect(createArgs({ ...EMPTY_DRAFT, title: "  New  " })).toEqual({ title: "New" });
     expect(
-      createArgs({ title: "Sub", dueDate: "2026-11-12", startDate: "bad", priority: "3", tags: "x" }, "parent-1"),
+      createArgs(
+        { title: "Sub", dueDate: "2026-11-12", startDate: "bad", priority: "3", tags: "x", collection: "col-1" },
+        "parent-1",
+      ),
     ).toEqual({ title: "Sub", parentId: "parent-1", dueDate: "2026-11-12", priority: 3, tags: ["x"] });
+    // A top-level task names its collection; a subtask (above) never does.
+    expect(createArgs({ ...EMPTY_DRAFT, title: "Top", collection: "col-1" })).toEqual({
+      title: "Top",
+      collectionId: "col-1",
+    });
     expect(createArgs({ ...EMPTY_DRAFT, title: "   " })).toBeNull();
   });
 
@@ -294,6 +303,10 @@ describe("editing drafts", () => {
     expect(updateArgs(original, { ...draftOf(original), startDate: "2026-11-01" })).toEqual({
       startDate: "2026-11-01",
     });
+    expect(updateArgs(original, { ...draftOf(original), collection: "col-2" })).toEqual({ collectionId: "col-2" });
+    expect(
+      updateArgs({ ...original, collectionId: "col-1" }, { ...draftOf(original), collection: "" }),
+    ).toEqual({ collectionId: null });
     expect(updateArgs(original, { ...draftOf(original), title: " " })).toBeNull();
   });
 });
