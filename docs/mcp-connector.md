@@ -45,7 +45,7 @@ page) → Supabase issues the token.
 
 ## Tools
 
-Read: `show_flows` (the same streams as `get_flows`, with a view: see [The Flows app](#the-flows-app-mcp-app)), `get_workspace`, `list_events`, `list_tasks`, `get_sleep_summary`,
+Read: `show_flows` (the same streams as `get_flows`, with a view: see [The Flows app](#the-flows-app-mcp-app)), `get_workspace`, `list_events`, `list_tasks`, `get_task` (one task with its editable fields and its subtask tree), `get_sleep_summary`,
 `get_agenda`, `get_flows`. Write: `create_event`, `update_event`, `create_task`,
 `update_task`, `complete_task`. Destructive (`delete_event`, `delete_task`)
 require `confirm: true` — called without it they return a preview of what
@@ -112,7 +112,21 @@ Claude Desktop) renders it in the chat, with three views behind one switch:
   `list_events`) and the tasks due that day.
 
 The member can regroup the streams, switch the attention rule and show only
-their own tasks. Any other host sees an ordinary tool with the same JSON text
+their own tasks.
+
+**Editing.** Picking a runway (or "Edit" in Now) opens the task in an editor
+under the view: title, start, deadline, priority and tags, with Save, Done (or
+Reopen), Delete and Close. Its subtasks are listed beneath, the whole tree
+indented by depth: tick one to complete or reopen it, type in its row to rename
+it, press × to delete it, and add a new one at the bottom. "New task" opens the
+same editor empty. Delete, for a task or a subtask, takes two presses: the
+first only arms the button, and for a task with subtasks says how many go with
+it. Every change is one call to an ordinary tool (`create_task`, `update_task`,
+`complete_task`, `delete_task`), after which the view refetches; a change that
+fails says so and leaves the view as it was. Save sends only the fields that
+changed. A task created here has no collection, like one Claude creates without
+naming one; a subtask is created in its parent's collection, with its parent's
+privacy. Any other host sees an ordinary tool with the same JSON text
 as `get_flows`.
 
 For the runways, each task in the output also carries `start` (its planned
@@ -134,7 +148,7 @@ How it stays inside the member's permissions:
   script and styles inline, declares no CSP domains and fetches nothing.
 - It holds no token and no session. It gets its data as the tool's
   `structuredContent`, and acts by asking the host to call this server's tools
-  (`show_flows` to refetch, `list_events` for the Calendar view, `complete_task` to tick a task off). The host sends
+  (`show_flows` to refetch, `list_events` for the Calendar view, `get_task` for the editor, and the task write tools). The host sends
   those with the member's own bearer token, so RLS decides exactly as it does
   for a call the model makes.
 - Titles and tag names are set as text, never parsed as markup.

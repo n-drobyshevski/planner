@@ -254,3 +254,46 @@ describe("calendarDays", () => {
     expect(days[1].events).toHaveLength(0);
   });
 });
+
+import { EMPTY_DRAFT, createArgs, draftOf, draftTags, updateArgs } from "@/lib/mcp/app/view-model";
+
+describe("editing drafts", () => {
+  const original = { title: "Write", dueDate: "2026-11-20", priority: 2, tags: ["thesis", "writing"] };
+
+  it("round-trips a task into a draft", () => {
+    expect(draftOf(original)).toEqual({
+      title: "Write",
+      dueDate: "2026-11-20",
+      startDate: "",
+      priority: "2",
+      tags: "thesis, writing",
+    });
+    expect(draftOf({ title: "Bare", tags: [], priority: 0 })).toEqual({ ...EMPTY_DRAFT, title: "Bare" });
+  });
+
+  it("reads tags as typed: commas, stray spaces, repeats", () => {
+    expect(draftTags({ ...EMPTY_DRAFT, tags: " a, b ,, a ,#c" })).toEqual(["a", "b", "#c"]);
+  });
+
+  it("builds create arguments with only what was filled in", () => {
+    expect(createArgs({ ...EMPTY_DRAFT, title: "  New  " })).toEqual({ title: "New" });
+    expect(
+      createArgs({ title: "Sub", dueDate: "2026-11-12", startDate: "bad", priority: "3", tags: "x" }, "parent-1"),
+    ).toEqual({ title: "Sub", parentId: "parent-1", dueDate: "2026-11-12", priority: 3, tags: ["x"] });
+    expect(createArgs({ ...EMPTY_DRAFT, title: "   " })).toBeNull();
+  });
+
+  it("sends only what changed, and clears with null or []", () => {
+    expect(updateArgs(original, draftOf(original))).toEqual({});
+    expect(updateArgs(original, { ...draftOf(original), title: "Rewrite" })).toEqual({ title: "Rewrite" });
+    expect(updateArgs(original, { ...draftOf(original), dueDate: "", priority: "", tags: "" })).toEqual({
+      dueDate: null,
+      priority: null,
+      tags: [],
+    });
+    expect(updateArgs(original, { ...draftOf(original), startDate: "2026-11-01" })).toEqual({
+      startDate: "2026-11-01",
+    });
+    expect(updateArgs(original, { ...draftOf(original), title: " " })).toBeNull();
+  });
+});

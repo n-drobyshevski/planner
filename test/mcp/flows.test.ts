@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { projectFlows, resolveFlowOptions, MAX_STREAMS, type FlowsInput } from "@/lib/mcp/flows";
+import {
+  projectFlows,
+  projectTaskDetail,
+  resolveFlowOptions,
+  MAX_STREAMS,
+  type FlowsInput,
+} from "@/lib/mcp/flows";
 import { DEFAULT_FLOWS_DISPLAY, DEFAULT_FLOWS_FILTER } from "@/lib/tasks/flows-display";
 import type { TaskRow } from "@/lib/types";
 
@@ -278,5 +284,33 @@ describe("projectFlows", () => {
     expect(p.start).toBe("2026-07-01");
     expect(p.progress).toEqual({ done: 2, total: 3 });
     expect(tasks.find((t) => t.id === "solo")!.progress).toBeUndefined();
+  });
+});
+
+describe("projectTaskDetail", () => {
+  it("returns the editable fields and the subtree, parent before child, without descriptions", () => {
+    const root = task({ id: "r", title: "Root", tags: ["t"], dueDate: "2026-07-20", priority: 2 });
+    const all = [
+      root,
+      task({ id: "b", title: "Second", parentId: "r", position: 2 }),
+      task({ id: "a", title: "First", parentId: "r", position: 1, completedAt: NOW }),
+      task({ id: "a1", title: "Nested", parentId: "a" }),
+      task({ id: "other", title: "Elsewhere" }),
+    ];
+    const out = projectTaskDetail(root, all);
+    expect(out).toMatchObject({ id: "r", title: "Root", done: false, dueDate: "2026-07-20", priority: 2, tags: ["t"] });
+    expect(out.startDate).toBeUndefined();
+    expect(out.subtasks).toEqual([
+      { id: "a", title: "First", done: true, depth: 1 },
+      { id: "a1", title: "Nested", done: false, depth: 2 },
+      { id: "b", title: "Second", done: false, depth: 1 },
+    ]);
+    expect(JSON.stringify(out)).not.toContain("SECRET");
+  });
+
+  it("survives a cycle in the data", () => {
+    const a = task({ id: "a", title: "A", parentId: "b" });
+    const b = task({ id: "b", title: "B", parentId: "a" });
+    expect(projectTaskDetail(a, [a, b]).subtasks.map((s) => s.id)).toEqual(["b"]);
   });
 });

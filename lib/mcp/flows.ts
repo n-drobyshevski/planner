@@ -218,3 +218,60 @@ export function projectFlows(input: FlowsInput): FlowsOut {
     ...(ranked.length > MAX_STREAMS ? { truncated: true as const } : {}),
   };
 }
+
+// -- one task, for editing ------------------------------------------------------
+
+export interface TaskDetailSubtask {
+  id: string;
+  title: string;
+  done: boolean;
+  /** 1 = a direct child */
+  depth: number;
+}
+
+export interface TaskDetailOut {
+  id: string;
+  title: string;
+  done: boolean;
+  dueDate?: string;
+  startDate?: string;
+  priority?: number;
+  tags: string[];
+  /** the whole subtree, parent before child, siblings in their stored order */
+  subtasks: TaskDetailSubtask[];
+}
+
+/** How deep a subtree `get_task` walks, and how many subtasks it returns at most. */
+const DETAIL_MAX_DEPTH = 6;
+const DETAIL_MAX_SUBTASKS = 100;
+
+/**
+ * `get_task`'s output: the fields the Flows app edits, and the subtask tree
+ * flattened pre-order. Pure. Never reads a description.
+ */
+export function projectTaskDetail(task: TaskRow, all: TaskRow[]): TaskDetailOut {
+  const byParent = groupByParent(all);
+  const subtasks: TaskDetailSubtask[] = [];
+  const seen = new Set<string>([task.id]);
+  const walk = (parentId: string, depth: number) => {
+    if (depth > DETAIL_MAX_DEPTH) return;
+    const kids = [...(byParent.get(parentId) ?? [])].sort((a, b) => a.position - b.position);
+    for (const kid of kids) {
+      if (seen.has(kid.id) || subtasks.length >= DETAIL_MAX_SUBTASKS) continue;
+      seen.add(kid.id);
+      subtasks.push({ id: kid.id, title: clipTitle(kid.title), done: kid.completedAt != null, depth });
+      walk(kid.id, depth + 1);
+    }
+  };
+  walk(task.id, 1);
+  return {
+    id: task.id,
+    title: task.title,
+    done: task.completedAt != null,
+    ...(task.dueDate ? { dueDate: task.dueDate } : {}),
+    ...(task.startDate ? { startDate: task.startDate } : {}),
+    ...(task.priority != null ? { priority: task.priority } : {}),
+    tags: task.tags,
+    subtasks,
+  };
+}

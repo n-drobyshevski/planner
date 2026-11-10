@@ -548,3 +548,87 @@ describe("tags and streams", () => {
     expect(missing.data).not.toContain("Urgent Work");
   });
 });
+
+describe("task editing tools (the Flows app's writes)", () => {
+  const row = (over: Record<string, unknown>) =>
+    ({
+      id: "t1",
+      workspaceId: "w1",
+      ownerId: "m1",
+      assigneeId: null,
+      parentId: null,
+      collectionId: null,
+      categoryId: null,
+      title: "Task",
+      description: "PRIVATE NOTE",
+      isPrivate: false,
+      boardId: null,
+      priority: null,
+      dueDate: null,
+      startDate: null,
+      isMilestone: false,
+      position: 0,
+      completedAt: null,
+      attributes: {},
+      tags: [],
+      createdAt: 1,
+      updatedAt: 1,
+      ...over,
+    }) as never;
+
+  it("get_task returns the task with its subtasks and no description", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "p", title: "Parent", tags: ["x"], startDate: "2026-11-01" }),
+      row({ id: "c", title: "Child", parentId: "p" }),
+    ]);
+    const call = collectTools();
+    const res = await call("get_task", { id: "p" });
+    expect(res.isError).toBe(false);
+    expect(res.data).toMatchObject({ id: "p", startDate: "2026-11-01", tags: ["x"] });
+    expect(res.data.subtasks).toEqual([{ id: "c", title: "Child", done: false, depth: 1 }]);
+    expect(JSON.stringify(res.data)).not.toContain("PRIVATE");
+    expect((await call("get_task", { id: "missing" })).isError).toBe(true);
+  });
+
+  it("a subtask is created in its parent's collection, with its privacy", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "p", collectionId: "col-1", isPrivate: true })]);
+    vi.mocked(m.createTask).mockResolvedValue({ id: "new", title: "Sub" } as never);
+    const call = collectTools();
+    await call("create_task", { title: "Sub", parentId: "p" });
+    expect(vi.mocked(m.createTask).mock.calls[0][1]).toMatchObject({
+      parentId: "p",
+      collectionId: "col-1",
+      isPrivate: true,
+    });
+  });
+
+  it("a subtask of a task you cannot see is refused before anything is written", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([]);
+    const call = collectTools();
+    const res = await call("create_task", { title: "Sub", parentId: "hidden" });
+    expect(res.isError).toBe(true);
+    expect(m.createTask).not.toHaveBeenCalled();
+  });
+
+  it("a top-level create does not look anything up, and passes the start date", async () => {
+    vi.mocked(m.createTask).mockResolvedValue({ id: "new", title: "Top" } as never);
+    const call = collectTools();
+    await call("create_task", { title: "Top", startDate: "2026-11-12" });
+    expect(q.fetchTasks).not.toHaveBeenCalled();
+    const input = vi.mocked(m.createTask).mock.calls[0][1];
+    expect(input).toMatchObject({ startDate: "2026-11-12", collectionId: null });
+    expect(input).not.toHaveProperty("isPrivate");
+  });
+
+  it("update_task sets and clears the start date", async () => {
+    vi.mocked(m.updateTask).mockResolvedValue({ id: "t1", title: "Task" } as never);
+    const call = collectTools();
+    await call("update_task", { id: "t1", startDate: "2026-11-12" });
+    await call("update_task", { id: "t1", startDate: null });
+    expect(vi.mocked(m.updateTask).mock.calls.map((c) => c[2])).toEqual([
+      { startDate: "2026-11-12" },
+      { startDate: null },
+    ]);
+  });
+});
+

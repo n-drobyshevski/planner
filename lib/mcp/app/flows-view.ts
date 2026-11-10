@@ -21,13 +21,16 @@ import {
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
 
-import type { FlowsOut, FlowTaskOut } from "@/lib/mcp/flows";
+import type { FlowsOut, FlowTaskOut, TaskDetailOut, TaskDetailSubtask } from "@/lib/mcp/flows";
 import {
+  EMPTY_DRAFT,
   RUNWAY_NARROW,
   RUNWAY_NOW_X,
   STRINGS,
   attentionLevel,
   calendarDays,
+  createArgs,
+  draftOf,
   nowItems,
   pickLocale,
   runwayLabel,
@@ -36,8 +39,10 @@ import {
   runwayTicks,
   streamSummary,
   taskDetail,
+  updateArgs,
   type CalendarEventIn,
   type Strings,
+  type TaskDraft,
   type ViewLocale,
 } from "./view-model";
 
@@ -63,6 +68,20 @@ interface State {
   /** the next week's events; null until the Calendar view asks for them */
   events: CalendarEventIn[] | null;
   eventsStatus: "idle" | "loading" | "error";
+  editor: Editor | null;
+}
+
+/** The task being edited (or created). Field values live here, not in the DOM, so a repaint keeps them. */
+interface Editor {
+  mode: "edit" | "create";
+  /** edit: the task as the server last gave it; null while it loads */
+  detail: TaskDetailOut | null;
+  failed: boolean;
+  draft: TaskDraft;
+  newSubtask: string;
+  /** the id whose delete button was pressed once and waits for a second press */
+  confirmDelete: string | null;
+  busy: boolean;
 }
 
 const state: State = {
@@ -78,6 +97,7 @@ const state: State = {
   locale: pickLocale(navigator.language),
   events: null,
   eventsStatus: "idle",
+  editor: null,
 };
 
 const app = new App({ name: "Planner flows", version: "1.1.0" });
@@ -122,7 +142,8 @@ function accept(result: { structuredContent?: unknown; isError?: boolean }): boo
   state.groupBy = data.groupBy;
   state.attention = data.attention;
   state.stream = data.stream;
-  if (state.selected && !findTask(state.selected)) state.selected = null;
+  // A selected task that left the listing stays open in the editor: it may be
+  // newly created, or simply ranked below the tasks each stream shows.
   return true;
 }
 
@@ -200,33 +221,189 @@ function setView(view: View) {
   render();
 }
 
-async function complete(task: FlowTaskOut) {
+function complete(task: FlowTaskOut) {
+  if (state.selected === task.id) {
+    state.selected = null;
+    state.editor = null;
+  }
+  return setDone(task.id, task.title, true);
+}
+
+// -- editing -----------------------------------------------------------------------
+
+/** Call one of this server's tools through the host; its JSON result, or a throw. */
+async function call(name: string, args: Record<string, unknown>): Promise<unknown> {
+  const result = await app.callServerTool({ name, arguments: args });
+  const first = result.content?.[0];
+  if (result.isError || !first || first.type !== "text") throw new Error("tool failed");
+  return JSON.parse(first.text);
+}
+
+function isDetail(value: unknown): value is TaskDetailOut {
+  const d = value as TaskDetailOut;
+  return typeof d === "object" && d !== null && typeof d.id === "string" && Array.isArray(d.subtasks) && Array.isArray(d.tags);
+}
+
+async function loadDetail(id: string, keepDraft = false) {
+  try {
+    const detail = await call("get_task", { id });
+    const editor = state.editor;
+    if (!editor || editor.mode !== "edit" || state.selected !== id) return;
+    if (!isDetail(detail)) throw new Error("bad task");
+    editor.detail = detail;
+    editor.failed = false;
+    if (!keepDraft) editor.draft = draftOf(detail);
+  } catch {
+    if (state.editor && state.selected === id) state.editor.failed = true;
+  }
+  render();
+}
+
+function openEditor(id: string) {
+  state.selected = id;
+  state.editor = { mode: "edit", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", confirmDelete: null, busy: false };
+  const known = findTask(id);
+  if (known) state.editor.draft = draftOf({ ...known, tags: known.tags ?? [] });
+  render();
+  void loadDetail(id);
+}
+
+function openCreate() {
+  state.selected = null;
+  state.editor = { mode: "create", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", confirmDelete: null, busy: false };
+  render();
+  document.getElementById("f-title")?.focus();
+}
+
+function closeEditor() {
+  state.selected = null;
+  state.editor = null;
+  render();
+}
+
+/** Tell the model what the member just changed, so its next answer is not stale. */
+function tellModel(text: string) {
+  void app.updateModelContext({ content: [{ type: "text", text }] }).catch(() => undefined);
+}
+
+/**
+ * Run one change: the tool call, then a fresh copy of the streams and of the
+ * open task. A failure changes nothing here and says so.
+ */
+async function mutate(work: () => Promise<string | null>, said: string) {
   const s = STRINGS[state.locale];
-  state.busy.add(task.id);
+  const editor = state.editor;
+  if (editor) editor.busy = true;
   state.notice = null;
   render();
-  let ok = false;
   try {
-    const result = await app.callServerTool({ name: "complete_task", arguments: { id: task.id } });
-    ok = !result.isError;
+    const noticed = await work();
+    state.notice = noticed;
+    tellModel(said);
   } catch {
-    ok = false;
-  }
-  state.busy.delete(task.id);
-  if (!ok) {
-    state.notice = s.doneFailed;
+    state.notice = s.actionFailed;
+    if (editor) editor.busy = false;
     render();
     return;
   }
-  state.notice = s.markedDone(task.title);
-  if (state.selected === task.id) state.selected = null;
-  // Tell the model what the member just did, so its next answer is not stale.
-  void app
-    .updateModelContext({
-      content: [{ type: "text", text: `The user marked the task "${task.title}" (id ${task.id}) as done in the Flows view.` }],
-    })
-    .catch(() => undefined);
+  if (editor) {
+    editor.busy = false;
+    editor.confirmDelete = null;
+  }
   await refetch();
+  if (state.editor?.mode === "edit" && state.selected) await loadDetail(state.selected, true);
+}
+
+async function saveEditor() {
+  const s = STRINGS[state.locale];
+  const editor = state.editor;
+  if (!editor) return;
+  if (editor.mode === "create") {
+    const args = createArgs(editor.draft);
+    if (!args) {
+      state.notice = s.titleNeeded;
+      render();
+      return;
+    }
+    await mutate(async () => {
+      const made = (await call("create_task", args)) as { id?: unknown };
+      state.editor = null;
+      if (typeof made.id === "string") {
+        state.selected = made.id;
+        state.editor = { mode: "edit", detail: null, failed: false, draft: { ...editor.draft }, newSubtask: "", confirmDelete: null, busy: false };
+      }
+      return s.created(String(args.title));
+    }, `The user created the task "${String(args.title)}" in the Flows view.`);
+    return;
+  }
+  const detail = editor.detail;
+  if (!detail) return;
+  const patch = updateArgs(detail, editor.draft);
+  if (patch === null) {
+    state.notice = s.titleNeeded;
+    render();
+    return;
+  }
+  if (Object.keys(patch).length === 0) {
+    state.notice = s.saved;
+    render();
+    return;
+  }
+  await mutate(async () => {
+    await call("update_task", { id: detail.id, ...patch });
+    return s.saved;
+  }, `The user edited the task "${detail.title}" (id ${detail.id}) in the Flows view: changed ${Object.keys(patch).join(", ")}.`);
+}
+
+/** Delete on the second press; the first only arms the button. */
+async function removeTask(id: string, title: string, isSubtask: boolean) {
+  const s = STRINGS[state.locale];
+  const editor = state.editor;
+  if (!editor) return;
+  if (editor.confirmDelete !== id) {
+    editor.confirmDelete = id;
+    render();
+    return;
+  }
+  await mutate(async () => {
+    await call("delete_task", { id, confirm: true });
+    if (!isSubtask) {
+      state.editor = null;
+      state.selected = null;
+    }
+    return s.deleted(title);
+  }, `The user deleted the ${isSubtask ? "subtask" : "task"} "${title}" (id ${id}) in the Flows view.`);
+}
+
+async function setDone(id: string, title: string, done: boolean) {
+  const s = STRINGS[state.locale];
+  await mutate(async () => {
+    await call("complete_task", { id, done });
+    return done ? s.markedDone(title) : s.saved;
+  }, `The user marked "${title}" (id ${id}) as ${done ? "done" : "not done"} in the Flows view.`);
+}
+
+async function renameSubtask(sub: TaskDetailSubtask, title: string) {
+  const next = title.trim();
+  if (!next || next === sub.title) return;
+  await mutate(async () => {
+    await call("update_task", { id: sub.id, title: next });
+    return STRINGS[state.locale].saved;
+  }, `The user renamed the subtask "${sub.title}" to "${next}" (id ${sub.id}) in the Flows view.`);
+}
+
+async function addSubtask() {
+  const editor = state.editor;
+  const parent = editor?.detail;
+  if (!editor || !parent) return;
+  const args = createArgs({ ...EMPTY_DRAFT, title: editor.newSubtask }, parent.id);
+  if (!args) return;
+  await mutate(async () => {
+    await call("create_task", args);
+    editor.newSubtask = "";
+    return STRINGS[state.locale].created(String(args.title));
+  }, `The user added the subtask "${String(args.title)}" to "${parent.title}" (id ${parent.id}) in the Flows view.`);
+  document.getElementById("f-newsub")?.focus();
 }
 
 // -- painting ------------------------------------------------------------------
@@ -281,6 +458,12 @@ function toolbar(s: Strings): HTMLElement {
   box.addEventListener("change", () => void refetch({ mine: box.checked }));
   mine.append(box, el("span", undefined, s.mine));
   controls.append(mine);
+  if (state.view !== "calendar") {
+    const add = el("button", "primary", s.newTask);
+    add.type = "button";
+    add.addEventListener("click", openCreate);
+    controls.append(add);
+  }
   bar.append(controls);
   return bar;
 }
@@ -308,8 +491,8 @@ function runwayRow(task: FlowTaskOut, today: string, s: Strings): HTMLElement {
   bar.setAttribute("aria-label", s.runway(task.title, detail));
   bar.title = s.runway(task.title, detail);
   bar.addEventListener("click", () => {
-    state.selected = state.selected === task.id ? null : task.id;
-    render();
+    if (state.selected === task.id) closeEditor();
+    else openEditor(task.id);
   });
   if (runway.fill > 0) {
     const fill = el("i", "fill");
@@ -380,22 +563,163 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
   }
   wrap.append(board);
 
-  const selected = state.selected ? findTask(state.selected) : undefined;
-  const detail = el("div", "detail");
-  if (selected) {
-    const text = el("div", "detail-text");
-    text.append(el("b", undefined, selected.title));
-    const facts = [
-      taskDetail(selected, data.date, state.locale) || s.noDeadline,
-      selected.progress ? s.subtasks(selected.progress.done, selected.progress.total) : "",
-    ].filter(Boolean);
-    text.append(el("span", selected.overdue ? "late" : undefined, facts.join(" · ")));
-    detail.append(text, doneButton(selected, s));
-  } else {
-    detail.append(el("span", "hint", s.pick));
-  }
-  wrap.append(detail);
+  wrap.append(editorPanel(s) ?? hintPanel(s));
   return wrap;
+}
+
+function hintPanel(s: Strings): HTMLElement {
+  const box = el("div", "detail");
+  box.append(el("span", "hint", s.pick));
+  return box;
+}
+
+function field(label: string, control: HTMLElement, id: string): HTMLElement {
+  const wrap = el("label", "field");
+  wrap.setAttribute("for", id);
+  control.id = id;
+  wrap.append(el("span", "field-label", label), control);
+  return wrap;
+}
+
+function textInput(value: string, onInput: (v: string) => void, type = "text"): HTMLInputElement {
+  const input = el("input");
+  input.type = type;
+  input.value = value;
+  input.addEventListener("input", () => onInput(input.value));
+  return input;
+}
+
+function subtaskRow(sub: TaskDetailSubtask, editor: Editor, s: Strings): HTMLElement {
+  const row = el("li", "sub");
+  row.style.paddingInlineStart = `${(sub.depth - 1) * 18}px`;
+  const box = el("input");
+  box.type = "checkbox";
+  box.checked = sub.done;
+  box.disabled = editor.busy;
+  box.setAttribute("aria-label", s.subDone(sub.title));
+  box.addEventListener("change", () => void setDone(sub.id, sub.title, box.checked));
+  const title = textInput(sub.title, () => undefined);
+  title.className = sub.done ? "sub-title sub-done" : "sub-title";
+  title.maxLength = 500;
+  title.setAttribute("aria-label", s.subRename(sub.title));
+  title.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") title.blur();
+    if (e.key === "Escape") {
+      title.value = sub.title;
+      title.blur();
+    }
+  });
+  title.addEventListener("blur", () => void renameSubtask(sub, title.value));
+  const armed = editor.confirmDelete === sub.id;
+  const del = el("button", armed ? "ghost danger armed" : "ghost danger", armed ? s.delConfirm : "×");
+  del.type = "button";
+  del.disabled = editor.busy;
+  del.setAttribute("aria-label", armed ? s.delConfirm : s.subDelete(sub.title));
+  del.addEventListener("click", () => void removeTask(sub.id, sub.title, true));
+  row.append(box, title, del);
+  return row;
+}
+
+/** The editor for the selected task, or for a new one; null when neither. */
+function editorPanel(s: Strings): HTMLElement | null {
+  const editor = state.editor;
+  if (!editor) return null;
+  const panel = el("form", "editor");
+  panel.setAttribute("aria-label", editor.mode === "create" ? s.newTask : s.editTask(editor.draft.title));
+  panel.addEventListener("submit", (e) => {
+    e.preventDefault();
+    void saveEditor();
+  });
+  const draft = editor.draft;
+
+  const title = textInput(draft.title, (v) => (draft.title = v));
+  title.maxLength = 500;
+  title.required = true;
+  panel.append(field(s.fTitle, title, "f-title"));
+
+  const grid = el("div", "editor-grid");
+  grid.append(
+    field(s.fStart, textInput(draft.startDate, (v) => (draft.startDate = v), "date"), "f-start"),
+    field(s.fDue, textInput(draft.dueDate, (v) => (draft.dueDate = v), "date"), "f-due"),
+  );
+  const priority = el("select");
+  for (const [value, name] of [["", s.priorityNone], ["1", s.priority[1]], ["2", s.priority[2]], ["3", s.priority[3]]]) {
+    const option = el("option", undefined, name);
+    option.value = value;
+    option.selected = draft.priority === value;
+    priority.append(option);
+  }
+  priority.addEventListener("change", () => (draft.priority = priority.value));
+  grid.append(field(s.fPriority, priority, "f-priority"));
+  const tags = textInput(draft.tags, (v) => (draft.tags = v));
+  tags.placeholder = s.tagsHint;
+  grid.append(field(s.fTags, tags, "f-tags"));
+  panel.append(grid);
+
+  if (editor.mode === "edit") {
+    const detail = editor.detail;
+    const section = el("div", "subs");
+    section.append(el("div", "subs-title", s.subtasksTitle));
+    if (editor.failed) section.append(el("p", "hint", s.failed));
+    else if (!detail) section.append(el("p", "hint", s.loading));
+    else {
+      if (detail.subtasks.length === 0) section.append(el("p", "hint", s.subEmpty));
+      else {
+        const list = el("ul", "sub-list");
+        for (const sub of detail.subtasks) list.append(subtaskRow(sub, editor, s));
+        section.append(list);
+      }
+      const add = el("div", "sub-add");
+      const input = textInput(editor.newSubtask, (v) => (editor.newSubtask = v));
+      input.id = "f-newsub";
+      input.maxLength = 500;
+      input.placeholder = s.subAdd;
+      input.setAttribute("aria-label", s.subAdd);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          void addSubtask();
+        }
+      });
+      const button = el("button", "ghost", s.subAddButton);
+      button.type = "button";
+      button.disabled = editor.busy;
+      button.addEventListener("click", () => void addSubtask());
+      add.append(input, button);
+      section.append(add);
+    }
+    panel.append(section);
+  }
+
+  const actions = el("div", "editor-actions");
+  const save = el("button", "primary", editor.mode === "create" ? s.create : s.save);
+  save.type = "submit";
+  save.disabled = editor.busy || (editor.mode === "edit" && !editor.detail);
+  actions.append(save);
+  const detail = editor.detail;
+  if (editor.mode === "edit" && detail) {
+    const done = el("button", "ghost", detail.done ? s.reopen : s.done);
+    done.type = "button";
+    done.disabled = editor.busy;
+    done.addEventListener("click", () => {
+      if (detail.done) void setDone(detail.id, detail.title, false);
+      else void complete({ id: detail.id, title: detail.title, score: 0, overdue: false });
+    });
+    actions.append(done);
+    const armed = editor.confirmDelete === detail.id;
+    const del = el("button", armed ? "ghost danger armed" : "ghost danger", armed ? s.delConfirm : s.del);
+    del.type = "button";
+    del.disabled = editor.busy;
+    del.addEventListener("click", () => void removeTask(detail.id, detail.title, false));
+    actions.append(del);
+    if (armed && detail.subtasks.length > 0) actions.append(el("span", "hint late", s.delSubtasks(detail.subtasks.length)));
+  }
+  const close = el("button", "ghost", s.cancel);
+  close.type = "button";
+  close.addEventListener("click", closeEditor);
+  actions.append(close);
+  panel.append(actions);
+  return panel;
 }
 
 function doneButton(task: FlowTaskOut, s: Strings): HTMLButtonElement {
@@ -411,7 +735,11 @@ function nowView(data: FlowsOut, s: Strings): HTMLElement {
   const wrap = el("div", "now");
   const items = nowItems(data.streams);
   wrap.append(el("p", "count", items.length ? s.nowCount(items.length) : s.nowEmpty));
-  if (items.length === 0) return wrap;
+  if (items.length === 0) {
+    const panel = editorPanel(s);
+    if (panel) wrap.append(panel);
+    return wrap;
+  }
   const list = el("ol", "now-list");
   items.forEach(({ task, streams }, index) => {
     const row = el("li", "now-row");
@@ -423,10 +751,16 @@ function nowView(data: FlowsOut, s: Strings): HTMLElement {
     if (detail) meta.append(el("span", task.overdue ? "late" : undefined, detail));
     for (const label of streams) meta.append(el("span", "pill", label));
     text.append(meta);
-    row.append(text, doneButton(task, s));
+    const edit = el("button", "ghost", s.edit);
+    edit.type = "button";
+    edit.setAttribute("aria-label", s.editTask(task.title));
+    edit.addEventListener("click", () => openEditor(task.id));
+    row.append(text, edit, doneButton(task, s));
     list.append(row);
   });
   wrap.append(list);
+  const panel = editorPanel(s);
+  if (panel) wrap.append(panel);
   return wrap;
 }
 
@@ -504,7 +838,11 @@ function render() {
   const body = el("div", state.status === "loading" ? "body stale" : "body");
   body.setAttribute("aria-busy", String(state.status === "loading"));
   if (state.view === "calendar") body.append(calendarView(data, s));
-  else if (data.streams.every((stream) => stream.open === 0)) body.append(el("p", "empty", s.empty));
+  else if (data.streams.every((stream) => stream.open === 0)) {
+    body.append(el("p", "empty", s.empty));
+    const panel = editorPanel(s);
+    if (panel) body.append(panel);
+  }
   else body.append(state.view === "now" ? nowView(data, s) : flowsView(data, s));
   root.append(body);
   if (data.truncated && state.view === "flows") root.append(el("p", "footnote", s.truncated));

@@ -34,6 +34,35 @@ function ruPlural(n: number, one: string, few: string, many: string): string {
 export const STRINGS = {
   en: {
     title: "Streams",
+    newTask: "New task",
+    edit: "Edit",
+    editTask: (title: string) => `Edit “${title}”`,
+    save: "Save",
+    create: "Create",
+    cancel: "Close",
+    del: "Delete",
+    delConfirm: "Delete for good?",
+    delSubtasks: (n: number) => `Its ${n} subtask${n === 1 ? "" : "s"} go with it.`,
+    fTitle: "Title",
+    fDue: "Deadline",
+    fStart: "Start",
+    fPriority: "Priority",
+    fTags: "Tags",
+    tagsHint: "separate with commas",
+    priorityNone: "None",
+    subtasksTitle: "Subtasks",
+    subAdd: "Add a subtask",
+    subAddButton: "Add",
+    subDone: (title: string) => `“${title}” done`,
+    subDelete: (title: string) => `Delete subtask “${title}”`,
+    subRename: (title: string) => `Rename subtask “${title}”`,
+    subEmpty: "No subtasks yet.",
+    titleNeeded: "A task needs a title.",
+    saved: "Saved.",
+    created: (title: string) => `“${title}” created.`,
+    deleted: (title: string) => `“${title}” deleted.`,
+    actionFailed: "That did not go through. Nothing was changed.",
+    reopen: "Reopen",
     views: { calendar: "Calendar", flows: "Flows", now: "Now" },
     view: "View",
     pick: "Pick a runway to see its task.",
@@ -83,6 +112,35 @@ export const STRINGS = {
   },
   ru: {
     title: "Направления",
+    newTask: "Новая задача",
+    edit: "Изменить",
+    editTask: (title: string) => `Изменить «${title}»`,
+    save: "Сохранить",
+    create: "Создать",
+    cancel: "Закрыть",
+    del: "Удалить",
+    delConfirm: "Удалить насовсем?",
+    delSubtasks: (n: number) => `Вместе с ней удалятся подзадачи: ${n}.`,
+    fTitle: "Название",
+    fDue: "Срок",
+    fStart: "Начало",
+    fPriority: "Приоритет",
+    fTags: "Теги",
+    tagsHint: "через запятую",
+    priorityNone: "Нет",
+    subtasksTitle: "Подзадачи",
+    subAdd: "Добавить подзадачу",
+    subAddButton: "Добавить",
+    subDone: (title: string) => `«${title}» сделана`,
+    subDelete: (title: string) => `Удалить подзадачу «${title}»`,
+    subRename: (title: string) => `Переименовать подзадачу «${title}»`,
+    subEmpty: "Подзадач пока нет.",
+    titleNeeded: "Задаче нужно название.",
+    saved: "Сохранено.",
+    created: (title: string) => `«${title}» создана.`,
+    deleted: (title: string) => `«${title}» удалена.`,
+    actionFailed: "Не получилось. Ничего не изменено.",
+    reopen: "Вернуть в работу",
     views: { calendar: "Календарь", flows: "Потоки", now: "Сейчас" },
     view: "Вид",
     pick: "Выберите полосу, чтобы увидеть задачу.",
@@ -389,4 +447,83 @@ export function calendarDays(
     }
   }
   return out;
+}
+
+// -- Editing ---------------------------------------------------------------------
+
+export interface TaskDraft {
+  title: string;
+  dueDate: string;
+  startDate: string;
+  /** "" = none, else "1".."3" */
+  priority: string;
+  /** as typed: comma-separated */
+  tags: string;
+}
+
+export const EMPTY_DRAFT: TaskDraft = { title: "", dueDate: "", startDate: "", priority: "", tags: "" };
+
+interface DraftSource {
+  title: string;
+  dueDate?: string;
+  startDate?: string;
+  priority?: number;
+  tags: readonly string[];
+}
+
+export function draftOf(task: DraftSource): TaskDraft {
+  return {
+    title: task.title,
+    dueDate: task.dueDate ?? "",
+    startDate: task.startDate ?? "",
+    priority: task.priority ? String(task.priority) : "",
+    tags: task.tags.join(", "),
+  };
+}
+
+/** The tags a draft names: split on commas, trimmed, empties and repeats dropped (the server normalizes). */
+export function draftTags(draft: TaskDraft): string[] {
+  const out: string[] = [];
+  for (const raw of draft.tags.split(",")) {
+    const tag = raw.trim();
+    if (tag && !out.includes(tag)) out.push(tag);
+  }
+  return out;
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const dateOrNull = (value: string): string | null => (DATE_RE.test(value) ? value : null);
+
+/** `create_task` arguments for a draft, or null when it has no title. */
+export function createArgs(draft: TaskDraft, parentId?: string): Record<string, unknown> | null {
+  const title = draft.title.trim();
+  if (!title) return null;
+  const tags = draftTags(draft);
+  return {
+    title,
+    ...(parentId ? { parentId } : {}),
+    ...(dateOrNull(draft.dueDate) ? { dueDate: draft.dueDate } : {}),
+    ...(dateOrNull(draft.startDate) ? { startDate: draft.startDate } : {}),
+    ...(draft.priority ? { priority: Number(draft.priority) } : {}),
+    ...(tags.length ? { tags } : {}),
+  };
+}
+
+/**
+ * `update_task` arguments holding only what the draft changed against the task
+ * as loaded: `{}` when nothing did, null when the title was emptied. A cleared
+ * date or priority is sent as null, cleared tags as [].
+ */
+export function updateArgs(original: DraftSource, draft: TaskDraft): Record<string, unknown> | null {
+  const title = draft.title.trim();
+  if (!title) return null;
+  const before = draftOf(original);
+  const patch: Record<string, unknown> = {};
+  if (title !== original.title) patch.title = title;
+  if (draft.dueDate !== before.dueDate) patch.dueDate = dateOrNull(draft.dueDate);
+  if (draft.startDate !== before.startDate) patch.startDate = dateOrNull(draft.startDate);
+  if (draft.priority !== before.priority) patch.priority = draft.priority ? Number(draft.priority) : null;
+  const tags = draftTags(draft);
+  if (tags.join(",") !== original.tags.join(",")) patch.tags = tags;
+  return patch;
 }

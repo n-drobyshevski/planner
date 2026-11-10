@@ -33,6 +33,7 @@ import {
   projectFlows,
   resolveFlowOptions,
   MCP_FLOWS_GROUP_BYS,
+  projectTaskDetail,
   type FlowsOut,
   type McpFlowsGroupBy,
 } from "./flows";
@@ -643,6 +644,27 @@ export function registerTools(server: McpServer): void {
     }
   });
 
+  server.registerTool(
+    "get_task",
+    {
+      title: "Get task",
+      description:
+        "One task by id with its editable fields and its whole subtask tree " +
+        "(flattened, parent before child, each with its depth). RLS-scoped. " +
+        "Never returns descriptions.",
+      inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, workspaceId } = mcpContext(extra);
+        const tasks = await fetchTasks(sb, workspaceId);
+        const task = tasks.find((t) => t.id === args.id);
+        if (!task) return fail(`No task with id ${args.id} is visible to you.`);
+        return ok(projectTaskDetail(task, tasks));
+      }),
+  );
+
   // -- tasks: write -------------------------------------------------------
   server.registerTool(
     "create_task",
@@ -669,6 +691,11 @@ export function registerTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe("Calendar date, yyyy-MM-dd, or null for none."),
+        startDate: z
+          .iso.date()
+          .nullable()
+          .optional()
+          .describe("Planned start, yyyy-MM-dd, or null for none."),
         clientRequestId: z
           .string()
           .min(1)
@@ -684,17 +711,26 @@ export function registerTools(server: McpServer): void {
     (args, extra) =>
       guard(async () => {
         const { sb, memberId, workspaceId } = mcpContext(extra);
+        // A subtask lives where its parent lives: same collection, same
+        // privacy (the web app does the same), unless the caller says otherwise.
+        let parent: TaskRow | undefined;
+        if (args.parentId) {
+          parent = (await fetchTasks(sb, workspaceId)).find((t) => t.id === args.parentId);
+          if (!parent) return fail(`No task with id ${args.parentId} is visible to you.`);
+        }
         const input: TaskInput = {
           workspaceId,
           ownerId: memberId,
           title: args.title,
           description: args.description ?? null,
-          collectionId: args.collectionId ?? null,
+          collectionId: args.collectionId ?? parent?.collectionId ?? null,
           boardId: args.boardId ?? null,
           parentId: args.parentId ?? null,
           categoryId: args.categoryId ?? null,
           priority: args.priority ?? null,
           dueDate: args.dueDate ?? null,
+          startDate: args.startDate ?? null,
+          ...(parent ? { isPrivate: parent.isPrivate } : {}),
           ...(args.tags !== undefined ? { tags: args.tags } : {}),
           clientRequestId: args.clientRequestId,
         };
@@ -717,6 +753,7 @@ export function registerTools(server: McpServer): void {
         boardId: z.string().nullable().optional(),
         priority: z.number().int().min(0).max(3).nullable().optional(),
         dueDate: z.string().nullable().optional(),
+        startDate: z.iso.date().nullable().optional().describe("Planned start, yyyy-MM-dd, or null."),
         tags: z
           .array(z.string().max(MAX_TAG_LENGTH * 2))
           .max(MAX_TAGS * 2)
@@ -734,6 +771,7 @@ export function registerTools(server: McpServer): void {
         if (args.boardId !== undefined) patch.boardId = args.boardId;
         if (args.priority !== undefined) patch.priority = args.priority;
         if (args.dueDate !== undefined) patch.dueDate = args.dueDate;
+        if (args.startDate !== undefined) patch.startDate = args.startDate;
         if (args.tags !== undefined) patch.tags = args.tags;
         if (Object.keys(patch).length === 0)
           return fail("Provide at least one field to update.");

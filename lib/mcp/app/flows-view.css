@@ -100,7 +100,29 @@ button:disabled { opacity: 0.55; cursor: default; }
 .event-due .time { color: var(--text); font-weight: 600; }
 .event-none { display: block; color: var(--muted); font-size: 12px; }
 
+/* The editor: one task's fields and its subtasks. */
+.primary { min-height: 44px; padding: 4px 14px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: var(--bg); font-weight: 600; cursor: pointer; }
+input[type="text"], input[type="date"] { min-height: 36px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; min-width: 0; width: 100%; }
+.editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.editor-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.editor select { width: 100%; min-height: 36px; }
+.subs { display: grid; gap: 6px; }
+.subs-title { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.sub-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sub { display: flex; gap: 8px; align-items: center; }
+.sub input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0 4px; }
+.sub-title { flex: 1; }
+.sub-done { text-decoration: line-through; color: var(--muted); }
+.sub-add { display: flex; gap: 8px; }
+.sub-add input { flex: 1; }
+.danger { color: var(--late); }
+.sub .danger { flex: none; min-width: 36px; min-height: 36px; padding: 0 8px; }
+.armed { border: 2px solid var(--late); font-weight: 600; }
+.editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.editor-actions .ghost, .editor-actions .primary { min-height: 44px; }
+
 @media (max-width: 520px) {
+  .editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .board { grid-template-columns: minmax(0, 1fr); }
   .corner { display: none; }
   .name { grid-template-columns: auto 1fr; gap: 8px; align-items: baseline; padding-bottom: 0; }
