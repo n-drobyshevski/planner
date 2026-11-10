@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_FLOWS_FILTER,
+  DEFAULT_FLOWS_DISPLAY,
   activeFilterCount,
+  coerceFlowsDisplay,
   filterLanes,
   flowOrderOf,
   groupLanes,
@@ -10,7 +12,7 @@ import {
   type FlowsFilter,
 } from "@/lib/tasks/flows-display";
 import type { FlowLane } from "@/lib/tasks/flows-layout";
-import type { Board, Category, TaskRow } from "@/lib/types";
+import type { Board, Category, Collection, Member, TaskRow } from "@/lib/types";
 
 const T0 = Date.UTC(2026, 5, 1);
 const DAY = 86_400_000;
@@ -82,13 +84,31 @@ function category(over: Partial<Category>): Category {
 const boards = [board({ id: "b1", name: "To Do", position: 0 }), board({ id: "b2", name: "Done", position: 1, isDone: true })];
 const categories = [category({ id: "c1", name: "Home", sortOrder: 0 }), category({ id: "c2", name: "Work", sortOrder: 1, color: "#0369a1" })];
 
+const collections = [
+  { id: "k2", workspaceId: "w", ownerId: null, name: "Zeta", color: "#111111", sortOrder: 0 },
+  { id: "k1", workspaceId: "w", ownerId: null, name: "Alpha", color: "#222222", sortOrder: 1 },
+] as Collection[];
+const members = [
+  { id: "m1", name: "Ana", color: "#c2410c" },
+  { id: "m2", name: "Ben", color: "#0369a1" },
+] as Member[];
+
 const ctx: FlowsDisplayCtx = {
   boardsById: new Map(boards.map((b) => [b.id, b])),
   boardOrder: new Map(boards.map((b, i) => [b.id, i])),
   categoriesById: new Map(categories.map((c) => [c.id, c])),
+  collectionsById: new Map(collections.map((c) => [c.id, c])),
+  collectionOrder: new Map(collections.map((c, i) => [c.id, i])),
+  membersById: new Map(members.map((m) => [m.id, m])),
+  memberOrder: new Map(members.map((m, i) => [m.id, i])),
+  today: "2026-06-10",
+  attention: "combined",
   labels: {
     noStatus: "No status",
     noCategory: "No category",
+    noTag: "No tag",
+    noCollection: "No collection",
+    unassigned: "Unassigned",
     priority: { 0: "None", 1: "Low", 2: "Medium", 3: "High" },
   },
 };
@@ -216,5 +236,147 @@ describe("activeFilterCount", () => {
     expect(activeFilterCount(DEFAULT_FLOWS_FILTER)).toBe(0);
     const f: FlowsFilter = { ...DEFAULT_FLOWS_FILTER, boardIds: ["b1"], done: "open", privacy: "private" };
     expect(activeFilterCount(f)).toBe(3);
+  });
+});
+
+describe("tag and assignee filters", () => {
+  const lanes = [
+    lane({ id: "a", tags: ["home", "urgent"], assigneeId: "m1" }),
+    lane({ id: "b", tags: [], assigneeId: null }),
+    lane({ id: "c", tags: ["work"], assigneeId: "m2" }),
+  ];
+
+  it("matches a lane having ANY listed tag; null is the untagged bucket", () => {
+    expect(ids(filterLanes(lanes, { ...DEFAULT_FLOWS_FILTER, tags: ["urgent", "work"] }))).toEqual(["a", "c"]);
+    expect(ids(filterLanes(lanes, { ...DEFAULT_FLOWS_FILTER, tags: [null] }))).toEqual(["b"]);
+    expect(ids(filterLanes(lanes, { ...DEFAULT_FLOWS_FILTER, tags: [null, "home"] }))).toEqual(["a", "b"]);
+  });
+
+  it("filters by assignee with null = unassigned", () => {
+    expect(ids(filterLanes(lanes, { ...DEFAULT_FLOWS_FILTER, assigneeIds: ["m2"] }))).toEqual(["c"]);
+    expect(ids(filterLanes(lanes, { ...DEFAULT_FLOWS_FILTER, assigneeIds: [null, "m1"] }))).toEqual(["a", "b"]);
+  });
+
+  it("counts them in activeFilterCount", () => {
+    expect(activeFilterCount({ ...DEFAULT_FLOWS_FILTER, tags: ["x"], assigneeIds: [null] })).toBe(2);
+  });
+});
+
+describe("attention sort", () => {
+  const lanes = [
+    lane({ id: "calm", dueDate: "2026-08-01", priority: 1 }),
+    lane({ id: "hot", dueDate: "2026-06-09", priority: 3 }),
+    lane({ id: "mid", dueDate: "2026-06-17", priority: 2 }),
+    lane({ id: "done", dueDate: "2026-06-09", priority: 3, completedAt: T0 }),
+  ];
+  const attn = { today: "2026-06-10", mode: "combined" as const };
+
+  it("desc puts the most pressing first, asc the reverse", () => {
+    expect(ids(sortLanes(lanes, "attention", "desc", undefined, attn))).toEqual(["hot", "mid", "calm", "done"]);
+    expect(ids(sortLanes(lanes, "attention", "asc", undefined, attn))).toEqual(["done", "calm", "mid", "hot"]);
+  });
+
+  it("is used by groupLanes through the ctx", () => {
+    const [g] = groupLanes(lanes, "none", "attention", "desc", ctx);
+    expect(ids(g.lanes)[0]).toBe("hot");
+  });
+
+  it("keeps input order without an attention context", () => {
+    expect(ids(sortLanes(lanes, "attention", "desc"))).toEqual(["calm", "hot", "mid", "done"]);
+  });
+});
+
+describe("groupLanes: tag, collection, assignee", () => {
+  it("puts a multi-tag lane in each tag bucket, alphabetical, untagged last", () => {
+    const both = lane({ id: "both", tags: ["work", "home"] });
+    const lanes = [lane({ id: "plain" }), both, lane({ id: "w", tags: ["work"] })];
+    const groups = groupLanes(lanes, "tag", "manual", "asc", ctx);
+    expect(groups.map((g) => g.label)).toEqual(["home", "work", "No tag"]);
+    expect(ids(groups[0].lanes)).toEqual(["both"]);
+    expect(ids(groups[1].lanes)).toEqual(["both", "w"]);
+    expect(groups[0].lanes[0]).toBe(groups[1].lanes[0]); // the same lane object
+    expect(new Set(groups.map((g) => g.key)).size).toBe(3);
+    expect(groups.every((g) => g.color === undefined)).toBe(true);
+  });
+
+  it("a tag literally named none does not collide with the untagged bucket", () => {
+    const groups = groupLanes([lane({ id: "a", tags: ["none"] }), lane({ id: "b" })], "tag", "manual", "asc", ctx);
+    expect(groups.map((g) => g.label)).toEqual(["none", "No tag"]);
+  });
+
+  it("orders collection buckets by the collection's order, none last", () => {
+    const lanes = [
+      lane({ id: "a", collectionId: "k1" }),
+      lane({ id: "b", collectionId: null }),
+      lane({ id: "c", collectionId: "k2" }),
+    ];
+    const groups = groupLanes(lanes, "collection", "manual", "asc", ctx);
+    expect(groups.map((g) => g.label)).toEqual(["Zeta", "Alpha", "No collection"]);
+  });
+
+  it("orders assignee buckets by member order, unassigned last, with the member color", () => {
+    const lanes = [
+      lane({ id: "a", assigneeId: null }),
+      lane({ id: "b", assigneeId: "m2" }),
+      lane({ id: "c", assigneeId: "m1" }),
+    ];
+    const groups = groupLanes(lanes, "assignee", "manual", "asc", ctx);
+    expect(groups.map((g) => g.label)).toEqual(["Ana", "Ben", "Unassigned"]);
+    expect(groups[0].color).toBe("#c2410c");
+    expect(groups[2].color).toBeUndefined();
+  });
+});
+
+describe("coerceFlowsDisplay", () => {
+  it("falls back to defaults on garbage", () => {
+    for (const bad of [null, undefined, 5, "x", [], { filter: "x", groupBy: 3, mode: {}, tags: 1 }]) {
+      expect(coerceFlowsDisplay(bad)).toEqual(DEFAULT_FLOWS_DISPLAY);
+    }
+  });
+
+  it("upgrades an old-schema blob, keeping its fields and defaulting the new ones", () => {
+    const old = {
+      filter: { boardIds: ["b1"], categoryIds: [null], priorities: [3], done: "open", milestone: "all", privacy: "all" },
+      groupBy: "status",
+      sortBy: "due",
+      sortDir: "desc",
+    };
+    const out = coerceFlowsDisplay(old);
+    expect(out.filter).toEqual({ ...DEFAULT_FLOWS_FILTER, boardIds: ["b1"], categoryIds: [null], priorities: [3], done: "open" });
+    expect(out.groupBy).toBe("status");
+    expect(out.sortDir).toBe("desc");
+    expect(out.mode).toBe("tasks");
+    expect(out.attention).toBe("combined");
+    expect(out.scope).toBe("collection");
+  });
+
+  it("drops wrong-shaped individual fields only", () => {
+    const out = coerceFlowsDisplay({ groupBy: "tag", mode: "bogus", filter: { tags: [1], assigneeIds: ["m1", null] } });
+    expect(out.groupBy).toBe("tag");
+    expect(out.mode).toBe("tasks");
+    expect(out.filter.tags).toBeNull();
+    expect(out.filter.assigneeIds).toEqual(["m1", null]);
+  });
+
+  it("round-trips a full object through JSON", () => {
+    const full = {
+      filter: {
+        boardIds: ["b1"],
+        categoryIds: ["c1", null],
+        priorities: [0, 2],
+        tags: ["x", null],
+        assigneeIds: [null, "m1"],
+        done: "done",
+        milestone: "only",
+        privacy: "private",
+      },
+      groupBy: "assignee",
+      sortBy: "attention",
+      sortDir: "desc",
+      mode: "streams",
+      attention: "deadline",
+      scope: "all",
+    } as const;
+    expect(coerceFlowsDisplay(JSON.parse(JSON.stringify(full)))).toEqual(full);
   });
 });

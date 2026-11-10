@@ -7,6 +7,7 @@ import type {
   CategoryGoal,
   InsightsPrefs,
   InsightsView,
+  TaskStream,
   Collection,
   Board,
   SleepLog,
@@ -29,6 +30,7 @@ import {
   mapCategoryGoal,
   mapInsightsPrefs,
   mapInsightsView,
+  mapTaskStream,
   mapCollection,
   mapBoard,
   mapSleepLog,
@@ -386,6 +388,40 @@ export async function fetchInsightsViews(
     .order("created_at");
   if (error) throw error;
   return (data ?? []).map(mapInsightsView);
+}
+
+/** The viewer's saved Flows streams (member-private under RLS), in list order. */
+export async function fetchTaskStreams(
+  sb: SupabaseClient,
+  workspaceId: string,
+  memberId: string,
+): Promise<TaskStream[]> {
+  const { data, error } = await sb
+    .from("task_streams")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("member_id", memberId)
+    .order("position")
+    .order("created_at");
+  if (error) throw error;
+  return (data ?? []).map(mapTaskStream);
+}
+
+/**
+ * The viewer's stream called `name` (trimmed, case-insensitive, as the unique
+ * index compares), or null. Matches in JS over the member's list rather than
+ * with ilike, whose `%`/`_` wildcards a name may contain; a member has few
+ * streams.
+ */
+export async function fetchTaskStreamByName(
+  sb: SupabaseClient,
+  workspaceId: string,
+  memberId: string,
+  name: string,
+): Promise<TaskStream | null> {
+  const wanted = name.trim().toLowerCase();
+  const streams = await fetchTaskStreams(sb, workspaceId, memberId);
+  return streams.find((s) => s.name.toLowerCase() === wanted) ?? null;
 }
 
 /** The viewer's Insights prefs row, or null before first customization. */

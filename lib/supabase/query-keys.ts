@@ -38,6 +38,9 @@ export const qk = {
   /** The viewer's saved Insights views (member-private under RLS). */
   insightsViews: (workspaceId: string, memberId: string) =>
     ["insights-views", workspaceId, memberId] as const,
+  /** The viewer's saved Flows streams (member-private under RLS). */
+  taskStreams: (workspaceId: string, memberId: string) =>
+    ["task-streams", workspaceId, memberId] as const,
   /** The viewer's Insights dashboard prefs row (member-private under RLS). */
   insightsPrefs: (workspaceId: string, memberId: string) =>
     ["insights-prefs", workspaceId, memberId] as const,

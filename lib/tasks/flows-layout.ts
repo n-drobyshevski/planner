@@ -15,6 +15,9 @@ import type {
   TaskStatusEvent,
 } from "@/lib/types";
 import { dateInputToUtcMs } from "@/lib/datetime/local";
+// Type-only: flows-streams imports this module's types, so a value import
+// here would be a cycle.
+import type { StreamSummary } from "@/lib/tasks/flows-streams";
 
 export const DAY_MS = 86_400_000;
 
@@ -96,6 +99,7 @@ export const FLOW_GEOM = {
   branchWidth: 1.5,
   gutterWidth: 272, // left label column (fits the ru zoom labels + Today control)
   groupHeaderHeight: 28, // a group-by section header band (gutter + canvas)
+  streamHeight: 52, // a collapsed stream line (label + counts, gutter + canvas)
   rulerHeight: 36,
   minDaySpan: 7,
   defaultLookbackDays: 90,
@@ -313,6 +317,11 @@ export interface LaidOutLane {
 /** A laid-out lane row (the discriminated `kind` lets headers share the list). */
 export interface LaneRow extends LaidOutLane {
   kind: "lane";
+  /**
+   * `${groupKey}:${taskId}` — unique per row. A lane can sit in several groups
+   * (tag grouping), so the task id alone is not a safe React key.
+   */
+  rowKey: string;
 }
 
 /** A group-by section header band, spanning the gutter and the canvas. */
@@ -325,9 +334,33 @@ export interface GroupHeaderRow {
   top: number;
   height: number;
   count: number;
+  /** the group's stream summary, when the caller supplied streams */
+  summary?: StreamSummary;
 }
 
-export type FlowRow = LaneRow | GroupHeaderRow;
+/** A collapsed lane standing for a whole group (streams mode). */
+export interface StreamRow {
+  kind: "stream";
+  key: string;
+  label: string;
+  color?: string;
+  top: number;
+  height: number;
+  stream: StreamSummary;
+  /** the stream's own lane rows follow this row */
+  isExpanded: boolean;
+}
+
+export type FlowRow = LaneRow | GroupHeaderRow | StreamRow;
+
+export interface LayoutOptions {
+  /** "tasks" (default): a lane per task. "streams": a collapsed row per group. */
+  mode?: "tasks" | "streams";
+  /** per-group summaries (matched by group key) from buildStreams */
+  streams?: StreamSummary[];
+  /** group keys whose lanes are shown under their stream row (streams mode) */
+  expandedStreams?: ReadonlySet<string>;
+}
 
 /**
  * One bucket of lanes produced by the display pipeline (lib/tasks/flows-display).
@@ -343,21 +376,43 @@ export interface LaneGroup {
 }
 
 /**
- * Stack groups into rows. Each group optionally opens with a header row, then
- * stacks its lanes; an expanded lane reserves a sub-row per branch beneath its
- * trunk. Headers and lanes share one vertical coordinate space, so the gutter
- * and the SVG canvas (both iterating these rows) stay pixel-aligned. Returns the
- * flat row list plus the total track height.
+ * Stack groups into rows. In "tasks" mode each group optionally opens with a
+ * header row, then stacks its lanes; an expanded lane reserves a sub-row per
+ * branch beneath its trunk. In "streams" mode each group is one stream row, and
+ * its lanes follow only when its key is in `expandedStreams` (no header rows). A
+ * group with no matching summary falls back to the tasks-mode layout rather than
+ * vanishing. Rows share one vertical coordinate space, so the gutter and the SVG
+ * canvas (both iterating these rows) stay pixel-aligned. Returns the flat row
+ * list plus the total track height.
  */
 export function layoutRows(
   groups: LaneGroup[],
   expanded: ReadonlySet<string>,
+  opts: LayoutOptions = {},
   geom: typeof FLOW_GEOM = FLOW_GEOM,
 ): { rows: FlowRow[]; totalHeight: number } {
+  const streamsMode = opts.mode === "streams";
+  const summaries = new Map((opts.streams ?? []).map((s) => [s.key, s]));
   let y = 0;
   const rows: FlowRow[] = [];
   for (const group of groups) {
-    if (group.header) {
+    const summary = summaries.get(group.key);
+    let showLanes = true;
+    if (streamsMode && summary) {
+      const isExpanded = opts.expandedStreams?.has(group.key) ?? false;
+      rows.push({
+        kind: "stream",
+        key: group.key,
+        label: group.label,
+        color: group.color,
+        top: y,
+        height: geom.streamHeight,
+        stream: summary,
+        isExpanded,
+      });
+      y += geom.streamHeight;
+      showLanes = isExpanded;
+    } else if (group.header) {
       rows.push({
         kind: "group",
         key: group.key,
@@ -366,9 +421,11 @@ export function layoutRows(
         top: y,
         height: geom.groupHeaderHeight,
         count: group.lanes.length,
+        ...(summary ? { summary } : {}),
       });
       y += geom.groupHeaderHeight;
     }
+    if (!showLanes) continue;
     for (const lane of group.lanes) {
       const top = y;
       y += geom.laneHeight;
@@ -380,7 +437,15 @@ export function layoutRows(
           }))
         : [];
       if (isExpanded) y += lane.branches.length * geom.subRowHeight;
-      rows.push({ kind: "lane", lane, top, isExpanded, branchRows, height: y - top });
+      rows.push({
+        kind: "lane",
+        rowKey: `${group.key}:${lane.task.id}`,
+        lane,
+        top,
+        isExpanded,
+        branchRows,
+        height: y - top,
+      });
     }
   }
   return { rows, totalHeight: y };

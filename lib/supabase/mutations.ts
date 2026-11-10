@@ -4,6 +4,7 @@ import type {
   EventRow,
   InsightsPrefs,
   InsightsView,
+  TaskStream,
   SleepLog,
   MemberSleepPrefs,
   TaskRow,
@@ -22,6 +23,7 @@ import {
   mapEvent,
   mapInsightsPrefs,
   mapInsightsView,
+  mapTaskStream,
   mapSleepLog,
   mapMemberSleepPrefs,
   mapTask,
@@ -33,6 +35,8 @@ import {
   eventInputToRow,
   eventPatchToRow,
   insightsViewInputToRow,
+  taskStreamInputToRow,
+  taskStreamPatchToRow,
   sleepLogInputToRow,
   memberSleepPrefsInputToRow,
   taskInputToRow,
@@ -44,6 +48,8 @@ import {
   type CategoryGoalInput,
   type EventInput,
   type InsightsViewInput,
+  type TaskStreamInput,
+  type TaskStreamPatch,
   type SleepLogInput,
   type MemberSleepPrefsInput,
   type TaskInput,
@@ -67,6 +73,7 @@ import {
   boardPatchSchema,
   checkpointInputSchema,
   checkpointPatchSchema,
+  taskStreamNameSchema,
   parseInput,
 } from "@/lib/tasks/schemas";
 import type { ItemAttributes } from "@/lib/attributes/schema";
@@ -1272,6 +1279,61 @@ export async function deleteInsightsView(
   viewId: string,
 ): Promise<void> {
   const { error } = await sb.from("insights_views").delete().eq("id", viewId);
+  if (error) throw error;
+}
+
+/** Postgres unique_violation: the (member_id, lower(name)) index. */
+function streamWriteError(error: { code?: string }): unknown {
+  return error.code === "23505"
+    ? new Error("You already have a stream with that name.")
+    : error;
+}
+
+/** Save a new stream. The name is trimmed and validated (1..60). */
+export async function createTaskStream(
+  sb: SupabaseClient,
+  input: TaskStreamInput,
+): Promise<TaskStream> {
+  const name = parseInput(taskStreamNameSchema, input.name);
+  const { data, error } = await sb
+    .from("task_streams")
+    .insert(taskStreamInputToRow({ ...input, name }))
+    .select()
+    .single();
+  if (error) throw streamWriteError(error);
+  return mapTaskStream(data);
+}
+
+/**
+ * Rename a stream and/or replace its definition. A provided name is trimmed
+ * and validated; an empty patch is a no-op read-back of the row.
+ */
+export async function updateTaskStream(
+  sb: SupabaseClient,
+  streamId: string,
+  patch: TaskStreamPatch,
+): Promise<TaskStream> {
+  const row = taskStreamPatchToRow({
+    ...patch,
+    name:
+      patch.name === undefined
+        ? undefined
+        : parseInput(taskStreamNameSchema, patch.name),
+  });
+  const query =
+    Object.keys(row).length === 0
+      ? sb.from("task_streams").select().eq("id", streamId)
+      : sb.from("task_streams").update(row).eq("id", streamId).select();
+  const { data, error } = await query.single();
+  if (error) throw streamWriteError(error);
+  return mapTaskStream(data);
+}
+
+export async function deleteTaskStream(
+  sb: SupabaseClient,
+  streamId: string,
+): Promise<void> {
+  const { error } = await sb.from("task_streams").delete().eq("id", streamId);
   if (error) throw error;
 }
 

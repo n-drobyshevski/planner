@@ -167,6 +167,8 @@ export function FlowTrack({
               </g>
             );
           }
+          // A collapsed stream line is drawn by the streams pass (not yet wired).
+          if (row.kind === "stream") return null;
           const { lane, top, branchRows } = row;
           // Theme-mapped, stroke-legible color — feeds every trunk/branch/node
           // stroke and the checkpoint lane fallback below, so the whole lane

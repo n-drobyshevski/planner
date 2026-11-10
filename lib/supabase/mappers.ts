@@ -3,6 +3,7 @@
 
 import { parseAttributes, type ItemAttributes } from "@/lib/attributes/schema";
 import { asFlowLineStyle } from "@/lib/tasks/flow-line-styles";
+import { coerceFlowsDisplay, type FlowsDisplay } from "@/lib/tasks/flows-display";
 import { normalizeTags } from "@/lib/tasks/tags";
 import type {
   EventRow,
@@ -13,6 +14,7 @@ import type {
   CategoryGoal,
   InsightsPrefs,
   InsightsView,
+  TaskStream,
   Collection,
   Board,
   SleepLog,
@@ -231,6 +233,53 @@ export function insightsViewInputToRow(input: InsightsViewInput): Row {
     config: input.config,
     position: input.position ?? 0,
   };
+}
+
+export function mapTaskStream(r: Row): TaskStream {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    memberId: r.member_id as string,
+    name: r.name as string,
+    // Lenient: a row written by an older/newer client (or hand-edited) falls
+    // back to defaults field by field instead of throwing.
+    definition: coerceFlowsDisplay(r.definition),
+    position: (r.position as number) ?? 0,
+    createdAt: toMs(r.created_at),
+    updatedAt: toMs(r.updated_at),
+  };
+}
+
+/** Insert payload for a saved stream. `name` is expected already trimmed. */
+export interface TaskStreamInput {
+  workspaceId: string;
+  memberId: string;
+  name: string;
+  definition: FlowsDisplay;
+  position?: number;
+}
+
+export function taskStreamInputToRow(input: TaskStreamInput): Row {
+  return {
+    workspace_id: input.workspaceId,
+    member_id: input.memberId,
+    name: input.name,
+    definition: input.definition,
+    position: input.position ?? 0,
+  };
+}
+
+/** Update payload: rename and/or replace the definition. */
+export interface TaskStreamPatch {
+  name?: string;
+  definition?: FlowsDisplay;
+}
+
+export function taskStreamPatchToRow(patch: TaskStreamPatch): Row {
+  const row: Row = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.definition !== undefined) row.definition = patch.definition;
+  return row;
 }
 
 /** Lenient read of the prefs `dashboard` jsonb: junk degrades to {}. */

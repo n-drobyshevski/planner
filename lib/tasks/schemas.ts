@@ -208,6 +208,18 @@ export const collectionPatchSchema = collectionInputSchema
   .partial();
 
 /**
+ * A saved stream's name (task_streams.name). Trimmed, 1..60 characters, the
+ * same bounds as the DB CHECK; uniqueness (per member, ignoring case) is the
+ * unique index's job.
+ */
+export const TASK_STREAM_NAME_MAX = 60;
+export const taskStreamNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Please name the stream.")
+  .max(TASK_STREAM_NAME_MAX, `Keep the name under ${TASK_STREAM_NAME_MAX} characters.`);
+
+/**
  * Parse with a plain Error carrying the first issue's message, so the existing
  * toast plumbing (use-task-mutations `run()`) shows a human-readable line
  * instead of a serialized ZodError.

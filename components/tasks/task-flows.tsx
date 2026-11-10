@@ -189,9 +189,20 @@ export function TaskFlows({
       boardsById: new Map(boards.map((b) => [b.id, b])),
       boardOrder: new Map(boards.map((b, i) => [b.id, i])),
       categoriesById: new Map(categories.map((c) => [c.id, c])),
+      // TODO(UI pass): wire real collections, the viewer's local day and
+      // the display's attention mode, plus localized labels for the new groupings.
+      collectionsById: new Map(),
+      collectionOrder: new Map(),
+      membersById: members,
+      memberOrder: new Map([...members.keys()].map((id, i) => [id, i])),
+      today: new Date(nowMs).toISOString().slice(0, 10),
+      attention: display.attention,
       labels: {
         noStatus: t("flows.display.noStatus"),
         noCategory: t("flows.display.noCategory"),
+        noTag: "No tag",
+        noCollection: "No collection",
+        unassigned: "Unassigned",
         priority: {
           0: t("priority.none"),
           1: t("priority.low"),
@@ -200,7 +211,7 @@ export function TaskFlows({
         },
       },
     }),
-    [boards, categories, t],
+    [boards, categories, members, t, nowMs, display.attention],
   );
 
   // filter -> group/sort -> layout. The window derives from the *filtered*
@@ -557,7 +568,7 @@ export function TaskFlows({
                 {rows.map((row) =>
                   row.kind === "group" ? (
                     <GutterGroupHeader key={`group-${row.key}`} row={row} />
-                  ) : (
+                  ) : row.kind === "lane" ? (
                     <GutterLaneRow
                       key={row.lane.task.id}
                       row={row}
@@ -576,7 +587,7 @@ export function TaskFlows({
                       expandAll={expandAll}
                       collapseAll={collapseAll}
                     />
-                  ),
+                  ) : null, // TODO(UI pass): render stream rows
                 )}
               </SortableContext>
               <DragOverlay>

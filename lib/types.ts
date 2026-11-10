@@ -3,6 +3,7 @@
 
 import type { ItemAttributes } from "@/lib/attributes/schema";
 import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
+import type { FlowsDisplay } from "@/lib/tasks/flows-display";
 
 export type OverrideType = "cancel" | "modify";
 /** An event's lifecycle state, driving how it renders on the calendar:
@@ -482,6 +483,24 @@ export interface InsightsView {
   config: unknown;
   position: number;
   createdAt: number;
+}
+
+/**
+ * A member's saved stream: a named Flows display configuration (filter +
+ * grouping + sort) they can reopen by name, and the MCP server can look up by
+ * name. Member-private under RLS, like InsightsView. `definition` is already
+ * coerced (coerceFlowsDisplay) on read, so it is always well-formed. Names are
+ * unique per member, ignoring case.
+ */
+export interface TaskStream {
+  id: string;
+  workspaceId: string;
+  memberId: string;
+  name: string;
+  definition: FlowsDisplay;
+  position: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 /**
