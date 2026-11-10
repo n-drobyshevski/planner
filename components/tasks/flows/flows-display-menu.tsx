@@ -30,6 +30,7 @@ import {
   type FlowsDisplay,
   type FlowsFilter,
   type FlowsGroupBy,
+  type FlowsLaneStyle,
   type FlowsMode,
   type FlowsScope,
   type FlowsSortBy,
@@ -195,6 +196,23 @@ export function FlowsDisplayMenu({
           />
           <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             {t(display.mode === "streams" ? "flows.display.modeStreamsHint" : "flows.display.modeTasksHint")}
+          </p>
+          <Subhead>{t("flows.display.laneStyle")}</Subhead>
+          <TriToggle
+            value={display.laneStyle}
+            onValueChange={(v) => onChange({ ...display, laneStyle: v as FlowsLaneStyle })}
+            options={[
+              ["runway", t("flows.display.laneStyleRunway")],
+              ["line", t("flows.display.laneStyleLine")],
+            ]}
+            ariaLabel={t("flows.display.laneStyle")}
+          />
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
+            {t(
+              display.laneStyle === "runway"
+                ? "flows.display.laneStyleRunwayHint"
+                : "flows.display.laneStyleLineHint",
+            )}
           </p>
           {collections.length > 1 && (
             <>

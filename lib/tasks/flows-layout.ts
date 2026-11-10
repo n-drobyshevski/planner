@@ -97,6 +97,11 @@ export const FLOW_GEOM = {
   dueRadius: 5,
   trunkWidth: 2.5,
   branchWidth: 1.5,
+  // Runway lane style: a trunk bar fits the 44px lane with 9px clear above and
+  // below (its deadline label sits beside it, never under it); a branch bar fits
+  // the 28px sub-row with 6px clear, so neighbouring rows never touch.
+  runwayHeight: 26,
+  branchRunwayHeight: 16,
   gutterWidth: 272, // left label column (fits the ru zoom labels + Today control)
   groupHeaderHeight: 28, // a group-by section header band (gutter + canvas)
   streamHeight: 52, // a collapsed stream line (label + counts, gutter + canvas)

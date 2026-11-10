@@ -13,7 +13,14 @@
 // Future / not-yet-real markers borrow the calendar's dotted = "pencilled in"
 // language; ownership reads as filled (mine) vs outlined (a partner's).
 
-import { useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import type {
   FlowBranch,
   FlowCheckpoint,
@@ -23,7 +30,10 @@ import type {
   StreamRow,
 } from "@/lib/tasks/flows-layout";
 import type { StreamSummary } from "@/lib/tasks/flows-streams";
-import { FLOW_GEOM, xForTime, timeForX } from "@/lib/tasks/flows-layout";
+import { DAY_MS, FLOW_GEOM, xForTime, timeForX } from "@/lib/tasks/flows-layout";
+import { runwayOf, stackSlots, type Runway } from "@/lib/tasks/flows-runway";
+import type { FlowsLaneStyle } from "@/lib/tasks/flows-display";
+import { RunwayBar, RunwayHatch, labelWidth, runwayExtent } from "./flow-runway";
 import {
   lineStyleStroke,
   wavePath,
@@ -37,6 +47,7 @@ const G = FLOW_GEOM;
 const HIT = 26; // node hit-target (px); Flows is desktop-only, so < 44 is fine
 const ELBOW = 12; // horizontal run of a branch diverge/merge curve
 const DOTS = "2 2.5"; // dash pattern for "planned / not yet real" strokes
+const RUNWAY_FADE_PX = 64; // how far an open-ended runway reaches past now before it has faded
 
 export interface FlowTrackProps {
   rows: FlowRow[];
@@ -70,7 +81,26 @@ export interface FlowTrackProps {
   onOpenCheckpoint: (cp: FlowCheckpoint) => void;
   /** click on empty trunk at a date: place a new checkpoint there (create mode) */
   onCanvasPlace: (taskId: string, atDate: string) => void;
+  /** "runway" (default): bars from start to deadline; "line": the thin trunk lines */
+  laneStyle?: FlowsLaneStyle;
+  /** the viewer's calendar day ("yyyy-MM-dd"): what "late" and "due tomorrow" count from */
+  today?: string;
+  /** a task's subtree progress (done / total subtasks), for the runway fill */
+  progressOf?: (taskId: string) => { done: number; total: number };
+  /** localized tooltip / accessible name for a runway bar */
+  runwayLabel?: (seg: FlowSegment, r: Runway) => string;
+  /** the short deadline label drawn beside a bar, or null for none */
+  runwayShort?: (seg: FlowSegment, r: Runway) => string | null;
+  /**
+   * accessible name for a collapsed stream's runway stack (it expands the
+   * stream): the stream, each shown runway's own label, and how many more
+   */
+  streamLabel?: (stream: StreamSummary, runways: string[], hidden: number) => string;
+  /** the visible "+N" after a stream's stack when not every runway fits */
+  moreShort?: (count: number) => string;
 }
+
+const NO_PROGRESS = { done: 0, total: 0 };
 
 interface Hover {
   x: number;
@@ -99,10 +129,71 @@ export function FlowTrack({
   onOpenTask,
   onOpenCheckpoint,
   onCanvasPlace,
+  laneStyle = "line",
+  today,
+  progressOf,
+  runwayLabel,
+  runwayShort,
+  streamLabel,
+  moreShort,
 }: FlowTrackProps) {
   const [hover, setHover] = useState<Hover | null>(null);
+  // The canvas's horizontal scroll offset (runway style only): a bar that starts
+  // off screen keeps its title at the visible left edge instead of clipping it.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [viewLeft, setViewLeft] = useState(0);
+  useEffect(() => {
+    const scroller = rootRef.current?.parentElement;
+    if (laneStyle !== "runway" || !scroller) return;
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      setViewLeft(scroller.scrollLeft);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(read);
+    };
+    read();
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [laneStyle]);
   const x = (ms: number) => xForTime(ms, t0, pxPerDay);
   const nowX = x(Math.min(nowMs, t1));
+  // SVG ids (clip paths, masks, the hatch) must be unique in the document and
+  // url-safe; React's useId carries colons / guillemets, so strip them.
+  const uid = `fr${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const hatchId = `${uid}-hatch`;
+  const runways = laneStyle === "runway";
+  const fadeMs = (RUNWAY_FADE_PX / pxPerDay) * DAY_MS;
+  /** A segment's runway in runway style (null in line style, or for a milestone). */
+  const runwayFor = (seg: FlowSegment): Runway | null =>
+    runways
+      ? runwayOf(seg, nowMs, progressOf?.(seg.task.id) ?? NO_PROGRESS, { today, fadeMs })
+      : null;
+  /**
+   * A collapsed stream's stack (runway style): its open tasks' runways, or its
+   * finished ones when nothing is open, as many as fit the row; the rest are "+N".
+   */
+  const streamStack = (row: StreamRow) => {
+    const open = row.stream.lanes.filter((l) => !l.done);
+    const pool = open.length > 0 ? open : row.stream.lanes;
+    const items = pool.flatMap((lane) => {
+      const r = runwayFor(lane);
+      return r ? [{ lane, r }] : [];
+    });
+    const slots = stackSlots(items.length, row.height);
+    const shown = items.slice(0, slots.shown).map((it, i) => ({
+      ...it,
+      cy: row.top + slots.tops[i] + slots.barHeight / 2,
+      ...runwayExtent(it.r, x, slots.barHeight),
+    }));
+    const minX = shown.length ? Math.min(...shown.map((s) => s.x1)) : 0;
+    const maxX = shown.length ? Math.max(...shown.map((s) => s.reach)) : 0;
+    return { shown, hidden: slots.hidden, barHeight: slots.barHeight, minX, maxX };
+  };
 
   // Click on empty trunk → place a checkpoint at that date. A click that landed
   // on a node/marker/checkpoint hit-button is ignored (that button opens/edits
@@ -125,6 +216,7 @@ export function FlowTrack({
 
   return (
     <div
+      ref={rootRef}
       className="relative shrink-0"
       style={{ width: trackWidth, height }}
       onMouseLeave={() => setHover(null)}
@@ -136,6 +228,11 @@ export function FlowTrack({
         className="absolute inset-0"
         aria-hidden
       >
+        {runways && (
+          <defs>
+            <RunwayHatch id={hatchId} />
+          </defs>
+        )}
         {/* faint day/week/month gridlines behind the lanes */}
         {gridMs.map((ms, i) => {
           const gx = x(ms);
@@ -151,7 +248,7 @@ export function FlowTrack({
             />
           );
         })}
-        {rows.map((row) => {
+        {rows.map((row, ri) => {
           // A group-by section band: a faint full-width tint + a divider under
           // it, aligned to the gutter's header row by sharing `top`/`height`.
           if (row.kind === "group") {
@@ -172,6 +269,42 @@ export function FlowTrack({
                   y2={row.top + row.height}
                   stroke="var(--border)"
                 />
+              </g>
+            );
+          }
+          if (row.kind === "stream" && runways) {
+            const stack = streamStack(row);
+            return (
+              <g key={`stream-${row.key}`} aria-hidden>
+                <StreamBand row={row} trackWidth={trackWidth} />
+                {stack.shown.map(({ lane, r, cy }, i) => (
+                  <RunwayBar
+                    key={lane.task.id}
+                    uid={`${uid}-s${row.top}-${i}`}
+                    r={r}
+                    x={x}
+                    cy={cy}
+                    h={stack.barHeight}
+                    color={toPaletteStroke(colorOf(lane.task))}
+                    mine={lane.task.ownerId === currentMemberId}
+                    nowX={nowX}
+                    hatchId={hatchId}
+                    small
+                  />
+                ))}
+                {stack.hidden > 0 && moreShort && (
+                  <text
+                    x={plusX(stack.maxX, nowX, moreShort(stack.hidden))}
+                    y={row.top + row.height / 2}
+                    dominantBaseline="central"
+                    fontSize={11}
+                    fontWeight={600}
+                    fill="var(--muted-foreground)"
+                    className="tabular-nums"
+                  >
+                    {moreShort(stack.hidden)}
+                  </text>
+                )}
               </g>
             );
           }
@@ -212,13 +345,35 @@ export function FlowTrack({
           // A milestone / planned-start segment carries its status in the marker,
           // so only deadline (`due`) and scheduled-block markers are drawn as
           // nodes; a real span shows every node.
-          const trunkNodes =
-            lane.milestone || planned
+          // Runway style: the bar's edges and fill carry start, deadline and
+          // progress, so only booked-time tiles stay on it as nodes (status
+          // dots would sit on the title); checkpoints stay as their own overlay.
+          const rw = runwayFor(lane);
+          const trunkNodes = rw
+            ? lane.nodes.filter((n) => n.kind === "scheduled")
+            : lane.milestone || planned
               ? lane.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
               : lane.nodes;
           return (
-            <g key={row.rowKey} opacity={lane.done ? 0.55 : 1}>
-              {lane.milestone ? (
+            // A runway draws its own muted "done" state; dimming the whole group
+            // would also dim the title inside the bar below AAA.
+            <g key={row.rowKey} opacity={lane.done && !rw ? 0.55 : 1}>
+              {rw ? (
+                <RunwayBar
+                  uid={`${uid}-l${ri}`}
+                  r={rw}
+                  x={x}
+                  cy={trunkY}
+                  h={G.runwayHeight}
+                  color={color}
+                  mine={mine}
+                  nowX={nowX}
+                  hatchId={hatchId}
+                  viewLeft={viewLeft}
+                  title={lane.task.title}
+                  short={runwayShort?.(lane, rw) ?? null}
+                />
+              ) : lane.milestone ? (
                 <>
                   {!lane.done && (
                     <DottedLead x1={nowX} x2={startX} y={trunkY} color={color} mine={mine} />
@@ -297,7 +452,52 @@ export function FlowTrack({
                   branchY.set(branch.task.id, subTop + G.subRowHeight / 2);
                 const fromYOf = (b: FlowBranch) =>
                   b.depth <= 1 ? trunkY : branchY.get(b.parentId) ?? trunkY;
-                return branchRows.map(({ branch, subTop }) => {
+                // Runway style: a thin tick from the parent's bar down to each
+                // branch bar at the branch's start, so nested runways still read
+                // as a tree. All ticks go first, so the bars cover any tick that
+                // passes behind a sibling's bar on its way down.
+                const ticks = branchRows.map(({ branch, subTop }) => {
+                  const brw = runwayFor(branch);
+                  if (!brw) return null;
+                  const parentH = branch.depth <= 1 ? G.runwayHeight : G.branchRunwayHeight;
+                  const bx = Math.max(0, x(brw.startMs)) + 3;
+                  return (
+                    <line
+                      key={`tick-${branch.task.id}`}
+                      x1={bx}
+                      y1={fromYOf(branch) + parentH / 2}
+                      x2={bx}
+                      y2={subTop + G.subRowHeight / 2 - G.branchRunwayHeight / 2}
+                      stroke={color}
+                      strokeOpacity={0.45}
+                      strokeWidth={1}
+                    />
+                  );
+                });
+                return [...ticks, ...branchRows.map(({ branch, subTop }, bi) => {
+                  const brw = runwayFor(branch);
+                  if (brw) {
+                    const subY = subTop + G.subRowHeight / 2;
+                    return (
+                      <g key={branch.task.id}>
+                        <RunwayBar
+                          uid={`${uid}-l${ri}-b${bi}`}
+                          r={brw}
+                          x={x}
+                          cy={subY}
+                          h={G.branchRunwayHeight}
+                          color={color}
+                          mine={branch.task.ownerId === currentMemberId}
+                          nowX={nowX}
+                          hatchId={hatchId}
+                          viewLeft={viewLeft}
+                          title={branch.task.title}
+                          short={runwayShort?.(branch, brw) ?? null}
+                          small
+                        />
+                      </g>
+                    );
+                  }
                   const bStroke = lineStyleStroke(lineStyleOf(branch.task));
                   return (
                     <Branch
@@ -314,7 +514,7 @@ export function FlowTrack({
                       opacityScale={bStroke.opacityScale}
                     />
                   );
-                });
+                })];
               })()}
               {/* trunk nodes */}
               {trunkNodes.map((n, i) => (
@@ -335,9 +535,11 @@ export function FlowTrack({
               ))}
               {/* branch nodes (a milestone branch carries its status in its marker) */}
               {branchRows.map(({ branch, subTop }) =>
-                (branch.milestone
-                  ? branch.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
-                  : branch.nodes
+                (runways && !branch.milestone
+                  ? branch.nodes.filter((n) => n.kind === "scheduled")
+                  : branch.milestone
+                    ? branch.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
+                    : branch.nodes
                 ).map((n, i) => (
                   <NodeShape
                     key={`${branch.task.id}-${i}`}
@@ -368,6 +570,28 @@ export function FlowTrack({
 
       {/* interactive hit-targets (focus ring + tooltip + open) */}
       {rows.map((row) => {
+        if (row.kind === "stream" && runways) {
+          const stack = streamStack(row);
+          if (stack.shown.length === 0) return null;
+          const top = stack.shown[0].cy - stack.barHeight / 2 - 2;
+          const bottom = stack.shown[stack.shown.length - 1].cy + stack.barHeight / 2 + 2;
+          const text =
+            streamLabel?.(
+              row.stream,
+              stack.shown.map(({ lane, r }) => runwayLabel?.(lane, r) ?? lane.task.title),
+              stack.hidden,
+            ) ?? row.stream.label;
+          return rectButton(
+            `stream-${row.key}-runways`,
+            text,
+            stack.minX - 2,
+            top,
+            stack.maxX - stack.minX + 4,
+            bottom - top,
+            () => onToggleStream(row.key),
+            row.isExpanded,
+          );
+        }
         if (row.kind === "stream") {
           const y = row.top + G.streamHeight / 2;
           return stackNodes(row.stream.nodes).map(({ node, count }) =>
@@ -388,13 +612,30 @@ export function FlowTrack({
         const trunkY = top + G.laneHeight / 2;
         const hits: ReactNode[] = [];
         const planned = !lane.milestone && lane.startMs > nowMs && lane.endMs === null;
-        if (lane.milestone || planned) {
+        const rw = runwayFor(lane);
+        if (rw) {
+          // The bar itself is the target: it opens the task. Booked-time tiles
+          // and checkpoints come after it, so they stay on top and reachable.
+          const { x1, reach } = runwayExtent(rw, x, G.runwayHeight);
+          hits.push(
+            rectButton(
+              `${rk}-runway`,
+              runwayLabel?.(lane, rw) ?? lane.task.title,
+              x1,
+              trunkY - G.runwayHeight / 2,
+              reach - x1,
+              G.runwayHeight,
+              () => onOpenTask(lane.task),
+            ),
+          );
+        } else if (lane.milestone || planned) {
           hits.push(
             renderHitAt(lane.task, segmentLabel(lane), x(lane.startMs), trunkY, `${rk}-marker`),
           );
         }
-        const trunkNodes =
-          lane.milestone || planned
+        const trunkNodes = rw
+          ? lane.nodes.filter((n) => n.kind === "scheduled")
+          : lane.milestone || planned
             ? lane.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
             : lane.nodes;
         trunkNodes.forEach((n, i) =>
@@ -412,15 +653,30 @@ export function FlowTrack({
         branchRows.forEach(({ branch, subTop }) => {
           const subY = subTop + G.subRowHeight / 2;
           const bPlanned = !branch.milestone && branch.startMs > nowMs && branch.endMs === null;
-          if (branch.milestone || bPlanned) {
+          const brw = runwayFor(branch);
+          if (brw) {
+            const { x1, reach } = runwayExtent(brw, x, G.branchRunwayHeight);
+            hits.push(
+              rectButton(
+                `${rk}-${branch.task.id}-runway`,
+                runwayLabel?.(branch, brw) ?? branch.task.title,
+                x1,
+                subY - G.branchRunwayHeight / 2,
+                reach - x1,
+                G.branchRunwayHeight,
+                () => onOpenTask(branch.task),
+              ),
+            );
+          } else if (branch.milestone || bPlanned) {
             // marker sits just past the diverge elbow (see <Branch>)
             const mx = x(branch.startMs) + ELBOW;
             hits.push(
               renderHitAt(branch.task, segmentLabel(branch), mx, subY, `${rk}-marker`),
             );
           }
-          const bNodes =
-            branch.milestone || bPlanned
+          const bNodes = brw
+            ? branch.nodes.filter((n) => n.kind === "scheduled")
+            : branch.milestone || bPlanned
               ? branch.nodes.filter((n) => n.kind === "due" || n.kind === "scheduled")
               : branch.nodes;
           bNodes.forEach((n, i) =>
@@ -489,6 +745,75 @@ export function FlowTrack({
       />
     );
   }
+
+  /**
+   * A focusable hit-target over a whole bar (a runway, or a stream's stack).
+   * The tooltip follows the pointer along the bar (a long runway's centre can be
+   * off screen) and sits at the bar's visible start on keyboard focus.
+   */
+  function rectButton(
+    key: string,
+    text: string,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    onClick: () => void,
+    expanded?: boolean,
+  ) {
+    const w = Math.max(width, HIT);
+    const focusX = Math.min(left + w / 2, Math.max(left, 0) + 48);
+    const tipY = top + height / 2;
+    return (
+      <button
+        key={key}
+        type="button"
+        aria-label={text}
+        aria-expanded={expanded}
+        title={text}
+        onClick={onClick}
+        onMouseMove={(e) => {
+          const box = e.currentTarget.getBoundingClientRect();
+          setHover({ x: left + (e.clientX - box.left), y: tipY, text });
+        }}
+        onFocus={() => setHover({ x: focusX, y: tipY, text })}
+        onMouseLeave={() => setHover(null)}
+        onBlur={() => setHover(null)}
+        className="absolute rounded-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        style={{ left, top, width: w, height }}
+      />
+    );
+  }
+}
+
+/** x of a stream stack's "+N", past its furthest bar and clear of the now-line. */
+function plusX(maxX: number, nowX: number, text: string): number {
+  const lx = maxX + 8;
+  const w = labelWidth(text, 11);
+  return nowX > lx - 3 && nowX < lx + w + 3 ? nowX + 6 : lx;
+}
+
+/** A stream row's faint band and its bottom divider (both lane styles). */
+function StreamBand({ row, trackWidth }: { row: StreamRow; trackWidth: number }) {
+  return (
+    <>
+      <rect
+        x={0}
+        y={row.top}
+        width={trackWidth}
+        height={row.height}
+        fill="var(--muted)"
+        opacity={0.25}
+      />
+      <line
+        x1={0}
+        y1={row.top + row.height}
+        x2={trackWidth}
+        y2={row.top + row.height}
+        stroke="var(--border)"
+      />
+    </>
+  );
 }
 
 /**
@@ -654,21 +979,7 @@ function StreamLine({
   const stacks = stackNodes(s.nodes);
   return (
     <g aria-hidden>
-      <rect
-        x={0}
-        y={row.top}
-        width={trackWidth}
-        height={row.height}
-        fill="var(--muted)"
-        opacity={0.25}
-      />
-      <line
-        x1={0}
-        y1={row.top + row.height}
-        x2={trackWidth}
-        y2={row.top + row.height}
-        stroke="var(--border)"
-      />
+      <StreamBand row={row} trackWidth={trackWidth} />
       <g opacity={open ? 1 : 0.55}>
         {endX - startX > 0.5 && (
           <line

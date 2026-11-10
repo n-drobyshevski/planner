@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { render, screen, within } from "../test-utils";
+import { cleanup, render, screen, within } from "../test-utils";
 import { TaskFlows } from "@/components/tasks/task-flows";
 import { SlotTarget, ToolbarSlotsProvider } from "@/components/toolbar-slots";
 import { DEFAULT_FLOWS_DISPLAY, type FlowsDisplay } from "@/lib/tasks/flows-display";
@@ -124,6 +124,27 @@ describe("TaskFlows — tags, attention and streams", () => {
     renderFlows({ groupBy: "tag" });
     expect(screen.getAllByRole("button", { name: "Book room" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Move Book room" })).toHaveLength(2);
+  });
+
+  it("names each runway bar by its deadline, and keeps the line style available", () => {
+    renderFlows({ groupBy: "none" });
+    expect(screen.getByRole("button", { name: "Draft: due tomorrow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Book room: 2 days over, due / })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ethics form: no deadline" })).toBeInTheDocument();
+    cleanup();
+    renderFlows({ groupBy: "none", laneStyle: "line" });
+    expect(screen.queryByRole("button", { name: "Draft: due tomorrow" })).toBeNull();
+  });
+
+  it("stacks a collapsed stream's runways behind one control that opens it", async () => {
+    const user = userEvent.setup();
+    renderFlows({ groupBy: "tag", mode: "streams" });
+    const stack = screen.getByRole("button", {
+      name: /^thesis: Draft: due tomorrow; Book room: 2 days over/,
+    });
+    expect(stack).toHaveAttribute("aria-expanded", "false");
+    await user.click(stack);
+    expect(screen.getByRole("button", { name: "Draft" })).toBeInTheDocument();
   });
 
   it("marks lanes that need attention with a spoken reason", () => {

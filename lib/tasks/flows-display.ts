@@ -88,8 +88,12 @@ export interface FlowsDisplay {
    * The pipeline itself ignores it; it only travels with the persisted settings.
    */
   scope: FlowsScope;
+  /** how a lane draws: a bar from start to deadline ("runway"), or a thin trunk line */
+  laneStyle: FlowsLaneStyle;
 }
 
+export type FlowsLaneStyle = "line" | "runway";
+export const FLOWS_LANE_STYLES: FlowsLaneStyle[] = ["runway", "line"];
 export type FlowsMode = "tasks" | "streams";
 export type FlowsScope = "collection" | "all";
 export const FLOWS_MODES: FlowsMode[] = ["tasks", "streams"];
@@ -117,6 +121,7 @@ export const DEFAULT_FLOWS_DISPLAY: FlowsDisplay = {
   mode: "tasks",
   attention: "combined",
   scope: "collection",
+  laneStyle: "runway",
 };
 
 /** Lookups + localized bucket labels the grouping needs. Pure data in. */
@@ -421,5 +426,6 @@ export function coerceFlowsDisplay(raw: unknown): FlowsDisplay {
     mode: oneOf(o.mode, FLOWS_MODES, DEFAULT_FLOWS_DISPLAY.mode),
     attention: oneOf(o.attention, ATTENTION_MODES, DEFAULT_FLOWS_DISPLAY.attention),
     scope: oneOf(o.scope, FLOWS_SCOPES, DEFAULT_FLOWS_DISPLAY.scope),
+    laneStyle: oneOf(o.laneStyle, FLOWS_LANE_STYLES, DEFAULT_FLOWS_DISPLAY.laneStyle),
   };
 }

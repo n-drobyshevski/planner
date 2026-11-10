@@ -10,8 +10,9 @@ import { FlowsPreview } from "./preview-client";
  * renders `notFound()`, so the route ships effectively unreachable.
  *
  * Query params preset the display: `mode` (tasks|streams), `group`, `sort`,
- * `dir`, `attention`, `scope`, `expand` (a stream key), `dialog=task` (opens
- * the create-task dialog, with tag suggestions).
+ * `dir`, `attention`, `scope`, `lanes` (runway|line), `expand` (a stream key,
+ * repeatable, e.g. `tag:thesis`), `dialog=task` (opens the create-task dialog,
+ * with tag suggestions).
  */
 export default function PreviewFlowsPage() {
   if (process.env.NODE_ENV === "production") notFound();

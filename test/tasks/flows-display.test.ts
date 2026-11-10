@@ -348,6 +348,7 @@ describe("coerceFlowsDisplay", () => {
     expect(out.mode).toBe("tasks");
     expect(out.attention).toBe("combined");
     expect(out.scope).toBe("collection");
+    expect(out.laneStyle).toBe("runway");
   });
 
   it("drops wrong-shaped individual fields only", () => {
@@ -355,6 +356,8 @@ describe("coerceFlowsDisplay", () => {
     expect(out.groupBy).toBe("tag");
     expect(out.mode).toBe("tasks");
     expect(out.filter.tags).toBeNull();
+    expect(coerceFlowsDisplay({ laneStyle: "ribbon" }).laneStyle).toBe("runway");
+    expect(coerceFlowsDisplay({ laneStyle: "line" }).laneStyle).toBe("line");
     expect(out.filter.assigneeIds).toEqual(["m1", null]);
   });
 
@@ -376,6 +379,7 @@ describe("coerceFlowsDisplay", () => {
       mode: "streams",
       attention: "deadline",
       scope: "all",
+      laneStyle: "line",
     } as const;
     expect(coerceFlowsDisplay(JSON.parse(JSON.stringify(full)))).toEqual(full);
   });

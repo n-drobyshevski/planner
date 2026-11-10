@@ -120,7 +120,12 @@
         "combined": "Due date and priority, weighed together."
       },
       "attentionDesc": "Most pressing first",
-      "attentionAsc": "Least pressing first"
+      "attentionAsc": "Least pressing first",
+      "laneStyle": "Lane style",
+      "laneStyleRunway": "Runways",
+      "laneStyleLine": "Lines",
+      "laneStyleRunwayHint": "Each task is a bar from its start to its deadline, filled as its subtasks get done.",
+      "laneStyleLineHint": "Each task is a thin line from its start to now, with its status changes on it."
     },
     "filter": {
       "priority": "Priority",
@@ -200,6 +205,18 @@
       "nameTooLong": "Keep the name under {max} characters.",
       "nameTaken": "You already have a stream with that name.",
       "saveFailed": "Couldn't save the stream. Try again."
+    },
+    "runway": {
+      "dueToday": "due today",
+      "dueTomorrow": "due tomorrow",
+      "over": "{count, plural, one {# day over} other {# days over}}",
+      "dueOn": "due {date}",
+      "startsOn": "planned, starts {date}",
+      "doneOn": "done {date}",
+      "noDeadline": "no deadline",
+      "subtasks": "{done} of {total, plural, one {# subtask} other {# subtasks}} done",
+      "more": "+{count}",
+      "moreLabel": "{count, plural, one {# more task} other {# more tasks}}"
     }
   },
   "checkpointDialog": {

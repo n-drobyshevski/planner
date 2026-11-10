@@ -51,7 +51,8 @@ import {
   type LaneRow,
   type StreamRow,
 } from "@/lib/tasks/flows-layout";
-import type { ById } from "@/lib/tasks/tree";
+import { progressDeep, type ById } from "@/lib/tasks/tree";
+import { runwayDueLabel, type Runway } from "@/lib/tasks/flows-runway";
 import {
   filterLanes,
   flowOrderOf,
@@ -61,6 +62,7 @@ import {
 } from "@/lib/tasks/flows-display";
 import { buildStreams, rankStreams, type StreamSummary } from "@/lib/tasks/flows-streams";
 import { attentionReason, type AttentionReason } from "@/lib/tasks/attention-reason";
+import { daysUntil } from "@/lib/tasks/attention";
 import { collectTags } from "@/lib/tasks/tags";
 import { useFlowsDnd, type FlowsDndItem } from "@/lib/hooks/use-flows-dnd";
 import type { FlowLineStyle } from "@/lib/tasks/flow-line-styles";
@@ -126,6 +128,8 @@ export interface TaskFlowsProps {
   expandLane?: { id: string; key: number } | null;
   /** status-event history still loading (tasks may already be ready) */
   loading?: boolean;
+  /** stream keys open on first render (the dev preview presets one) */
+  initialExpandedStreams?: string[];
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -151,6 +155,7 @@ export function TaskFlows({
   savedStreams,
   expandLane,
   loading,
+  initialExpandedStreams,
 }: TaskFlowsProps) {
   const t = useTranslations("tasks");
   const locale = useLocale();
@@ -203,7 +208,9 @@ export function TaskFlows({
   // The viewer's calendar day ("yyyy-MM-dd" in their zone) — what "due
   // tomorrow" and "overdue" are measured against.
   const today = useMemo(() => msToDateInput(nowMs, timeZone), [nowMs, timeZone]);
-  const [expandedStreams, setExpandedStreams] = useState<ReadonlySet<string>>(new Set());
+  const [expandedStreams, setExpandedStreams] = useState<ReadonlySet<string>>(
+    () => new Set(initialExpandedStreams ?? []),
+  );
 
   // Lookups + localized bucket labels the grouping needs (pure data; the
   // pipeline stays unit-testable).
@@ -554,6 +561,77 @@ export function TaskFlows({
     return `${task.title}: ${title} · ${state} · ${when}`;
   }
 
+  /** A task's whole-subtree progress, for its runway's fill. */
+  const progressOf = useCallback(
+    (taskId: string) => progressDeep(taskId, childrenByParent),
+    [childrenByParent],
+  );
+
+  /** The short label beside a runway: "due tomorrow", "Sat", "19 Nov", "2 days over". */
+  function runwayShort(seg: FlowSegment, r: Runway): string | null {
+    const label = runwayDueLabel(r, seg.task.dueDate, today);
+    if (!label) return null;
+    switch (label.kind) {
+      case "today":
+        return t("flows.runway.dueToday");
+      case "tomorrow":
+        return t("flows.runway.dueTomorrow");
+      case "over":
+        return t("flows.runway.over", { count: label.days });
+      case "weekday":
+        return format(dateInputToUtcMs(label.dueDate), "EEE", {
+          in: tz("UTC"),
+          locale: dateFnsLocale(locale),
+        });
+      case "date":
+        return formatDayMonthToken(label.dueDate, locale);
+    }
+  }
+
+  /** "Draft the literature review: due tomorrow, 2 of 5 subtasks done". */
+  function runwayLabel(seg: FlowSegment, r: Runway): string {
+    const parts: string[] = [];
+    const due = seg.task.dueDate;
+    if (r.state === "done") {
+      parts.push(
+        t("flows.runway.doneOn", { date: formatWeekdayDayMonth(r.endMs, timeZone, locale) }),
+      );
+    } else {
+      if (r.state === "planned") {
+        parts.push(
+          t("flows.runway.startsOn", {
+            date: formatWeekdayDayMonth(r.startMs, timeZone, locale),
+          }),
+        );
+      }
+      if (!due) parts.push(t("flows.runway.noDeadline"));
+      else if (r.state === "late") {
+        parts.push(t("flows.runway.over", { count: Math.max(1, -daysUntil(due, today)) }));
+        parts.push(t("flows.runway.dueOn", { date: dueDate(due) }));
+      } else {
+        const days = daysUntil(due, today);
+        parts.push(days >= 2 ? `${dueWords(days)} (${dueDate(due)})` : dueWords(days));
+      }
+    }
+    if (r.subtasks.total > 0) {
+      parts.push(
+        t("flows.runway.subtasks", { done: r.subtasks.done, total: r.subtasks.total }),
+      );
+    }
+    return `${seg.task.title}: ${parts.join(", ")}`;
+  }
+
+  /**
+   * A collapsed stream's stack on the canvas: the stream, then each runway it
+   * shows ("thesis: Draft…: due tomorrow; Book…: 2 days over; 1 more task").
+   * Distinct from the gutter row's "Show the tasks in …", which it mirrors.
+   */
+  function streamRunwayLabel(s: StreamSummary, runways: string[], hidden: number): string {
+    const parts = [...runways];
+    if (hidden > 0) parts.push(t("flows.runway.moreLabel", { count: hidden }));
+    return `${s.label}: ${parts.join("; ")}`;
+  }
+
   /** Default date for a checkpoint added from a lane's row menu: the lane's
    *  mid-span, but never before today (a fresh lane defaults to ~now). */
   function defaultCheckpointDate(lane: FlowLane): string {
@@ -816,6 +894,13 @@ export function TaskFlows({
               const task = tasks.find((t) => t.id === taskId);
               if (task) actions.addCheckpoint(task, atDate);
             }}
+            laneStyle={display.laneStyle}
+            today={today}
+            progressOf={progressOf}
+            runwayLabel={runwayLabel}
+            runwayShort={runwayShort}
+            streamLabel={streamRunwayLabel}
+            moreShort={(count) => t("flows.runway.more", { count })}
           />
         </div>
       </div>

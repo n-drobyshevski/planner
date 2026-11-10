@@ -81,6 +81,8 @@ interface Seed {
   owner?: string;
   parent?: string;
   doneDaysAgo?: number;
+  /** a planned start this many days from today (a future start = "planned") */
+  startIn?: number;
 }
 
 // "dueIn" is relative to the viewer's today, so the attention markers read the
@@ -95,8 +97,12 @@ const SEEDS: Seed[] = [
   { id: "t7", title: "Renew the car insurance", col: "col1", state: 0, createdDaysAgo: 15, dueIn: 4, priority: 2, tags: ["admin"], assignee: "m2", owner: "m2" },
   { id: "t8", title: "Sort the winter clothes", col: "col1", state: 0, createdDaysAgo: 2 },
   { id: "t9", title: "Physio exercises", col: "col1", state: 1, createdDaysAgo: 25, dueIn: 12, priority: 1, tags: ["health"], assignee: "m1" },
+  { id: "t10", title: "Write the methods chapter", col: "col2", state: 0, createdDaysAgo: 1, startIn: 4, dueIn: 16, priority: 1, tags: ["thesis"], assignee: "m1" },
   { id: "s1", title: "Outline chapter two", col: "col2", state: 2, createdDaysAgo: 18, doneDaysAgo: 4, parent: "t1" },
   { id: "s2", title: "Annotate key papers", col: "col2", state: 1, createdDaysAgo: 16, dueIn: 2, parent: "t1" },
+  { id: "s3", title: "Pick the search terms", col: "col2", state: 2, createdDaysAgo: 19, doneDaysAgo: 12, parent: "t1" },
+  { id: "s4", title: "Summarise each strand", col: "col2", state: 0, createdDaysAgo: 10, dueIn: 1, parent: "t1" },
+  { id: "s5", title: "Write the gap statement", col: "col2", state: 0, createdDaysAgo: 8, parent: "t1" },
 ];
 
 function buildFixtures(today: string, nowMs: number) {
@@ -122,7 +128,7 @@ function buildFixtures(today: string, nowMs: number) {
       boardId: board,
       priority: s.priority ?? null,
       dueDate: s.dueIn === undefined ? null : msToDateInput(todayMs + s.dueIn * DAY, "UTC"),
-      startDate: null,
+      startDate: s.startIn === undefined ? null : msToDateInput(todayMs + s.startIn * DAY, "UTC"),
       isMilestone: false,
       position: 0,
       sequential: false,
@@ -200,6 +206,7 @@ function FlowsPreviewInner() {
       sortDir: params.get("dir") ?? (params.get("sort") === "attention" ? "desc" : "asc"),
       attention: params.get("attention") ?? "combined",
       scope: params.get("scope") ?? "all",
+      laneStyle: params.get("lanes") ?? "runway",
     }),
   );
   const [streams, setStreams] = useState<TaskStream[]>(() => [
@@ -308,6 +315,7 @@ function FlowsPreviewInner() {
             onDisplayChange={setDisplay}
             onResetDisplay={() => setDisplay(DEFAULT_FLOWS_DISPLAY)}
             savedStreams={savedStreams}
+            initialExpandedStreams={params.getAll("expand")}
           />
         </main>
       </div>

@@ -120,7 +120,12 @@
         "combined": "Срок и приоритет вместе."
       },
       "attentionDesc": "Сначала срочные",
-      "attentionAsc": "Сначала спокойные"
+      "attentionAsc": "Сначала спокойные",
+      "laneStyle": "Рисунок дорожек",
+      "laneStyleRunway": "Полосы",
+      "laneStyleLine": "Линии",
+      "laneStyleRunwayHint": "Задача — полоса от начала до срока; заливка растёт по мере выполнения подзадач.",
+      "laneStyleLineHint": "Задача — тонкая линия от начала до сегодня, с отметками смены статуса."
     },
     "filter": {
       "priority": "Приоритет",
@@ -200,6 +205,18 @@
       "nameTooLong": "Название — не длиннее {max} символов.",
       "nameTaken": "Направление с таким названием у тебя уже есть.",
       "saveFailed": "Не получилось сохранить направление. Попробуй ещё раз."
+    },
+    "runway": {
+      "dueToday": "срок сегодня",
+      "dueTomorrow": "срок завтра",
+      "over": "{count, plural, one {# день} few {# дня} many {# дней} other {# дня}} просрочки",
+      "dueOn": "срок {date}",
+      "startsOn": "запланировано, начало {date}",
+      "doneOn": "готово {date}",
+      "noDeadline": "без срока",
+      "subtasks": "{total, plural, one {готово {done} из # подзадачи} other {готово {done} из # подзадач}}",
+      "more": "+{count}",
+      "moreLabel": "ещё {count, plural, one {# задача} few {# задачи} many {# задач} other {# задачи}}"
     }
   },
   "checkpointDialog": {
