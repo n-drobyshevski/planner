@@ -73,6 +73,8 @@ interface State {
   collections: { id: string; name: string }[] | null;
   /** streams the user opened past the first COLLAPSED_TASKS rows */
   expanded: Set<string>;
+  /** the one stream the Flows view shows; null = the most pressing one */
+  focus: string | null;
 }
 
 /** Rows a stream shows before "and N more". */
@@ -109,6 +111,7 @@ const state: State = {
   editor: null,
   collections: null,
   expanded: new Set(),
+  focus: null,
 };
 
 const app = new App({ name: "Planner flows", version: "1.1.0" });
@@ -588,8 +591,29 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
   const wrap = el("div", "flows");
   const board = el("div", "board");
   board.append(el("div", "corner"), ruler(data.date, s));
-  for (const stream of data.streams) {
-    if (stream.open === 0) continue;
+  // One stream at a time: a picker of the streams with open tasks, most
+  // pressing first. A focus that is gone (regrouped, all done) falls back.
+  const open = data.streams.filter((st) => st.open > 0);
+  const current = open.find((st) => st.key === state.focus) ?? open[0];
+  if (open.length > 1) {
+    const pick = el("div", "seg stream-pick");
+    pick.setAttribute("role", "group");
+    pick.setAttribute("aria-label", s.stream);
+    for (const st of open) {
+      const on = st === current;
+      const button = el("button", on ? "seg-on" : undefined);
+      button.type = "button";
+      button.setAttribute("aria-pressed", String(on));
+      button.append(el("span", undefined, st.label), el("span", st.overdue > 0 ? "pick-n late" : "pick-n", String(st.open)));
+      button.addEventListener("click", () => {
+        state.focus = st.key;
+        render();
+      });
+      pick.append(button);
+    }
+    wrap.append(pick);
+  }
+  for (const stream of current ? [current] : []) {
     const name = el("div", "name");
     name.append(el("b", undefined, stream.label));
     name.append(el("small", stream.overdue > 0 ? "late" : undefined, streamSummary(stream, data.date, state.locale)));

@@ -133,3 +133,9 @@ input[type="text"], input[type="date"] { min-height: 36px; padding: 4px 8px; bor
   .axis { order: -1; }
 }
 @media (prefers-reduced-motion: no-preference) { .body { transition: opacity 120ms; } }
+
+/* Flows: which one stream is shown. */
+.stream-pick { flex-wrap: wrap; align-self: start; max-width: 100%; }
+.stream-pick button { display: inline-flex; gap: 8px; align-items: center; }
+.pick-n { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.pick-n.late { color: var(--late); font-weight: 600; }
