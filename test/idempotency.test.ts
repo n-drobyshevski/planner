@@ -102,7 +102,11 @@ function fakeClientWithConflict(existingRow: Record<string, unknown>) {
       if (mode === "insert") {
         return {
           data: null,
-          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+          error: {
+            code: "23505",
+            message:
+              'duplicate key value violates unique constraint "events_owner_client_request_id_idx"',
+          },
         };
       }
       return { data: existingRow, error: null };

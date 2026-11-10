@@ -407,23 +407,6 @@ export async function fetchTaskStreams(
   return (data ?? []).map(mapTaskStream);
 }
 
-/**
- * The viewer's stream called `name` (trimmed, case-insensitive, as the unique
- * index compares), or null. Matches in JS over the member's list rather than
- * with ilike, whose `%`/`_` wildcards a name may contain; a member has few
- * streams.
- */
-export async function fetchTaskStreamByName(
-  sb: SupabaseClient,
-  workspaceId: string,
-  memberId: string,
-  name: string,
-): Promise<TaskStream | null> {
-  const wanted = name.trim().toLowerCase();
-  const streams = await fetchTaskStreams(sb, workspaceId, memberId);
-  return streams.find((s) => s.name.toLowerCase() === wanted) ?? null;
-}
-
 /** The viewer's Insights prefs row, or null before first customization. */
 export async function fetchInsightsPrefs(
   sb: SupabaseClient,

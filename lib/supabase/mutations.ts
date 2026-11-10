@@ -109,6 +109,18 @@ function guardUpdatedAt<Q extends { gte: (c: string, v: string) => Q; lt: (c: st
 const UNIQUE_VIOLATION = "23505";
 
 /**
+ * True when an insert failed on the idempotency index itself, not on some
+ * other unique constraint (a caller-chosen id that already exists, say): only
+ * then is "return the row already created for this key" the right answer.
+ */
+function isClientRequestReplay(error: { code?: string; message?: string; details?: string }): boolean {
+  return (
+    error.code === UNIQUE_VIOLATION &&
+    `${error.message ?? ""} ${error.details ?? ""}`.includes("client_request_id")
+  );
+}
+
+/**
  * Insert an event and return the stored row. Pass `id` to choose the new
  * row's id up front, so an insert whose answer is lost can still be undone.
  *
@@ -130,7 +142,7 @@ export async function createEvent(
     .select()
     .single();
   if (error) {
-    if (error.code === UNIQUE_VIOLATION && input.clientRequestId) {
+    if (isClientRequestReplay(error) && input.clientRequestId) {
       return fetchEventByClientRequestId(sb, input.ownerId, input.clientRequestId);
     }
     throw error;
@@ -1386,7 +1398,7 @@ export async function createTask(
     .select()
     .single();
   if (error) {
-    if (error.code === UNIQUE_VIOLATION && parsed.clientRequestId) {
+    if (isClientRequestReplay(error) && parsed.clientRequestId) {
       return fetchTaskByClientRequestId(sb, parsed.ownerId, parsed.clientRequestId);
     }
     throw error;

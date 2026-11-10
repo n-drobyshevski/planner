@@ -411,9 +411,51 @@ export function TasksShell({
   // descendant (not just direct children).
   const editingSubtasks = useMemo(() => {
     if (!editingTask) return [];
-    const ids = subtreeIds(editingTask.id, childrenByParent);
-    return collectionTasks.filter((tk) => tk.id !== editingTask.id && ids.has(tk.id));
-  }, [editingTask, childrenByParent, collectionTasks]);
+    const ids = subtreeIds(editingTask.id, allChildrenByParent);
+    return tasks.filter((tk) => tk.id !== editingTask.id && ids.has(tk.id));
+  }, [editingTask, allChildrenByParent, tasks]);
+
+  // Resolved from the live task set so the dialog can inherit its collection,
+  // privacy, and context, and file the new row under it.
+  const creatingParent =
+    editorState?.mode === "create" && editorState.parentId
+      ? (tasks.find((t) => t.id === editorState.parentId) ?? null)
+      : null;
+
+  // The editor works in the edited task's own collection, which under the
+  // Flows "all collections" scope need not be the active one: its columns,
+  // tree and dependency candidates must come from there, or saving would file
+  // the task under another collection's column and read its done-state wrong.
+  const editorCollectionId = editingTask
+    ? editingTask.collectionId
+    : creatingParent
+      ? creatingParent.collectionId
+      : (activeCollection?.id ?? null);
+  const editorInActive = editorCollectionId === (activeCollection?.id ?? null);
+  const editorTasks = useMemo(
+    () =>
+      editorInActive
+        ? collectionTasks
+        : tasks.filter((t) => t.collectionId === editorCollectionId),
+    [editorInActive, collectionTasks, tasks, editorCollectionId],
+  );
+  const editorBoards = useMemo(
+    () =>
+      editorInActive
+        ? activeBoards
+        : allBoards
+            .filter((b) => b.collectionId === editorCollectionId)
+            .sort((a, b) => a.position - b.position),
+    [editorInActive, activeBoards, allBoards, editorCollectionId],
+  );
+  const editorById = useMemo(
+    () => (editorInActive ? collectionById : indexById(editorTasks)),
+    [editorInActive, collectionById, editorTasks],
+  );
+  const editorByParent = useMemo(
+    () => (editorInActive ? childrenByParent : groupByParent(editorTasks)),
+    [editorInActive, childrenByParent, editorTasks],
+  );
 
   // One grouped prop for the views instead of a six-way handler drill.
   const actions: TaskActions = {
@@ -458,13 +500,6 @@ export function TasksShell({
     : null;
 
   // The parent a create-as-subtask was launched from (Flows "Add subtask").
-  // Resolved from the live task set so the dialog can inherit its collection,
-  // privacy, and context, and file the new row under it.
-  const creatingParent =
-    editorState?.mode === "create" && editorState.parentId
-      ? (tasks.find((t) => t.id === editorState.parentId) ?? null)
-      : null;
-
   function syncUrl(v: TasksView, collectionId: string | null) {
     const params = new URLSearchParams();
     params.set("view", v);
@@ -603,17 +638,17 @@ export function TasksShell({
             mode={dialogs.editor.mode}
             workspaceId={workspace.data.workspaceId}
             currentMemberId={workspace.data.currentMember.id}
-            collectionId={activeCollection?.id ?? null}
-            boards={activeBoards}
+            collectionId={editorCollectionId}
+            boards={editorBoards}
             members={members}
             categories={categories}
             task={editingTask}
             subtasks={editingSubtasks}
-            treeById={collectionById}
-            treeByParent={childrenByParent}
+            treeById={editorById}
+            treeByParent={editorByParent}
             dependencies={dependencies}
             dependencyBlocked={dependencyBlocked}
-            dependencyCandidates={collectionTasks}
+            dependencyCandidates={editorTasks}
             tagSuggestions={tagSuggestions}
             createParent={
               dialogs.editor.mode === "create" ? creatingParent : null
@@ -638,7 +673,7 @@ export function TasksShell({
                 : undefined
             }
             onScheduleSubtask={(id) => {
-              const st = collectionTasks.find((tk) => tk.id === id);
+              const st = tasks.find((tk) => tk.id === id);
               if (st) dialogs.scheduleFromEditor(st);
             }}
             onOpenSubtask={(id) => dialogs.openEdit(id)}

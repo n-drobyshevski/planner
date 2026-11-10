@@ -34,7 +34,7 @@ import {
   resolveFlowOptions,
   MCP_FLOWS_GROUP_BYS,
 } from "./flows";
-import { collectTags, normalizeTag } from "@/lib/tasks/tags";
+import { MAX_TAGS, MAX_TAG_LENGTH, collectTags, normalizeTag } from "@/lib/tasks/tags";
 import type { Board, TaskRow } from "@/lib/types";
 
 // --- helpers ---------------------------------------------------------------
@@ -74,11 +74,13 @@ function allDayRange(
   end: number,
   timeZone: string,
 ): { start: number; end: number } {
-  if (start % DAY_MS === 0 && end % DAY_MS === 0) return { start, end };
-  return {
-    start: dateInputToUtcMs(dateKeyInZone(start, timeZone)),
-    end: dateInputToUtcMs(dateKeyInZone(end, timeZone)),
-  };
+  if (start % DAY_MS === 0 && end % DAY_MS === 0 && end > start) return { start, end };
+  const first = dateInputToUtcMs(dateKeyInZone(start, timeZone));
+  const last = dateInputToUtcMs(dateKeyInZone(end, timeZone));
+  // The stored end is exclusive. A caller that gives an inclusive end on the
+  // last day (09:00 to 23:59, or the same instant twice) lands both ends on
+  // one date; that is a one-day event, never a zero-length one.
+  return { start: first, end: last > first ? last : first + DAY_MS };
 }
 
 /** Wrap data as a compact text tool result (no outputSchema → text content). */
@@ -626,8 +628,8 @@ export function registerTools(server: McpServer): void {
         categoryId: z.string().optional(),
         priority: z.number().int().min(0).max(3).optional(),
         tags: z
-          .array(z.string().max(100))
-          .max(30)
+          .array(z.string().max(MAX_TAG_LENGTH * 2))
+          .max(MAX_TAGS * 2)
           .optional()
           .describe("Free-form labels (normalized: lowercase, '#' dropped, max 12)."),
         dueDate: z
@@ -684,8 +686,8 @@ export function registerTools(server: McpServer): void {
         priority: z.number().int().min(0).max(3).nullable().optional(),
         dueDate: z.string().nullable().optional(),
         tags: z
-          .array(z.string().max(100))
-          .max(30)
+          .array(z.string().max(MAX_TAG_LENGTH * 2))
+          .max(MAX_TAGS * 2)
           .optional()
           .describe("Replace the task's tags (normalized). [] clears them."),
       },

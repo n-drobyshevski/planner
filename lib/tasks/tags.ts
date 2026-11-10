@@ -7,17 +7,18 @@ export const MAX_TAGS = 12;
 export const MAX_TAG_LENGTH = 40;
 
 /**
- * One tag in normal form, or null if nothing is left: leading `#` dropped,
+ * One tag in normal form, or null if nothing is left: leading `#`s dropped,
  * trimmed, lowercased, inner whitespace runs turned into a single hyphen,
  * commas removed (the dialog splits on them), clipped to MAX_TAG_LENGTH.
  */
 export function normalizeTag(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
+  // Commas go first, so the leading `#` run is stripped from what is really
+  // the start (",#work" and "# #work" are both "work", never "#work").
   const tag = raw
     .normalize("NFC")
-    .trim()
-    .replace(/^#+/, "")
     .replace(/,/g, " ")
+    .replace(/^[\s#]+/, "")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "-")
