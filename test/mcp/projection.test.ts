@@ -226,6 +226,7 @@ function task(partial: Partial<TaskRow> & { id: string; title: string }): TaskRo
     attributes: {},
     createdAt: 0,
     updatedAt: 0,
+    updatedBy: null,
     ...partial,
   };
 }

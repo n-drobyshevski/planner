@@ -7,12 +7,12 @@
 -- column, not `attributes` — this is plumbing, not an app-visible field, and
 -- keeping it out of the attributes jsonb keeps it out of that schema's
 -- registry (lib/attributes/schema.ts).
-alter table events add column client_request_id text;
-alter table tasks add column client_request_id text;
+alter table events add column if not exists client_request_id text;
+alter table tasks add column if not exists client_request_id text;
 
-create unique index events_owner_client_request_id_idx
+create unique index if not exists events_owner_client_request_id_idx
   on events (owner_id, client_request_id)
   where client_request_id is not null;
-create unique index tasks_owner_client_request_id_idx
+create unique index if not exists tasks_owner_client_request_id_idx
   on tasks (owner_id, client_request_id)
   where client_request_id is not null;
