@@ -34,6 +34,18 @@ function ruPlural(n: number, one: string, few: string, many: string): string {
 export const STRINGS = {
   en: {
     title: "Streams",
+    views: { calendar: "Calendar", flows: "Flows", now: "Now" },
+    view: "View",
+    pick: "Pick a runway to see its task.",
+    noDeadline: "no deadline",
+    subtasks: (done: number, total: number) => `${done} of ${total} subtasks`,
+    nowEmpty: "Nothing needs attention right now.",
+    nowCount: (n: number) => `${n} need${n === 1 ? "s" : ""} attention`,
+    calendarEmpty: "Nothing planned",
+    calendarFailed: "Could not load the calendar.",
+    allDay: "all day",
+    dueTask: "due",
+    runway: (title: string, detail: string) => (detail ? `${title}: ${detail}` : title),
     empty: "No streams yet: nothing is open in this view.",
     loading: "Loading…",
     failed: "Could not load the streams.",
@@ -71,6 +83,18 @@ export const STRINGS = {
   },
   ru: {
     title: "Направления",
+    views: { calendar: "Календарь", flows: "Потоки", now: "Сейчас" },
+    view: "Вид",
+    pick: "Выберите полосу, чтобы увидеть задачу.",
+    noDeadline: "без срока",
+    subtasks: (done: number, total: number) => `подзадачи: ${done} из ${total}`,
+    nowEmpty: "Сейчас ничего не требует внимания.",
+    nowCount: (n: number) => `требует внимания: ${n}`,
+    calendarEmpty: "Ничего не запланировано",
+    calendarFailed: "Не удалось загрузить календарь.",
+    allDay: "весь день",
+    dueTask: "срок",
+    runway: (title: string, detail: string) => (detail ? `${title}: ${detail}` : title),
     empty: "Направлений пока нет: в этом виде нет открытых задач.",
     loading: "Загрузка…",
     failed: "Не удалось загрузить направления.",
@@ -186,4 +210,183 @@ export function stripMarks(tasks: readonly FlowTaskOut[], today: string): StripM
     else byDay.set(clamped, { x: (clamped + STRIP_PAST_DAYS) / span, overdue: days < 0, count: 1 });
   }
   return [...byDay.values()].sort((a, b) => a.x - b.x);
+}
+
+// -- Runways: the Flows view --------------------------------------------------
+
+/** The Flows view shows this many days before and after today. */
+export const RUNWAY_PAST_DAYS = 14;
+export const RUNWAY_FUTURE_DAYS = 21;
+/** Where today sits across the track (0..1). */
+export const RUNWAY_NOW_X = RUNWAY_PAST_DAYS / (RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS);
+/** How far past today an undated task's open-ended runway is drawn. */
+const OPEN_ENDED_DAYS = 4;
+
+export type RunwayState = "open" | "late" | "planned" | "open-ended";
+
+export interface Runway {
+  state: RunwayState;
+  /** the bar, 0..1 across the track (clamped into it) */
+  x0: number;
+  x1: number;
+  /** the bar starts before / ends after what the track shows */
+  clippedStart: boolean;
+  clippedEnd: boolean;
+  /** share of the bar that is done, 0..1 (0 when the task has no subtasks) */
+  fill: number;
+  /** late only: the hatched span from the deadline to today */
+  over: { x0: number; x1: number } | null;
+}
+
+/**
+ * A task as a runway: a bar from its start to its deadline. A late task gets
+ * the span from the deadline to today as its overrun; a task with no deadline
+ * runs a little past today and has no end. Positions are fractions of the
+ * track, so the view only multiplies by its width.
+ */
+export function runwayOf(task: FlowTaskOut, today: string): Runway {
+  const span = RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS;
+  const pos = (days: number) => (days + RUNWAY_PAST_DAYS) / span;
+  const clamp = (x: number) => Math.min(1, Math.max(0, x));
+
+  const dueDays = task.dueDate ? daysBetween(today, task.dueDate) : Number.NaN;
+  const hasDue = !Number.isNaN(dueDays);
+  let startDays = task.start ? daysBetween(today, task.start) : Number.NaN;
+  // No usable start: a week of runway before the deadline, or before today.
+  if (Number.isNaN(startDays)) startDays = (hasDue ? dueDays : 0) - 7;
+  // A deadline on or before the start still needs a bar one can see and press.
+  const endDays = hasDue ? Math.max(dueDays, startDays + 1) : Math.max(0, startDays) + OPEN_ENDED_DAYS;
+
+  const late = hasDue && dueDays < 0;
+  const state: RunwayState = !hasDue ? "open-ended" : late ? "late" : startDays > 0 ? "planned" : "open";
+  const total = task.progress?.total ?? 0;
+  // Kept a sliver inside the right edge, so a runway wholly beyond the track
+  // still shows as a stub there instead of vanishing.
+  const x0 = Math.min(clamp(pos(startDays)), 0.98);
+  const x1 = clamp(pos(endDays));
+  return {
+    state,
+    x0,
+    // Never thinner than a sliver, even squeezed against an edge of the track.
+    x1: Math.max(x1, Math.min(1, x0 + 0.02)),
+    clippedStart: pos(startDays) < 0,
+    clippedEnd: pos(endDays) > 1,
+    fill: total > 0 ? Math.min(1, (task.progress?.done ?? 0) / total) : 0,
+    over: late ? { x0: clamp(pos(dueDays)), x1: RUNWAY_NOW_X } : null,
+  };
+}
+
+/** A bar narrower than this share of the track cannot hold its title: it goes beside the bar. */
+export const RUNWAY_NARROW = 0.24;
+
+/** Where a runway's words go: inside the bar, after it, or before it. */
+export function runwayLabelSide(runway: Runway): "after" | "before" | "inside" {
+  const end = Math.max(runway.x1, runway.over?.x1 ?? 0);
+  if (end <= 0.78) return "after";
+  return runway.x0 >= 0.3 ? "before" : "inside";
+}
+
+/** The words beside a runway's end: how long is left, or how far over. */
+export function runwayLabel(task: FlowTaskOut, today: string, locale: ViewLocale): string | null {
+  return deadlineLabel(task.dueDate, today, locale);
+}
+
+/** Week ticks for the Flows ruler: a date label and its position, Mondays only. */
+export function runwayTicks(today: string, locale: ViewLocale): { x: number; label: string }[] {
+  const span = RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS;
+  const format = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "ru", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+  const ticks: { x: number; label: string }[] = [];
+  for (let d = -RUNWAY_PAST_DAYS; d <= RUNWAY_FUTURE_DAYS; d++) {
+    const ms = Date.parse(`${today}T00:00:00Z`) + d * 86_400_000;
+    // Mondays only, and none where it would sit under the "Now" pill or be
+    // cut off by the track's right edge.
+    if (new Date(ms).getUTCDay() !== 1 || Math.abs(d) < 3 || d > RUNWAY_FUTURE_DAYS - 2) continue;
+    ticks.push({ x: (d + RUNWAY_PAST_DAYS) / span, label: format.format(ms) });
+  }
+  return ticks;
+}
+
+// -- Now: one ranked list across every stream ----------------------------------
+
+export interface NowItem {
+  task: FlowTaskOut;
+  /** labels of every stream the task was listed under */
+  streams: string[];
+}
+
+/** Every listed task that needs attention, once each, most pressing first. */
+export function nowItems(streams: readonly FlowStreamOut[]): NowItem[] {
+  const byId = new Map<string, NowItem>();
+  for (const stream of streams) {
+    for (const task of stream.tasks) {
+      if (task.score < 0.5) continue;
+      const item = byId.get(task.id);
+      if (item) item.streams.push(stream.label);
+      else byId.set(task.id, { task, streams: [stream.label] });
+    }
+  }
+  return [...byId.values()].sort((a, b) => {
+    if (a.task.score !== b.task.score) return b.task.score - a.task.score;
+    return (a.task.dueDate ?? "9999").localeCompare(b.task.dueDate ?? "9999");
+  });
+}
+
+// -- Calendar: the next seven days ---------------------------------------------
+
+export interface CalendarEventIn {
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+}
+
+export interface CalendarDay {
+  date: string;
+  /** timed and all-day events starting that local day, in order */
+  events: { title: string; time: string | null }[];
+  /** tasks due that day */
+  due: FlowTaskOut[];
+}
+
+/**
+ * The next `days` local days, each with its events and the tasks due on it.
+ * `localDate` and `localTime` turn an event's instant into the viewer's date
+ * and clock time (the view passes the browser's; tests pass fixed ones), so
+ * this stays free of the clock and the time zone. An all-day event's date is
+ * floating: it is read from the ISO string itself, never shifted.
+ */
+export function calendarDays(
+  today: string,
+  days: number,
+  events: readonly CalendarEventIn[],
+  streams: readonly FlowStreamOut[],
+  localDate: (iso: string) => string,
+  localTime: (iso: string) => string,
+): CalendarDay[] {
+  const out: CalendarDay[] = [];
+  const index = new Map<string, CalendarDay>();
+  for (let d = 0; d < days; d++) {
+    const date = new Date(Date.parse(`${today}T00:00:00Z`) + d * 86_400_000).toISOString().slice(0, 10);
+    const day: CalendarDay = { date, events: [], due: [] };
+    out.push(day);
+    index.set(date, day);
+  }
+  const sorted = [...events].sort((a, b) => a.start.localeCompare(b.start));
+  for (const event of sorted) {
+    const date = event.allDay ? event.start.slice(0, 10) : localDate(event.start);
+    index.get(date)?.events.push({ title: event.title, time: event.allDay ? null : localTime(event.start) });
+  }
+  const seen = new Set<string>();
+  for (const stream of streams) {
+    for (const task of stream.tasks) {
+      if (!task.dueDate || seen.has(task.id)) continue;
+      seen.add(task.id);
+      index.get(task.dueDate)?.due.push(task);
+    }
+  }
+  return out;
 }

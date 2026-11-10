@@ -13,7 +13,7 @@ import {
 } from "@/lib/tasks/flows-display";
 import { buildStreams, rankStreams } from "@/lib/tasks/flows-streams";
 import { laneAttention } from "@/lib/tasks/attention";
-import { groupByParent } from "@/lib/tasks/tree";
+import { groupByParent, progressDeep } from "@/lib/tasks/tree";
 import { clipTitle } from "./projection";
 
 /** The groupings `get_flows` offers ("none" is the web app's headerless mode, not a stream split). */
@@ -33,7 +33,11 @@ export const MAX_STREAMS = 30;
 export interface FlowTaskOut {
   id: string;
   title: string;
+  /** when the task's runway begins: its planned start, else its first activity ("yyyy-MM-dd") */
+  start?: string;
   dueDate?: string;
+  /** subtasks done / total, over the whole subtree; absent when it has none */
+  progress?: { done: number; total: number };
   priority?: number;
   score: number;
   overdue: boolean;
@@ -95,6 +99,14 @@ const LABELS: FlowsDisplayCtx["labels"] = {
 };
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+function progressOf(
+  taskId: string,
+  byParent: Map<string | null, TaskRow[]>,
+): Pick<FlowTaskOut, "progress"> {
+  const { done, total } = progressDeep(taskId, byParent);
+  return total > 0 ? { progress: { done, total } } : {};
+}
 
 /**
  * Resolve the effective options of a `get_flows` call. A saved stream's
@@ -175,7 +187,9 @@ export function projectFlows(input: FlowsInput): FlowsOut {
         return {
           id: t.id,
           title: clipTitle(t.title),
+          start: new Date(lane.startMs).toISOString().slice(0, 10),
           ...(t.dueDate ? { dueDate: t.dueDate } : {}),
+          ...progressOf(t.id, byParent),
           ...(t.priority != null ? { priority: t.priority } : {}),
           score: round2(info.score),
           overdue: info.overdue,

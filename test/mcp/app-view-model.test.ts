@@ -118,3 +118,139 @@ describe("pickLocale", () => {
     expect(pickLocale(undefined)).toBe("en");
   });
 });
+
+import {
+  RUNWAY_NOW_X,
+  calendarDays,
+  nowItems,
+  runwayLabelSide,
+  runwayOf,
+  runwayTicks,
+} from "@/lib/mcp/app/view-model";
+
+describe("runwayOf", () => {
+  it("runs from the start to the deadline, with progress as its fill", () => {
+    const r = runwayOf(
+      task({ start: "2026-11-03", dueDate: "2026-11-17", progress: { done: 2, total: 5 } }),
+      TODAY,
+    );
+    expect(r.state).toBe("open");
+    expect(r.x0).toBeCloseTo(7 / 35);
+    expect(r.x1).toBeCloseTo(21 / 35);
+    expect(r.fill).toBeCloseTo(0.4);
+    expect(r.over).toBeNull();
+    expect(r.x0 < RUNWAY_NOW_X && RUNWAY_NOW_X < r.x1).toBe(true);
+  });
+
+  it("gives a late task its overrun, from the deadline to today", () => {
+    const r = runwayOf(task({ start: "2026-11-01", dueDate: "2026-11-08", overdue: true }), TODAY);
+    expect(r.state).toBe("late");
+    expect(r.over).toEqual({ x0: r.x1, x1: RUNWAY_NOW_X });
+    expect(r.fill).toBe(0);
+  });
+
+  it("leaves an undated task open-ended, a little past today", () => {
+    const r = runwayOf(task({ start: "2026-11-05" }), TODAY);
+    expect(r.state).toBe("open-ended");
+    expect(r.x1).toBeGreaterThan(RUNWAY_NOW_X);
+    expect(r.over).toBeNull();
+  });
+
+  it("marks a task that has not started as planned", () => {
+    expect(runwayOf(task({ start: "2026-11-16", dueDate: "2026-11-28" }), TODAY).state).toBe("planned");
+  });
+
+  it("clamps into the track and says which ends are cut off", () => {
+    const r = runwayOf(task({ start: "2026-09-01", dueDate: "2027-01-15" }), TODAY);
+    expect([r.x0, r.x1, r.clippedStart, r.clippedEnd]).toEqual([0, 1, true, true]);
+  });
+
+  it("always leaves a bar one can see, whatever the dates say", () => {
+    for (const t of [
+      task({ start: "2026-11-12", dueDate: "2026-11-12" }),
+      task({ start: "2026-11-20", dueDate: "2026-11-11" }),
+      task({ dueDate: "2026-11-12" }),
+      task({}),
+      task({ start: "nonsense", dueDate: "nonsense" }),
+      task({ start: "2026-12-30", dueDate: "2026-12-31" }),
+    ]) {
+      const r = runwayOf(t, TODAY);
+      expect(r.x1).toBeGreaterThan(r.x0);
+      expect(r.x0).toBeGreaterThanOrEqual(0);
+      expect(r.x1).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("runwayLabelSide", () => {
+  it("puts the words after the bar, before it near the right edge, inside a full-width one", () => {
+    expect(runwayLabelSide(runwayOf(task({ start: "2026-11-03", dueDate: "2026-11-12" }), TODAY))).toBe("after");
+    expect(runwayLabelSide(runwayOf(task({ start: "2026-11-20", dueDate: "2026-11-30" }), TODAY))).toBe("before");
+    expect(runwayLabelSide(runwayOf(task({ start: "2026-09-01", dueDate: "2026-12-20" }), TODAY))).toBe("inside");
+  });
+});
+
+describe("runwayTicks", () => {
+  it("labels Mondays, but none under the Now pill or at the cut-off right edge", () => {
+    const ticks = runwayTicks(TODAY, "en");
+    expect(ticks.map((t) => t.label)).toEqual(["2 Nov", "16 Nov", "23 Nov"]);
+    expect(ticks.every((t) => t.x > 0 && t.x < 0.95)).toBe(true);
+  });
+});
+
+describe("nowItems", () => {
+  it("lists each pressing task once, most pressing first, with every stream it is in", () => {
+    const shared = task({ id: "a", title: "Shared", score: 0.9, dueDate: "2026-11-08" });
+    const items = nowItems([
+      stream({ label: "thesis", tasks: [shared, task({ id: "b", score: 0.6 }), task({ id: "c", score: 0.2 })] }),
+      stream({ label: "admin", tasks: [shared, task({ id: "d", score: 0.6, dueDate: "2026-11-12" })] }),
+    ]);
+    expect(items.map((i) => i.task.id)).toEqual(["a", "d", "b"]);
+    expect(items[0].streams).toEqual(["thesis", "admin"]);
+  });
+});
+
+describe("calendarDays", () => {
+  const localDate = (iso: string) => iso.slice(0, 10);
+  const localTime = (iso: string) => iso.slice(11, 16);
+
+  it("files events and due tasks under their day, in order", () => {
+    const days = calendarDays(
+      TODAY,
+      3,
+      [
+        { title: "Late call", start: "2026-11-10T19:00:00Z", end: "2026-11-10T20:00:00Z", allDay: false },
+        { title: "Standup", start: "2026-11-10T09:00:00Z", end: "2026-11-10T09:15:00Z", allDay: false },
+        { title: "Inspection", start: "2026-11-12T00:00:00Z", end: "2026-11-13T00:00:00Z", allDay: true },
+        { title: "Next week", start: "2026-11-20T09:00:00Z", end: "2026-11-20T10:00:00Z", allDay: false },
+      ],
+      [
+        stream({ tasks: [task({ id: "a", dueDate: "2026-11-11" })] }),
+        stream({ tasks: [task({ id: "a", dueDate: "2026-11-11" }), task({ id: "b" })] }),
+      ],
+      localDate,
+      localTime,
+    );
+    expect(days.map((d) => d.date)).toEqual(["2026-11-10", "2026-11-11", "2026-11-12"]);
+    expect(days[0].events).toEqual([
+      { title: "Standup", time: "09:00" },
+      { title: "Late call", time: "19:00" },
+    ]);
+    expect(days[1].due.map((t) => t.id)).toEqual(["a"]);
+    expect(days[2].events).toEqual([{ title: "Inspection", time: null }]);
+  });
+
+  it("reads an all-day date from the string, never through the viewer's zone", () => {
+    const shifted = () => "2026-11-11";
+    const days = calendarDays(
+      TODAY,
+      2,
+      [{ title: "Floating", start: "2026-11-10T00:00:00Z", end: "2026-11-11T00:00:00Z", allDay: true }],
+      [],
+      shifted,
+      () => "00:00",
+    );
+    expect(days[0].events).toHaveLength(1);
+    expect(days[1].events).toHaveLength(0);
+  });
+});

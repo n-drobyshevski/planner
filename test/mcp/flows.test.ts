@@ -190,7 +190,8 @@ describe("projectFlows", () => {
       ]),
     );
     const bare = out.streams.find((s) => s.label === "No tag")!.tasks[0];
-    expect(Object.keys(bare).sort()).toEqual(["id", "overdue", "score", "title"]);
+    expect(Object.keys(bare).sort()).toEqual(["id", "overdue", "score", "start", "title"]);
+    expect(bare.start).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     const full = out.streams.find((s) => s.label === "t")!.tasks[0];
     expect(full.tags).toEqual(["t"]);
     expect(JSON.stringify(out)).not.toContain("SECRET");
@@ -260,5 +261,22 @@ describe("projectFlows", () => {
       filter: DEFAULT_FLOWS_FILTER,
     });
     expect(resolveFlowOptions({}, DEFAULT_FLOWS_DISPLAY).groupBy).toBe("tag");
+  });
+  it("gives each task its runway: the planned start, and subtask progress over the whole subtree", () => {
+    const parent = task({ id: "p", title: "Parent", tags: ["t"], startDate: "2026-07-01", dueDate: "2026-07-20" });
+    const out = projectFlows(
+      input([
+        parent,
+        task({ id: "c1", title: "Child", parentId: "p", completedAt: NOW - 1 }),
+        task({ id: "c2", title: "Child", parentId: "p" }),
+        task({ id: "g1", title: "Grandchild", parentId: "c2", completedAt: NOW - 1 }),
+        task({ id: "solo", title: "Solo", tags: ["t"] }),
+      ]),
+    );
+    const tasks = out.streams.find((s) => s.label === "t")!.tasks;
+    const p = tasks.find((t) => t.id === "p")!;
+    expect(p.start).toBe("2026-07-01");
+    expect(p.progress).toEqual({ done: 2, total: 3 });
+    expect(tasks.find((t) => t.id === "solo")!.progress).toBeUndefined();
   });
 });

@@ -96,19 +96,35 @@ retries after a dropped response.
 
 ## The Flows app (MCP App)
 
-`show_flows` is `get_flows` with a view. A host that supports
-MCP Apps (claude.ai,
-Claude Desktop) renders it in the chat: one card per stream with its open and
-overdue counts, an attention chip, and a small timeline of the next two weeks
-with a mark per deadline. In the view the member can regroup, switch the
-attention rule, show only their own tasks, and mark a task done. Any other
-host sees an ordinary tool with the same JSON text as `get_flows`.
+`show_flows` is `get_flows` with a view. A host that supports MCP Apps (claude.ai,
+Claude Desktop) renders it in the chat, with three views behind one switch:
+
+- **Flows** (the default): each stream's open tasks as *runways*. A runway is
+  a bar from the task's start to its deadline, on one time axis shared by every
+  stream, with a line at today. The darker fill is the share of subtasks done.
+  A late task carries a hatched overrun from its deadline to today and says how
+  far over it is; a task with no deadline fades out past today; one that has
+  not started is outlined with dashes. Picking a runway shows its task, with a
+  button to mark it done.
+- **Now**: every task that needs attention, once each, most pressing first,
+  with the streams it belongs to and a Done button.
+- **Calendar**: the next seven days, each with its events (fetched through
+  `list_events`) and the tasks due that day.
+
+The member can regroup the streams, switch the attention rule and show only
+their own tasks. Any other host sees an ordinary tool with the same JSON text
+as `get_flows`.
+
+For the runways, each task in the output also carries `start` (its planned
+start, else its first activity, `yyyy-MM-dd`) and, when it has subtasks,
+`progress: { done, total }` over its whole subtree. `get_flows` returns them
+too.
 
 | Path | Role |
 | --- | --- |
 | `lib/mcp/app/register.ts` | The `show_flows` tool and the `ui://planner/flows.html` resource |
 | `lib/mcp/app/flows-view.ts`, `flows-view.css` | The view (browser code, no framework) |
-| `lib/mcp/app/view-model.ts` | Its pure helpers: labels, the timeline's marks |
+| `lib/mcp/app/view-model.ts` | Its pure helpers: runway geometry, labels, the Now list, the Calendar days |
 | `lib/mcp/app/flows-app.generated.ts` | The built view: one self-contained HTML document |
 | `scripts/build-mcp-app.mjs` | Builds it (`pnpm build:mcp-app`; also runs before `pnpm build`) |
 
@@ -118,7 +134,7 @@ How it stays inside the member's permissions:
   script and styles inline, declares no CSP domains and fetches nothing.
 - It holds no token and no session. It gets its data as the tool's
   `structuredContent`, and acts by asking the host to call this server's tools
-  (`show_flows` to refetch, `complete_task` to tick a task off). The host sends
+  (`show_flows` to refetch, `list_events` for the Calendar view, `complete_task` to tick a task off). The host sends
   those with the member's own bearer token, so RLS decides exactly as it does
   for a call the model makes.
 - Titles and tag names are set as text, never parsed as markup.
