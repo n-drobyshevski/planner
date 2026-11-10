@@ -24,6 +24,7 @@ vi.mock("@/lib/mcp/auth", () => ({
 }));
 
 import { registerTools } from "@/lib/mcp/tools";
+import { fetchTasks } from "@/lib/supabase/queries";
 import { FLOWS_APP_URI } from "@/lib/mcp/app/register";
 import { FLOWS_APP_HTML } from "@/lib/mcp/app/flows-app.generated";
 
@@ -84,6 +85,24 @@ describe("the Flows MCP App", () => {
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent).toMatchObject({ date: "2026-11-10", groupBy: "tag", streams: [] });
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+  });
+
+  it("gives the view every open task of a stream and the model only `limit`", async () => {
+    const rows = Array.from({ length: 12 }, (_, i) => ({
+      id: `t${i}`, workspaceId: "w1", ownerId: "m1", assigneeId: null, parentId: null,
+      collectionId: null, categoryId: null, description: null, isPrivate: false, color: null,
+      boardId: null, priority: null, dueDate: null, startDate: null, isMilestone: false,
+      position: i, sequential: false, completedAt: null, attributes: {}, tags: ["work"],
+      createdAt: 1, updatedAt: 1, updatedBy: null, title: `Task ${i}`,
+    }));
+    vi.mocked(fetchTasks).mockResolvedValueOnce(rows as never);
+    const { tools } = collect();
+    const result = await tools.get("show_flows")!.cb({ date: "2026-11-10" }, {});
+    const view = result.structuredContent as { streams: { open: number; tasks: unknown[] }[] };
+    expect(view.streams[0]).toMatchObject({ open: 12 });
+    expect(view.streams[0].tasks).toHaveLength(12);
+    const text = JSON.parse(result.content[0].text) as typeof view;
+    expect(text.streams[0].tasks).toHaveLength(3);
   });
 
   it("answers an unknown saved stream with an error and no structured content", async () => {

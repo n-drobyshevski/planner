@@ -69,6 +69,7 @@ button:disabled { opacity: 0.55; cursor: default; }
 .tag-inside { right: 6px; margin: 0; background: var(--surface); pointer-events: none; }
 .tag { max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
 .lane .more { padding: 0 8px; }
+.lane button.more { justify-self: start; align-self: flex-start; margin: 2px 8px; min-height: 32px; color: var(--muted); }
 .detail { display: flex; gap: 12px; align-items: center; justify-content: space-between; min-height: 60px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .detail-text { display: grid; min-width: 0; }
 .detail-text b { overflow-wrap: anywhere; }

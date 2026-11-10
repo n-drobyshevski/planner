@@ -71,7 +71,12 @@ interface State {
   editor: Editor | null;
   /** the member's collections, for the editor; null until first asked for */
   collections: { id: string; name: string }[] | null;
+  /** streams the user opened past the first COLLAPSED_TASKS rows */
+  expanded: Set<string>;
 }
+
+/** Rows a stream shows before "and N more". */
+const COLLAPSED_TASKS = 6;
 
 /** The task being edited (or created). Field values live here, not in the DOM, so a repaint keeps them. */
 interface Editor {
@@ -103,6 +108,7 @@ const state: State = {
   eventsStatus: "idle",
   editor: null,
   collections: null,
+  expanded: new Set(),
 };
 
 const app = new App({ name: "Planner flows", version: "1.1.0" });
@@ -172,7 +178,6 @@ async function refetch(patch: Partial<Pick<State, "groupBy" | "attention" | "min
         groupBy: state.groupBy,
         attention: state.attention,
         mine: state.mine,
-        limit: 6,
         ...(state.stream ? { stream: state.stream } : {}),
       },
     });
@@ -592,9 +597,24 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
     const nowLine = el("div", "now-line");
     nowLine.style.left = pct(RUNWAY_NOW_X);
     lane.append(nowLine);
-    for (const task of stream.tasks) lane.append(runwayRow(task, data.date, s));
-    const hidden = stream.open - stream.tasks.length;
-    if (hidden > 0) lane.append(el("div", "more", s.more(hidden)));
+    const open = state.expanded.has(stream.key);
+    const shown = open ? stream.tasks : stream.tasks.slice(0, COLLAPSED_TASKS);
+    for (const task of shown) lane.append(runwayRow(task, data.date, s));
+    const folded = stream.tasks.length - shown.length;
+    // Past what the server sent (a very long stream): a count, not a button.
+    const unsent = stream.open - stream.tasks.length;
+    if (folded > 0 || (open && stream.tasks.length > COLLAPSED_TASKS)) {
+      const toggle = el("button", "ghost more", open ? s.fewer : s.more(stream.open - shown.length));
+      toggle.type = "button";
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.addEventListener("click", () => {
+        if (open) state.expanded.delete(stream.key);
+        else state.expanded.add(stream.key);
+        render();
+      });
+      lane.append(toggle);
+    }
+    if (unsent > 0 && (open || folded === 0)) lane.append(el("div", "more", s.more(unsent)));
     board.append(name, lane);
   }
   wrap.append(board);
