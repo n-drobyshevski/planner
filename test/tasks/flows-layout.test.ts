@@ -35,6 +35,7 @@ function task(over: Partial<TaskRow>): TaskRow {
     sequential: false,
     completedAt: null,
     attributes: {},
+    tags: [],
     createdAt: T0,
     updatedAt: T0,
     updatedBy: null,

@@ -3,6 +3,7 @@
 
 import { parseAttributes, type ItemAttributes } from "@/lib/attributes/schema";
 import { asFlowLineStyle } from "@/lib/tasks/flow-line-styles";
+import { normalizeTags } from "@/lib/tasks/tags";
 import type {
   EventRow,
   EventStatus,
@@ -350,6 +351,8 @@ export function mapTask(r: Row): TaskRow {
     sequential: Boolean(r.sequential),
     completedAt: toMsOrNull(r.completed_at),
     attributes: parseAttributes(r.attributes),
+    // Absent before the tags migration lands, and never trusted to be clean.
+    tags: Array.isArray(r.tags) ? normalizeTags(r.tags) : [],
     createdAt: toMs(r.created_at),
     updatedAt: toMs(r.updated_at),
     updatedBy: (r.updated_by as string | null) ?? null,
@@ -576,6 +579,8 @@ export interface TaskInput {
   completedAt?: number | null;
   /** whole-object write; callers start from the parsed full bag so unknown keys survive */
   attributes?: ItemAttributes;
+  /** free-form labels; normalized on write (lib/tasks/tags.ts) */
+  tags?: string[];
   /** caller-chosen idempotency key (e.g. an MCP client's), scoped per owner */
   clientRequestId?: string;
 }
@@ -604,6 +609,9 @@ export function taskInputToRow(input: TaskInput): Row {
     // See eventInputToRow: omit rather than null so writes still work before
     // the client_request_id migration lands, as long as nothing sets one.
     ...(input.clientRequestId ? { client_request_id: input.clientRequestId } : {}),
+    // Same reasoning: an untagged create never names the column, so it still
+    // works if the app deploys before the tags migration.
+    ...(input.tags && input.tags.length > 0 ? { tags: normalizeTags(input.tags) } : {}),
   };
 }
 
@@ -627,6 +635,7 @@ export function taskPatchToRow(patch: Partial<TaskInput>): Row {
   if ("sequential" in patch) row.sequential = patch.sequential;
   if ("completedAt" in patch) row.completed_at = toIsoOrNull(patch.completedAt ?? null);
   if ("attributes" in patch) row.attributes = patch.attributes ?? {};
+  if ("tags" in patch) row.tags = normalizeTags(patch.tags ?? []);
   return row;
 }
 

@@ -277,6 +277,8 @@ export interface TaskRow {
   completedAt: number | null;
   /** optimization attributes (energy/flexibility/...); jsonb bag, see lib/attributes/schema.ts */
   attributes: ItemAttributes;
+  /** free-form labels, normalized (lib/tasks/tags.ts); a task joins one stream per tag. [] = none */
+  tags: string[];
   createdAt: number;
   updatedAt: number;
   /** member whose write last touched the row (server-stamped, read-only; never sent); null = unknown */

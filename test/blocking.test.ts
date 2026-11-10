@@ -32,6 +32,7 @@ function mk(id: string, done = false): TaskRow {
     sequential: false,
     completedAt: done ? 100 : null,
     attributes: {},
+    tags: [],
     createdAt: 0,
     updatedAt: 0,
     updatedBy: null,

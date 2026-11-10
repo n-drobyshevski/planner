@@ -307,6 +307,7 @@ export function toTaskRow(t: TaskJson): TaskRow {
     sequential: false,
     completedAt: t.completedAt,
     attributes: {},
+    tags: [],
     createdAt: t.createdAt,
     updatedAt: t.createdAt,
     updatedBy: null,

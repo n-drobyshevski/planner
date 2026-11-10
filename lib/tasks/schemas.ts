@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { itemAttributesSchema } from "@/lib/attributes/schema";
 import { flowLineStyleSchema } from "@/lib/tasks/flow-line-styles";
+import { MAX_TAGS, MAX_TAG_LENGTH, normalizeTags } from "@/lib/tasks/tags";
 
 const nullableUuid = z.uuid().nullable();
 
@@ -17,6 +18,15 @@ const titleSchema = z
   .min(1, "Please add a title.")
   .max(500, "Keep the title under 500 characters.");
 const descriptionSchema = z.string().max(10_000, "Keep the description under 10,000 characters.");
+
+/**
+ * Tags are forgiving on the way in ("#Work", " work ") and normalized by the
+ * schema, so every writer stores the same form the DB CHECK expects.
+ */
+export const tagsSchema = z
+  .array(z.string().max(MAX_TAG_LENGTH * 2))
+  .max(MAX_TAGS * 2)
+  .transform((tags) => normalizeTags(tags));
 
 const taskInputBase = z.object({
   workspaceId: z.uuid(),
@@ -39,6 +49,7 @@ const taskInputBase = z.object({
   sequential: z.boolean().optional(),
   completedAt: z.number().int().nullable().optional(),
   attributes: itemAttributesSchema.optional(),
+  tags: tagsSchema.optional(),
   clientRequestId: z.string().min(1).max(100).optional(),
 });
 

@@ -224,6 +224,7 @@ function task(partial: Partial<TaskRow> & { id: string; title: string }): TaskRo
     sequential: false,
     completedAt: null,
     attributes: {},
+    tags: [],
     createdAt: 0,
     updatedAt: 0,
     updatedBy: null,
