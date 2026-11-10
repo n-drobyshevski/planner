@@ -699,7 +699,10 @@ export interface FlowItem {
   title: string;
   done: boolean;
   blocked: boolean;
+  /** its first few open blockers, for labels */
   waitingOn: { id: string; title: string }[];
+  /** every task it waits for, open or done: what links, arrows, dimming and the loop check use */
+  blockedBy: string[];
   /** the stream it was first listed under */
   stream: string;
   /** set for a subtask: its top-level task's title */
@@ -718,6 +721,7 @@ export function flowItems(streams: readonly FlowStreamOut[]): FlowItem[] {
           done: false,
           blocked: task.blocked === true,
           waitingOn: task.waitingOn ?? [],
+          blockedBy: task.blockedBy ?? (task.waitingOn ?? []).map((b) => b.id),
           stream: stream.label,
         });
       }
@@ -729,6 +733,7 @@ export function flowItems(streams: readonly FlowStreamOut[]): FlowItem[] {
           done: sub.done,
           blocked: sub.blocked === true,
           waitingOn: sub.waitingOn ?? [],
+          blockedBy: sub.blockedBy ?? (sub.waitingOn ?? []).map((b) => b.id),
           stream: stream.label,
           under: task.title,
         });
@@ -744,16 +749,20 @@ export interface DepEdge {
   to: string;
 }
 
-/** Every waits-for link the loaded data names (each task's waitingOn, inverted into holds too). */
+/**
+ * Every waits-for link the loaded data names: each item's whole `blockedBy`
+ * (open and done blockers alike, so a link to a finished task still draws and
+ * still counts for the loop check), inverted into holds too.
+ */
 export function dependencyEdges(items: readonly FlowItem[]): DepEdge[] {
   const out: DepEdge[] = [];
   const seen = new Set<string>();
   for (const item of items) {
-    for (const b of item.waitingOn) {
-      const key = `${b.id}>${item.id}`;
+    for (const id of item.blockedBy) {
+      const key = `${id}>${item.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ from: b.id, to: item.id });
+      out.push({ from: id, to: item.id });
     }
   }
   return out;

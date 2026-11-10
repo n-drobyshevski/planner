@@ -5,6 +5,8 @@ import {
   resolveFlowOptions,
   MAX_STREAMS,
   MAX_FLOW_SUBTASKS,
+  MAX_FLOW_BLOCKED_BY,
+  MAX_WAITING_ON,
   type FlowsInput,
   type FlowSubtaskOut,
 } from "@/lib/mcp/flows";
@@ -347,6 +349,33 @@ describe("projectFlows — dependencies", () => {
     expect(w).not.toHaveProperty("waitingOn");
   });
 
+  it("gives the view every dependency id, open or done, uncapped up to MAX_FLOW_BLOCKED_BY", () => {
+    const blockers = Array.from({ length: MAX_FLOW_BLOCKED_BY + 5 }, (_, i) =>
+      task({ id: `b${i}`, title: `B${i}`, tags: ["y"], ...(i % 2 ? { completedAt: NOW - 1 } : {}) }),
+    );
+    const tasks = [
+      task({ id: "w", title: "Waiting", tags: ["x"] }),
+      task({ id: "s", title: "Sub", parentId: "w", position: 1 }),
+      ...blockers,
+    ];
+    const dependencies = [
+      ...blockers.map((b) => dep("w", b.id)),
+      dep("s", "b1"),
+      dep("w", "hidden"),
+    ];
+    const view = projectFlows(input(tasks, { dependencies, limit: 10, withSubtasks: true }));
+    const w = view.streams.flatMap((s) => s.tasks).find((t) => t.id === "w")!;
+    // waitingOn stays the few open ones, for labels; blockedBy is every link.
+    expect(w.waitingOn).toHaveLength(MAX_WAITING_ON);
+    expect(w.blockedBy).toEqual(blockers.slice(0, MAX_FLOW_BLOCKED_BY).map((b) => b.id));
+    // A done blocker is a link too.
+    expect(w.subtasks![0].blockedBy).toEqual(["b1"]);
+    expect(w.subtasks![0]).not.toHaveProperty("waitingOn");
+    // get_flows (no view) never carries it.
+    const plain = projectFlows(input(tasks, { dependencies, limit: 10 }));
+    expect(plain.streams.flatMap((s) => s.tasks).some((t) => "blockedBy" in t)).toBe(false);
+  });
+
   it("gives the view each task's subtree, pre-order, done ones included, with blocked state", () => {
     const tasks = [
       task({ id: "p", title: "Parent", tags: ["x"], sequential: true }),
@@ -371,6 +400,7 @@ describe("projectFlows — dependencies", () => {
         done: false,
         blocked: true,
         waitingOn: [{ id: "other", title: "Other" }],
+        blockedBy: ["other"],
       },
       // "do in order": the second open subtask waits for the first.
       { id: "c3", title: "Third", parentId: "p", depth: 1, done: false, blocked: true },

@@ -67,7 +67,9 @@ Every id must be a task the caller can see; a task can't wait for itself;
 only the blocked task's owner can change its blockers; and a loop is refused
 with "That would make a dependency loop: …" (checked over the visible edges
 first, and by the database's acyclic trigger for chains through tasks the
-caller can't see; a refused replace undoes the adds it made). `get_task`
+caller can't see; a refused replace undoes the adds it made). `update_task`
+writes the blockers before any other field, so a refused set leaves the whole
+task as it was (never "fields saved, call failed"). `get_task`
 returns `sequential` (its subtasks are "do in order"), `blockedBy` and
 `blocks` (each `{ id, title, done }`: what it waits for, and what waits for
 it), and each subtask row adds `sequential`, `blocked` (open and waiting on an
@@ -166,8 +168,12 @@ too. Only `show_flows`' structured content (the view's data, not the model's
 text) adds each task's `subtasks`: its whole subtask tree, flattened
 pre-order, done ones included, at most 100 per task and never deeper than
 `MAX_DEPTH`, each `{ id, title, parentId, depth (1 = direct child), done,
-start?, due?, blocked?, waitingOn? }` (`blocked` here also covers a "do in
-order" sibling still waiting its turn).
+start?, due?, blocked?, waitingOn?, blockedBy? }` (`blocked` here also covers
+a "do in order" sibling still waiting its turn). There, too, each task and
+subtask carries `blockedBy?`: the ids of every task it waits for, open or
+done, at most 50, which the view draws its links, arrows, dimming and loop
+check from (`waitingOn`, open and at most 3, stays its labels). Like
+`subtasks`, it is left out of the model's text.
 
 | Path | Role |
 | --- | --- |

@@ -155,6 +155,41 @@ describe("flowItems and dependency edges", () => {
   });
 });
 
+describe("links from blockedBy, not the capped waitingOn", () => {
+  // w9 waits for five tasks: two done (no waitingOn entry), three open (waitingOn,
+  // capped by the server) and one more open past the cap.
+  const done1 = task({ id: "d1" });
+  const done2 = task({ id: "d2" });
+  const opens = ["o1", "o2", "o3", "o4"].map((id) => task({ id }));
+  const w9 = task({
+    id: "w9",
+    blocked: true,
+    waitingOn: opens.slice(0, 3).map((o) => ({ id: o.id, title: o.id })),
+    blockedBy: ["d1", "d2", "o1", "o2", "o3", "o4"],
+  });
+  const s9 = sub({ id: "s9", parentId: "w9", blockedBy: ["d1"] });
+  const all = [done1, done2, ...opens, { ...w9, subtasks: [s9] }];
+  const items = flowItems([stream("work", all)]);
+  const edges = dependencyEdges(items);
+
+  it("draws every link, done blockers and those past the cap included", () => {
+    expect(linksOf("w9", edges).blockers).toEqual(["d1", "d2", "o1", "o2", "o3", "o4"]);
+    expect(linksOf("d1", edges).holds).toEqual(["w9", "s9"]);
+    const rows = laneRows(all, new Set());
+    const runway = (r: LaneRow) => runwayOf(r.task, TODAY);
+    expect(dependencyArrows(rows, "w9", edges, runway).map((a) => a.from)).toEqual(["d1", "d2", "o1", "o2", "o3", "o4"]);
+    expect(dimmedRows(rows, "w9", edges).size).toBe(0);
+  });
+  it("finds a loop through a done blocker or one past the cap", () => {
+    // o4 waiting for w9 would close w9 → o4; d1 waiting for s9 would close s9 → d1.
+    expect(waitCandidates("o4", items, [], [], "w9")[0]).toMatchObject({ id: "w9", disabled: "loop" });
+    expect(waitCandidates("d1", items, [], [], "s9")[0]).toMatchObject({ id: "s9", disabled: "loop" });
+  });
+  it("keeps waitingOn for the labels", () => {
+    expect(items.find((i) => i.id === "w9")?.waitingOn.map((w) => w.id)).toEqual(["o1", "o2", "o3"]);
+  });
+});
+
 describe("selection: dimming and arrows", () => {
   const items = flowItems(streams);
   const edges = dependencyEdges(items);

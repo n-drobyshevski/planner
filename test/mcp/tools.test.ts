@@ -818,6 +818,35 @@ describe("task editing tools (the Flows app's writes)", () => {
     expect(vi.mocked(m.removeDependency).mock.calls.map((c) => c[1])).toEqual(["d-added"]);
   });
 
+  it("update_task writes blockers before fields, so a loop the database refuses saves nothing", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "a", title: "Write" }), row({ id: "b" })]);
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValue([]);
+    vi.mocked(m.addDependency).mockRejectedValueOnce(new Error("That dependency would create a cycle"));
+    const call = collectTools();
+    const res = await call("update_task", { id: "a", title: "Write it", dueDate: "2026-11-20", blockedBy: ["b"] });
+    expect(res.isError).toBe(true);
+    expect(res.data).toMatch(/^That would make a dependency loop: /);
+    // The fields were never written: the error is the whole truth.
+    expect(m.updateTask).not.toHaveBeenCalled();
+
+    // Accepted: the blockers go first, then the fields.
+    vi.clearAllMocks();
+    const order: string[] = [];
+    vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "a", title: "Write" }), row({ id: "b" })]);
+    vi.mocked(q.fetchTaskDependencies).mockResolvedValue([]);
+    vi.mocked(m.addDependency).mockImplementation(async (_sb, input) => {
+      order.push("dependency");
+      return { id: "d", createdAt: 1, ...input };
+    });
+    vi.mocked(m.updateTask).mockImplementation(async (_sb, id) => {
+      order.push("fields");
+      return { id, title: "Write it" } as never;
+    });
+    const saved = await call("update_task", { id: "a", title: "Write it", blockedBy: ["b"] });
+    expect(saved.data).toEqual({ id: "a", title: "Write it", blockedBy: ["b"] });
+    expect(order).toEqual(["dependency", "fields"]);
+  });
+
   it("create_task adds its blockers after creating, and checks them first", async () => {
     vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "b1" }), row({ id: "b2" })]);
     vi.mocked(m.createTask).mockResolvedValue(row({ id: "new", title: "New" }));

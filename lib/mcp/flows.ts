@@ -41,6 +41,8 @@ export interface FlowBlockerOut {
 export const MAX_WAITING_ON = 3;
 /** Subtasks `show_flows` hands its view per top-level task at most. */
 export const MAX_FLOW_SUBTASKS = 100;
+/** Dependency ids `show_flows` hands its view per task at most (`blockedBy`). */
+export const MAX_FLOW_BLOCKED_BY = 50;
 
 export interface FlowTaskOut {
   id: string;
@@ -60,6 +62,12 @@ export interface FlowTaskOut {
   waitingOn?: FlowBlockerOut[];
   /** how many open tasks wait for this one; absent when none */
   holds?: number;
+  /**
+   * `show_flows`' view only (FlowsInput.withSubtasks): the ids of every task
+   * it waits for, open or done, at most MAX_FLOW_BLOCKED_BY; absent when none.
+   * The view draws its links from this; `waitingOn` stays the labels.
+   */
+  blockedBy?: string[];
   /**
    * `show_flows`' view only (FlowsInput.withSubtasks): the whole subtask tree,
    * flattened pre-order, done ones included, at most MAX_FLOW_SUBTASKS.
@@ -83,6 +91,8 @@ export interface FlowSubtaskOut {
   blocked?: true;
   /** its unfinished dependency blockers, most pressing first, at most MAX_WAITING_ON */
   waitingOn?: FlowBlockerOut[];
+  /** every task it waits for, open or done, at most MAX_FLOW_BLOCKED_BY (as FlowTaskOut.blockedBy) */
+  blockedBy?: string[];
 }
 
 export interface FlowStreamOut {
@@ -184,6 +194,17 @@ function waitingOf(t: TaskRow, ix: DepIndex): { blocked?: true; waitingOn?: Flow
   };
 }
 
+/** For the view: every visible task `t` waits for, open or done, capped. */
+function blockedByOf(t: TaskRow, ix: DepIndex): { blockedBy?: string[] } {
+  const ids: string[] = [];
+  for (const d of ix.deps) {
+    if (d.taskId !== t.id || ids.includes(d.dependsOnTaskId) || !ix.byId.has(d.dependsOnTaskId)) continue;
+    ids.push(d.dependsOnTaskId);
+    if (ids.length >= MAX_FLOW_BLOCKED_BY) break;
+  }
+  return ids.length > 0 ? { blockedBy: ids } : {};
+}
+
 /** Open tasks (visible to the caller) that wait for `t`. */
 function holdsOf(t: TaskRow, ix: DepIndex): number {
   let n = 0;
@@ -234,6 +255,7 @@ function flowSubtasks(
       ...(s.dueDate ? { due: s.dueDate } : {}),
       ...(!done && (wait.blocked || seqBlocked.has(s.id)) ? { blocked: true as const } : {}),
       ...(wait.waitingOn ? { waitingOn: wait.waitingOn } : {}),
+      ...blockedByOf(s, ix),
     });
   }
   return out;
@@ -329,7 +351,7 @@ export function projectFlows(input: FlowsInput): FlowsOut {
           ...(t.tags.length > 0 ? { tags: t.tags } : {}),
           ...waitingOf(t, ix),
           ...(holds > 0 ? { holds } : {}),
-          ...(input.withSubtasks ? { subtasks: flowSubtasks(t, byParent, ix) } : {}),
+          ...(input.withSubtasks ? { ...blockedByOf(t, ix), subtasks: flowSubtasks(t, byParent, ix) } : {}),
         };
       });
     return {

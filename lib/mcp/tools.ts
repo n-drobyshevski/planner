@@ -262,10 +262,11 @@ const flowsInputShape = {
       .describe("Tasks returned per stream. Default: 3."),
 };
 
-/** A Flows task as the model reads it: the view's subtask tree left out. */
-function withoutSubtasks(task: FlowTaskOut): FlowTaskOut {
+/** A Flows task as the model reads it: the view's subtask tree and link ids left out. */
+function withoutViewFields(task: FlowTaskOut): FlowTaskOut {
   const copy = { ...task };
   delete copy.subtasks;
+  delete copy.blockedBy;
   return copy;
 }
 
@@ -787,13 +788,13 @@ export function registerTools(server: McpServer): void {
       const flows = await loadFlows({ ...args, limit: SHOW_FLOWS_TASKS, withSubtasks: true }, extra);
       if (typeof flows === "string") return fail(flows);
       const perStream = args.limit ?? 3;
-      // The subtask trees are for the view to draw; the model's text stays as
-      // get_flows would answer.
+      // The subtask trees and link ids are for the view to draw; the model's
+      // text stays as get_flows would answer.
       const forModel: FlowsOut = {
         ...flows,
         streams: flows.streams.map((st) => ({
           ...st,
-          tasks: st.tasks.slice(0, perStream).map(withoutSubtasks),
+          tasks: st.tasks.slice(0, perStream).map(withoutViewFields),
         })),
       };
       return { ...ok(forModel), structuredContent: flows as unknown as Record<string, unknown> };
@@ -948,7 +949,8 @@ export function registerTools(server: McpServer): void {
         "Update fields of a task by id. Only provided fields change. To complete " +
         "a task prefer complete_task (it also moves it to the done board). " +
         "`blockedBy` replaces the set of tasks it waits for ([] clears it); a " +
-        "dependency loop is refused. Only the task's owner can change it.",
+        "dependency loop is refused, and then nothing else in the call is changed " +
+        "either. Only the task's owner can change it.",
       inputSchema: {
         id: z.string(),
         title: z.string().min(1).max(500).optional(),
@@ -1010,21 +1012,32 @@ export function registerTools(server: McpServer): void {
           plan = planned;
           loaded = { tasks, task };
         }
-        const withDeps = async (result: Record<string, unknown>): Promise<CallToolResult> => {
-          if (!plan) return ok(result);
+        // Dependencies are written before any field, so a set the database
+        // refuses (a loop through tasks the caller can't see) leaves the task
+        // exactly as it was: never "fields saved, but the call failed".
+        // `applyBlockedBy` takes back its own partial adds on that refusal.
+        let applied: string[] | undefined;
+        const depsFirst = async (): Promise<CallToolResult | undefined> => {
+          if (!plan) return undefined;
           const { workspaceId } = mcpContext(extra);
-          const applied = await applyBlockedBy(sb, workspaceId, args.id, plan);
-          if (typeof applied === "string") return fail(applied);
-          return ok({ ...result, blockedBy: applied });
+          const result = await applyBlockedBy(sb, workspaceId, args.id, plan);
+          if (typeof result === "string") return fail(result);
+          applied = result;
+          return undefined;
         };
+        const done = (result: Record<string, unknown>): CallToolResult =>
+          ok(applied === undefined ? result : { ...result, blockedBy: applied });
 
         if (args.collectionId === undefined) {
           if (Object.keys(patch).length === 0) {
             if (!loaded) return fail("Provide at least one field to update.");
-            return withDeps({ id: loaded.task.id, title: loaded.task.title });
+            const { task } = loaded;
+            return (await depsFirst()) ?? done({ id: task.id, title: task.title });
           }
+          const refused = await depsFirst();
+          if (refused) return refused;
           const row = await updateTask(sb, args.id, patch);
-          return withDeps({ id: row.id, title: row.title });
+          return done({ id: row.id, title: row.title });
         }
 
         // A move. Subtasks live where their parent lives, and a column belongs
@@ -1044,10 +1057,12 @@ export function registerTools(server: McpServer): void {
           return fail(`No collection with id ${target} is visible to you.`);
         if (task.parentId && target !== task.collectionId)
           return fail("A subtask stays in its parent's collection. Move the parent instead.");
+        const refused = await depsFirst();
+        if (refused) return refused;
         if (target === task.collectionId) {
-          if (Object.keys(patch).length === 0) return withDeps({ id: task.id, title: task.title, moved: 0 });
+          if (Object.keys(patch).length === 0) return done({ id: task.id, title: task.title, moved: 0 });
           const row = await updateTask(sb, args.id, patch);
-          return withDeps({ id: row.id, title: row.title, moved: 0 });
+          return done({ id: row.id, title: row.title, moved: 0 });
         }
         const moving = subtreeInOrder(task, tasks);
         let moved = 0;
@@ -1062,7 +1077,7 @@ export function registerTools(server: McpServer): void {
           if (item.id === task.id) title = row.title;
           moved++;
         }
-        return withDeps({ id: task.id, title, moved });
+        return done({ id: task.id, title, moved });
       }),
   );
 
