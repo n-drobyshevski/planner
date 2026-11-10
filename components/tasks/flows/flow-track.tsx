@@ -35,6 +35,12 @@ import { runwayOf, stackSlots, type Runway } from "@/lib/tasks/flows-runway";
 import type { FlowsLaneStyle } from "@/lib/tasks/flows-display";
 import { RunwayBar, RunwayHatch, labelWidth, runwayExtent } from "./flow-runway";
 import {
+  depAnchors,
+  depArrows,
+  depDimmed,
+  type DepEdgeIn,
+} from "@/lib/tasks/flows-deps";
+import {
   lineStyleStroke,
   wavePath,
   type FlowLineStyle,
@@ -98,6 +104,13 @@ export interface FlowTrackProps {
   streamLabel?: (stream: StreamSummary, runways: string[], hidden: number) => string;
   /** the visible "+N" after a stream's stack when not every runway fits */
   moreShort?: (count: number) => string;
+  /**
+   * Every waits-for edge in scope. While a runway is hovered or focused, its
+   * links to bars on screen are drawn as elbow arrows and other bars dim.
+   */
+  deps?: readonly DepEdgeIn[];
+  /** tasks waiting on an unfinished dependency: their bars carry a padlock */
+  blockedIds?: ReadonlySet<string>;
 }
 
 const NO_PROGRESS = { done: 0, total: 0 };
@@ -136,8 +149,12 @@ export function FlowTrack({
   runwayShort,
   streamLabel,
   moreShort,
+  deps,
+  blockedIds,
 }: FlowTrackProps) {
   const [hover, setHover] = useState<Hover | null>(null);
+  // The runway under the pointer or keyboard focus: its dependency links show.
+  const [activeId, setActiveId] = useState<string | null>(null);
   // The canvas's horizontal scroll offset (runway style only): a bar that starts
   // off screen keeps its title at the visible left edge instead of clipping it.
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -194,6 +211,20 @@ export function FlowTrack({
     const maxX = shown.length ? Math.max(...shown.map((s) => s.reach)) : 0;
     return { shown, hidden: slots.hidden, barHeight: slots.barHeight, minX, maxX };
   };
+
+  // Dependency connectors for the active runway (runway style only).
+  const anchors = runways
+    ? depAnchors(rows, (seg, h) => {
+        const r = runwayFor(seg);
+        if (!r) return null;
+        const e = runwayExtent(r, x, h);
+        return { x1: e.x1, x2: e.x2 };
+      })
+    : new Map();
+  const arrows = depArrows(activeId, deps ?? [], anchors);
+  // Dim only when there is a link to show; a lone task needs no spotlight.
+  const dimmed = arrows.length > 0 ? depDimmed(activeId, deps ?? [], anchors) : new Set<string>();
+  const dimOf = (id: string) => (dimmed.has(id) ? 0.35 : 1);
 
   // Click on empty trunk → place a checkpoint at that date. A click that landed
   // on a node/marker/checkpoint hit-button is ignored (that button opens/edits
@@ -359,6 +390,7 @@ export function FlowTrack({
             // would also dim the title inside the bar below AAA.
             <g key={row.rowKey} opacity={lane.done && !rw ? 0.55 : 1}>
               {rw ? (
+                <g opacity={dimOf(lane.task.id)} className="transition-opacity motion-reduce:transition-none">
                 <RunwayBar
                   uid={`${uid}-l${ri}`}
                   r={rw}
@@ -372,7 +404,9 @@ export function FlowTrack({
                   viewLeft={viewLeft}
                   title={lane.task.title}
                   short={runwayShort?.(lane, rw) ?? null}
+                  blocked={blockedIds?.has(lane.task.id)}
                 />
+                </g>
               ) : lane.milestone ? (
                 <>
                   {!lane.done && (
@@ -479,7 +513,11 @@ export function FlowTrack({
                   if (brw) {
                     const subY = subTop + G.subRowHeight / 2;
                     return (
-                      <g key={branch.task.id}>
+                      <g
+                        key={branch.task.id}
+                        opacity={dimOf(branch.task.id)}
+                        className="transition-opacity motion-reduce:transition-none"
+                      >
                         <RunwayBar
                           uid={`${uid}-l${ri}-b${bi}`}
                           r={brw}
@@ -493,6 +531,7 @@ export function FlowTrack({
                           viewLeft={viewLeft}
                           title={branch.task.title}
                           short={runwayShort?.(branch, brw) ?? null}
+                          blocked={blockedIds?.has(branch.task.id)}
                           small
                         />
                       </g>
@@ -554,6 +593,22 @@ export function FlowTrack({
             </g>
           );
         })}
+        {/* the active runway's waits-for links: blocker end → waiting start */}
+        {arrows.map((a) => (
+          <g key={`dep-${a.from}-${a.to}`} className="pointer-events-none">
+            <path
+              d={a.d}
+              fill="none"
+              stroke="var(--foreground)"
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+            />
+            <path
+              d={`M ${a.head.x} ${a.head.y} l -6 -4 v 8 z`}
+              fill="var(--foreground)"
+            />
+          </g>
+        ))}
       </svg>
 
       {/* now-line — the one place the terracotta accent appears (a state marker) */}
@@ -626,6 +681,8 @@ export function FlowTrack({
               reach - x1,
               G.runwayHeight,
               () => onOpenTask(lane.task),
+              undefined,
+              lane.task.id,
             ),
           );
         } else if (lane.milestone || planned) {
@@ -665,6 +722,8 @@ export function FlowTrack({
                 reach - x1,
                 G.branchRunwayHeight,
                 () => onOpenTask(branch.task),
+                undefined,
+                branch.task.id,
               ),
             );
           } else if (branch.milestone || bPlanned) {
@@ -760,6 +819,8 @@ export function FlowTrack({
     height: number,
     onClick: () => void,
     expanded?: boolean,
+    /** a runway's task: hovering or focusing it shows its dependency links */
+    taskId?: string,
   ) {
     const w = Math.max(width, HIT);
     const focusX = Math.min(left + w / 2, Math.max(left, 0) + 48);
@@ -776,9 +837,19 @@ export function FlowTrack({
           const box = e.currentTarget.getBoundingClientRect();
           setHover({ x: left + (e.clientX - box.left), y: tipY, text });
         }}
-        onFocus={() => setHover({ x: focusX, y: tipY, text })}
-        onMouseLeave={() => setHover(null)}
-        onBlur={() => setHover(null)}
+        onMouseEnter={taskId ? () => setActiveId(taskId) : undefined}
+        onFocus={() => {
+          setHover({ x: focusX, y: tipY, text });
+          if (taskId) setActiveId(taskId);
+        }}
+        onMouseLeave={() => {
+          setHover(null);
+          if (taskId) setActiveId((cur) => (cur === taskId ? null : cur));
+        }}
+        onBlur={() => {
+          setHover(null);
+          if (taskId) setActiveId((cur) => (cur === taskId ? null : cur));
+        }}
         className="absolute rounded-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         style={{ left, top, width: w, height }}
       />

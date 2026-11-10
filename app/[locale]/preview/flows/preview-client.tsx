@@ -15,6 +15,7 @@ import {
   type FlowsDisplay,
 } from "@/lib/tasks/flows-display";
 import { groupByParent, indexById } from "@/lib/tasks/tree";
+import { dependencyBlockedIds } from "@/lib/tasks/blocking";
 import { collectTags } from "@/lib/tasks/tags";
 import type { TaskActions } from "@/components/tasks/task-actions";
 import type {
@@ -103,6 +104,14 @@ const SEEDS: Seed[] = [
   { id: "s3", title: "Pick the search terms", col: "col2", state: 2, createdDaysAgo: 19, doneDaysAgo: 12, parent: "t1" },
   { id: "s4", title: "Summarise each strand", col: "col2", state: 0, createdDaysAgo: 10, dueIn: 1, parent: "t1" },
   { id: "s5", title: "Write the gap statement", col: "col2", state: 0, createdDaysAgo: 8, parent: "t1" },
+];
+
+/** Waits-for links: the methods chapter waits for the review, the ethics form for the room, the gap statement for the summary. */
+const DEPS = [
+  { taskId: "t10", dependsOnTaskId: "t1" },
+  { taskId: "t3", dependsOnTaskId: "t2" },
+  { taskId: "s5", dependsOnTaskId: "s4" },
+  { taskId: "t10", dependsOnTaskId: "s5" },
 ];
 
 function buildFixtures(today: string, nowMs: number) {
@@ -235,6 +244,10 @@ function FlowsPreviewInner() {
     return m;
   }, [fixtures.events]);
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), []);
+  const dependencyBlocked = useMemo(
+    () => dependencyBlockedIds(DEPS, (id) => tasks.find((t) => t.id === id)?.completedAt != null),
+    [tasks],
+  );
   const boards = useMemo(
     () =>
       display.scope === "all"
@@ -316,6 +329,8 @@ function FlowsPreviewInner() {
             onResetDisplay={() => setDisplay(DEFAULT_FLOWS_DISPLAY)}
             savedStreams={savedStreams}
             initialExpandedStreams={params.getAll("expand")}
+            dependencies={DEPS}
+            blockedIds={dependencyBlocked}
           />
         </main>
       </div>

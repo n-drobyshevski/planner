@@ -139,3 +139,58 @@ input[type="text"], input[type="date"] { min-height: 36px; padding: 4px 8px; bor
 .stream-pick button { display: inline-flex; gap: 8px; align-items: center; }
 .pick-n { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .pick-n.late { color: var(--late); font-weight: 600; }
+
+/* Subtasks in the lane (B1): thinner runways under an unfolded task. */
+.run-sub { height: 22px; }
+.run-sub .bar { top: 1px; height: 20px; border-radius: 5px; }
+.run-sub .bar-title { font-size: 11px; line-height: 18px; padding: 0 6px; }
+.run-sub .tag { top: 2px; font-size: 11px; line-height: 18px; }
+.run-sub .over { top: 1px; height: 20px; border-radius: 0 5px 5px 0; }
+.bar-title { display: flex; gap: 5px; align-items: center; }
+.bar-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bar-done { opacity: 0.6; }
+.bar-done .bar-text { text-decoration: line-through; }
+.bar-blocked { border-style: dashed; }
+.lock { flex: none; width: 11px; height: 11px; }
+.bar-has-chev .bar-title { padding-left: 22px; }
+.chev { position: absolute; top: 2px; z-index: 4; width: 22px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; line-height: 28px; cursor: pointer; }
+.run-sub .chev { top: 1px; height: 20px; line-height: 20px; }
+.chev:hover { color: var(--text); }
+.guide { position: absolute; width: 1px; background: var(--line); z-index: 0; pointer-events: none; }
+
+/* Dependencies on the lane (A1): connectors for the selected task only. */
+.run.dim { opacity: 0.4; }
+.links { position: absolute; top: 0; left: 0; width: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+.links path { fill: none; stroke: var(--text); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.head { position: absolute; z-index: 4; width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid var(--text); transform: translate(-100%, -50%); pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .links { animation: links-in 160ms ease-out; }
+  .run { transition: opacity 120ms; }
+}
+@keyframes links-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* The editor's "Waits for" field (C1). */
+.wait-field { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 40px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.wait-field:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wait-field input[type="text"] { flex: 1; min-width: 120px; width: auto; border: 0; padding: 4px 2px; background: transparent; }
+.wait-field input:focus-visible { outline: 0; }
+.chips { display: contents; list-style: none; margin: 0; padding: 0; }
+.chip { display: inline-flex; gap: 5px; align-items: center; max-width: 100%; min-height: 28px; padding: 0 2px 0 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 12px; }
+.chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-x { flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
+.chip-x:hover { color: var(--text); background: var(--bg); }
+.wait-menu { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
+.wait-menu li + li { border-top: 1px solid var(--line); }
+.wait-opt { display: flex; gap: 12px; justify-content: space-between; align-items: center; width: 100%; min-height: 40px; padding: 6px 10px; border: 0; background: transparent; text-align: start; font-size: 13px; cursor: pointer; }
+.wait-opt:hover:not(:disabled) { background: var(--surface); }
+.wait-opt:disabled { opacity: 1; color: var(--muted); cursor: default; }
+.wait-title { min-width: 0; overflow-wrap: anywhere; }
+.wait-why { flex: none; font-size: 12px; color: var(--muted); }
+.wait-none { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+.hold-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.editor-notice { margin: 0; color: var(--text); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* A connector turns 1.5% out from a bar: linked rows' words sit past that turn. */
+.tag-clear { margin-left: 14px; }
+.tag-clear.tag-before { margin-left: 0; margin-right: 14px; }
+.run-done .tag { text-decoration: line-through; }

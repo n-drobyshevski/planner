@@ -2,7 +2,7 @@
 // stream row says and where its deadline marks sit. No DOM, no clock, so they
 // are unit-tested on their own; the view only paints what these return.
 
-import type { FlowStreamOut, FlowTaskOut } from "@/lib/mcp/flows";
+import type { FlowStreamOut, FlowSubtaskOut, FlowTaskOut } from "@/lib/mcp/flows";
 
 export type ViewLocale = "en" | "ru";
 
@@ -114,6 +114,22 @@ export const STRINGS = {
     },
     modes: { combined: "Both", deadline: "Deadline", priority: "Priority" },
     priority: ["", "low", "medium", "high"],
+    expand: (title: string) => `Show the subtasks of “${title}”`,
+    collapse: (title: string) => `Hide the subtasks of “${title}”`,
+    waits: (titles: string) => `waits: ${titles}`,
+    after: (title: string) => `after ${title}`,
+    waitsDetail: (titles: string) => `waits for ${titles}`,
+    waiting: "waiting",
+    doneShort: "done",
+    waitsFor: "Waits for",
+    holds: "Holds",
+    holdsNone: "Nothing waits for this task.",
+    waitsNone: "Waits for nothing.",
+    findTask: "Find a task to wait for",
+    alreadyAdded: "already added",
+    wouldLoop: "would make a loop",
+    noMatch: "No matching open tasks.",
+    unwait: (title: string) => `Stop waiting for “${title}”`,
   },
   ru: {
     title: "Направления",
@@ -197,6 +213,22 @@ export const STRINGS = {
     },
     modes: { combined: "Оба", deadline: "Срок", priority: "Приоритет" },
     priority: ["", "низкий", "средний", "высокий"],
+    expand: (title: string) => `Показать подзадачи «${title}»`,
+    collapse: (title: string) => `Скрыть подзадачи «${title}»`,
+    waits: (titles: string) => `ждёт: ${titles}`,
+    after: (title: string) => `после ${title}`,
+    waitsDetail: (titles: string) => `ждёт ${titles}`,
+    waiting: "ждёт",
+    doneShort: "сделана",
+    waitsFor: "Ждёт",
+    holds: "Её ждут",
+    holdsNone: "Эту задачу ничего не ждёт.",
+    waitsNone: "Ничего не ждёт.",
+    findTask: "Найти задачу, которую ждать",
+    alreadyAdded: "уже добавлена",
+    wouldLoop: "получится петля",
+    noMatch: "Открытых задач с таким названием нет.",
+    unwait: (title: string) => `Больше не ждать «${title}»`,
   },
 } as const;
 
@@ -346,6 +378,8 @@ export function runwayOf(task: FlowTaskOut, today: string): Runway {
 
 /** A bar narrower than this share of the track cannot hold its title: it goes beside the bar. */
 export const RUNWAY_NARROW = 0.24;
+/** The same for a subtask's thinner bar, whose title is shorter and smaller. */
+export const SUB_RUNWAY_NARROW = 0.1;
 
 /** Where a runway's words go: inside the bar, after it, or before it. */
 export function runwayLabelSide(runway: Runway): "after" | "before" | "inside" {
@@ -550,4 +584,340 @@ export function updateArgs(original: DraftSource, draft: TaskDraft): Record<stri
   if (tags.join(",") !== original.tags.join(",")) patch.tags = tags;
   if (draft.collection !== before.collection) patch.collectionId = draft.collection || null;
   return patch;
+}
+
+// -- Subtasks on the timeline (B1) ------------------------------------------------
+
+/** Row heights in the lane, in px; flows-view.css draws them the same. */
+export const LANE_PAD = 8;
+export const LANE_GAP = 4;
+export const TASK_ROW = 32;
+export const SUB_ROW = 22;
+/** Deepest subtask level the lane shows. */
+export const MAX_SUB_DEPTH = 3;
+
+/**
+ * A subtask as a runway, on its own dates. A missing date falls back to the
+ * parent's, so an undated subtask spans its parent and a half-dated one stays
+ * inside it where it can.
+ */
+export function subtaskRunway(sub: FlowSubtaskOut, parent: FlowTaskOut, today: string): Runway {
+  let start = sub.start;
+  let due = sub.due;
+  if (!start && !due) {
+    start = parent.start;
+    due = parent.dueDate;
+  } else if (!start) {
+    if (parent.start && due && parent.start <= due) start = parent.start;
+  } else if (!due) {
+    if (parent.dueDate && parent.dueDate >= start) due = parent.dueDate;
+  }
+  const runway = runwayOf({ id: sub.id, title: sub.title, start, dueDate: due, score: 0, overdue: false }, today);
+  // A done subtask is not late: it shows struck through instead.
+  if (sub.done && runway.state === "late") return { ...runway, state: "open", over: null };
+  return runway;
+}
+
+export type LaneRow =
+  | { kind: "task"; id: string; task: FlowTaskOut; top: number; height: number }
+  | { kind: "sub"; id: string; sub: FlowSubtaskOut; task: FlowTaskOut; top: number; height: number };
+
+/** Done / total over a subtask's own subtree; null when it has none. */
+export function subtreeProgress(subs: readonly FlowSubtaskOut[], id: string): { done: number; total: number } | null {
+  const i = subs.findIndex((s) => s.id === id);
+  if (i < 0) return null;
+  const depth = subs[i].depth;
+  let done = 0;
+  let total = 0;
+  // Pre-order: the subtree is the run of deeper rows right after it.
+  for (let j = i + 1; j < subs.length && subs[j].depth > depth; j++) {
+    total += 1;
+    if (subs[j].done) done += 1;
+  }
+  return total > 0 ? { done, total } : null;
+}
+
+/**
+ * The lane's rows, top to bottom: each task, and under an expanded one the
+ * subtasks whose every ancestor is expanded too (to MAX_SUB_DEPTH), with
+ * where each row sits (px from the lane's top).
+ */
+export function laneRows(tasks: readonly FlowTaskOut[], expanded: ReadonlySet<string>): LaneRow[] {
+  const rows: LaneRow[] = [];
+  let y = LANE_PAD;
+  type RowIn =
+    | { kind: "task"; id: string; task: FlowTaskOut }
+    | { kind: "sub"; id: string; sub: FlowSubtaskOut; task: FlowTaskOut };
+  const push = (row: RowIn, height: number) => {
+    rows.push({ ...row, top: y, height } as LaneRow);
+    y += height + LANE_GAP;
+  };
+  for (const task of tasks) {
+    push({ kind: "task", id: task.id, task }, TASK_ROW);
+    if (!expanded.has(task.id)) continue;
+    // The deepest level still open; anything deeper than it stays hidden.
+    let openTo = 1;
+    for (const sub of task.subtasks ?? []) {
+      if (sub.depth > openTo || sub.depth > MAX_SUB_DEPTH) continue;
+      push({ kind: "sub", id: sub.id, sub, task }, SUB_ROW);
+      openTo = expanded.has(sub.id) ? sub.depth + 1 : sub.depth;
+    }
+  }
+  return rows;
+}
+
+/** Whether a lane row has subtasks of its own to expand. */
+export function hasChildren(row: LaneRow): boolean {
+  if (row.kind === "task") return (row.task.subtasks?.length ?? 0) > 0;
+  if (row.sub.depth >= MAX_SUB_DEPTH) return false;
+  const subs = row.task.subtasks ?? [];
+  const i = subs.findIndex((s) => s.id === row.id);
+  return i >= 0 && i + 1 < subs.length && subs[i + 1].depth > row.sub.depth;
+}
+
+/**
+ * What a blocked subtask waits for, for its "after …" tag: its first named
+ * blocker, else (waiting its turn under a "do in order" parent) the open
+ * sibling just before it. Null when it is not blocked.
+ */
+export function subtaskWaitTitle(sub: FlowSubtaskOut, subs: readonly FlowSubtaskOut[]): string | null {
+  if (!sub.blocked) return null;
+  if (sub.waitingOn?.[0]) return sub.waitingOn[0].title;
+  const i = subs.findIndex((s) => s.id === sub.id);
+  for (let j = i - 1; j >= 0; j--) {
+    if (subs[j].depth < sub.depth) break;
+    if (subs[j].depth === sub.depth && subs[j].parentId === sub.parentId && !subs[j].done) return subs[j].title;
+  }
+  return null;
+}
+
+// -- Dependencies (A1, C1) ----------------------------------------------------------
+
+/** A task or subtask anywhere in the loaded streams, once. */
+export interface FlowItem {
+  id: string;
+  title: string;
+  done: boolean;
+  blocked: boolean;
+  waitingOn: { id: string; title: string }[];
+  /** the stream it was first listed under */
+  stream: string;
+  /** set for a subtask: its top-level task's title */
+  under?: string;
+}
+
+/** Every task and subtask in the loaded data, deduplicated, in listing order. */
+export function flowItems(streams: readonly FlowStreamOut[]): FlowItem[] {
+  const byId = new Map<string, FlowItem>();
+  for (const stream of streams) {
+    for (const task of stream.tasks) {
+      if (!byId.has(task.id)) {
+        byId.set(task.id, {
+          id: task.id,
+          title: task.title,
+          done: false,
+          blocked: task.blocked === true,
+          waitingOn: task.waitingOn ?? [],
+          stream: stream.label,
+        });
+      }
+      for (const sub of task.subtasks ?? []) {
+        if (byId.has(sub.id)) continue;
+        byId.set(sub.id, {
+          id: sub.id,
+          title: sub.title,
+          done: sub.done,
+          blocked: sub.blocked === true,
+          waitingOn: sub.waitingOn ?? [],
+          stream: stream.label,
+          under: task.title,
+        });
+      }
+    }
+  }
+  return [...byId.values()];
+}
+
+/** One "waits for" link: `to` waits for `from`. */
+export interface DepEdge {
+  from: string;
+  to: string;
+}
+
+/** Every waits-for link the loaded data names (each task's waitingOn, inverted into holds too). */
+export function dependencyEdges(items: readonly FlowItem[]): DepEdge[] {
+  const out: DepEdge[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    for (const b of item.waitingOn) {
+      const key = `${b.id}>${item.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ from: b.id, to: item.id });
+    }
+  }
+  return out;
+}
+
+/** The selected task's links: what it waits for, and what waits for it. */
+export function linksOf(id: string, edges: readonly DepEdge[]): { blockers: string[]; holds: string[] } {
+  return {
+    blockers: edges.filter((e) => e.to === id).map((e) => e.from),
+    holds: edges.filter((e) => e.from === id).map((e) => e.to),
+  };
+}
+
+/** Rows to dim while `selected` is chosen: all but it and its linked rows. Empty when nothing is selected. */
+export function dimmedRows(rows: readonly LaneRow[], selected: string | null, edges: readonly DepEdge[]): Set<string> {
+  if (!selected || !rows.some((r) => r.id === selected)) return new Set();
+  const { blockers, holds } = linksOf(selected, edges);
+  const keep = new Set([selected, ...blockers, ...holds]);
+  return new Set(rows.filter((r) => !keep.has(r.id)).map((r) => r.id));
+}
+
+export interface Arrow {
+  /** SVG path in lane units: x in 0..100 (% of the lane), y in px */
+  d: string;
+  /** where the arrowhead sits (the waiting bar's start), x in 0..100, y in px */
+  head: { x: number; y: number };
+  from: string;
+  to: string;
+}
+
+/** How far (in % of the lane) a connector runs out of a bar before it turns. */
+const ELBOW = 1.5;
+
+/**
+ * Elbow connector from the end of a blocker's bar to the start of the bar
+ * waiting for it. When the waiting bar starts left of where the line turns,
+ * the line drops into the gap above (or below) the waiting row first and
+ * comes in from its left, so it never runs back across a bar.
+ */
+export function elbowPath(
+  from: { x1: number; y: number },
+  to: { x0: number; y: number; top: number; bottom: number },
+  /** come in through the gap even when there is room: the waiting row's words sit before its bar */
+  viaGap = false,
+): string {
+  const r = (n: number) => Math.round(n * 100) / 100;
+  const out = Math.min(100, from.x1 * 100 + ELBOW);
+  const x0 = to.x0 * 100;
+  if (!viaGap && x0 >= out + ELBOW) return `M${r(from.x1 * 100)} ${r(from.y)}H${r(out)}V${r(to.y)}H${r(x0)}`;
+  const gapY = to.y > from.y ? to.top - LANE_GAP / 2 : to.bottom + LANE_GAP / 2;
+  const back = Math.max(0, x0 - ELBOW);
+  return `M${r(from.x1 * 100)} ${r(from.y)}H${r(out)}V${r(gapY)}H${r(back)}V${r(to.y)}H${r(x0)}`;
+}
+
+/**
+ * The connectors for the selected task: from each blocker on screen to it,
+ * and from it to each task on screen that waits for it. `runwayFor` gives a
+ * row's bar. Links to tasks not on screen are left to `offscreenBlockers`.
+ */
+export function dependencyArrows(
+  rows: readonly LaneRow[],
+  selected: string | null,
+  edges: readonly DepEdge[],
+  runwayFor: (row: LaneRow) => Runway,
+): Arrow[] {
+  if (!selected) return [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  if (!byId.has(selected)) return [];
+  const { blockers, holds } = linksOf(selected, edges);
+  const out: Arrow[] = [];
+  const add = (fromId: string, toId: string) => {
+    const a = byId.get(fromId);
+    const b = byId.get(toId);
+    if (!a || !b || a === b) return;
+    const ra = runwayFor(a);
+    const rb = runwayFor(b);
+    const ya = a.top + a.height / 2;
+    const yb = b.top + b.height / 2;
+    out.push({
+      d: elbowPath(
+        { x1: ra.x1, y: ya },
+        { x0: rb.x0, y: yb, top: b.top, bottom: b.top + b.height },
+        runwayLabelSide(rb) === "before",
+      ),
+      head: { x: rb.x0 * 100, y: yb },
+      from: fromId,
+      to: toId,
+    });
+  };
+  for (const b of blockers) add(b, selected);
+  for (const h of holds) add(selected, h);
+  return out;
+}
+
+/** The selected row's blockers that are not on screen, for its "waits: …" label. */
+export function offscreenBlockers(
+  rows: readonly LaneRow[],
+  selected: string | null,
+  items: readonly FlowItem[],
+): { id: string; title: string }[] {
+  if (!selected) return [];
+  const row = rows.find((r) => r.id === selected);
+  if (!row) return [];
+  const onScreen = new Set(rows.map((r) => r.id));
+  const own = items.find((i) => i.id === selected)?.waitingOn ?? [];
+  return own.filter((b) => !onScreen.has(b.id));
+}
+
+export interface WaitCandidate {
+  id: string;
+  title: string;
+  /** where it lives: its stream, or "stream › parent" for a subtask */
+  context: string;
+  disabled: "added" | "loop" | null;
+}
+
+/**
+ * Tasks the edited one could wait for, matching `query`: every loaded task
+ * and open subtask but itself, with those already added or that would make a
+ * loop (they already wait for it, directly or through others) disabled.
+ * `knownWaiters` are the ids `get_task` says wait for it directly (its full
+ * list; the streams name only a few blockers per task).
+ */
+export function waitCandidates(
+  selfId: string | null,
+  items: readonly FlowItem[],
+  added: readonly string[],
+  knownWaiters: readonly string[],
+  query: string,
+  limit = 8,
+): WaitCandidate[] {
+  const edges = dependencyEdges(items);
+  // Everything that (transitively) waits for self.
+  const waiting = new Set<string>();
+  if (selfId) {
+    const stack = [...knownWaiters, ...edges.filter((e) => e.from === selfId).map((e) => e.to)];
+    while (stack.length) {
+      const id = stack.pop() as string;
+      if (waiting.has(id) || id === selfId) continue;
+      waiting.add(id);
+      for (const e of edges) if (e.from === id) stack.push(e.to);
+    }
+  }
+  const q = query.trim().toLocaleLowerCase();
+  const out: WaitCandidate[] = [];
+  // Top-level tasks first, then subtasks; each in listing order.
+  const ordered = [...items.filter((i) => !i.under), ...items.filter((i) => i.under)];
+  for (const item of ordered) {
+    if (item.id === selfId || item.done) continue;
+    if (q && !item.title.toLocaleLowerCase().includes(q)) continue;
+    out.push({
+      id: item.id,
+      title: item.title,
+      context: item.under ? `${item.stream} › ${item.under}` : item.stream,
+      disabled: added.includes(item.id) ? "added" : waiting.has(item.id) ? "loop" : null,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** `blockedBy` for update_task when the chosen set differs from the saved one; undefined when it does not. */
+export function blockedByPatch(saved: readonly string[], chosen: readonly string[]): string[] | undefined {
+  const a = [...new Set(saved)].sort();
+  const b = [...new Set(chosen)].sort();
+  return a.join(",") === b.join(",") ? undefined : [...new Set(chosen)];
 }

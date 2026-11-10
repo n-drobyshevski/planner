@@ -216,6 +216,8 @@
       "noDeadline": "no deadline",
       "subtasks": "{done} of {total, plural, one {# subtask} other {# subtasks}} done",
       "more": "+{count}",
+      "waitsFor": "waits for {titles}",
+      "holds": "{count, plural, one {# task waits} other {# tasks wait}} for it",
       "moreLabel": "{count, plural, one {# more task} other {# more tasks}}"
     }
   },
@@ -439,7 +441,7 @@
     }
   },
   "dependencies": {
-    "blockedByLabel": "Blocked by",
+    "blockedByLabel": "Waits for",
     "addLabel": "Add a blocker",
     "addPlaceholder": "Add a task that blocks this…",
     "emptyHint": "Not blocked by anything.",

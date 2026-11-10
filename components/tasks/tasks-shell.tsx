@@ -622,6 +622,8 @@ export function TasksShell({
                     savedStreams={savedStreams}
                     expandLane={expandLane}
                     loading={eventsLoading || blocksLoading}
+                    dependencies={dependencies}
+                    blockedIds={dependencyBlocked}
                   />
                 ) : view === "board" ? (
                   <TaskBoard
