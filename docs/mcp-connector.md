@@ -45,7 +45,7 @@ page) → Supabase issues the token.
 
 ## Tools
 
-Read: `show_flows` (the same streams as `get_flows`, with a view: see [The Flows app](#the-flows-app-mcp-app)), `get_workspace`, `list_events`, `list_tasks`, `get_task` (one task with its editable fields and its subtask tree), `get_sleep_summary`,
+Read (`list_tasks` takes `tag` and `mine`): `show_flows` (the same streams as `get_flows`, with a view: see [The Flows app](#the-flows-app-mcp-app)), `get_workspace`, `list_events`, `list_tasks`, `get_task` (one task with its editable fields and its subtask tree), `get_sleep_summary`,
 `get_agenda`, `get_flows`. Write: `create_event`, `update_event`, `create_task`,
 `update_task`, `complete_task`. Destructive (`delete_event`, `delete_task`)
 require `confirm: true` — called without it they return a preview of what

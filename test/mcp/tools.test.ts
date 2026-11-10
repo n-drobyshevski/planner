@@ -718,4 +718,14 @@ describe("task editing tools (the Flows app's writes)", () => {
     await call("update_task", { id: "p", collectionId: "col-1", title: "New" });
     expect(vi.mocked(m.updateTask).mock.calls[0][2]).toEqual({ title: "New" });
   });
+
+  it("list_tasks with mine keeps only the tasks the caller created", async () => {
+    vi.mocked(q.fetchTasks).mockResolvedValue([
+      row({ id: "own", ownerId: "m1" }),
+      row({ id: "partners", ownerId: "m2", assigneeId: "m1" }),
+    ]);
+    const call = collectTools();
+    expect((await call("list_tasks", { mine: true })).data.tasks.map((t: { id: string }) => t.id)).toEqual(["own"]);
+    expect((await call("list_tasks", {})).data.count).toBe(2);
+  });
 });

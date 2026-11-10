@@ -574,12 +574,16 @@ export function registerTools(server: McpServer): void {
           .boolean()
           .optional()
           .describe("Include subtasks (parentId set). Default: true."),
+        mine: z
+          .boolean()
+          .optional()
+          .describe("Only tasks you own (created). Default: false."),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (args, extra) =>
       guard(async () => {
-        const { sb, workspaceId } = mcpContext(extra);
+        const { sb, workspaceId, memberId } = mcpContext(extra);
         let tasks = await fetchTasks(sb, workspaceId);
         if (args.collectionId)
           tasks = tasks.filter((t) => t.collectionId === args.collectionId);
@@ -591,6 +595,7 @@ export function registerTools(server: McpServer): void {
         }
         if (args.includeCompleted === false)
           tasks = tasks.filter((t) => t.completedAt == null);
+        if (args.mine === true) tasks = tasks.filter((t) => t.ownerId === memberId);
         if (args.includeSubtasks === false)
           tasks = tasks.filter((t) => t.parentId == null);
         return ok({
