@@ -17,6 +17,7 @@ vi.mock("@/lib/supabase/mutations", () => ({
   createTask: vi.fn(),
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
+  createCollection: vi.fn(),
   addDependency: vi.fn(),
   removeDependency: vi.fn(async () => undefined),
   StaleWriteError: class StaleWriteError extends Error {},
@@ -79,6 +80,7 @@ describe("MCP tools", () => {
         "update_task",
         "complete_task",
         "delete_task",
+        "create_collection",
         "get_sleep_summary",
       ]),
     );
@@ -956,9 +958,9 @@ describe("task editing tools (the Flows app's writes)", () => {
       const noWip = await call("update_task", { id: "t1", state: "wip" });
       expect(noWip.isError).toBe(true);
       expect(noWip.data).toBe("This collection has no in-progress column.");
-      const loose = await call("update_task", { id: "t2", state: "done" });
+      const loose = await call("update_task", { id: "t2", state: "wip" });
       expect(loose.isError).toBe(true);
-      expect(loose.data).toMatch(/^This task is in no collection, so it has no done column/);
+      expect(loose.data).toMatch(/^This task is in no collection, so it has no in-progress column/);
       expect((await call("update_task", { id: "t1", state: "done", boardId: "fin" })).isError).toBe(true);
       expect((await call("update_task", { id: "t1", state: "done", collectionId: "c1" })).isError).toBe(true);
       expect((await call("update_task", { id: "nope", state: "done" })).isError).toBe(true);
@@ -981,6 +983,303 @@ describe("task editing tools (the Flows app's writes)", () => {
           { state: "planned", from: "2026-11-01T09:00" },
           { state: "wip", from: "2026-11-05T14:30" },
         ],
+      });
+    });
+  });
+
+  describe("columns by name, and tasks in no collection", () => {
+    // Columns out of position order; "Echo" is c1, "Other" is c2.
+    const boards = [
+      { id: "review", collectionId: "c1", name: "Review", position: 2, isDone: false },
+      { id: "todo", collectionId: "c1", name: "Inbox", position: 0, isDone: false },
+      { id: "done", collectionId: "c1", name: "Done", position: 3, isDone: true },
+      { id: "doing", collectionId: "c1", name: "Doing", position: 1, isDone: false },
+      { id: "o-todo", collectionId: "c2", name: "Later", position: 0, isDone: false },
+      { id: "o-wip", collectionId: "c2", name: "Review", position: 1, isDone: false },
+      { id: "o-done", collectionId: "c2", name: "Shipped", position: 2, isDone: true },
+    ];
+    const collections = [
+      { id: "c1", name: "Echo", ownerId: "m1" },
+      { id: "c2", name: "Other", ownerId: null },
+    ];
+    beforeEach(() => {
+      vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue({
+        members: [],
+        categories: [],
+        collections,
+        boards,
+      } as never);
+      vi.mocked(m.updateTask).mockImplementation(async (_sb, id, patch) => ({ id, title: "Task", ...patch }) as never);
+    });
+    const patches = () => vi.mocked(m.updateTask).mock.calls.map((c) => c[2]);
+
+    it("get_workspace gives each collection its columns, left to right", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([]);
+      vi.mocked(q.fetchTaskStreams).mockResolvedValue([]);
+      const call = collectTools();
+      const res = await call("get_workspace");
+      expect(res.data.collections[0]).toEqual({
+        id: "c1",
+        name: "Echo",
+        columns: [
+          { id: "todo", name: "Inbox", done: false, position: 0 },
+          { id: "doing", name: "Doing", done: false, position: 1 },
+          { id: "review", name: "Review", done: false, position: 2 },
+          { id: "done", name: "Done", done: true, position: 3 },
+        ],
+      });
+      expect(res.data.boards).toHaveLength(7);
+    });
+
+    it("list_tasks and get_task name the task's column, omitted when in none", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "a", collectionId: "c1", boardId: "review" }),
+        row({ id: "b" }),
+      ]);
+      const call = collectTools();
+      const list = await call("list_tasks");
+      expect(list.data.tasks.map((t: { column?: string }) => t.column)).toEqual(["Review", undefined]);
+      expect((await call("get_task", { id: "a" })).data).toMatchObject({ column: "Review", state: "wip" });
+      expect((await call("get_task", { id: "b" })).data).not.toHaveProperty("column");
+    });
+
+    it("update_task column moves to the named column, case-insensitively, and returns it with its role", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "t1", collectionId: "c1", boardId: "todo" })]);
+      const call = collectTools();
+      const res = await call("update_task", { id: "t1", column: "  rEvIeW " });
+      expect(res.isError).toBe(false);
+      expect(res.data).toEqual({ id: "t1", title: "Task", column: "Review", state: "wip" });
+      expect(patches()).toEqual([{ boardId: "review", completedAt: null }]);
+    });
+
+    it("update_task column: entering the done column completes, leaving it reopens, staying writes nothing", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "t1", collectionId: "c1", boardId: "doing" })]);
+      const call = collectTools();
+      expect((await call("update_task", { id: "t1", column: "done" })).data).toMatchObject({ state: "done" });
+      expect(patches()[0]).toMatchObject({ boardId: "done" });
+      expect(typeof patches()[0].completedAt).toBe("number");
+
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "t1", collectionId: "c1", boardId: "done", completedAt: 9 })]);
+      await call("update_task", { id: "t1", column: "Inbox", title: "Again" });
+      expect(patches()[1]).toEqual({ title: "Again", boardId: "todo", completedAt: null });
+
+      const stay = await call("update_task", { id: "t1", column: "Done" });
+      expect(stay.data).toEqual({ id: "t1", title: "Task", column: "Done", state: "done" });
+      expect(m.updateTask).toHaveBeenCalledTimes(2);
+    });
+
+    it("update_task column with state: the column's role must be the state", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "t1", collectionId: "c1", boardId: "todo" })]);
+      const call = collectTools();
+      const wrong = await call("update_task", { id: "t1", column: "Review", state: "done" });
+      expect(wrong.isError).toBe(true);
+      expect(wrong.data).toMatch(/^The column "Review" is wip, not done/);
+      // The first open column is planned, whatever its name.
+      expect((await call("update_task", { id: "t1", column: "Inbox", state: "wip" })).isError).toBe(true);
+      expect(m.updateTask).not.toHaveBeenCalled();
+      const right = await call("update_task", { id: "t1", column: "Review", state: "wip" });
+      expect(right.data).toMatchObject({ column: "Review", state: "wip" });
+      expect(patches()).toEqual([{ boardId: "review", completedAt: null }]);
+    });
+
+    it("update_task column with no such column: state alone with a state, refused without one", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "t1", collectionId: "c1", boardId: "todo" }),
+        row({ id: "loose" }),
+      ]);
+      const call = collectTools();
+      const missing = await call("update_task", { id: "t1", column: "Blocked" });
+      expect(missing.isError).toBe(true);
+      expect(missing.data).toBe('No column named "Blocked" in this collection. Its columns: "Inbox", "Doing", "Review", "Done".');
+      const looseCol = await call("update_task", { id: "loose", column: "Doing" });
+      expect(looseCol.isError).toBe(true);
+      expect(looseCol.data).toMatch(/^This task is in no collection, so it has no columns/);
+      expect((await call("update_task", { id: "t1", column: "Doing", boardId: "doing" })).isError).toBe(true);
+      expect(m.updateTask).not.toHaveBeenCalled();
+
+      const fallback = await call("update_task", { id: "t1", column: "Blocked", state: "wip" });
+      expect(fallback.isError).toBe(false);
+      expect(fallback.data).toEqual({ id: "t1", title: "Task", state: "wip" });
+      expect(patches()).toEqual([{ boardId: "doing", completedAt: null }]);
+    });
+
+    it("update_task column with collectionId: looked up in the new collection, entered after the move", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "p", collectionId: "c1", boardId: "doing" }),
+        row({ id: "kid", parentId: "p", collectionId: "c1", boardId: "todo" }),
+      ]);
+      const call = collectTools();
+      // "Review" is in both; the target's is the one entered.
+      const res = await call("update_task", { id: "p", collectionId: "c2", column: "review" });
+      expect(res.data).toEqual({ id: "p", title: "Task", moved: 2, column: "Review", state: "wip" });
+      expect(vi.mocked(m.updateTask).mock.calls.map((c) => [c[1], c[2]])).toEqual([
+        ["p", { collectionId: "c2", boardId: "o-wip", completedAt: null }],
+        ["kid", { collectionId: "c2", boardId: "o-todo" }],
+      ]);
+
+      vi.mocked(m.updateTask).mockClear();
+      await call("update_task", { id: "p", collectionId: "c2", column: "Shipped", state: "done" });
+      expect(patches()[0]).toMatchObject({ collectionId: "c2", boardId: "o-done" });
+      expect(typeof patches()[0].completedAt).toBe("number");
+
+      vi.mocked(m.updateTask).mockClear();
+      const notThere = await call("update_task", { id: "p", collectionId: "c2", column: "Doing" });
+      expect(notThere.data).toBe('No column named "Doing" in that collection. Its columns: "Later", "Review", "Shipped".');
+      expect((await call("update_task", { id: "p", collectionId: "cx", column: "Doing" })).data).toBe(
+        "No collection with id cx is visible to you.",
+      );
+      expect((await call("update_task", { id: "kid", collectionId: "c2", column: "Later" })).isError).toBe(true);
+      expect(m.updateTask).not.toHaveBeenCalled();
+    });
+
+    it("a task in no collection: complete_task and state done/planned set and clear the completion alone", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "loose" })]);
+      const call = collectTools();
+      expect((await call("complete_task", { id: "loose" })).data).toEqual({ id: "loose", title: "Task", done: true });
+      expect(Object.keys(patches()[0])).toEqual(["completedAt"]);
+      expect(typeof patches()[0].completedAt).toBe("number");
+
+      const viaState = await call("update_task", { id: "loose", state: "done" });
+      expect(viaState.data).toEqual({ id: "loose", title: "Task", state: "done" });
+      expect(Object.keys(patches()[1])).toEqual(["completedAt"]);
+
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "loose", completedAt: 5 })]);
+      expect((await call("update_task", { id: "loose", state: "planned" })).data).toMatchObject({ state: "planned" });
+      expect(patches()[2]).toEqual({ completedAt: null });
+      await call("complete_task", { id: "loose", done: false });
+      expect(patches()[3]).toEqual({ completedAt: null });
+      // Already done: nothing to write.
+      await call("update_task", { id: "loose", state: "done" });
+      expect(m.updateTask).toHaveBeenCalledTimes(4);
+    });
+
+    it("a completion the database does not keep is an error, not a silent success", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "loose" })]);
+      vi.mocked(m.updateTask).mockImplementation(async (_sb, id, patch) => ({ id, title: "Task", ...patch, completedAt: null }) as never);
+      const call = collectTools();
+      const done = await call("complete_task", { id: "loose" });
+      expect(done.isError).toBe(true);
+      expect(done.data).toMatch(/^The database did not record the completion/);
+      expect(done.data).not.toMatch(/other fields/);
+      const viaState = await call("update_task", { id: "loose", state: "done", title: "Renamed" });
+      expect(viaState.isError).toBe(true);
+      expect(viaState.data).toMatch(/The other fields in this call were saved\.$/);
+    });
+
+    it("complete_task refuses a collection with no done column (or no open one), writing nothing", async () => {
+      vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue({
+        members: [],
+        categories: [],
+        collections,
+        boards: [
+          { id: "open", collectionId: "c1", name: "Open", position: 0, isDone: false },
+          { id: "fin", collectionId: "c2", name: "Fin", position: 0, isDone: true },
+        ],
+      } as never);
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "a", collectionId: "c1", boardId: "open" }),
+        row({ id: "b", collectionId: "c2", boardId: "fin", completedAt: 3 }),
+      ]);
+      const call = collectTools();
+      expect((await call("complete_task", { id: "a" })).data).toBe("This collection has no done column.");
+      expect((await call("complete_task", { id: "b", done: false })).data).toBe("This collection has no open column.");
+      expect(m.updateTask).not.toHaveBeenCalled();
+    });
+
+    describe("create_collection", () => {
+      const lanes = [
+        { name: "Backlog", done: false },
+        { name: "Doing", done: false },
+        { name: "Done", done: true },
+      ];
+
+      it("is a write that destroys nothing", () => {
+        const configs = new Map<string, { annotations?: Record<string, boolean> }>();
+        registerTools({ registerTool: (n: string, c: never) => configs.set(n, c), registerResource() {} } as never);
+        expect(configs.get("create_collection")?.annotations).toMatchObject({
+          readOnlyHint: false,
+          destructiveHint: false,
+        });
+      });
+
+      it("creates a collection you own with the columns in order", async () => {
+        vi.mocked(m.createCollection).mockResolvedValue("new");
+        vi.mocked(q.fetchWorkspaceBundle)
+          .mockResolvedValueOnce({ members: [], categories: [], collections, boards } as never)
+          .mockResolvedValueOnce({
+            members: [],
+            categories: [],
+            collections: [...collections, { id: "new", name: "Board", ownerId: "m1" }],
+            boards: [
+              ...boards,
+              { id: "n2", collectionId: "new", name: "Done", position: 2, isDone: true },
+              { id: "n0", collectionId: "new", name: "Backlog", position: 0, isDone: false },
+              { id: "n1", collectionId: "new", name: "Doing", position: 1, isDone: false },
+            ],
+          } as never);
+        const call = collectTools();
+        const res = await call("create_collection", { name: " Board ", columns: lanes });
+        expect(res.isError).toBe(false);
+        expect(res.data).toEqual({
+          id: "new",
+          name: "Board",
+          created: true,
+          columns: [
+            { id: "n0", name: "Backlog", done: false, position: 0 },
+            { id: "n1", name: "Doing", done: false, position: 1 },
+            { id: "n2", name: "Done", done: true, position: 2 },
+          ],
+        });
+        expect(vi.mocked(m.createCollection).mock.calls[0][1]).toMatchObject({
+          workspaceId: "w1",
+          ownerId: "m1",
+          name: "Board",
+          color: expect.stringMatching(/^#/),
+          sortOrder: expect.any(Number),
+          columns: [
+            { name: "Backlog", isDone: false },
+            { name: "Doing", isDone: false },
+            { name: "Done", isDone: true },
+          ],
+        });
+      });
+
+      it("is idempotent by name: a collection you own with that name comes back unchanged", async () => {
+        const call = collectTools();
+        const res = await call("create_collection", { name: "ECHO", columns: lanes });
+        expect(res.data).toEqual({
+          id: "c1",
+          name: "Echo",
+          created: false,
+          columns: [
+            { id: "todo", name: "Inbox", done: false, position: 0 },
+            { id: "doing", name: "Doing", done: false, position: 1 },
+            { id: "review", name: "Review", done: false, position: 2 },
+            { id: "done", name: "Done", done: true, position: 3 },
+          ],
+        });
+        expect(m.createCollection).not.toHaveBeenCalled();
+        // A shared collection of that name is not yours: a new one is made.
+        vi.mocked(m.createCollection).mockResolvedValue("new");
+        expect((await call("create_collection", { name: "other", columns: lanes })).data).toMatchObject({
+          id: "new",
+          created: true,
+        });
+      });
+
+      it("refuses anything but exactly one done column, and repeated column names, writing nothing", async () => {
+        const call = collectTools();
+        const none = await call("create_collection", { name: "X", columns: [{ name: "A", done: false }, { name: "B", done: false }] });
+        expect(none.isError).toBe(true);
+        expect(none.data).toBe("Exactly one column must be the done column (done: true); 0 are.");
+        const two = await call("create_collection", { name: "X", columns: [{ name: "A", done: true }, { name: "B", done: true }] });
+        expect(two.data).toBe("Exactly one column must be the done column (done: true); 2 are.");
+        const dup = await call("create_collection", { name: "X", columns: [{ name: "Doing", done: false }, { name: " doing", done: true }] });
+        expect(dup.isError).toBe(true);
+        expect(dup.data).toBe('Column names must differ (case-insensitively): "doing" is there twice.');
+        // Checked before the name is looked up, so a retry with bad columns never passes for a match.
+        expect((await call("create_collection", { name: "Echo", columns: [{ name: "A", done: false }, { name: "B", done: false }] })).isError).toBe(true);
+        expect(m.createCollection).not.toHaveBeenCalled();
       });
     });
   });

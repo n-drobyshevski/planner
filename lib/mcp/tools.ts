@@ -20,6 +20,7 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  createCollection,
   addDependency,
   removeDependency,
   StaleWriteError,
@@ -49,7 +50,8 @@ import {
 import { registerFlowsApp, registerSyncBoards } from "./app/register";
 import { requestBoardSync } from "./echo-sync";
 import { MAX_TAGS, MAX_TAG_LENGTH, collectTags, normalizeTag } from "@/lib/tasks/tags";
-import { TASK_STATES, boardStates, taskState, type TaskState } from "@/lib/tasks/task-state";
+import { TASK_STATES, boardStates, stateOfBoard, taskState, type TaskState } from "@/lib/tasks/task-state";
+import { CONTEXT_PALETTE } from "@/lib/contexts/palette";
 import type { Board, TaskDependency, TaskRow } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -258,6 +260,9 @@ const STATE_COLUMN: Record<TaskState, string> = { planned: "to-do", wip: "in-pro
  */
 function stateMove(task: TaskRow, state: TaskState, boards: readonly Board[]): Partial<TaskInput> | string {
   if (taskState(task, boardStates(boards)) === state) return {};
+  // A task in no collection has no column: done and planned are its
+  // completion alone (see completesWithoutColumn); in progress needs a column.
+  if (!task.collectionId && state !== "wip") return completionPatch(task, null, state === "done");
   const target = stateColumn(boards, task.collectionId, state);
   if (!target) {
     return task.collectionId
@@ -265,6 +270,55 @@ function stateMove(task: TaskRow, state: TaskState, boards: readonly Board[]): P
       : `This task is in no collection, so it has no ${STATE_COLUMN[state]} column. Move it into a collection first.`;
   }
   return completionPatch(task, target, state === "done");
+}
+
+/**
+ * Whether a write completes a task in no column, so the completion is the
+ * `completedAt` written itself (there is no done column to enter). Its result
+ * is checked: a database whose completion trigger only keeps `completed_at`
+ * in a done column clears it, and the tool must say so, not report success.
+ */
+const completesWithoutColumn = (task: TaskRow, patch: Partial<TaskInput>): boolean =>
+  !task.boardId && patch.boardId === undefined && patch.completedAt != null;
+
+const notRecorded = (otherFields: boolean): string =>
+  "The database did not record the completion: this task is in no column, and " +
+  "a completion is only kept in a done column. Move it into a collection " +
+  "(update_task with collectionId) and complete it there." +
+  (otherFields ? " The other fields in this call were saved." : "");
+
+// --- columns (a collection's boards) -----------------------------------------
+
+/** A column as the tools return it. */
+interface ColumnOut {
+  id: string;
+  name: string;
+  /** the done column */
+  done: boolean;
+  position: number;
+}
+
+/** Column and collection names compare trimmed and case-insensitively. */
+const nameKey = (name: string): string => name.trim().toLowerCase();
+
+/** A collection's columns, left to right. */
+function columnsOf(boards: readonly Board[], collectionId: string): Board[] {
+  return boards
+    .filter((b) => b.collectionId === collectionId)
+    .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+}
+
+const columnOut = (b: Board): ColumnOut => ({ id: b.id, name: b.name, done: b.isDone, position: b.position });
+
+/**
+ * update_task's `column`: enter that column as complete_task would (the done
+ * column stamps the completion, leaving it clears it). `{}` when the task is
+ * in it already; a done task moving between done columns keeps its time.
+ */
+function columnMove(task: TaskRow, column: Board, role: TaskState): Partial<TaskInput> {
+  if (column.id === task.boardId) return {};
+  if (role === "done" && task.completedAt != null) return { boardId: column.id };
+  return completionPatch(task, column, role === "done");
 }
 
 /** `get_flows` / `show_flows` input: one shape, so the tool and its view agree. */
@@ -393,10 +447,11 @@ export function registerTools(server: McpServer): void {
     {
       title: "Get workspace",
       description:
-        "List the workspace's members, categories, collections and boards, with " +
+        "List the workspace's members, categories, collections (each with its " +
+        "columns, left to right: {id, name, done, position}) and boards, with " +
         "their ids, plus every tag in use and your saved streams (id and name). " +
         "Call this first — other tools take these ids (categoryId, " +
-        "collectionId, boardId, ownerId) and tag names.",
+        "collectionId, boardId, ownerId), column names and tag names.",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -417,7 +472,11 @@ export function registerTools(server: McpServer): void {
             name: c.name,
             shared: c.ownerId == null,
           })),
-          collections: b.collections.map((c) => ({ id: c.id, name: c.name })),
+          collections: b.collections.map((c) => ({
+            id: c.id,
+            name: c.name,
+            columns: columnsOf(b.boards, c.id).map(columnOut),
+          })),
           boards: b.boards.map((bd) => ({
             id: bd.id,
             name: bd.name,
@@ -427,6 +486,74 @@ export function registerTools(server: McpServer): void {
           tags: collectTags(tasks),
           streams: streams.map((st) => ({ id: st.id, name: st.name })),
         });
+      }),
+  );
+
+  // -- collections ----------------------------------------------------------
+  server.registerTool(
+    "create_collection",
+    {
+      title: "Create collection",
+      description:
+        "Create a collection you own, with its columns left to right. Exactly one " +
+        "column is the done column (`done: true`: entering it completes a task); " +
+        "column names must differ, case-insensitively. A column's role comes " +
+        "from its place: the first open column is 'planned', the done column " +
+        "'done', any other 'wip'. Idempotent by name: if you already own a " +
+        "collection with this name (case-insensitive), it is returned unchanged, " +
+        "with its own columns and `created: false` (they are not changed to " +
+        "match). Returns {id, name, created, columns: [{id, name, done, position}]}.",
+      inputSchema: {
+        name: z.string().trim().min(1).max(80),
+        columns: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1).max(60),
+              done: z.boolean().describe("The done column; exactly one is."),
+            }),
+          )
+          .min(2)
+          .max(12)
+          .describe("The columns, left to right."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    (args, extra) =>
+      guard(async () => {
+        const { sb, memberId, workspaceId } = mcpContext(extra);
+        const name = args.name.trim();
+        const columns = args.columns.map((c) => ({ name: c.name.trim(), isDone: c.done }));
+        const doneCount = columns.filter((c) => c.isDone).length;
+        if (doneCount !== 1)
+          return fail(`Exactly one column must be the done column (done: true); ${doneCount} are.`);
+        const seen = new Set<string>();
+        for (const c of columns) {
+          if (seen.has(nameKey(c.name)))
+            return fail(`Column names must differ (case-insensitively): "${c.name}" is there twice.`);
+          seen.add(nameKey(c.name));
+        }
+        const bundle = await fetchWorkspaceBundle(sb);
+        const existing = bundle.collections.find((c) => c.ownerId === memberId && nameKey(c.name) === nameKey(name));
+        if (existing) {
+          return ok({
+            id: existing.id,
+            name: existing.name,
+            created: false,
+            columns: columnsOf(bundle.boards, existing.id).map(columnOut),
+          });
+        }
+        // As the web app makes one (its first colour, last in the order), but
+        // personal: the caller's own.
+        const id = await createCollection(sb, {
+          workspaceId,
+          ownerId: memberId,
+          name,
+          color: CONTEXT_PALETTE[0],
+          sortOrder: Date.now(),
+          columns,
+        });
+        const after = await fetchWorkspaceBundle(sb);
+        return ok({ id, name, created: true, columns: columnsOf(after.boards, id).map(columnOut) });
       }),
   );
 
@@ -728,8 +855,8 @@ export function registerTools(server: McpServer): void {
         "among siblings, `blockedBy` = ids of the tasks it waits for, omitted " +
         "when none, and `state`: 'planned' in its collection's first open " +
         "column, 'done' in the done column, 'wip' in any other column; a task " +
-        "in no column is 'planned' unless done); use get_workspace to resolve " +
-        "board names.",
+        "in no column is 'planned' unless done) and `column` (its column's " +
+        "name, omitted when it is in none).",
       inputSchema: {
         collectionId: z.string().optional(),
         boardId: z.string().optional(),
@@ -761,6 +888,7 @@ export function registerTools(server: McpServer): void {
           fetchWorkspaceBundle(sb),
         ]);
         const states = boardStates(bundle.boards);
+        const columnName = new Map(bundle.boards.map((b) => [b.id, b.name]));
         let tasks = all;
         if (args.collectionId)
           tasks = tasks.filter((t) => t.collectionId === args.collectionId);
@@ -788,6 +916,7 @@ export function registerTools(server: McpServer): void {
             title: t.title,
             done: t.completedAt != null,
             state: taskState(t, states),
+            column: t.boardId ? columnName.get(t.boardId) : undefined,
             boardId: t.boardId ?? undefined,
             collectionId: t.collectionId ?? undefined,
             parentId: t.parentId ?? undefined,
@@ -873,7 +1002,8 @@ export function registerTools(server: McpServer): void {
         "whole subtask tree (flattened, parent before child, each with its depth, " +
         "`sequential`, `blocked` = waiting on an unfinished dependency or an " +
         "earlier sibling, start/due dates and `blockedBy` ids), its `state` " +
-        "('planned', 'wip' or 'done', as list_tasks) and `phases`: its states " +
+        "('planned', 'wip' or 'done', as list_tasks), `column` (its column's " +
+        "name, omitted when in none) and `phases`: its states " +
         "over time, oldest first, each {state, from} with `from` in UTC " +
         "(yyyy-MM-ddTHH:mm). RLS-scoped. Never returns descriptions.",
       inputSchema: { id: z.string() },
@@ -890,7 +1020,9 @@ export function registerTools(server: McpServer): void {
         ]);
         const task = tasks.find((t) => t.id === args.id);
         if (!task) return fail(`No task with id ${args.id} is visible to you.`);
-        return ok(projectTaskDetail(task, tasks, deps, indexStates(bundle.boards, events)));
+        const detail = projectTaskDetail(task, tasks, deps, indexStates(bundle.boards, events));
+        const column = task.boardId ? bundle.boards.find((b) => b.id === task.boardId)?.name : undefined;
+        return ok(column === undefined ? detail : { ...detail, column });
       }),
   );
 
@@ -1017,7 +1149,14 @@ export function registerTools(server: McpServer): void {
         "collection ('planned' = the first open column, 'wip' = the first " +
         "in-progress column, 'done' = the done column, as complete_task; leaving " +
         "'done' reopens it); a task already in that state stays put, and a " +
-        "collection with no such column is refused. Only the task's owner can " +
+        "collection with no such column is refused. A task in no collection " +
+        "takes 'done' and 'planned' as its completion alone ('wip' is refused). " +
+        "`column` moves it to the column of that name (case-insensitive) in its " +
+        "collection, or in `collectionId`'s when moving it in the same call, " +
+        "completing or reopening it as complete_task when it enters or leaves " +
+        "the done column; with `state` too, that column's role must be `state`, " +
+        "and when no column has that name `state` applies alone. The result " +
+        "returns the `column` and its `state`. Only the task's owner can " +
         "change it.",
       inputSchema: {
         id: z.string(),
@@ -1055,6 +1194,16 @@ export function registerTools(server: McpServer): void {
               "'planned', 'wip' (in progress) or 'done'. Not with `boardId`. The result " +
               "returns the `state`.",
           ),
+        column: z
+          .string()
+          .trim()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe(
+            "Move the task to the column with this name (case-insensitive) in its " +
+              "collection, or in `collectionId`'s if it moves too. Not with `boardId`.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
@@ -1088,9 +1237,14 @@ export function registerTools(server: McpServer): void {
           plan = planned;
           loaded = { tasks, task };
         }
-        // State: a column chosen by its role, checked before anything is written.
-        if (args.state !== undefined) {
-          if (args.boardId !== undefined) return fail("Give `boardId` or `state`, not both.");
+        // State and column: a column chosen by its role or by its name, checked
+        // before anything is written. A column named for a move is looked up in
+        // the collection the task moves to, and entered after the move.
+        let columnPatch: Partial<TaskInput> = {};
+        let entered: { column: string; state: TaskState } | undefined;
+        if (args.state !== undefined || args.column !== undefined) {
+          if (args.boardId !== undefined)
+            return fail(`Give \`boardId\` or \`${args.column !== undefined ? "column" : "state"}\`, not both.`);
           const { workspaceId } = mcpContext(extra);
           const [tasks, bundle] = await Promise.all([
             loaded ? Promise.resolve(loaded.tasks) : fetchTasks(sb, workspaceId),
@@ -1098,11 +1252,49 @@ export function registerTools(server: McpServer): void {
           ]);
           const task = tasks.find((t) => t.id === args.id);
           if (!task) return fail(`No task with id ${args.id} is visible to you.`);
-          if (args.collectionId !== undefined && args.collectionId !== task.collectionId)
-            return fail("Move the task first, then set its `state` in the new collection.");
-          const move = stateMove(task, args.state, bundle.boards);
-          if (typeof move === "string") return fail(move);
-          Object.assign(patch, move);
+          const moving = args.collectionId !== undefined && args.collectionId !== task.collectionId;
+          const collectionId = moving ? args.collectionId! : task.collectionId;
+          if (moving && collectionId !== null && !bundle.collections.some((c) => c.id === collectionId))
+            return fail(`No collection with id ${collectionId} is visible to you.`);
+          const cols = collectionId ? columnsOf(bundle.boards, collectionId) : [];
+          const column =
+            args.column !== undefined ? cols.find((b) => nameKey(b.name) === nameKey(args.column!)) : undefined;
+          if (column) {
+            const role = stateOfBoard(column, cols);
+            if (args.state !== undefined && role !== args.state) {
+              return fail(
+                `The column "${column.name}" is ${role}, not ${args.state}: a column's role comes from ` +
+                  "its place (the first open column is planned, the done column is done, any other is wip).",
+              );
+            }
+            columnPatch = columnMove(task, column, role);
+            entered = { column: column.name, state: role };
+          } else {
+            if (args.state === undefined) {
+              if (!collectionId)
+                return fail(
+                  "This task is in no collection, so it has no columns. Move it into a collection " +
+                    "first (collectionId), or give `state`.",
+                );
+              const names = cols.map((b) => `"${b.name}"`).join(", ");
+              return fail(
+                `No column named "${args.column!.trim()}" in ${moving ? "that" : "this"} collection. ` +
+                  `Its columns: ${names || "none"}.`,
+              );
+            }
+            // No such column: the state rule alone, as without `column`.
+            if (moving) {
+              return fail(
+                args.column !== undefined
+                  ? `No column named "${args.column.trim()}" in that collection, and \`state\` alone ` +
+                      "is not set in the call that moves a task. Move it first, then set its `state`."
+                  : "Move the task first, then set its `state` in the new collection.",
+              );
+            }
+            const move = stateMove(task, args.state, bundle.boards);
+            if (typeof move === "string") return fail(move);
+            Object.assign(patch, move);
+          }
           loaded = { tasks, task };
         }
         // Dependencies are written before any field, so a set the database
@@ -1122,10 +1314,17 @@ export function registerTools(server: McpServer): void {
           ok({
             ...result,
             ...(applied === undefined ? {} : { blockedBy: applied }),
-            ...(args.state === undefined ? {} : { state: args.state }),
+            ...(entered ?? (args.state === undefined ? {} : { state: args.state })),
           });
+        // A completion with no column to enter is the written completedAt
+        // itself: say so if the database did not keep it.
+        const written = (row: TaskRow, sent: Partial<TaskInput>): CallToolResult | undefined =>
+          loaded && completesWithoutColumn(loaded.task, sent) && row.completedAt == null
+            ? fail(notRecorded(applied !== undefined || Object.keys(sent).some((k) => k !== "completedAt")))
+            : undefined;
 
         if (args.collectionId === undefined) {
+          Object.assign(patch, columnPatch);
           if (Object.keys(patch).length === 0) {
             if (!loaded) return fail("Provide at least one field to update.");
             const { task } = loaded;
@@ -1134,7 +1333,7 @@ export function registerTools(server: McpServer): void {
           const refused = await depsFirst();
           if (refused) return refused;
           const row = await updateTask(sb, args.id, patch);
-          return done({ id: row.id, title: row.title });
+          return written(row, patch) ?? done({ id: row.id, title: row.title });
         }
 
         // A move. Subtasks live where their parent lives, and a column belongs
@@ -1157,18 +1356,21 @@ export function registerTools(server: McpServer): void {
         const refused = await depsFirst();
         if (refused) return refused;
         if (target === task.collectionId) {
+          Object.assign(patch, columnPatch);
           if (Object.keys(patch).length === 0) return done({ id: task.id, title: task.title, moved: 0 });
           const row = await updateTask(sb, args.id, patch);
-          return done({ id: row.id, title: row.title, moved: 0 });
+          return written(row, patch) ?? done({ id: row.id, title: row.title, moved: 0 });
         }
         const moving = subtreeInOrder(task, tasks);
         let moved = 0;
         let title = task.title;
         for (const item of moving) {
+          // The task itself enters the named column, if any, in its new collection.
           const step: Partial<TaskInput> = {
             ...(item.id === task.id ? patch : {}),
             collectionId: target,
             boardId: landingBoardId(bundle.boards, target, item.completedAt != null),
+            ...(item.id === task.id ? columnPatch : {}),
           };
           const row = await updateTask(sb, item.id, step);
           if (item.id === task.id) title = row.title;
@@ -1184,7 +1386,10 @@ export function registerTools(server: McpServer): void {
       title: "Complete task",
       description:
         "Mark a task done (or reopen it with done:false). Mirrors the app: a done " +
-        "task moves to its collection's done board and records completion time.",
+        "task moves to its collection's done board and records completion time; " +
+        "reopened, it moves to the first open board. A task in no collection " +
+        "records (or clears) the completion time alone. A collection with no " +
+        "done board (or, to reopen, no open board) is refused.",
       inputSchema: {
         id: z.string(),
         done: z.boolean().optional().describe("true = complete (default), false = reopen."),
@@ -1199,12 +1404,18 @@ export function registerTools(server: McpServer): void {
         const task = tasks.find((t) => t.id === args.id);
         if (!task) return fail(`No task with id ${args.id} is visible to you.`);
         const bundle = await fetchWorkspaceBundle(sb);
-        const cols = bundle.boards.filter((b) => b.collectionId === task.collectionId);
+        const cols = task.collectionId ? bundle.boards.filter((b) => b.collectionId === task.collectionId) : [];
         // Done → first done board; reopen → first non-done board (mirrors the app).
         const target = done
           ? cols.find((b) => b.isDone)
           : cols.find((b) => !b.isDone);
-        const row = await updateTask(sb, args.id, completionPatch(task, target, done));
+        // Without one the database would undo the write (the completion follows
+        // the column), so say so instead of reporting a change that isn't there.
+        if (task.collectionId && !target)
+          return fail(`This collection has no ${done ? "done" : "open"} column.`);
+        const patch = completionPatch(task, target, done);
+        const row = await updateTask(sb, args.id, patch);
+        if (completesWithoutColumn(task, patch) && row.completedAt == null) return fail(notRecorded(false));
         return ok({ id: row.id, title: row.title, done });
       }),
   );

@@ -877,9 +877,26 @@ export async function createCollection(
     sortOrder?: number;
     /** Localized labels for the three seeded columns; English fallback otherwise. */
     boardNames?: DefaultBoardNames;
+    /**
+     * The columns to seed instead of the three defaults, left to right (the MCP
+     * `create_collection` tool: one column per Obsidian lane). The caller
+     * validates them (names, exactly one done column).
+     */
+    columns?: readonly { name: string; isDone: boolean }[];
   },
 ): Promise<string> {
   const parsed = parseInput(collectionInputSchema, input);
+  // The columns, checked before anything is written (the right-most default is
+  // the completion column).
+  const names = input.boardNames ?? FALLBACK_BOARD_NAMES;
+  const columns = (
+    input.columns ?? [
+      { name: names.todo, isDone: false },
+      { name: names.inProgress, isDone: false },
+      { name: names.done, isDone: true },
+    ]
+  ).map((c) => parseInput(boardPatchSchema, { name: c.name, isDone: c.isDone }));
+
   const { data, error } = await sb
     .from("collections")
     .insert({
@@ -894,14 +911,21 @@ export async function createCollection(
   if (error) throw error;
   const collectionId = data.id as string;
 
-  // Seed the three default columns (the right-most is the completion column).
-  const names = input.boardNames ?? FALLBACK_BOARD_NAMES;
-  const { error: boardErr } = await sb.from("boards").insert([
-    { workspace_id: parsed.workspaceId, collection_id: collectionId, name: names.todo, line_style: "solid", position: 0, is_done: false },
-    { workspace_id: parsed.workspaceId, collection_id: collectionId, name: names.inProgress, line_style: "solid", position: 1, is_done: false },
-    { workspace_id: parsed.workspaceId, collection_id: collectionId, name: names.done, line_style: "solid", position: 2, is_done: true },
-  ]);
-  if (boardErr) throw boardErr;
+  const { error: boardErr } = await sb.from("boards").insert(
+    columns.map((c, position) => ({
+      workspace_id: parsed.workspaceId,
+      collection_id: collectionId,
+      name: c.name,
+      line_style: "solid",
+      position,
+      is_done: c.isDone ?? false,
+    })),
+  );
+  if (boardErr) {
+    // Never leave a collection without its columns: take it back (best effort).
+    await sb.from("collections").delete().eq("id", collectionId);
+    throw boardErr;
+  }
   return collectionId;
 }
 
