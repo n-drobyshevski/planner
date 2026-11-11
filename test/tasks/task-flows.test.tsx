@@ -128,19 +128,20 @@ describe("TaskFlows — tags, attention and streams", () => {
 
   it("names each runway bar by its deadline, and keeps the line style available", () => {
     renderFlows({ groupBy: "none" });
-    expect(screen.getByRole("button", { name: "Draft: due tomorrow" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Book room: 2 days over, due / })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ethics form: no deadline" })).toBeInTheDocument();
+    // The state comes first, in words (the bar's patterns are never the only signal).
+    expect(screen.getByRole("button", { name: "Draft: not started, due tomorrow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Book room: not started, 2 days over, due / })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ethics form: not started, no deadline" })).toBeInTheDocument();
     cleanup();
     renderFlows({ groupBy: "none", laneStyle: "line" });
-    expect(screen.queryByRole("button", { name: "Draft: due tomorrow" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Draft: not started, due tomorrow" })).toBeNull();
   });
 
   it("stacks a collapsed stream's runways behind one control that opens it", async () => {
     const user = userEvent.setup();
     renderFlows({ groupBy: "tag", mode: "streams" });
     const stack = screen.getByRole("button", {
-      name: /^thesis: Draft: due tomorrow; Book room: 2 days over/,
+      name: /^thesis: Draft: not started, due tomorrow; Book room: not started, 2 days over/,
     });
     expect(stack).toHaveAttribute("aria-expanded", "false");
     await user.click(stack);

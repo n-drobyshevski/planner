@@ -18,6 +18,7 @@ const task = (partial: Partial<FlowTaskOut> = {}): FlowTaskOut => ({
   title: "Task",
   score: 0.5,
   overdue: false,
+  state: "planned",
   ...partial,
 });
 const stream = (partial: Partial<FlowStreamOut> = {}): FlowStreamOut => ({
@@ -263,6 +264,13 @@ describe("calendarDays", () => {
 });
 
 import { EMPTY_DRAFT, createArgs, draftOf, draftTags, updateArgs } from "@/lib/mcp/app/view-model";
+import {
+  DONE_PHASE_MIN_PX,
+  RUNWAY_TRACK_PX,
+  phaseDetail,
+  phaseMs,
+  runwaySegments,
+} from "@/lib/mcp/app/view-model";
 
 describe("editing drafts", () => {
   const original = { title: "Write", dueDate: "2026-11-20", priority: 2, tags: ["thesis", "writing"] };
@@ -315,5 +323,88 @@ describe("editing drafts", () => {
       updateArgs({ ...original, collectionId: "col-1" }, { ...draftOf(original), collection: "" }),
     ).toEqual({ collectionId: null });
     expect(updateArgs(original, { ...draftOf(original), title: " " })).toBeNull();
+  });
+});
+
+describe("runway phases", () => {
+  // TODAY is 2026-11-10; the track has 16 px a day, so 1 px = 1/2016 of it.
+  const px = (x: number) => Math.round(x * RUNWAY_TRACK_PX);
+  const runway = runwayOf({ start: "2026-11-01", dueDate: "2026-11-20" }, TODAY);
+
+  it("reads a phase's start as UTC, and a bare date as its midnight", () => {
+    expect(phaseMs("2026-11-05T14:30")).toBe(Date.UTC(2026, 10, 5, 14, 30));
+    expect(phaseMs("2026-11-05")).toBe(Date.UTC(2026, 10, 5));
+    expect(phaseMs("soon")).toBeNaN();
+  });
+
+  it("cuts the bar where the state changed, on the runway's day mapping", () => {
+    const segs = runwaySegments(
+      runway,
+      [
+        { state: "planned", from: "2026-11-01T08:00" },
+        { state: "wip", from: "2026-11-05T12:00" },
+      ],
+      TODAY,
+    );
+    expect(segs.map((g) => g.state)).toEqual(["planned", "wip"]);
+    expect(segs[0].x0).toBe(runway.x0);
+    expect(px(segs[0].x1)).toBe(px(runway.x0) + 4 * 16 + 8); // 4.5 days in
+    expect(segs[1].x1).toBe(runway.x1); // the future keeps the state now
+  });
+
+  it("never draws a change past today's line, and keeps a done end wide enough for its check", () => {
+    const segs = runwaySegments(
+      runway,
+      [
+        { state: "planned", from: "2026-11-01T08:00" },
+        { state: "wip", from: "2026-11-10T09:00" },
+      ],
+      TODAY,
+    );
+    expect(segs[0].x1).toBeCloseTo(RUNWAY_NOW_X);
+    const done = runwaySegments(
+      runwayOf({ start: "2026-11-01", dueDate: "2026-11-08" }, TODAY),
+      [
+        { state: "wip", from: "2026-11-01T08:00" },
+        { state: "done", from: "2026-11-09T09:00" },
+      ],
+      TODAY,
+    );
+    expect(done.map((g) => g.state)).toEqual(["wip", "done"]);
+    expect(px(done[1].x1 - done[1].x0)).toBe(DONE_PHASE_MIN_PX);
+  });
+
+  it("merges a stretch under PHASE_MIN_PX, and has nothing to cut without phases", () => {
+    const segs = runwaySegments(
+      runway,
+      [
+        { state: "planned", from: "2026-11-01T08:00" },
+        { state: "wip", from: "2026-11-04T00:00" },
+        { state: "planned", from: "2026-11-04T03:00" }, // 2 px of wip
+        { state: "wip", from: "2026-11-06T00:00" },
+      ],
+      TODAY,
+    );
+    expect(segs.map((g) => g.state)).toEqual(["planned", "wip"]);
+    expect(runwaySegments(runway, undefined, TODAY)).toEqual([]);
+    expect(runwaySegments(runway, [], TODAY)).toEqual([]);
+  });
+
+  it("says the state in words, in both languages", () => {
+    const wip = [
+      { state: "planned" as const, from: "2026-11-01T08:00" },
+      { state: "wip" as const, from: "2026-11-05T12:00" },
+    ];
+    expect(phaseDetail(wip, "en")).toBe("in progress since 5 Nov");
+    expect(phaseDetail(wip, "ru")).toBe("в работе с 5 нояб.");
+    const done = [...wip, { state: "done" as const, from: "2026-11-09T16:00" }];
+    expect(phaseDetail(done, "en")).toBe("started 5 Nov, done 9 Nov");
+    expect(phaseDetail(done, "ru")).toBe("начата 5 нояб., готово 9 нояб.");
+    expect(phaseDetail([{ state: "planned", from: "2026-11-01T08:00" }], "en")).toBe("not started");
+    expect(phaseDetail([{ state: "planned", from: "2026-11-01T08:00" }], "ru")).toBe("не начата");
+    expect(phaseDetail([...wip, { state: "planned", from: "2026-11-07T08:00" }], "en")).toBe("back in the plan since 7 Nov");
+    // Dates are the viewer's: late on 5 Nov in UTC is already 6 Nov in Tokyo.
+    expect(phaseDetail([{ state: "wip", from: "2026-11-05T20:00" }], "en", "Asia/Tokyo")).toBe("in progress since 6 Nov");
+    expect(phaseDetail(undefined, "en")).toBeNull();
   });
 });

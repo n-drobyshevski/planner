@@ -9,6 +9,10 @@
   --muted: var(--color-text-secondary, light-dark(#57504a, #b8b0a6));
   --line: var(--color-border-primary, light-dark(#d9d2c7, #44403c));
   --late: light-dark(#8f1d1d, #ffb4ab);
+  /* a runway's states: in progress = stone hatch with a solid edge, done = a fill in the text colour */
+  --wip: light-dark(#6b645c, #a8a29e);
+  --wip-soft: light-dark(#d9d2c7, #57534e);
+  --done: var(--text);
   --accent: light-dark(#44403c, #e7e2da);
   /* warm-stone shadow for things that float (the View menu) */
   --shadow: light-dark(rgb(28 25 23 / 0.14), rgb(0 0 0 / 0.5));
@@ -263,3 +267,29 @@ input[type="text"], input[type="date"] { min-height: 36px; padding: 4px 8px; bor
   .seg-views .full { display: none; }
   .seg-views .short { display: inline; }
 }
+
+/* Runway phases: the bar cut where the task's state changed. Each stretch
+   draws its own edge; the bar keeps its box, selection, chevron and padlock. */
+.bar-phased { border-width: 0; background: transparent; }
+.bar-phased .bar-title { line-height: 28px; }
+.run-sub .bar-phased .bar-title { line-height: 20px; }
+.bar-phased.bar-done { opacity: 1; }
+.phs { position: absolute; inset: 0; pointer-events: none; }
+.ph { position: absolute; top: 0; bottom: 0; border: 1.5px solid transparent; border-left-width: 0; border-right-width: 0; }
+.ph-first { border-left-width: 1.5px; border-top-left-radius: 7px; border-bottom-left-radius: 7px; }
+.ph-last { border-right-width: 1.5px; border-top-right-radius: 7px; border-bottom-right-radius: 7px; }
+.run-sub .ph-first { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+.run-sub .ph-last { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
+.ph-planned { border-style: dashed; border-color: var(--muted); background: transparent; }
+.ph-wip { border-color: var(--wip); background: repeating-linear-gradient(135deg, var(--wip-soft) 0 6px, var(--surface) 6px 12px); }
+.ph-done { border-color: var(--done); background: var(--done); }
+/* Late: the started stretches take the late edge; the overrun past the deadline stays as it is. */
+.bar-late .ph-wip, .bar-late .ph-done { border-width: 2px 0; border-color: var(--late); }
+.bar-late .ph-wip.ph-first, .bar-late .ph-done.ph-first { border-left-width: 2px; }
+.bar-late .ph-wip.ph-last, .bar-late .ph-done.ph-last { border-right-width: 2px; }
+/* A bar running off the track, or with no deadline, has no edge on that side. */
+.clip-start .ph-first { border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.clip-end .ph-last, .bar-open-ended .ph-last { border-right-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ph-ink { position: absolute; inset: 0; color: var(--bg); pointer-events: none; }
+.ph-check { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; font-size: 12px; font-style: normal; font-weight: 700; color: var(--bg); pointer-events: none; }
+.run-sub .ph-check { font-size: 11px; }

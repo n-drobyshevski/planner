@@ -10,6 +10,7 @@ import {
   fetchTasks,
   fetchTaskStreams,
   fetchTaskDependencies,
+  fetchTaskStatusEvents,
   fetchSleepLogs,
 } from "@/lib/supabase/queries";
 import {
@@ -37,7 +38,9 @@ import {
   resolveFlowOptions,
   MCP_FLOWS_GROUP_BYS,
   landingBoardId,
+  indexStates,
   projectTaskDetail,
+  stateColumn,
   subtreeInOrder,
   type FlowsOut,
   type FlowTaskOut,
@@ -46,6 +49,7 @@ import {
 import { registerFlowsApp, registerSyncBoards } from "./app/register";
 import { requestBoardSync } from "./echo-sync";
 import { MAX_TAGS, MAX_TAG_LENGTH, collectTags, normalizeTag } from "@/lib/tasks/tags";
+import { TASK_STATES, boardStates, taskState, type TaskState } from "@/lib/tasks/task-state";
 import type { Board, TaskDependency, TaskRow } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -231,6 +235,38 @@ async function applyBlockedBy(
   return plan.final;
 }
 
+// --- task state (planned / wip / done) ---------------------------------------
+
+/**
+ * The patch that completes (`done`) or reopens a task, moving it to `target`
+ * when it is not there yet: what complete_task writes, and update_task's
+ * `state`.
+ */
+function completionPatch(task: TaskRow, target: Board | null | undefined, done: boolean): Partial<TaskInput> {
+  const patch: Partial<TaskInput> = { completedAt: done ? Date.now() : null };
+  if (target && target.id !== task.boardId) patch.boardId = target.id;
+  return patch;
+}
+
+const STATE_COLUMN: Record<TaskState, string> = { planned: "to-do", wip: "in-progress", done: "done" };
+
+/**
+ * update_task's `state`: the first column with that role in the task's
+ * collection, entered as complete_task would (done stamps the completion,
+ * anything else clears it). `{}` when the task is in that state already; a
+ * string is why it can't be done.
+ */
+function stateMove(task: TaskRow, state: TaskState, boards: readonly Board[]): Partial<TaskInput> | string {
+  if (taskState(task, boardStates(boards)) === state) return {};
+  const target = stateColumn(boards, task.collectionId, state);
+  if (!target) {
+    return task.collectionId
+      ? `This collection has no ${STATE_COLUMN[state]} column.`
+      : `This task is in no collection, so it has no ${STATE_COLUMN[state]} column. Move it into a collection first.`;
+  }
+  return completionPatch(task, target, state === "done");
+}
+
 /** `get_flows` / `show_flows` input: one shape, so the tool and its view agree. */
 const flowsInputShape = {
     date: z
@@ -268,6 +304,7 @@ function withoutViewFields(task: FlowTaskOut): FlowTaskOut {
   const copy = { ...task };
   delete copy.subtasks;
   delete copy.blockedBy;
+  delete copy.phases;
   return copy;
 }
 
@@ -310,14 +347,17 @@ async function loadFlows(args: FlowsArgs, extra: Parameters<typeof mcpContext>[0
     },
     saved?.definition,
   );
-  const [bundle, tasks, dependencies] = await Promise.all([
+  // The column-move history is only for the view's phases.
+  const [bundle, tasks, dependencies, statusEvents] = await Promise.all([
     fetchWorkspaceBundle(sb),
     fetchTasks(sb, workspaceId),
     fetchTaskDependencies(sb, workspaceId),
+    args.withSubtasks ? fetchTaskStatusEvents(sb, workspaceId) : Promise.resolve([]),
   ]);
   return projectFlows({
     tasks,
     dependencies,
+    statusEvents,
     withSubtasks: args.withSubtasks ?? false,
     boards: bundle.boards,
     categories: bundle.categories,
@@ -685,8 +725,11 @@ export function registerTools(server: McpServer): void {
       description:
         "List tasks (RLS-scoped). Optionally filter by collectionId, boardId, or " +
         "completion or tag. Returns compact rows (with tags, `position` = order " +
-        "among siblings, and `blockedBy` = ids of the tasks it waits for, omitted " +
-        "when none); use get_workspace to resolve board names.",
+        "among siblings, `blockedBy` = ids of the tasks it waits for, omitted " +
+        "when none, and `state`: 'planned' in its collection's first open " +
+        "column, 'done' in the done column, 'wip' in any other column; a task " +
+        "in no column is 'planned' unless done); use get_workspace to resolve " +
+        "board names.",
       inputSchema: {
         collectionId: z.string().optional(),
         boardId: z.string().optional(),
@@ -712,10 +755,12 @@ export function registerTools(server: McpServer): void {
     (args, extra) =>
       guard(async () => {
         const { sb, workspaceId, memberId } = mcpContext(extra);
-        const [all, deps] = await Promise.all([
+        const [all, deps, bundle] = await Promise.all([
           fetchTasks(sb, workspaceId),
           fetchTaskDependencies(sb, workspaceId),
+          fetchWorkspaceBundle(sb),
         ]);
+        const states = boardStates(bundle.boards);
         let tasks = all;
         if (args.collectionId)
           tasks = tasks.filter((t) => t.collectionId === args.collectionId);
@@ -742,6 +787,7 @@ export function registerTools(server: McpServer): void {
             id: t.id,
             title: t.title,
             done: t.completedAt != null,
+            state: taskState(t, states),
             boardId: t.boardId ?? undefined,
             collectionId: t.collectionId ?? undefined,
             parentId: t.parentId ?? undefined,
@@ -826,21 +872,25 @@ export function registerTools(server: McpServer): void {
         "for; `blocks`: the tasks waiting for it; each {id, title, done}) and its " +
         "whole subtask tree (flattened, parent before child, each with its depth, " +
         "`sequential`, `blocked` = waiting on an unfinished dependency or an " +
-        "earlier sibling, start/due dates and `blockedBy` ids). RLS-scoped. " +
-        "Never returns descriptions.",
+        "earlier sibling, start/due dates and `blockedBy` ids), its `state` " +
+        "('planned', 'wip' or 'done', as list_tasks) and `phases`: its states " +
+        "over time, oldest first, each {state, from} with `from` in UTC " +
+        "(yyyy-MM-ddTHH:mm). RLS-scoped. Never returns descriptions.",
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (args, extra) =>
       guard(async () => {
         const { sb, workspaceId } = mcpContext(extra);
-        const [tasks, deps] = await Promise.all([
+        const [tasks, deps, bundle, events] = await Promise.all([
           fetchTasks(sb, workspaceId),
           fetchTaskDependencies(sb, workspaceId),
+          fetchWorkspaceBundle(sb),
+          fetchTaskStatusEvents(sb, workspaceId),
         ]);
         const task = tasks.find((t) => t.id === args.id);
         if (!task) return fail(`No task with id ${args.id} is visible to you.`);
-        return ok(projectTaskDetail(task, tasks, deps));
+        return ok(projectTaskDetail(task, tasks, deps, indexStates(bundle.boards, events)));
       }),
   );
 
@@ -963,7 +1013,12 @@ export function registerTools(server: McpServer): void {
         "a task prefer complete_task (it also moves it to the done board). " +
         "`blockedBy` replaces the set of tasks it waits for ([] clears it); a " +
         "dependency loop is refused, and then nothing else in the call is changed " +
-        "either. Only the task's owner can change it.",
+        "either. `state` moves it to the first column with that role in its " +
+        "collection ('planned' = the first open column, 'wip' = the first " +
+        "in-progress column, 'done' = the done column, as complete_task; leaving " +
+        "'done' reopens it); a task already in that state stays put, and a " +
+        "collection with no such column is refused. Only the task's owner can " +
+        "change it.",
       inputSchema: {
         id: z.string(),
         title: z.string().min(1).max(500).optional(),
@@ -991,6 +1046,14 @@ export function registerTools(server: McpServer): void {
           .describe(
             `Replace the ids of the tasks this one waits for (max ${MAX_BLOCKED_BY}; [] clears). ` +
               "The result returns the final `blockedBy`.",
+          ),
+        state: z
+          .enum(TASK_STATES)
+          .optional()
+          .describe(
+            "Move the task to the first column with this role in its collection: " +
+              "'planned', 'wip' (in progress) or 'done'. Not with `boardId`. The result " +
+              "returns the `state`.",
           ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -1025,6 +1088,23 @@ export function registerTools(server: McpServer): void {
           plan = planned;
           loaded = { tasks, task };
         }
+        // State: a column chosen by its role, checked before anything is written.
+        if (args.state !== undefined) {
+          if (args.boardId !== undefined) return fail("Give `boardId` or `state`, not both.");
+          const { workspaceId } = mcpContext(extra);
+          const [tasks, bundle] = await Promise.all([
+            loaded ? Promise.resolve(loaded.tasks) : fetchTasks(sb, workspaceId),
+            fetchWorkspaceBundle(sb),
+          ]);
+          const task = tasks.find((t) => t.id === args.id);
+          if (!task) return fail(`No task with id ${args.id} is visible to you.`);
+          if (args.collectionId !== undefined && args.collectionId !== task.collectionId)
+            return fail("Move the task first, then set its `state` in the new collection.");
+          const move = stateMove(task, args.state, bundle.boards);
+          if (typeof move === "string") return fail(move);
+          Object.assign(patch, move);
+          loaded = { tasks, task };
+        }
         // Dependencies are written before any field, so a set the database
         // refuses (a loop through tasks the caller can't see) leaves the task
         // exactly as it was: never "fields saved, but the call failed".
@@ -1039,7 +1119,11 @@ export function registerTools(server: McpServer): void {
           return undefined;
         };
         const done = (result: Record<string, unknown>): CallToolResult =>
-          ok(applied === undefined ? result : { ...result, blockedBy: applied });
+          ok({
+            ...result,
+            ...(applied === undefined ? {} : { blockedBy: applied }),
+            ...(args.state === undefined ? {} : { state: args.state }),
+          });
 
         if (args.collectionId === undefined) {
           if (Object.keys(patch).length === 0) {
@@ -1120,11 +1204,7 @@ export function registerTools(server: McpServer): void {
         const target = done
           ? cols.find((b) => b.isDone)
           : cols.find((b) => !b.isDone);
-        const patch: Partial<TaskInput> = {
-          completedAt: done ? Date.now() : null,
-        };
-        if (target && target.id !== task.boardId) patch.boardId = target.id;
-        const row = await updateTask(sb, args.id, patch);
+        const row = await updateTask(sb, args.id, completionPatch(task, target, done));
         return ok({ id: row.id, title: row.title, done });
       }),
   );

@@ -1,5 +1,5 @@
 import "server-only";
-import type { Board, Category, Collection, Member, TaskDependency, TaskRow } from "@/lib/types";
+import type { Board, Category, Collection, Member, TaskDependency, TaskRow, TaskStatusEvent } from "@/lib/types";
 import type { AttentionMode } from "@/lib/tasks/attention";
 import { buildFlowLanes } from "@/lib/tasks/flows-layout";
 import {
@@ -15,6 +15,7 @@ import { buildStreams, rankStreams } from "@/lib/tasks/flows-streams";
 import { laneAttention } from "@/lib/tasks/attention";
 import { MAX_DEPTH, flattenTree, groupByParent, progressDeep, subtreeIds } from "@/lib/tasks/tree";
 import { blockedIds, openBlockersOf } from "@/lib/tasks/blocking";
+import { boardStates, phasesOf, taskState, type TaskState } from "@/lib/tasks/task-state";
 import { clipTitle } from "./projection";
 
 /** The groupings `get_flows` offers ("none" is the web app's headerless mode, not a stream split). */
@@ -43,6 +44,14 @@ export const MAX_WAITING_ON = 3;
 export const MAX_FLOW_SUBTASKS = 100;
 /** Dependency ids `show_flows` hands its view per task at most (`blockedBy`). */
 export const MAX_FLOW_BLOCKED_BY = 50;
+/** Phases (`phases`) a task carries at most: the most recent ones. */
+export const MAX_PHASES = 20;
+
+/** One stretch of a task's history: in `state` from `from` (UTC, "yyyy-MM-dd'T'HH:mm"). */
+export interface PhaseOut {
+  state: TaskState;
+  from: string;
+}
 
 export interface FlowTaskOut {
   id: string;
@@ -55,6 +64,8 @@ export interface FlowTaskOut {
   priority?: number;
   score: number;
   overdue: boolean;
+  /** its column's role: the first open column = planned, the done column = done, any other = wip */
+  state: TaskState;
   tags?: string[];
   /** set only while the task waits for an unfinished dependency */
   blocked?: true;
@@ -73,6 +84,8 @@ export interface FlowTaskOut {
    * flattened pre-order, done ones included, at most MAX_FLOW_SUBTASKS.
    */
   subtasks?: FlowSubtaskOut[];
+  /** `show_flows`' view only: its states over time, oldest first, at most MAX_PHASES */
+  phases?: PhaseOut[];
 }
 
 /** One subtask of a Flows task, for the view. */
@@ -83,10 +96,14 @@ export interface FlowSubtaskOut {
   /** 1 = a direct child of the top-level task (never more than MAX_DEPTH) */
   depth: number;
   done: boolean;
+  /** its column's role, as FlowTaskOut.state */
+  state: TaskState;
   /** planned start, "yyyy-MM-dd" */
   start?: string;
   /** due date, "yyyy-MM-dd" */
   due?: string;
+  /** its states over time, as FlowTaskOut.phases */
+  phases?: PhaseOut[];
   /** set only while open and waiting: on an unfinished dependency, or on an earlier sibling under a "do in order" parent */
   blocked?: true;
   /** its unfinished dependency blockers, most pressing first, at most MAX_WAITING_ON */
@@ -139,8 +156,10 @@ export interface FlowsInput {
   streamName?: string;
   /** every blocks/blocked-by edge the caller can see (RLS-scoped) */
   dependencies: TaskDependency[];
-  /** add each task's flattened subtask tree (`show_flows`' view); default false */
+  /** add each task's flattened subtask tree and phases (`show_flows`' view); default false */
   withSubtasks?: boolean;
+  /** the recorded column moves (RLS-scoped), for `phases`; only read withSubtasks */
+  statusEvents?: TaskStatusEvent[];
 }
 
 /** Plain English: this output is read by a machine/LLM, not localized. */
@@ -215,6 +234,32 @@ function holdsOf(t: TaskRow, ix: DepIndex): number {
   return n;
 }
 
+/** Column roles and each task's recorded moves, for `state` and `phases`. */
+export interface StateIndex {
+  states: Map<string, TaskState>;
+  eventsByTask: Map<string, TaskStatusEvent[]>;
+}
+
+export function indexStates(boards: readonly Board[], events: readonly TaskStatusEvent[] = []): StateIndex {
+  const eventsByTask = new Map<string, TaskStatusEvent[]>();
+  for (const e of events) {
+    const list = eventsByTask.get(e.taskId);
+    if (list) list.push(e);
+    else eventsByTask.set(e.taskId, [e]);
+  }
+  return { states: boardStates(boards), eventsByTask };
+}
+
+/** "yyyy-MM-dd'T'HH:mm" in UTC. */
+const minuteIso = (ms: number): string => new Date(ms).toISOString().slice(0, 16);
+
+/** A task's phases as the tools return them: the most recent MAX_PHASES. */
+export function phasesOut(task: TaskRow, st: StateIndex): PhaseOut[] {
+  return phasesOf(task, st.eventsByTask.get(task.id), st.states)
+    .slice(-MAX_PHASES)
+    .map((p) => ({ state: p.state, from: minuteIso(p.from) }));
+}
+
 /** Ids blocked by sequential order among each parent's children ("do in order"). */
 function sequentialBlocked(
   rootId: string,
@@ -235,6 +280,7 @@ function flowSubtasks(
   root: TaskRow,
   byParent: Map<string | null, TaskRow[]>,
   ix: DepIndex,
+  st: StateIndex,
 ): FlowSubtaskOut[] {
   const nodes = flattenTree(root.id, byParent, subtreeIds(root.id, byParent));
   const seqBlocked = sequentialBlocked(root.id, byParent, ix.byId);
@@ -251,8 +297,10 @@ function flowSubtasks(
       parentId: s.parentId ?? root.id,
       depth,
       done,
+      state: taskState(s, st.states),
       ...(s.startDate ? { start: s.startDate } : {}),
       ...(s.dueDate ? { due: s.dueDate } : {}),
+      phases: phasesOut(s, st),
       ...(!done && (wait.blocked || seqBlocked.has(s.id)) ? { blocked: true as const } : {}),
       ...(wait.waitingOn ? { waitingOn: wait.waitingOn } : {}),
       ...blockedByOf(s, ix),
@@ -293,6 +341,7 @@ export function projectFlows(input: FlowsInput): FlowsOut {
 
   const byParent = groupByParent(input.tasks);
   const ix = indexDeps(input.tasks, input.dependencies);
+  const st = indexStates(input.boards, input.withSubtasks ? input.statusEvents : []);
   const topLevel = (byParent.get(null) ?? []).filter(
     (t) => !input.mine || t.ownerId === input.memberId || t.assigneeId === input.memberId,
   );
@@ -348,10 +397,13 @@ export function projectFlows(input: FlowsInput): FlowsOut {
           ...(t.priority != null ? { priority: t.priority } : {}),
           score: round2(info.score),
           overdue: info.overdue,
+          state: taskState(t, st.states),
           ...(t.tags.length > 0 ? { tags: t.tags } : {}),
           ...waitingOf(t, ix),
           ...(holds > 0 ? { holds } : {}),
-          ...(input.withSubtasks ? { ...blockedByOf(t, ix), subtasks: flowSubtasks(t, byParent, ix) } : {}),
+          ...(input.withSubtasks
+            ? { ...blockedByOf(t, ix), subtasks: flowSubtasks(t, byParent, ix, st), phases: phasesOut(t, st) }
+            : {}),
         };
       });
     return {
@@ -408,6 +460,10 @@ export interface TaskDetailOut {
   id: string;
   title: string;
   done: boolean;
+  /** its column's role (see FlowTaskOut.state) */
+  state: TaskState;
+  /** its states over time, oldest first, at most MAX_PHASES */
+  phases: PhaseOut[];
   dueDate?: string;
   startDate?: string;
   priority?: number;
@@ -436,6 +492,7 @@ export function projectTaskDetail(
   task: TaskRow,
   all: TaskRow[],
   dependencies: readonly TaskDependency[] = [],
+  st: StateIndex = indexStates([]),
 ): TaskDetailOut {
   const byParent = groupByParent(all);
   const ix = indexDeps(all, dependencies);
@@ -482,6 +539,8 @@ export function projectTaskDetail(
     id: task.id,
     title: task.title,
     done: task.completedAt != null,
+    state: taskState(task, st.states),
+    phases: phasesOut(task, st),
     ...(task.dueDate ? { dueDate: task.dueDate } : {}),
     ...(task.startDate ? { startDate: task.startDate } : {}),
     ...(task.priority != null ? { priority: task.priority } : {}),
@@ -512,6 +571,23 @@ export function landingBoardId(
     .filter((b) => b.collectionId === collectionId)
     .sort((a, b) => a.position - b.position);
   return (cols.find((b) => b.isDone === done) ?? null)?.id ?? null;
+}
+
+/**
+ * The first column (lowest position) of `collectionId` whose role is
+ * `state`, or null when the collection has none (or there is no collection).
+ */
+export function stateColumn(
+  boards: readonly Board[],
+  collectionId: string | null,
+  state: TaskState,
+): Board | null {
+  if (!collectionId) return null;
+  const cols = boards
+    .filter((b) => b.collectionId === collectionId)
+    .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+  const states = boardStates(cols);
+  return cols.find((b) => states.get(b.id) === state) ?? null;
 }
 
 /** A task and its whole subtree, parents before children, siblings in order. */

@@ -25,6 +25,7 @@ import type { FlowsOut, FlowSubtaskOut, FlowTaskOut, TaskDetailOut, TaskDetailSu
 import type { SyncBoardsOut } from "@/lib/mcp/echo-sync";
 import {
   EMPTY_DRAFT,
+  DONE_PHASE_MIN_PX,
   RUNWAY_NARROW_PX,
   RUNWAY_TRACK_PX,
   ALL_STREAMS,
@@ -45,6 +46,8 @@ import {
   laneRows,
   nowItems,
   offscreenBlockers,
+  phaseDetail,
+  runwaySegments,
   subtaskRunway,
   subtaskWaitTitle,
   subtreeProgress,
@@ -290,7 +293,7 @@ function setView(view: View) {
   render();
 }
 
-function complete(task: FlowTaskOut) {
+function complete(task: Pick<FlowTaskOut, "id" | "title">) {
   if (state.selected === task.id) {
     state.selected = null;
     state.editor = null;
@@ -937,6 +940,15 @@ function laneWidth(): number {
   return RUNWAY_TRACK_PX;
 }
 
+/** The viewer's time zone, for the dates of state changes (sent in UTC). */
+function viewerZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 /** A lane row's bar: a task's own runway, or a subtask's on its dates. */
 function rowRunway(row: LaneRow, today: string): Runway {
   return row.kind === "task" ? runwayOf(row.task, today) : subtaskRunway(row.sub, row.task, today);
@@ -975,11 +987,15 @@ function runwayRow(row: LaneRow, ctx: RowContext, s: Strings): HTMLElement {
   const waitTitles = isSub
     ? [subtaskWaitTitle(row.sub, row.task.subtasks ?? [])].filter((t): t is string => !!t)
     : (row.task.waitingOn ?? []).map((w) => w.title);
+  // The bar cut where the task's state changed (planned / in progress / done).
+  const phases = isSub ? row.sub.phases : row.task.phases;
+  const segs = runwaySegments(runway, phases, ctx.today);
+  const stateWords = phaseDetail(phases, state.locale, viewerZone());
   const detail = [
     label ?? (isSub ? "" : s.noDeadline),
+    stateWords ?? (done ? s.doneShort : ""),
     progress ? s.subtasks(progress.done, progress.total) : "",
     blocked ? (waitTitles.length ? s.waitsDetail(waitTitles.join(", ")) : s.waiting) : "",
-    done ? s.doneShort : "",
   ]
     .filter(Boolean)
     .join(", ");
@@ -999,7 +1015,24 @@ function runwayRow(row: LaneRow, ctx: RowContext, s: Strings): HTMLElement {
   bar.setAttribute("aria-label", s.runway(title, detail));
   bar.title = s.runway(title, detail);
   bar.addEventListener("click", () => toggleSelect(row.id));
-  if (runway.fill > 0 || (progress && progress.done > 0)) {
+  // Each stretch in its state's style: planned dashed, in progress hatched,
+  // done filled. The subtask fill gives way to them (the count stays in the
+  // words beside the bar).
+  const span = runway.x1 - runway.x0;
+  const rel = (x: number) => (span > 0 ? (x - runway.x0) / span : 0);
+  if (segs.length > 0) {
+    bar.classList.add("bar-phased");
+    const layer = el("span", "phs");
+    segs.forEach((g, i) => {
+      const seg = el("i", `ph ph-${g.state}`);
+      if (i === 0) seg.classList.add("ph-first");
+      if (i === segs.length - 1) seg.classList.add("ph-last");
+      seg.style.left = pct(rel(g.x0));
+      seg.style.width = pct(rel(g.x1) - rel(g.x0));
+      layer.append(seg);
+    });
+    bar.append(layer);
+  } else if (runway.fill > 0 || (progress && progress.done > 0)) {
     const share = runway.fill > 0 ? runway.fill : progress ? progress.done / progress.total : 0;
     const fill = el("i", "fill");
     fill.style.width = pct(share);
@@ -1018,6 +1051,24 @@ function runwayRow(row: LaneRow, ctx: RowContext, s: Strings): HTMLElement {
   if (blocked) inner.append(lockIcon());
   if (!narrow) inner.append(el("span", "bar-text", title));
   if (inner.childNodes.length) bar.append(inner);
+  for (const g of segs) {
+    if (g.state !== "done") continue;
+    // Over the dark fill the words turn light: a second copy, cut to the stretch.
+    if (inner.childNodes.length) {
+      const ink = el("span", "ph-ink");
+      ink.setAttribute("aria-hidden", "true");
+      ink.append(inner.cloneNode(true));
+      ink.style.clipPath = `inset(0 ${pct(1 - rel(g.x1))} 0 ${pct(rel(g.x0))})`;
+      bar.append(ink);
+    }
+    // A check at the stretch's end: done never rests on the fill alone.
+    if ((g.x1 - g.x0) * laneWidth() >= DONE_PHASE_MIN_PX - 2) {
+      const check = el("i", "ph-check", "✓");
+      check.setAttribute("aria-hidden", "true");
+      check.style.right = `calc(${pct(1 - rel(g.x1))} + 4px)`;
+      bar.append(check);
+    }
+  }
   el0.append(bar);
 
   if (expandable) {
@@ -1537,7 +1588,7 @@ function editorPanel(s: Strings): HTMLElement | null {
     done.disabled = editor.busy;
     done.addEventListener("click", () => {
       if (detail.done) void setDone(detail.id, detail.title, false);
-      else void complete({ id: detail.id, title: detail.title, score: 0, overdue: false });
+      else void complete({ id: detail.id, title: detail.title });
     });
     actions.append(done);
     const armed = editor.confirmDelete === detail.id;
