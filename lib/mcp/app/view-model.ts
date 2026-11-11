@@ -2,8 +2,9 @@
 // stream row says and where its deadline marks sit. No DOM, no clock, so they
 // are unit-tested on their own; the view only paints what these return.
 
-import type { FlowStreamOut, FlowSubtaskOut, FlowTaskOut } from "@/lib/mcp/flows";
+import type { FlowStreamOut, FlowSubtaskOut, FlowTaskOut, PhaseOut } from "@/lib/mcp/flows";
 import type { SyncBoardOut, SyncBoardsOut } from "@/lib/mcp/echo-sync";
+import { stateSegments, type StateSegment } from "@/lib/tasks/task-state";
 
 export type ViewLocale = "en" | "ru";
 
@@ -131,6 +132,12 @@ export const STRINGS = {
     waitsDetail: (titles: string) => `waits for ${titles}`,
     waiting: "waiting",
     doneShort: "done",
+    notStarted: "not started",
+    inProgress: "in progress",
+    plannedSince: (date: string) => `back in the plan since ${date}`,
+    wipSince: (date: string) => `in progress since ${date}`,
+    startedOn: (date: string) => `started ${date}`,
+    doneOn: (date: string) => `done ${date}`,
     waitsFor: "Waits for",
     holds: "Holds",
     holdsNone: "Nothing waits for this task.",
@@ -263,6 +270,12 @@ export const STRINGS = {
     waitsDetail: (titles: string) => `ждёт ${titles}`,
     waiting: "ждёт",
     doneShort: "сделана",
+    notStarted: "не начата",
+    inProgress: "в работе",
+    plannedSince: (date: string) => `снова в плане с ${date}`,
+    wipSince: (date: string) => `в работе с ${date}`,
+    startedOn: (date: string) => `начата ${date}`,
+    doneOn: (date: string) => `готово ${date}`,
     waitsFor: "Ждёт",
     holds: "Её ждут",
     holdsNone: "Эту задачу ничего не ждёт.",
@@ -463,7 +476,7 @@ export interface Runway {
  * runs a little past today and has no end. Positions are fractions of the
  * track, so the view only multiplies by its width.
  */
-export function runwayOf(task: FlowTaskOut, today: string): Runway {
+export function runwayOf(task: Pick<FlowTaskOut, "start" | "dueDate" | "progress">, today: string): Runway {
   const span = RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS;
   const pos = (days: number) => (days + RUNWAY_PAST_DAYS) / span;
   const clamp = (x: number) => Math.min(1, Math.max(0, x));
@@ -493,6 +506,72 @@ export function runwayOf(task: FlowTaskOut, today: string): Runway {
     fill: total > 0 ? Math.min(1, (task.progress?.done ?? 0) / total) : 0,
     over: late ? { x0: clamp(pos(dueDays)), x1: RUNWAY_NOW_X } : null,
   };
+}
+
+// -- Phases: a runway cut where the task's state changed ------------------------------
+
+/** A stretch narrower than this many px joins its neighbour. */
+export const PHASE_MIN_PX = 6;
+/** The done stretch at a bar's end is kept this wide at least, room for its ✓. */
+export const DONE_PHASE_MIN_PX = 16;
+
+/** A phase's start in ms; NaN when it does not parse. `from` is UTC, "yyyy-MM-ddTHH:mm" (or a bare date). */
+export function phaseMs(from: string): number {
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(from)) return Date.parse(`${from}:00Z`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(from)) return utcMs(from);
+  return Number.NaN;
+}
+
+/**
+ * The runway cut where the task's state changed: each stretch in the state the
+ * task was in then, as fractions of the track (the same day-to-x mapping as
+ * runwayOf). Changes are never drawn past today's line, so the future keeps
+ * the state now; a stretch under PHASE_MIN_PX joins its neighbour; the bar
+ * always ends in the state now (a done one at least DONE_PHASE_MIN_PX wide);
+ * a bar too short for two stretches is one, in the state now. Empty without
+ * phases.
+ */
+export function runwaySegments(runway: Runway, phases: readonly PhaseOut[] | undefined, today: string): StateSegment[] {
+  if (!phases || phases.length === 0) return [];
+  const span = RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS;
+  const todayMs = utcMs(today);
+  const marks = phases.map((p) => ({
+    state: p.state,
+    x: ((phaseMs(p.from) - todayMs) / DAY_MS + RUNWAY_PAST_DAYS) / span,
+  }));
+  const now = phases[phases.length - 1].state;
+  return stateSegments(marks, runway.x0, runway.x1, {
+    minWidth: PHASE_MIN_PX / RUNWAY_TRACK_PX,
+    currentMinWidth: (now === "done" ? DONE_PHASE_MIN_PX : PHASE_MIN_PX) / RUNWAY_TRACK_PX,
+    maxX: RUNWAY_NOW_X,
+  });
+}
+
+/**
+ * The words for a task's state, for its tooltip and accessible name: "not
+ * started", "in progress since 5 Nov", "started 5 Nov, done 9 Nov". Dates are
+ * read in `timeZone` (the view passes the browser's). Null without phases.
+ */
+export function phaseDetail(
+  phases: readonly PhaseOut[] | undefined,
+  locale: ViewLocale,
+  timeZone = "UTC",
+): string | null {
+  if (!phases || phases.length === 0) return null;
+  const s = STRINGS[locale];
+  const format = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "ru", { day: "numeric", month: "short", timeZone });
+  const date = (from: string) => {
+    const ms = phaseMs(from);
+    return Number.isNaN(ms) ? null : format.format(ms);
+  };
+  const last = phases[phases.length - 1];
+  const at = date(last.from);
+  if (last.state === "wip") return at ? s.wipSince(at) : s.inProgress;
+  // Planned from the start: not started. Planned again after work began: since when.
+  if (last.state === "planned") return phases.length > 1 && at ? s.plannedSince(at) : s.notStarted;
+  const started = [...phases].reverse().find((p) => p.state === "wip");
+  const startedAt = started ? date(started.from) : null;
+  return [startedAt ? s.startedOn(startedAt) : "", at ? s.doneOn(at) : s.doneShort].filter(Boolean).join(", ");
 }
 
 /** A bar narrower than this many px cannot hold its title: it goes beside the bar. */
@@ -731,7 +810,7 @@ export function subtaskRunway(sub: FlowSubtaskOut, parent: FlowTaskOut, today: s
   } else if (!due) {
     if (parent.dueDate && parent.dueDate >= start) due = parent.dueDate;
   }
-  const runway = runwayOf({ id: sub.id, title: sub.title, start, dueDate: due, score: 0, overdue: false }, today);
+  const runway = runwayOf({ start, dueDate: due }, today);
   // A done subtask is not late: it shows struck through instead.
   if (sub.done && runway.state === "late") return { ...runway, state: "open", over: null };
   return runway;

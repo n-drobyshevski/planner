@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  MAX_PHASES,
+  indexStates,
   projectFlows,
   projectTaskDetail,
+  stateColumn,
   resolveFlowOptions,
   MAX_STREAMS,
   MAX_FLOW_SUBTASKS,
@@ -11,7 +14,7 @@ import {
   type FlowSubtaskOut,
 } from "@/lib/mcp/flows";
 import { DEFAULT_FLOWS_DISPLAY, DEFAULT_FLOWS_FILTER } from "@/lib/tasks/flows-display";
-import type { TaskDependency, TaskRow } from "@/lib/types";
+import type { Board, TaskDependency, TaskRow, TaskStatusEvent } from "@/lib/types";
 
 const ME = "m-me";
 const PARTNER = "m-partner";
@@ -206,7 +209,7 @@ describe("projectFlows", () => {
       ]),
     );
     const bare = out.streams.find((s) => s.label === "No tag")!.tasks[0];
-    expect(Object.keys(bare).sort()).toEqual(["id", "overdue", "score", "start", "title"]);
+    expect(Object.keys(bare).sort()).toEqual(["id", "overdue", "score", "start", "state", "title"]);
     expect(bare.start).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     const full = out.streams.find((s) => s.label === "t")!.tasks[0];
     expect(full.tags).toEqual(["t"]);
@@ -389,21 +392,28 @@ describe("projectFlows — dependencies", () => {
       input(tasks, { dependencies: [dep("g1", "other")], withSubtasks: true }),
     );
     const p = out.streams.flatMap((s) => s.tasks).find((t) => t.id === "p")!;
-    expect(p.subtasks).toEqual<FlowSubtaskOut[]>([
-      { id: "c1", title: "First", parentId: "p", depth: 1, done: true },
-      { id: "c2", title: "Second", parentId: "p", depth: 1, done: false, start: "2026-07-11", due: "2026-07-15" },
+    expect(p.subtasks!.every((sub) => Array.isArray(sub.phases))).toBe(true);
+    const withoutPhases = (sub: FlowSubtaskOut): FlowSubtaskOut => {
+      const copy = { ...sub };
+      delete copy.phases;
+      return copy;
+    };
+    expect(p.subtasks!.map(withoutPhases)).toEqual<FlowSubtaskOut[]>([
+      { id: "c1", title: "First", parentId: "p", depth: 1, done: true, state: "done" },
+      { id: "c2", title: "Second", parentId: "p", depth: 1, done: false, state: "planned", start: "2026-07-11", due: "2026-07-15" },
       {
         id: "g1",
         title: "Grandchild",
         parentId: "c2",
         depth: 2,
         done: false,
+        state: "planned",
         blocked: true,
         waitingOn: [{ id: "other", title: "Other" }],
         blockedBy: ["other"],
       },
       // "do in order": the second open subtask waits for the first.
-      { id: "c3", title: "Third", parentId: "p", depth: 1, done: false, blocked: true },
+      { id: "c3", title: "Third", parentId: "p", depth: 1, done: false, state: "planned", blocked: true },
     ]);
     expect(out.streams.flatMap((s) => s.tasks).find((t) => t.id === "other")!.subtasks).toEqual([]);
     expect(JSON.stringify(out)).not.toContain("SECRET");
@@ -481,5 +491,92 @@ describe("projectTaskDetail", () => {
     const a = task({ id: "a", title: "A", parentId: "b" });
     const b = task({ id: "b", title: "B", parentId: "a" });
     expect(projectTaskDetail(a, [a, b]).subtasks.map((s) => s.id)).toEqual(["b"]);
+  });
+});
+
+describe("task state and phases", () => {
+  const col = (id: string, position: number, isDone = false): Board => ({
+    id,
+    workspaceId: "w1",
+    collectionId: "c1",
+    name: id,
+    lineStyle: "solid",
+    position,
+    isDone,
+    createdAt: 0,
+    updatedAt: 0,
+  });
+  const boards = [col("todo", 0), col("doing", 1), col("done", 2, true)];
+  const H = 3_600_000;
+  const ev = (taskId: string, from: string | null, to: string, at: number): TaskStatusEvent => ({
+    id: `${taskId}-${at}`,
+    taskId,
+    workspaceId: "w1",
+    fromBoardId: from,
+    toBoardId: to,
+    toIsDone: to === "done",
+    changedBy: null,
+    changedAt: at,
+  });
+
+  it("gives every task and subtask its state, and the view its phases", () => {
+    const t0 = Date.UTC(2026, 6, 1, 8);
+    const tasks = [
+      task({ id: "p", title: "Parent", collectionId: "c1", boardId: "doing", createdAt: t0 }),
+      task({ id: "s", title: "Sub", parentId: "p", collectionId: "c1", boardId: "done", completedAt: t0 + 50 * H, createdAt: t0 }),
+    ];
+    const statusEvents = [
+      ev("p", null, "todo", t0),
+      ev("p", "todo", "doing", t0 + 30 * H),
+      ev("s", null, "todo", t0),
+      ev("s", "todo", "doing", t0 + 26 * H),
+      ev("s", "doing", "done", t0 + 50 * H),
+    ];
+    const view = projectFlows(input(tasks, { boards, statusEvents, withSubtasks: true }));
+    const p = view.streams[0].tasks[0];
+    expect(p.state).toBe("wip");
+    expect(p.phases).toEqual([
+      { state: "planned", from: "2026-07-01T08:00" },
+      { state: "wip", from: "2026-07-02T14:00" },
+    ]);
+    expect(p.subtasks![0]).toMatchObject({
+      state: "done",
+      phases: [
+        { state: "planned", from: "2026-07-01T08:00" },
+        { state: "wip", from: "2026-07-02T10:00" },
+        { state: "done", from: "2026-07-03T10:00" },
+      ],
+    });
+    // get_flows (no view): the state, never the phases.
+    const plain = projectFlows(input(tasks, { boards, statusEvents }));
+    expect(plain.streams[0].tasks[0].state).toBe("wip");
+    expect(plain.streams[0].tasks[0]).not.toHaveProperty("phases");
+  });
+
+  it("keeps the most recent MAX_PHASES phases", () => {
+    const t0 = Date.UTC(2026, 6, 1, 8);
+    const events = [ev("p", null, "todo", t0)];
+    for (let i = 1; i <= 30; i++) events.push(ev("p", i % 2 ? "todo" : "doing", i % 2 ? "doing" : "todo", t0 + i * H));
+    const p = task({ id: "p", title: "Bouncy", collectionId: "c1", boardId: "todo", createdAt: t0 });
+    const out = projectTaskDetail(p, [p], [], indexStates(boards, events));
+    expect(out.phases).toHaveLength(MAX_PHASES);
+    expect(out.phases[MAX_PHASES - 1]).toEqual({ state: "planned", from: "2026-07-02T14:00" });
+    expect(out.state).toBe("planned");
+  });
+
+  it("projectTaskDetail without a history: the state from completion, one phase", () => {
+    const done = task({ id: "d", title: "Done", completedAt: NOW, createdAt: Date.UTC(2026, 6, 1) });
+    const out = projectTaskDetail(done, [done]);
+    expect(out.state).toBe("done");
+    expect(out.phases).toEqual([{ state: "done", from: "2026-07-01T00:00" }]);
+  });
+
+  it("stateColumn picks the first column with that role, by position", () => {
+    const mixed = [col("review", 2), col("done", 3, true), col("todo", 0), col("doing", 1)];
+    expect(stateColumn(mixed, "c1", "planned")?.id).toBe("todo");
+    expect(stateColumn(mixed, "c1", "wip")?.id).toBe("doing");
+    expect(stateColumn(mixed, "c1", "done")?.id).toBe("done");
+    expect(stateColumn([col("todo", 0), col("done", 1, true)], "c1", "wip")).toBeNull();
+    expect(stateColumn(mixed, null, "planned")).toBeNull();
   });
 });

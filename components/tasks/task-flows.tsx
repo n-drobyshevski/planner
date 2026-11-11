@@ -54,6 +54,7 @@ import {
 import { progressDeep, type ById } from "@/lib/tasks/tree";
 import { depLinksOf, type DepEdgeIn } from "@/lib/tasks/flows-deps";
 import { runwayDueLabel, type Runway } from "@/lib/tasks/flows-runway";
+import { boardStates, phasesOf, type Phase } from "@/lib/tasks/task-state";
 import {
   filterLanes,
   flowOrderOf,
@@ -211,6 +212,22 @@ export function TaskFlows({
       }),
     [tasks, childrenByParent, eventsByTask, blocksByTask, checkpointsByTask, nowMs],
   );
+
+  // Each task's states over time (planned / in progress / done) from its column
+  // moves, for the runway's cut bar and its label. Cached per task row, so an
+  // edited task (a new object) is worked out afresh.
+  const phasesFor = useMemo(() => {
+    const states = boardStates(boards);
+    const cache = new WeakMap<TaskRow, Phase[]>();
+    return (task: TaskRow): Phase[] => {
+      let phases = cache.get(task);
+      if (!phases) {
+        phases = phasesOf(task, eventsByTask.get(task.id), states);
+        cache.set(task, phases);
+      }
+      return phases;
+    };
+  }, [boards, eventsByTask]);
 
   // The viewer's calendar day ("yyyy-MM-dd" in their zone) — what "due
   // tomorrow" and "overdue" are measured against.
@@ -599,11 +616,29 @@ export function TaskFlows({
   function runwayLabel(seg: FlowSegment, r: Runway): string {
     const parts: string[] = [];
     const due = seg.task.dueDate;
+    // Its state in words: the cut bar's patterns are never the only way to know it.
+    const phases = phasesFor(seg.task);
+    const now = phases[phases.length - 1];
+    const startedAt = [...phases].reverse().find((p) => p.state === "wip")?.from;
     if (r.state === "done") {
+      if (startedAt !== undefined) {
+        parts.push(
+          t("flows.runway.startedOn", { date: formatWeekdayDayMonth(startedAt, timeZone, locale) }),
+        );
+      }
       parts.push(
         t("flows.runway.doneOn", { date: formatWeekdayDayMonth(r.endMs, timeZone, locale) }),
       );
     } else {
+      if (now?.state === "wip") {
+        parts.push(
+          t("flows.runway.inProgressSince", {
+            date: formatWeekdayDayMonth(now.from, timeZone, locale),
+          }),
+        );
+      } else if (now?.state === "planned" && r.state !== "planned") {
+        parts.push(t("flows.runway.notStarted"));
+      }
       if (r.state === "planned") {
         parts.push(
           t("flows.runway.startsOn", {
@@ -922,6 +957,7 @@ export function TaskFlows({
             moreShort={(count) => t("flows.runway.more", { count })}
             deps={dependencies}
             blockedIds={blockedIds}
+            phasesOf={phasesFor}
           />
         </div>
       </div>

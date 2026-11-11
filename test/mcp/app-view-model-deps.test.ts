@@ -26,12 +26,13 @@ import {
 } from "@/lib/mcp/app/view-model";
 
 const TODAY = "2026-11-10";
-const task = (p: Partial<FlowTaskOut> & { id: string }): FlowTaskOut => ({ title: p.id, score: 0.5, overdue: false, ...p });
+const task = (p: Partial<FlowTaskOut> & { id: string }): FlowTaskOut => ({ title: p.id, score: 0.5, overdue: false, state: "planned", ...p });
 const sub = (p: Partial<FlowSubtaskOut> & { id: string }): FlowSubtaskOut => ({
   title: p.id,
   parentId: "p",
   depth: 1,
   done: false,
+  state: "planned",
   ...p,
 });
 const stream = (label: string, tasks: FlowTaskOut[]): FlowStreamOut => ({
@@ -62,7 +63,7 @@ const parent = task({
 describe("subtaskRunway", () => {
   it("uses the subtask's own dates", () => {
     const r = subtaskRunway(sub({ id: "x", start: "2026-11-08", due: "2026-11-12" }), parent, TODAY);
-    const own = runwayOf({ id: "x", title: "x", start: "2026-11-08", dueDate: "2026-11-12", score: 0, overdue: false }, TODAY);
+    const own = runwayOf({ start: "2026-11-08", dueDate: "2026-11-12" }, TODAY);
     expect(r).toEqual(own);
   });
   it("falls back to the parent's span when it has no dates", () => {

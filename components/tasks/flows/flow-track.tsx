@@ -48,6 +48,7 @@ import {
 import { toPaletteStroke } from "@/lib/theme/appearance";
 import { msToDateInput } from "@/lib/datetime/local";
 import type { TaskRow } from "@/lib/types";
+import type { Phase } from "@/lib/tasks/task-state";
 
 const G = FLOW_GEOM;
 const HIT = 26; // node hit-target (px); Flows is desktop-only, so < 44 is fine
@@ -111,6 +112,8 @@ export interface FlowTrackProps {
   deps?: readonly DepEdgeIn[];
   /** tasks waiting on an unfinished dependency: their bars carry a padlock */
   blockedIds?: ReadonlySet<string>;
+  /** a task's states over time (runway style): its bar is cut where they change */
+  phasesOf?: (task: TaskRow) => readonly Phase[] | undefined;
 }
 
 const NO_PROGRESS = { done: 0, total: 0 };
@@ -151,6 +154,7 @@ export function FlowTrack({
   moreShort,
   deps,
   blockedIds,
+  phasesOf,
 }: FlowTrackProps) {
   const [hover, setHover] = useState<Hover | null>(null);
   // The runway under the pointer or keyboard focus: its dependency links show.
@@ -405,6 +409,7 @@ export function FlowTrack({
                   title={lane.task.title}
                   short={runwayShort?.(lane, rw) ?? null}
                   blocked={blockedIds?.has(lane.task.id)}
+                  phases={phasesOf?.(lane.task)}
                 />
                 </g>
               ) : lane.milestone ? (
@@ -532,6 +537,7 @@ export function FlowTrack({
                           title={branch.task.title}
                           short={runwayShort?.(branch, brw) ?? null}
                           blocked={blockedIds?.has(branch.task.id)}
+                          phases={phasesOf?.(branch.task)}
                           small
                         />
                       </g>

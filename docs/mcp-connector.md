@@ -77,6 +77,27 @@ unfinished dependency or an earlier sibling under a "do in order" parent),
 `start?`, `due?` and `blockedBy?` (ids). Blocking is soft: completing a
 blocked task is allowed (the web app says what it was still waiting for).
 
+Task state: every task is `planned`, `wip` (in progress) or `done`, read from
+its column's role in its collection (columns are user-defined, so the role
+comes from their place, not their name): the done column (`isDone`) is
+`done`, the first open column (lowest position) is `planned`, and every other
+open column is `wip`; a task in no column is `planned` unless completed
+(`lib/tasks/task-state.ts`). `list_tasks` rows carry `state`. `update_task`
+takes `state: "planned" | "wip" | "done"` and moves the task to the first
+column (lowest position) with that role in its collection: `done` completes it
+the way `complete_task` does (done column, completion time), and leaving
+`done` reopens it like `complete_task` with `done: false`. A task already in
+that state stays where it is. A collection with no column of that role is
+refused ("This collection has no in-progress column."), as is a task in no
+collection, `state` together with `boardId`, and `state` together with a move
+to another collection; nothing is written then. The result carries `state`.
+`get_task` returns `state` and `phases`: the task's states over time, oldest
+first, at most 20 (the most recent), each `{ state, from }` with `from` in UTC
+as `yyyy-MM-ddTHH:mm`. Phases come from the `task_status_events` history (one
+row per column move, written by a database trigger): the first starts at the
+task's planned start, else its creation, in the state it was in then; the last
+is always the state now.
+
 ## Streams and attention
 
 `get_flows` answers "which of my tasks need attention now, stream by stream".
@@ -90,8 +111,8 @@ top-level tasks you own or are assigned to; default false, which also includes
 the partner's shared tasks, never their private ones) and `limit` (1..10 tasks
 per stream, default 3). Output: `{ date, groupBy, attention, stream?, streams:
 [{ key, label, open, done, overdue, needsAttention, nextDue?, score, tasks:
-[{ id, title, start?, dueDate?, progress?, priority?, score, overdue, tags?,
-blocked?, waitingOn?, holds? }] }], truncated? }`,
+[{ id, title, start?, dueDate?, progress?, priority?, score, overdue, state,
+tags?, blocked?, waitingOn?, holds? }] }], truncated? }`,
 streams most-pressing first; more than 30 streams are cut to the 30 top-ranked
 with `truncated: true`. A task with several tags appears in each tag's stream.
 `blocked: true` marks a task waiting for an unfinished dependency,
@@ -126,7 +147,15 @@ Claude Desktop) renders it in the chat, with three views behind one switch:
 
 - **Flows** (the default): each stream's open tasks as *runways*. A runway is
   a bar from the task's start to its deadline, on one time axis shared by every
-  stream, with a line at today. The darker fill is the share of subtasks done.
+  stream, with a line at today. The bar is cut where the task's state
+  changed, each stretch in its state's style: planned = dashed outline, in
+  progress = a stone diagonal hatch with a solid edge, done = a fill in the
+  text colour with a ✓. The future (past today's line) keeps the state now;
+  a stretch under 6 px joins its neighbour, the bar always ends in the state
+  now, and the tooltip and accessible name say it in words ("in progress
+  since 5 Nov", "started 5 Nov, done 9 Nov"). The share of subtasks done is
+  in the words beside the bar ("2/5"); without phases (an older server) the
+  darker fill shows it as before.
   A late task carries a hatched overrun from its deadline to today and says how
   far over it is; a task with no deadline fades out past today; one that has
   not started is outlined with dashes. Picking a runway shows its task, with a
@@ -188,12 +217,15 @@ too. Only `show_flows`' structured content (the view's data, not the model's
 text) adds each task's `subtasks`: its whole subtask tree, flattened
 pre-order, done ones included, at most 100 per task and never deeper than
 `MAX_DEPTH`, each `{ id, title, parentId, depth (1 = direct child), done,
-start?, due?, blocked?, waitingOn?, blockedBy? }` (`blocked` here also covers
+state, start?, due?, phases?, blocked?, waitingOn?, blockedBy? }` (`blocked` here also covers
 a "do in order" sibling still waiting its turn). There, too, each task and
 subtask carries `blockedBy?`: the ids of every task it waits for, open or
 done, at most 50, which the view draws its links, arrows, dimming and loop
 check from (`waitingOn`, open and at most 3, stays its labels). Like
-`subtasks`, it is left out of the model's text.
+`subtasks`, it is left out of the model's text. So are `phases` (on each task
+and subtask, as `get_task` returns them), which the view cuts each runway by;
+`show_flows` fetches the status history for them, `get_flows` does not. Every
+task and subtask also carries `state`, which the model's text keeps.
 
 | Path | Role |
 | --- | --- |

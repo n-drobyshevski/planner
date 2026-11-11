@@ -8,6 +8,7 @@ vi.mock("@/lib/supabase/queries", () => ({
   fetchTasks: vi.fn(async () => []),
   fetchTaskStreams: vi.fn(async () => []),
   fetchTaskDependencies: vi.fn(async () => []),
+  fetchTaskStatusEvents: vi.fn(async () => []),
   fetchSleepLogs: vi.fn(),
 }));
 vi.mock("@/lib/supabase/mutations", () => ({
@@ -123,11 +124,22 @@ describe("the Flows MCP App", () => {
     const result = await tools.get("show_flows")!.cb({ date: "2026-11-10" }, {});
     const view = result.structuredContent as { streams: { tasks: { id: string; subtasks?: unknown[] }[] }[] };
     expect(view.streams[0].tasks[0].subtasks).toEqual([
-      { id: "c", title: "Child", parentId: "p", depth: 1, done: false },
+      {
+        id: "c",
+        title: "Child",
+        parentId: "p",
+        depth: 1,
+        done: false,
+        state: "planned",
+        phases: [{ state: "planned", from: "1970-01-01T00:00" }],
+      },
     ]);
+    expect(view.streams[0].tasks[0]).toMatchObject({ state: "planned", phases: [{ state: "planned" }] });
     const text = JSON.parse(result.content[0].text) as typeof view;
     expect(text.streams[0].tasks[0].id).toBe("p");
+    expect(text.streams[0].tasks[0]).toMatchObject({ state: "planned" });
     expect(text.streams[0].tasks[0]).not.toHaveProperty("subtasks");
+    expect(text.streams[0].tasks[0]).not.toHaveProperty("phases");
     expect(result.content[0].text).not.toContain("Child");
   });
 

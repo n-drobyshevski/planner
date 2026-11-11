@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // --- mock the data layer + the auth seam ----------------------------------
 vi.mock("@/lib/supabase/queries", () => ({
-  fetchWorkspaceBundle: vi.fn(),
+  fetchWorkspaceBundle: vi.fn(async () => ({ members: [], categories: [], collections: [], boards: [] })),
+  fetchTaskStatusEvents: vi.fn(async () => []),
   fetchWindow: vi.fn(),
   fetchTasks: vi.fn(),
   fetchTaskStreams: vi.fn(),
@@ -874,6 +875,114 @@ describe("task editing tools (the Flows app's writes)", () => {
     const res = await call("get_task", { id: "t" });
     expect(res.data.blockedBy).toEqual([{ id: "up", title: "Up", done: true }]);
     expect(res.data.blocks).toEqual([{ id: "down", title: "Down", done: false }]);
+  });
+
+  describe("task state (planned / wip / done)", () => {
+    // A collection whose columns come out of position order.
+    const boards = [
+      { id: "review", collectionId: "c1", position: 2, isDone: false },
+      { id: "todo", collectionId: "c1", position: 0, isDone: false },
+      { id: "done", collectionId: "c1", position: 3, isDone: true },
+      { id: "doing", collectionId: "c1", position: 1, isDone: false },
+      { id: "only", collectionId: "c2", position: 0, isDone: false },
+      { id: "fin", collectionId: "c2", position: 1, isDone: true },
+    ];
+    beforeEach(() => {
+      vi.mocked(q.fetchWorkspaceBundle).mockResolvedValue({
+        members: [],
+        categories: [],
+        collections: [],
+        boards,
+      } as never);
+      vi.mocked(m.updateTask).mockResolvedValue({ id: "t1", title: "Task" } as never);
+    });
+
+    it("list_tasks gives each row its state from its column's role", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "a", collectionId: "c1", boardId: "todo" }),
+        row({ id: "b", collectionId: "c1", boardId: "review" }),
+        row({ id: "c", collectionId: "c1", boardId: "done", completedAt: 5 }),
+        row({ id: "d" }),
+      ]);
+      const call = collectTools();
+      const res = await call("list_tasks");
+      expect(res.data.tasks.map((t: { id: string; state: string }) => [t.id, t.state])).toEqual([
+        ["a", "planned"],
+        ["b", "wip"],
+        ["c", "done"],
+        ["d", "planned"],
+      ]);
+    });
+
+    it("update_task state: wip moves to the first in-progress column and returns the state", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "t1", collectionId: "c1", boardId: "todo" })]);
+      const call = collectTools();
+      const res = await call("update_task", { id: "t1", state: "wip" });
+      expect(res.isError).toBe(false);
+      expect(res.data).toMatchObject({ id: "t1", state: "wip" });
+      expect(vi.mocked(m.updateTask).mock.calls[0][2]).toEqual({ boardId: "doing", completedAt: null });
+    });
+
+    it("update_task state: done completes like complete_task; leaving done reopens", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "t1", collectionId: "c1", boardId: "doing" })]);
+      const call = collectTools();
+      await call("update_task", { id: "t1", state: "done" });
+      const done = vi.mocked(m.updateTask).mock.calls[0][2];
+      expect(done.boardId).toBe("done");
+      expect(typeof done.completedAt).toBe("number");
+
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "t1", collectionId: "c1", boardId: "done", completedAt: 9 }),
+      ]);
+      await call("update_task", { id: "t1", state: "planned", title: "Again" });
+      expect(vi.mocked(m.updateTask).mock.calls[1][2]).toEqual({ title: "Again", boardId: "todo", completedAt: null });
+    });
+
+    it("update_task state: a task already in that state stays where it is", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([row({ id: "t1", collectionId: "c1", boardId: "review" })]);
+      const call = collectTools();
+      const res = await call("update_task", { id: "t1", state: "wip" });
+      expect(res.isError).toBe(false);
+      expect(res.data).toEqual({ id: "t1", title: "Task", state: "wip" });
+      expect(m.updateTask).not.toHaveBeenCalled();
+    });
+
+    it("update_task state: refuses a missing column, boardId alongside, and a move, writing nothing", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "t1", collectionId: "c2", boardId: "only" }),
+        row({ id: "t2" }),
+      ]);
+      const call = collectTools();
+      const noWip = await call("update_task", { id: "t1", state: "wip" });
+      expect(noWip.isError).toBe(true);
+      expect(noWip.data).toBe("This collection has no in-progress column.");
+      const loose = await call("update_task", { id: "t2", state: "done" });
+      expect(loose.isError).toBe(true);
+      expect(loose.data).toMatch(/^This task is in no collection, so it has no done column/);
+      expect((await call("update_task", { id: "t1", state: "done", boardId: "fin" })).isError).toBe(true);
+      expect((await call("update_task", { id: "t1", state: "done", collectionId: "c1" })).isError).toBe(true);
+      expect((await call("update_task", { id: "nope", state: "done" })).isError).toBe(true);
+      expect(m.updateTask).not.toHaveBeenCalled();
+    });
+
+    it("get_task returns the state and the phases from the column moves", async () => {
+      vi.mocked(q.fetchTasks).mockResolvedValue([
+        row({ id: "t1", collectionId: "c1", boardId: "doing", createdAt: Date.UTC(2026, 10, 1, 9) }),
+      ]);
+      vi.mocked(q.fetchTaskStatusEvents).mockResolvedValueOnce([
+        { id: "e1", taskId: "t1", workspaceId: "w1", fromBoardId: null, toBoardId: "todo", toIsDone: false, changedBy: null, changedAt: Date.UTC(2026, 10, 1, 9) },
+        { id: "e2", taskId: "t1", workspaceId: "w1", fromBoardId: "todo", toBoardId: "doing", toIsDone: false, changedBy: null, changedAt: Date.UTC(2026, 10, 5, 14, 30) },
+      ]);
+      const call = collectTools();
+      const res = await call("get_task", { id: "t1" });
+      expect(res.data).toMatchObject({
+        state: "wip",
+        phases: [
+          { state: "planned", from: "2026-11-01T09:00" },
+          { state: "wip", from: "2026-11-05T14:30" },
+        ],
+      });
+    });
   });
 
   it("list_tasks with mine keeps only the tasks the caller created", async () => {
