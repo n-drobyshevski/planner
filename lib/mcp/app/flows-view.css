@@ -196,3 +196,11 @@ input[type="text"], input[type="date"] { min-height: 36px; padding: 4px 8px; bor
 .tag-clear { margin-left: 14px; }
 .tag-clear.tag-before { margin-left: 0; margin-right: 14px; }
 .run-done .tag { text-decoration: line-through; }
+
+/* Flows "All": one column; each stream's name pins to the left as the track scrolls. */
+.board-all { grid-template-columns: minmax(0, 1fr); }
+.board-all .side { display: none; }
+.lane-head { position: sticky; left: 0; z-index: 4; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; width: max-content; max-width: min(100vw - 48px, 560px); padding: 8px 10px 2px; background: var(--bg); }
+.lane-head small { font-size: 12px; color: var(--muted); }
+.lane-head small.late { color: var(--late); }
+.board-all .lane:not(:last-child) { border-bottom: 1px solid var(--line); }

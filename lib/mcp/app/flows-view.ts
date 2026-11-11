@@ -26,6 +26,7 @@ import {
   EMPTY_DRAFT,
   RUNWAY_NARROW_PX,
   RUNWAY_TRACK_PX,
+  ALL_STREAMS,
   RUNWAY_NOW_X,
   SUB_RUNWAY_NARROW_PX,
   STRINGS,
@@ -51,6 +52,7 @@ import {
   runwayLabelSide,
   runwayOf,
   runwayTicks,
+  visibleStreams,
   streamSummary,
   taskDetail,
   updateArgs,
@@ -833,14 +835,29 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
     { passive: true },
   );
   board.append(side, track);
-  // One stream at a time: a picker of the streams with open tasks, most
-  // pressing first. A focus that is gone (regrouped, all done) falls back.
+  // A picker of the streams with open tasks, most pressing first, led by
+  // "All". One stream: its name sits in the left column. All: the column
+  // goes and each lane gets a header pinned to the left edge as it scrolls.
   const open = data.streams.filter((st) => st.open > 0);
-  const current = open.find((st) => st.key === state.focus) ?? open[0];
+  const all = state.focus === ALL_STREAMS && open.length > 1;
+  const shownStreams = visibleStreams(data.streams, all ? ALL_STREAMS : state.focus);
+  const current = all ? null : shownStreams[0];
+  if (all) board.classList.add("board-all");
   if (open.length > 1) {
     const pick = el("div", "seg stream-pick");
     pick.setAttribute("role", "group");
     pick.setAttribute("aria-label", s.stream);
+    const allButton = el("button", all ? "seg-on" : undefined);
+    allButton.type = "button";
+    allButton.setAttribute("aria-pressed", String(all));
+    const total = open.reduce((n, st) => n + st.open, 0);
+    const late = open.some((st) => st.overdue > 0);
+    allButton.append(el("span", undefined, s.allStreams), el("span", late ? "pick-n late" : "pick-n", String(total)));
+    allButton.addEventListener("click", () => {
+      state.focus = ALL_STREAMS;
+      render();
+    });
+    pick.append(allButton);
     for (const st of open) {
       const on = st === current;
       const button = el("button", on ? "seg-on" : undefined);
@@ -855,7 +872,7 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
     }
     wrap.append(pick);
   }
-  for (const stream of current ? [current] : []) {
+  for (const stream of shownStreams) {
     const name = el("div", "name");
     name.append(el("b", undefined, stream.label));
     name.append(el("small", stream.overdue > 0 ? "late" : undefined, streamSummary(stream, data.date, state.locale)));
@@ -893,8 +910,14 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
       lane.append(toggle);
     }
     if (unsent > 0 && (open || folded === 0)) lane.append(el("div", "more", s.more(unsent)));
-    side.append(name);
-    inner.append(lane);
+    if (all) {
+      const head = el("div", "lane-head");
+      head.append(...name.childNodes);
+      inner.append(head, lane);
+    } else {
+      side.append(name);
+      inner.append(lane);
+    }
   }
   const today = el("button", "ghost today", s.backToToday);
   today.type = "button";
