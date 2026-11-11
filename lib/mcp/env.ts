@@ -40,6 +40,23 @@ export function getMcpResourceUrl(): string | undefined {
 }
 
 /**
+ * Echo's board-sync endpoint (`https://<echo-host>/planner/board-sync`), which
+ * the Flows view's "Sync with Obsidian" button calls through the `sync_boards`
+ * tool. Server-only; unset (or not an http(s) URL) → the tool says it is not
+ * configured and calls nothing.
+ */
+export function getEchoBoardSyncUrl(): string | undefined {
+  const raw = process.env.ECHO_BOARD_SYNC_URL?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Issuer URL of the Supabase OAuth 2.1 authorization server — the value MCP
  * clients use to discover the auth server (RFC 8414). For Supabase this is the
  * project's `/auth/v1` endpoint.

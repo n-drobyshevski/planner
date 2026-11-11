@@ -7,7 +7,7 @@
 // no cookies, no planner session. Everything it knows arrives as the tool's
 // result, and everything it does goes back through the host as a tool call
 // the member's own token authorizes (`show_flows` to refetch, `complete_task`
-// to tick a task off).
+// to tick a task off, `sync_boards` to have Echo sync the Obsidian boards).
 //
 // Task titles and tag names are the member's text: they are only ever set
 // with `textContent`, never parsed as markup.
@@ -22,6 +22,7 @@ import {
 } from "@modelcontextprotocol/ext-apps";
 
 import type { FlowsOut, FlowSubtaskOut, FlowTaskOut, TaskDetailOut, TaskDetailSubtask } from "@/lib/mcp/flows";
+import type { SyncBoardsOut } from "@/lib/mcp/echo-sync";
 import {
   EMPTY_DRAFT,
   RUNWAY_NARROW_PX,
@@ -62,6 +63,7 @@ import {
   type Strings,
   type TaskDraft,
   type ViewLocale,
+  syncSummary,
 } from "./view-model";
 
 type GroupBy = FlowsOut["groupBy"];
@@ -97,6 +99,8 @@ interface State {
   scrollX: number | null;
   /** tasks and subtasks whose subtasks are shown in the lane */
   unfolded: Set<string>;
+  /** a "Sync with Obsidian" call is in flight */
+  syncing: boolean;
 }
 
 /** Rows a stream shows before "and N more". */
@@ -140,6 +144,7 @@ const state: State = {
   focus: null,
   scrollX: null,
   unfolded: new Set(),
+  syncing: false,
 };
 
 const app = new App({ name: "Planner flows", version: "1.1.0" });
@@ -522,6 +527,43 @@ async function addSubtask() {
     return STRINGS[state.locale].created(String(args.title));
   }, `The user added the subtask "${String(args.title)}" to "${parent.title}" (id ${parent.id}) in the Flows view.`);
   document.getElementById("f-newsub")?.focus();
+}
+
+/**
+ * "Sync with Obsidian": Echo runs one board-sync pass (the app-only
+ * `sync_boards` tool), then the streams are read again so its changes show.
+ */
+async function syncBoards() {
+  if (state.syncing) return;
+  const s = STRINGS[state.locale];
+  state.syncing = true;
+  state.notice = null;
+  render();
+  let synced = false;
+  try {
+    const result = (await call("sync_boards", {})) as SyncBoardsOut;
+    state.notice = syncSummary(result, s);
+    synced = result.status === "done";
+    tellModel(
+      synced
+        ? `The user synced the Obsidian task boards with the planner from the Flows view (${syncSummary(result, STRINGS.en)}). Re-read tasks before relying on earlier lists.`
+        : "The user asked Echo to sync the Obsidian task boards from the Flows view; the sync is still running.",
+    );
+  } catch (err) {
+    state.notice = err instanceof ToolError && err.message ? err.message : s.actionFailed;
+  }
+  state.syncing = false;
+  if (synced) await refetch();
+  else render();
+}
+
+function syncButton(s: Strings): HTMLButtonElement {
+  const button = el("button", "ghost sync", state.syncing ? s.syncing : s.sync);
+  button.type = "button";
+  button.disabled = state.syncing;
+  button.setAttribute("aria-busy", String(state.syncing));
+  button.addEventListener("click", () => void syncBoards());
+  return button;
 }
 
 // -- painting ------------------------------------------------------------------
@@ -925,7 +967,9 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
     state.scrollX = null;
     scrollToNow(track, true);
   });
-  wrap.append(today, board);
+  const actions = el("div", "flow-actions");
+  actions.append(syncButton(s), today);
+  wrap.append(actions, board);
   // After layout: back where the user left it, or with today in view.
   requestAnimationFrame(() => {
     if (state.scrollX === null) scrollToNow(track, false);

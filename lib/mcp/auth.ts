@@ -73,6 +73,11 @@ export interface McpContext {
   memberId: string;
   /** The member's (single) workspace id. */
   workspaceId: string;
+  /**
+   * The member's own bearer token, as verified. Only for forwarding to a service
+   * that checks it itself (Echo's board sync); never log it.
+   */
+  token: string;
 }
 
 /**
@@ -93,5 +98,6 @@ export function mcpContext(
     sb: clientForToken(data.token),
     memberId: data.memberId,
     workspaceId: data.workspaceId,
+    token: data.token,
   };
 }

@@ -43,7 +43,8 @@ import {
   type FlowTaskOut,
   type McpFlowsGroupBy,
 } from "./flows";
-import { registerFlowsApp } from "./app/register";
+import { registerFlowsApp, registerSyncBoards } from "./app/register";
+import { requestBoardSync } from "./echo-sync";
 import { MAX_TAGS, MAX_TAG_LENGTH, collectTags, normalizeTag } from "@/lib/tasks/tags";
 import type { Board, TaskDependency, TaskRow } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -798,6 +799,18 @@ export function registerTools(server: McpServer): void {
         })),
       };
       return { ...ok(forModel), structuredContent: flows as unknown as Record<string, unknown> };
+    } catch (err) {
+      return errorResult(err);
+    }
+  });
+
+  // The view's "Sync with Obsidian" button: Echo runs one board-sync pass with
+  // the member's own token as proof of who asked (lib/mcp/echo-sync.ts).
+  registerSyncBoards(server, async (_args, extra) => {
+    try {
+      const { token } = mcpContext(extra);
+      const result = await requestBoardSync(token);
+      return result.ok ? ok(result.data) : fail(result.message);
     } catch (err) {
       return errorResult(err);
     }

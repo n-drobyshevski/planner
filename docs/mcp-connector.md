@@ -139,6 +139,26 @@ Claude Desktop) renders it in the chat, with three views behind one switch:
 The member can regroup the streams, switch the attention rule and show only
 their own tasks.
 
+**Sync with Obsidian.** The Flows view has a "Sync with Obsidian" button (next
+to "Back to today") that asks Echo, the Telegram companion, to run one board-sync
+pass now, so the Obsidian task boards and the planner's tagged tasks are brought
+in step without waiting for Echo's next background pass. It calls `sync_boards`,
+an **app-only** tool (`_meta.ui.visibility: ["app"]`: the host lets the view call
+it and never offers it to the model). The tool `POST`s to `ECHO_BOARD_SYNC_URL`
+with the member's own bearer token (`Authorization: Bearer …`, 25 s timeout);
+Echo checks that token with Supabase (`/auth/v1/user`) and that it belongs to the
+planner account Echo is linked to, so there is no shared secret to keep. Echo
+answers with counts only (never a board's or a task's name): the view shows a
+one-line summary ("Synced: 3 cards changed, 1 task created."), tells the model in
+one line, and refetches the streams. If the pass takes longer than Echo's 20 s
+wait, the view says Echo is still syncing. Errors are the tool's own messages:
+not configured (no `ECHO_BOARD_SYNC_URL`), "Echo did not accept this account"
+(401/403: link the same planner account in Echo with `/planner_link`), "Board
+sync is off in Echo" (404), "Echo did not answer" (network or timeout). Echo
+also sends the pass's result to Telegram. Echo's side:
+`PLANNER_SUPABASE_ANON_KEY` (this project's public anon key) and
+`BOARD_SYNC_ENABLED`, see its docs/decisions.md, "Manual pass from the planner".
+
 **Editing.** Picking a runway (or "Edit" in Now) opens the task in an editor
 under the view: title, start, deadline, priority and tags, with Save, Done (or
 Reopen), Delete and Close. Its subtasks are listed beneath, the whole tree
@@ -177,7 +197,8 @@ check from (`waitingOn`, open and at most 3, stays its labels). Like
 
 | Path | Role |
 | --- | --- |
-| `lib/mcp/app/register.ts` | The `show_flows` tool and the `ui://planner/flows.html` resource |
+| `lib/mcp/app/register.ts` | The `show_flows` tool, the app-only `sync_boards` tool and the `ui://planner/flows.html` resource |
+| `lib/mcp/echo-sync.ts` | `sync_boards`' request to Echo and what it keeps of the answer |
 | `lib/mcp/app/flows-view.ts`, `flows-view.css` | The view (browser code, no framework) |
 | `lib/mcp/app/view-model.ts` | Its pure helpers: runway geometry, labels, the Now list, the Calendar days |
 | `lib/mcp/app/flows-app.generated.ts` | The built view: one self-contained HTML document |
@@ -189,7 +210,7 @@ How it stays inside the member's permissions:
   script and styles inline, declares no CSP domains and fetches nothing.
 - It holds no token and no session. It gets its data as the tool's
   `structuredContent`, and acts by asking the host to call this server's tools
-  (`show_flows` to refetch, `list_events` for the Calendar view, `get_task` for the editor, and the task write tools). The host sends
+  (`show_flows` to refetch, `list_events` for the Calendar view, `get_task` for the editor, the task write tools, and `sync_boards`). The host sends
   those with the member's own bearer token, so RLS decides exactly as it does
   for a call the model makes.
 - Titles and tag names are set as text, never parsed as markup.

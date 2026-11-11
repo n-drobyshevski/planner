@@ -3,6 +3,7 @@
 // are unit-tested on their own; the view only paints what these return.
 
 import type { FlowStreamOut, FlowSubtaskOut, FlowTaskOut } from "@/lib/mcp/flows";
+import type { SyncBoardOut, SyncBoardsOut } from "@/lib/mcp/echo-sync";
 
 export type ViewLocale = "en" | "ru";
 
@@ -133,6 +134,30 @@ export const STRINGS = {
     wouldLoop: "would make a loop",
     noMatch: "No matching open tasks.",
     unwait: (title: string) => `Stop waiting for “${title}”`,
+    sync: "Sync with Obsidian",
+    syncing: "Syncing…",
+    syncDone: (parts: string) => `Synced: ${parts}.`,
+    syncNothing: "Synced: nothing to change.",
+    syncCards: (n: number) => `${n} ${n === 1 ? "card" : "cards"} changed`,
+    syncTasksCreated: (n: number) => `${n} ${n === 1 ? "task" : "tasks"} created`,
+    syncTasksChanged: (n: number) => `${n} ${n === 1 ? "task" : "tasks"} changed`,
+    syncSubtasks: (n: number) => `${n} ${n === 1 ? "subtask" : "subtasks"} changed`,
+    syncLinks: (n: number) => `${n} ${n === 1 ? "link" : "links"} changed`,
+    syncConflicts: (n: number) => `${n} ${n === 1 ? "conflict" : "conflicts"} (the planner won)`,
+    syncHeld: (n: number) =>
+      `${n} ${n === 1 ? "removal" : "removals"} held back, one side looks almost empty (if that is right, send /boards now to Echo)`,
+    syncBoardBusy: "a board changed during the sync and waits for the next one",
+    syncBoardMissing: "a board could not be read",
+    syncQueued: "Echo is still syncing; refresh in a moment.",
+    syncAlready: "A sync is already on its way; refresh in a moment.",
+    syncFailed: "Echo could not finish the sync.",
+    syncStopped: {
+      planner_unavailable: "Echo could not reach the planner.",
+      unavailable: "Echo could not reach the vault.",
+      refused: "The vault refused the board write.",
+      no_boards: "Echo found no task boards to sync.",
+      other: "The sync stopped before it was done.",
+    },
   },
   ru: {
     title: "Направления",
@@ -235,6 +260,35 @@ export const STRINGS = {
     wouldLoop: "получится петля",
     noMatch: "Открытых задач с таким названием нет.",
     unwait: (title: string) => `Больше не ждать «${title}»`,
+    sync: "Синхронизировать с Obsidian",
+    syncing: "Синхронизирую…",
+    syncDone: (parts: string) => `Готово: ${parts}.`,
+    syncNothing: "Готово: менять нечего.",
+    syncCards: (n: number) =>
+      `${ruPlural(n, "изменена", "изменено", "изменено")} ${n} ${ruPlural(n, "карточка", "карточки", "карточек")}`,
+    syncTasksCreated: (n: number) =>
+      `${ruPlural(n, "создана", "создано", "создано")} ${n} ${ruPlural(n, "задача", "задачи", "задач")}`,
+    syncTasksChanged: (n: number) =>
+      `${ruPlural(n, "изменена", "изменено", "изменено")} ${n} ${ruPlural(n, "задача", "задачи", "задач")}`,
+    syncSubtasks: (n: number) =>
+      `${ruPlural(n, "изменена", "изменено", "изменено")} ${n} ${ruPlural(n, "подзадача", "подзадачи", "подзадач")}`,
+    syncLinks: (n: number) =>
+      `${ruPlural(n, "изменена", "изменено", "изменено")} ${n} ${ruPlural(n, "связь", "связи", "связей")}`,
+    syncConflicts: (n: number) => `${n} ${ruPlural(n, "конфликт", "конфликта", "конфликтов")} (победил планер)`,
+    syncHeld: (n: number) =>
+      `придержано ${n} ${ruPlural(n, "удаление", "удаления", "удалений")}: одна из сторон выглядит почти пустой (если так и задумано, отправь Echo /boards now)`,
+    syncBoardBusy: "доска изменилась во время синхронизации и ждёт следующей",
+    syncBoardMissing: "одну доску не удалось прочитать",
+    syncQueued: "Echo ещё синхронизирует; обнови чуть позже.",
+    syncAlready: "Синхронизация уже идёт; обнови чуть позже.",
+    syncFailed: "Echo не смог закончить синхронизацию.",
+    syncStopped: {
+      planner_unavailable: "Echo не достучался до планера.",
+      unavailable: "Echo не достучался до хранилища.",
+      refused: "Хранилище не приняло запись доски.",
+      no_boards: "Echo не нашёл досок задач.",
+      other: "Синхронизация остановилась, не закончив.",
+    },
   },
 } as const;
 
@@ -956,4 +1010,38 @@ export function blockedByPatch(saved: readonly string[], chosen: readonly string
   const a = [...new Set(saved)].sort();
   const b = [...new Set(chosen)].sort();
   return a.join(",") === b.join(",") ? undefined : [...new Set(chosen)];
+}
+
+/**
+ * The notice after "Sync with Obsidian": what Echo's pass did, from its counts
+ * alone (no board or task names ever reach the view). Card ids Echo adds to
+ * cards are bookkeeping and left out.
+ */
+export function syncSummary(result: SyncBoardsOut, s: Strings): string {
+  if (result.status === "queued") return s.syncQueued;
+  if (result.status === "already_queued") return s.syncAlready;
+  if (result.status === "failed") return s.syncFailed;
+  if (result.outcome !== "ok") {
+    const stopped = s.syncStopped as Record<string, string>;
+    return stopped[result.outcome] ?? s.syncStopped.other;
+  }
+  const total = (pick: (b: SyncBoardOut) => number) =>
+    result.boards.filter((b) => b.outcome === "ok").reduce((sum, b) => sum + pick(b), 0);
+  const parts: string[] = [];
+  const add = (n: number, say: (n: number) => string) => {
+    if (n > 0) parts.push(say(n));
+  };
+  add(total((b) => b.cards_added + b.cards_changed + b.cards_removed), s.syncCards);
+  add(total((b) => b.tasks_created), s.syncTasksCreated);
+  add(total((b) => b.tasks_changed + b.tasks_untagged), s.syncTasksChanged);
+  add(
+    total((b) => b.subs_added + b.subs_changed + b.subs_removed + b.subs_created + b.subs_detached),
+    s.syncSubtasks,
+  );
+  add(total((b) => b.deps_changed), s.syncLinks);
+  add(total((b) => b.conflicts), s.syncConflicts);
+  add(total((b) => b.held), s.syncHeld);
+  if (result.boards.some((b) => b.outcome === "changed")) parts.push(s.syncBoardBusy);
+  if (result.boards.some((b) => b.outcome === "missing" || b.outcome === "not_board")) parts.push(s.syncBoardMissing);
+  return parts.length ? s.syncDone(parts.join(", ")) : s.syncNothing;
 }
