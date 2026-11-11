@@ -68,7 +68,13 @@ export const STRINGS = {
     actionFailed: "That did not go through. Nothing was changed.",
     reopen: "Reopen",
     views: { calendar: "Calendar", flows: "Flows", now: "Now" },
+    viewsShort: { calendar: "Cal.", flows: "Flows", now: "Now" },
+    viewSwitch: "Switch view",
     view: "View",
+    viewMenu: "View options",
+    viewChanged: "View, changed from the default",
+    newTaskShort: "Task",
+    todayShort: "Today",
     pick: "Pick a runway to see its task.",
     noDeadline: "no deadline",
     subtasks: (done: number, total: number) => `${done} of ${total} subtasks`,
@@ -194,7 +200,13 @@ export const STRINGS = {
     actionFailed: "Не получилось. Ничего не изменено.",
     reopen: "Вернуть в работу",
     views: { calendar: "Календарь", flows: "Потоки", now: "Сейчас" },
+    viewsShort: { calendar: "Кален.", flows: "Потоки", now: "Сейчас" },
+    viewSwitch: "Переключить вид",
     view: "Вид",
+    viewMenu: "Настройки вида",
+    viewChanged: "Вид, изменён по сравнению с обычным",
+    newTaskShort: "Задача",
+    todayShort: "Сегодня",
     pick: "Выберите полосу, чтобы увидеть задачу.",
     noDeadline: "без срока",
     subtasks: (done: number, total: number) => `подзадачи: ${done} из ${total}`,
@@ -388,6 +400,32 @@ export function visibleStreams<T extends { key: string; open: number }>(streams:
   const current = open.find((st) => st.key === focus) ?? open[0];
   return current ? [current] : [];
 }
+
+// -- The toolbar's View menu ---------------------------------------------------
+
+/** The settings the toolbar's View menu holds. */
+export type ViewSetting = "groupBy" | "attention" | "mine";
+
+/** What the View menu starts from; the View button carries a dot when a shown setting differs. */
+export const VIEW_DEFAULTS = { groupBy: "tag", attention: "combined", mine: false } as const;
+
+/** The View menu's settings in each view: Calendar has no ranking or grouping, Now no grouping. */
+export function viewMenuFields(view: "calendar" | "flows" | "now"): ViewSetting[] {
+  if (view === "flows") return ["groupBy", "attention", "mine"];
+  if (view === "now") return ["attention", "mine"];
+  return ["mine"];
+}
+
+/** True when any of `fields` (all three by default) is off its default. */
+export function viewSettingsChanged(
+  settings: { groupBy: string; attention: string; mine: boolean },
+  fields: readonly ViewSetting[] = ["groupBy", "attention", "mine"],
+): boolean {
+  return fields.some((field) => settings[field] !== VIEW_DEFAULTS[field]);
+}
+
+/** How long a toolbar status line stays before it fades out, in ms. */
+export const STATUS_MS = 8000;
 
 // -- Runways: the Flows view --------------------------------------------------
 

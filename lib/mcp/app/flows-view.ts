@@ -30,6 +30,7 @@ import {
   ALL_STREAMS,
   RUNWAY_NOW_X,
   SUB_RUNWAY_NARROW_PX,
+  STATUS_MS,
   STRINGS,
   attentionLevel,
   blockedByPatch,
@@ -57,6 +58,8 @@ import {
   streamSummary,
   taskDetail,
   updateArgs,
+  viewMenuFields,
+  viewSettingsChanged,
   type CalendarEventIn,
   type LaneRow,
   type Runway,
@@ -83,7 +86,14 @@ interface State {
   selected: string | null;
   /** task ids with a completion in flight */
   busy: Set<string>;
+  /** the editor's own message (a save, a refused loop); shown inside the editor */
   notice: string | null;
+  /** the toolbar's status line (a sync result, a change made with no editor open) */
+  flash: { text: string; at: number } | null;
+  /** the toolbar's View menu is open */
+  viewMenu: boolean;
+  /** the stream chips' sideways scroll; null = bring the chosen chip into view */
+  chipsX: number | null;
   locale: ViewLocale;
   /** the next week's events; null until the Calendar view asks for them */
   events: CalendarEventIn[] | null;
@@ -135,6 +145,9 @@ const state: State = {
   selected: null,
   busy: new Set(),
   notice: null,
+  flash: null,
+  viewMenu: false,
+  chipsX: null,
   locale: pickLocale(navigator.language),
   events: null,
   eventsStatus: "idle",
@@ -392,6 +405,31 @@ function closeEditor() {
   render();
 }
 
+let flashTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Put a line in the toolbar's status slot; it fades and clears after STATUS_MS. */
+function flash(text: string | null) {
+  clearTimeout(flashTimer);
+  state.flash = text ? { text, at: Date.now() } : null;
+  if (!text) return;
+  flashTimer = setTimeout(() => {
+    state.flash = null;
+    // Only the slot changes: a full repaint here would take the focus from whatever is being typed.
+    const slot = document.getElementById("tb-status");
+    if (slot && !state.syncing) {
+      slot.textContent = "";
+      slot.removeAttribute("title");
+      slot.classList.remove("fading");
+    }
+  }, STATUS_MS);
+}
+
+/** A change's message: inside the open editor, where the press was; else in the toolbar. */
+function say(text: string | null) {
+  if (state.editor) state.notice = text;
+  else flash(text);
+}
+
 /** Tell the model what the member just changed, so its next answer is not stale. */
 function tellModel(text: string) {
   void app.updateModelContext({ content: [{ type: "text", text }] }).catch(() => undefined);
@@ -409,11 +447,11 @@ async function mutate(work: () => Promise<string | null>, said: string) {
   render();
   try {
     const noticed = await work();
-    state.notice = noticed;
+    say(noticed);
     tellModel(said);
   } catch (err) {
     // A refusal the tool explains (a loop, say) is shown as it is.
-    state.notice = err instanceof ToolError && err.message ? err.message : s.actionFailed;
+    say(err instanceof ToolError && err.message ? err.message : s.actionFailed);
     if (editor) editor.busy = false;
     render();
     return;
@@ -537,12 +575,12 @@ async function syncBoards() {
   if (state.syncing) return;
   const s = STRINGS[state.locale];
   state.syncing = true;
-  state.notice = null;
+  flash(null);
   render();
   let synced = false;
   try {
     const result = (await call("sync_boards", {})) as SyncBoardsOut;
-    state.notice = syncSummary(result, s);
+    flash(syncSummary(result, s));
     synced = result.status === "done";
     tellModel(
       synced
@@ -550,83 +588,329 @@ async function syncBoards() {
         : "The user asked Echo to sync the Obsidian task boards from the Flows view; the sync is still running.",
     );
   } catch (err) {
-    state.notice = err instanceof ToolError && err.message ? err.message : s.actionFailed;
+    flash(err instanceof ToolError && err.message ? err.message : s.actionFailed);
   }
   state.syncing = false;
   if (synced) await refetch();
   else render();
 }
 
-function syncButton(s: Strings): HTMLButtonElement {
-  const button = el("button", "ghost sync", state.syncing ? s.syncing : s.sync);
+// -- painting: the toolbar ---------------------------------------------------------------
+
+type IconName = "sync" | "today" | "sliders" | "plus";
+
+/** The toolbar's icons, 16×16 line drawings in the text colour. */
+const ICONS: Record<IconName, [string, Record<string, string>][]> = {
+  sync: [
+    ["path", { fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", d: "M13.5 6.5A5.5 5.5 0 0 0 3.2 4.6M2.5 9.5a5.5 5.5 0 0 0 10.3 1.9" }],
+    ["path", { fill: "currentColor", d: "M3.6 1.8v3.4H7zM12.4 14.2v-3.4H9z" }],
+  ],
+  today: [
+    ["circle", { cx: "8", cy: "8", r: "5.5", fill: "none", stroke: "currentColor", "stroke-width": "1.6" }],
+    ["circle", { cx: "8", cy: "8", r: "1.8", fill: "currentColor" }],
+  ],
+  sliders: [
+    ["path", { stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", d: "M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7" }],
+    ["circle", { cx: "10.5", cy: "4.5", r: "1.7", fill: "none", stroke: "currentColor", "stroke-width": "1.6" }],
+    ["circle", { cx: "5.5", cy: "11.5", r: "1.7", fill: "none", stroke: "currentColor", "stroke-width": "1.6" }],
+  ],
+  plus: [["path", { stroke: "currentColor", "stroke-width": "1.8", "stroke-linecap": "round", d: "M8 3v10M3 8h10" }]],
+};
+
+function icon(name: IconName): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "ic");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("aria-hidden", "true");
+  for (const [tag, attrs] of ICONS[name]) {
+    const part = document.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attrs)) part.setAttribute(key, value);
+    svg.append(part);
+  }
+  return svg;
+}
+
+/**
+ * A toolbar button: an icon, and a label that narrow widths hide (it stays
+ * for screen readers). `id` lets a repaint give the button its focus back.
+ */
+function toolButton(id: string, className: string, name: IconName, label?: string): HTMLButtonElement {
+  const button = el("button", `tbtn ${className}`);
   button.type = "button";
-  button.disabled = state.syncing;
+  button.id = id;
+  button.append(icon(name));
+  if (label) button.append(el("span", "lbl", label));
+  return button;
+}
+
+function syncButton(s: Strings): HTMLButtonElement {
+  const button = toolButton("tb-sync", "tbtn-icon sync", "sync");
+  const name = state.syncing ? s.syncing : s.sync;
+  button.setAttribute("aria-label", name);
+  button.title = name;
+  // aria-disabled, not disabled: the button keeps its focus while the sync runs.
+  button.setAttribute("aria-disabled", String(state.syncing));
   button.setAttribute("aria-busy", String(state.syncing));
   button.addEventListener("click", () => void syncBoards());
   return button;
 }
 
-// -- painting ------------------------------------------------------------------
+/** Give the focus to a toolbar control by id, once it is painted. */
+function focusById(id: string) {
+  (document.getElementById(id) as HTMLElement | null)?.focus({ preventScroll: true });
+}
 
-function select<T extends string>(
+function openViewMenu() {
+  state.viewMenu = true;
+  render();
+  // Into the menu: its first chosen option, or the switch.
+  const pop = document.getElementById("tb-view-pop");
+  (pop?.querySelector<HTMLElement>('[aria-pressed="true"], [role="switch"]'))?.focus({ preventScroll: true });
+}
+
+/** Close the View menu. Only the menu and its button change, so an outside click lands where it was aimed. */
+function closeViewMenu(returnFocus: boolean) {
+  if (!state.viewMenu) return;
+  state.viewMenu = false;
+  document.getElementById("tb-view-pop")?.remove();
+  const button = document.getElementById("tb-view");
+  button?.setAttribute("aria-expanded", "false");
+  button?.classList.remove("on");
+  if (returnFocus) button?.focus({ preventScroll: true });
+}
+
+document.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (!state.viewMenu) return;
+    const target = e.target as Element | null;
+    if (target?.closest?.("#tb-view-pop, #tb-view")) return;
+    closeViewMenu(false);
+  },
+  true,
+);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !state.viewMenu || e.defaultPrevented) return;
+  const active = document.activeElement;
+  const inside = !!active?.closest?.("#tb-view-pop, #tb-view");
+  if (inside) e.preventDefault();
+  closeViewMenu(inside);
+});
+
+/** A small segmented choice inside the View menu; each press refetches at once and the menu stays open. */
+function miniSeg<T extends string>(
+  key: string,
   label: string,
   value: T,
   options: readonly T[],
   names: Record<T, string>,
-  onChange: (next: T) => void,
+  onPick: (next: T) => void,
 ): HTMLElement {
-  const wrap = el("label", "field");
-  wrap.append(el("span", "field-label", label));
-  const input = el("select");
+  const box = el("div", "pop-field");
+  const head = el("div", "pop-label", label);
+  head.id = `tb-${key}-label`;
+  const seg = el("div", `seg seg-sm seg-${key}`);
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-labelledby", head.id);
   for (const option of options) {
-    const node = el("option", undefined, names[option]);
-    node.value = option;
-    node.selected = option === value;
-    input.append(node);
+    const on = option === value;
+    const button = el("button", on ? "seg-on" : undefined, names[option]);
+    button.type = "button";
+    button.id = `tb-${key}-${option}`;
+    button.setAttribute("aria-pressed", String(on));
+    button.addEventListener("click", () => {
+      if (!on) onPick(option);
+    });
+    seg.append(button);
   }
-  input.addEventListener("change", () => onChange(input.value as T));
-  wrap.append(input);
-  return wrap;
+  box.append(head, seg);
+  return box;
 }
 
+function viewMenu(s: Strings): HTMLElement {
+  const pop = el("div", "pop");
+  pop.id = "tb-view-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", s.viewMenu);
+  const fields = viewMenuFields(state.view);
+  if (fields.includes("groupBy")) {
+    pop.append(miniSeg("group", s.groupBy, state.groupBy, GROUPS, s.groups, (groupBy) => void refetch({ groupBy })));
+  }
+  if (fields.includes("attention")) {
+    pop.append(miniSeg("attention", s.attention, state.attention, MODES, s.modes, (attention) => void refetch({ attention })));
+  }
+  const mine = el("button", "switch");
+  mine.type = "button";
+  mine.id = "tb-mine";
+  mine.setAttribute("role", "switch");
+  mine.setAttribute("aria-checked", String(state.mine));
+  const knob = el("span", "knob");
+  knob.setAttribute("aria-hidden", "true");
+  mine.append(el("span", undefined, s.mine), knob);
+  mine.addEventListener("click", () => void refetch({ mine: !state.mine }));
+  pop.append(mine);
+  return pop;
+}
+
+/** The status slot: a sync in flight, or the last result, on one line that never moves the layout. */
+function statusSlot(s: Strings): HTMLElement {
+  const slot = el("p", "tb-status");
+  slot.id = "tb-status";
+  slot.setAttribute("role", "status");
+  const text = state.syncing ? s.syncing : (state.flash?.text ?? "");
+  slot.textContent = text;
+  if (text) slot.title = text;
+  if (!state.syncing && state.flash) {
+    // A repaint redraws the line: the fade picks up where it was.
+    slot.classList.add("fading");
+    slot.style.animationDelay = `-${Date.now() - state.flash.at}ms`;
+  }
+  return slot;
+}
+
+/**
+ * Row 1, shared by every view: the view switch; then, pushed right, the status
+ * line, Sync (Flows and Now), View (its menu holds what the view can change)
+ * and New task (not in Calendar, which has no editor).
+ */
 function toolbar(s: Strings): HTMLElement {
   const bar = el("div", "toolbar");
-  const views = el("div", "seg");
+  const views = el("div", "seg seg-views");
   views.setAttribute("role", "group");
-  views.setAttribute("aria-label", s.view);
+  views.setAttribute("aria-label", s.viewSwitch);
   for (const view of VIEWS) {
-    const button = el("button", view === state.view ? "seg-on" : undefined, s.views[view]);
+    const on = view === state.view;
+    const button = el("button", on ? "seg-on" : undefined);
     button.type = "button";
-    button.setAttribute("aria-pressed", String(view === state.view));
+    button.id = `tb-v-${view}`;
+    button.setAttribute("aria-pressed", String(on));
+    // Narrow phones show the short label; the full one stays the button's name.
+    button.setAttribute("aria-label", s.views[view]);
+    button.title = s.views[view];
+    button.append(el("span", "full", s.views[view]), el("span", "short", s.viewsShort[view]));
     button.addEventListener("click", () => setView(view));
     views.append(button);
   }
-  bar.append(views);
-  const controls = el("div", "controls");
-  if (state.view === "flows") {
-    controls.append(select(s.groupBy, state.groupBy, GROUPS, s.groups, (groupBy) => void refetch({ groupBy })));
+  bar.append(views, statusSlot(s));
+
+  const actions = el("div", "tb-actions");
+  if (state.view !== "calendar") actions.append(syncButton(s));
+
+  const changed = viewSettingsChanged(state, viewMenuFields(state.view));
+  const viewButton = toolButton("tb-view", "tbtn-fold view-btn", "sliders", s.view);
+  if (state.viewMenu) viewButton.classList.add("on");
+  viewButton.title = s.viewMenu;
+  viewButton.setAttribute("aria-haspopup", "dialog");
+  viewButton.setAttribute("aria-expanded", String(state.viewMenu));
+  viewButton.setAttribute("aria-controls", "tb-view-pop");
+  if (changed) {
+    const dot = el("span", "dot");
+    dot.setAttribute("aria-hidden", "true");
+    viewButton.append(dot);
+    viewButton.setAttribute("aria-label", s.viewChanged);
   }
+  viewButton.addEventListener("click", () => {
+    if (state.viewMenu) closeViewMenu(true);
+    else openViewMenu();
+  });
+  actions.append(viewButton);
+  if (state.viewMenu) actions.append(viewMenu(s));
+
   if (state.view !== "calendar") {
-    controls.append(
-      select(s.attention, state.attention, MODES, s.modes, (attention) => void refetch({ attention })),
-    );
-  }
-  const mine = el("label", "check");
-  const box = el("input");
-  box.type = "checkbox";
-  box.checked = state.mine;
-  box.addEventListener("change", () => void refetch({ mine: box.checked }));
-  mine.append(box, el("span", undefined, s.mine));
-  controls.append(mine);
-  if (state.view !== "calendar") {
-    const add = el("button", "primary", s.newTask);
-    add.type = "button";
+    const add = toolButton("tb-new", "tbtn-fold primary", "plus", s.newTaskShort);
+    add.setAttribute("aria-label", s.newTask);
+    add.title = s.newTask;
     add.addEventListener("click", openCreate);
-    controls.append(add);
+    actions.append(add);
   }
-  bar.append(controls);
+  bar.append(actions);
   return bar;
 }
+
+/**
+ * Row 2, Flows only: the stream chips ("All" first) in one sideways-scrolling
+ * row, then "Back to today" for the track below.
+ */
+function streamRow(
+  open: FlowsOut["streams"],
+  current: FlowsOut["streams"][number] | null,
+  all: boolean,
+  track: HTMLElement,
+  s: Strings,
+): HTMLElement {
+  const row = el("div", "row2");
+  if (open.length > 1) {
+    const chips = el("div", "streams");
+    chips.setAttribute("role", "group");
+    chips.setAttribute("aria-label", s.stream);
+    const chip = (id: string, label: string, count: number, overdue: number, on: boolean, pick: () => void) => {
+      const button = el("button", on ? "chip-s on" : "chip-s");
+      button.type = "button";
+      button.id = id;
+      button.setAttribute("aria-pressed", String(on));
+      button.append(el("span", "chip-label", label), el("span", overdue > 0 ? "n late" : "n", String(count)));
+      // Overdue is red and bold, and said in words too.
+      if (overdue > 0) button.append(el("span", "sr-only", `, ${s.overdue(overdue)}`));
+      button.addEventListener("click", () => {
+        state.chipsX = chips.scrollLeft;
+        pick();
+      });
+      return button;
+    };
+    const total = open.reduce((n, st) => n + st.open, 0);
+    const late = open.reduce((n, st) => n + st.overdue, 0);
+    chips.append(
+      chip("tb-st-all", s.allStreams, total, late, all, () => {
+        state.focus = ALL_STREAMS;
+        render();
+      }),
+    );
+    open.forEach((st, i) => {
+      chips.append(
+        chip(`tb-st-${i}`, st.label, st.open, st.overdue, st === current, () => {
+          state.focus = st.key;
+          render();
+        }),
+      );
+    });
+    const edge = () => chips.classList.toggle("more-right", chips.scrollLeft + chips.clientWidth < chips.scrollWidth - 1);
+    chips.addEventListener(
+      "scroll",
+      () => {
+        if (!chips.isConnected) return;
+        state.chipsX = chips.scrollLeft;
+        edge();
+      },
+      { passive: true },
+    );
+    requestAnimationFrame(() => {
+      if (state.chipsX !== null) chips.scrollLeft = state.chipsX;
+      else {
+        // First paint: the chosen chip in view.
+        const on = chips.querySelector<HTMLElement>(".chip-s.on");
+        if (on && on.offsetLeft + on.offsetWidth > chips.clientWidth) {
+          chips.scrollLeft = on.offsetLeft + on.offsetWidth - chips.clientWidth + 32;
+        }
+      }
+      edge();
+    });
+    row.append(chips);
+  } else {
+    row.append(el("span", "row2-gap"));
+  }
+  const today = toolButton("tb-today", "tbtn-fold today", "today", s.todayShort);
+  today.setAttribute("aria-label", s.backToToday);
+  today.title = s.backToToday;
+  today.addEventListener("click", () => {
+    state.scrollX = null;
+    scrollToNow(track, true);
+  });
+  row.append(today);
+  return row;
+}
+
+// -- painting: the views ---------------------------------------------------------
 
 const pct = (x: number) => `${x * 100}%`;
 
@@ -872,48 +1156,21 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
   track.addEventListener(
     "scroll",
     () => {
-      state.scrollX = track.scrollLeft;
+      // A repaint detaches this track, which then reads 0: that is not the user scrolling.
+      if (track.isConnected) state.scrollX = track.scrollLeft;
     },
     { passive: true },
   );
   board.append(side, track);
-  // A picker of the streams with open tasks, most pressing first, led by
-  // "All". One stream: its name sits in the left column. All: the column
-  // goes and each lane gets a header pinned to the left edge as it scrolls.
+  // Chips for the streams with open tasks, most pressing first, led by "All".
+  // One stream: its name sits in the left column. All: the column goes and
+  // each lane gets a header pinned to the left edge as it scrolls.
   const open = data.streams.filter((st) => st.open > 0);
   const all = state.focus === ALL_STREAMS && open.length > 1;
   const shownStreams = visibleStreams(data.streams, all ? ALL_STREAMS : state.focus);
   const current = all ? null : shownStreams[0];
   if (all) board.classList.add("board-all");
-  if (open.length > 1) {
-    const pick = el("div", "seg stream-pick");
-    pick.setAttribute("role", "group");
-    pick.setAttribute("aria-label", s.stream);
-    const allButton = el("button", all ? "seg-on" : undefined);
-    allButton.type = "button";
-    allButton.setAttribute("aria-pressed", String(all));
-    const total = open.reduce((n, st) => n + st.open, 0);
-    const late = open.some((st) => st.overdue > 0);
-    allButton.append(el("span", undefined, s.allStreams), el("span", late ? "pick-n late" : "pick-n", String(total)));
-    allButton.addEventListener("click", () => {
-      state.focus = ALL_STREAMS;
-      render();
-    });
-    pick.append(allButton);
-    for (const st of open) {
-      const on = st === current;
-      const button = el("button", on ? "seg-on" : undefined);
-      button.type = "button";
-      button.setAttribute("aria-pressed", String(on));
-      button.append(el("span", undefined, st.label), el("span", st.overdue > 0 ? "pick-n late" : "pick-n", String(st.open)));
-      button.addEventListener("click", () => {
-        state.focus = st.key;
-        render();
-      });
-      pick.append(button);
-    }
-    wrap.append(pick);
-  }
+  wrap.append(streamRow(open, current ?? null, all, track, s), board);
   for (const stream of shownStreams) {
     const name = el("div", "name");
     name.append(el("b", undefined, stream.label));
@@ -961,15 +1218,6 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
       inner.append(lane);
     }
   }
-  const today = el("button", "ghost today", s.backToToday);
-  today.type = "button";
-  today.addEventListener("click", () => {
-    state.scrollX = null;
-    scrollToNow(track, true);
-  });
-  const actions = el("div", "flow-actions");
-  actions.append(syncButton(s), today);
-  wrap.append(actions, board);
   // After layout: back where the user left it, or with today in view.
   requestAnimationFrame(() => {
     if (state.scrollX === null) scrollToNow(track, false);
@@ -1400,12 +1648,17 @@ function calendarView(data: FlowsOut, s: Strings): HTMLElement {
 }
 
 function render() {
+  // A repaint rebuilds the toolbar: whichever of its controls had the focus gets it back.
+  const active = document.activeElement as HTMLElement | null;
+  const keep = active?.id?.startsWith("tb-") ? active.id : null;
+  paint();
+  if (keep && document.activeElement !== document.getElementById(keep)) focusById(keep);
+}
+
+function paint() {
   const s = STRINGS[state.locale];
   document.documentElement.lang = state.locale;
   root.replaceChildren(toolbar(s));
-  const live = el("p", "notice", state.editor ? "" : (state.notice ?? ""));
-  live.setAttribute("role", "status");
-  root.append(live);
   if (state.status === "error") {
     const box = el("div", "empty");
     box.append(el("p", undefined, s.failed));
