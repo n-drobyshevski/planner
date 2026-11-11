@@ -24,9 +24,10 @@ import {
 import type { FlowsOut, FlowSubtaskOut, FlowTaskOut, TaskDetailOut, TaskDetailSubtask } from "@/lib/mcp/flows";
 import {
   EMPTY_DRAFT,
-  RUNWAY_NARROW,
+  RUNWAY_NARROW_PX,
+  RUNWAY_TRACK_PX,
   RUNWAY_NOW_X,
-  SUB_RUNWAY_NARROW,
+  SUB_RUNWAY_NARROW_PX,
   STRINGS,
   attentionLevel,
   blockedByPatch,
@@ -90,6 +91,8 @@ interface State {
   expanded: Set<string>;
   /** the one stream the Flows view shows; null = the most pressing one */
   focus: string | null;
+  /** the Flows track's sideways scroll; null = today in view */
+  scrollX: number | null;
   /** tasks and subtasks whose subtasks are shown in the lane */
   unfolded: Set<string>;
 }
@@ -133,6 +136,7 @@ const state: State = {
   collections: null,
   expanded: new Set(),
   focus: null,
+  scrollX: null,
   unfolded: new Set(),
 };
 
@@ -600,10 +604,9 @@ function lockIcon(): SVGSVGElement {
   return svg;
 }
 
-/** About how wide the lane is, in px: the board's width less its name column (gone on a phone). */
+/** The lane's width in px: the whole scrollable track. */
 function laneWidth(): number {
-  const board = Math.min(880, document.documentElement.clientWidth) - 30;
-  return board <= 490 ? board : board - Math.min(150, Math.max(96, board * 0.2));
+  return RUNWAY_TRACK_PX;
 }
 
 /** A lane row's bar: a task's own runway, or a subtask's on its dates. */
@@ -680,9 +683,9 @@ function runwayRow(row: LaneRow, ctx: RowContext, s: Strings): HTMLElement {
   // A subtask's title is short: it stays inside while the bar can hold it
   // whole (by an estimate of the lane's width), else it goes beside the bar.
   const narrow = isSub
-    ? runway.x1 - runway.x0 < SUB_RUNWAY_NARROW ||
+    ? (runway.x1 - runway.x0) * laneWidth() < SUB_RUNWAY_NARROW_PX ||
       (runway.x1 - runway.x0) * laneWidth() < title.length * 7 + 14 + (blocked ? 16 : 0) + (hasChildren(row) ? 22 : 0)
-    : runway.x1 - runway.x0 < RUNWAY_NARROW;
+    : (runway.x1 - runway.x0) * laneWidth() < Math.max(RUNWAY_NARROW_PX, Math.min(260, title.length * 7 + 24));
   const inner = el("span", "bar-title");
   if (blocked) inner.append(lockIcon());
   if (!narrow) inner.append(el("span", "bar-text", title));
@@ -787,6 +790,13 @@ function linksOverlay(rows: readonly LaneRow[], today: string, height: number): 
   return [svg, ...heads];
 }
 
+/** Scroll the Flows track so today sits about a third of the way in. */
+function scrollToNow(track: HTMLElement, smooth: boolean) {
+  const target = RUNWAY_NOW_X * RUNWAY_TRACK_PX - track.clientWidth / 3;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  track.scrollTo({ left: Math.max(0, target), behavior: smooth && !reduce ? "smooth" : "auto" });
+}
+
 function ruler(today: string, s: Strings): HTMLElement {
   const axis = el("div", "axis");
   axis.setAttribute("aria-hidden", "true");
@@ -804,7 +814,25 @@ function ruler(today: string, s: Strings): HTMLElement {
 function flowsView(data: FlowsOut, s: Strings): HTMLElement {
   const wrap = el("div", "flows");
   const board = el("div", "board");
-  board.append(el("div", "corner"), ruler(data.date, s));
+  // The name column stays put; the axis and the lane scroll sideways together.
+  const side = el("div", "side");
+  side.append(el("div", "corner"));
+  const track = el("div", "track");
+  track.tabIndex = 0;
+  track.setAttribute("role", "region");
+  track.setAttribute("aria-label", s.timeline);
+  const inner = el("div", "track-inner");
+  inner.style.width = `${RUNWAY_TRACK_PX}px`;
+  inner.append(ruler(data.date, s));
+  track.append(inner);
+  track.addEventListener(
+    "scroll",
+    () => {
+      state.scrollX = track.scrollLeft;
+    },
+    { passive: true },
+  );
+  board.append(side, track);
   // One stream at a time: a picker of the streams with open tasks, most
   // pressing first. A focus that is gone (regrouped, all done) falls back.
   const open = data.streams.filter((st) => st.open > 0);
@@ -865,9 +893,21 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
       lane.append(toggle);
     }
     if (unsent > 0 && (open || folded === 0)) lane.append(el("div", "more", s.more(unsent)));
-    board.append(name, lane);
+    side.append(name);
+    inner.append(lane);
   }
-  wrap.append(board);
+  const today = el("button", "ghost today", s.backToToday);
+  today.type = "button";
+  today.addEventListener("click", () => {
+    state.scrollX = null;
+    scrollToNow(track, true);
+  });
+  wrap.append(today, board);
+  // After layout: back where the user left it, or with today in view.
+  requestAnimationFrame(() => {
+    if (state.scrollX === null) scrollToNow(track, false);
+    else track.scrollLeft = state.scrollX;
+  });
 
   wrap.append(editorPanel(s) ?? hintPanel(s));
   return wrap;

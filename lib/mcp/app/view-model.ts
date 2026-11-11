@@ -100,6 +100,8 @@ export const STRINGS = {
     doneFailed: "Could not mark it done.",
     truncated: "Showing the 30 most pressing streams.",
     today: "today",
+    backToToday: "Back to today",
+    timeline: "Timeline, scrolls sideways",
     tomorrow: "tomorrow",
     inDays: (n: number) => `in ${n}d`,
     late: (n: number) => `${n}d late`,
@@ -199,6 +201,8 @@ export const STRINGS = {
     doneFailed: "Не получилось отметить.",
     truncated: "Показаны 30 самых срочных направлений.",
     today: "сегодня",
+    backToToday: "К сегодня",
+    timeline: "Шкала времени, прокручивается вбок",
     tomorrow: "завтра",
     inDays: (n: number) => `через ${n} ${ruPlural(n, "день", "дня", "дней")}`,
     late: (n: number) => `опоздание ${n} ${ruPlural(n, "день", "дня", "дней")}`,
@@ -314,9 +318,13 @@ export function stripMarks(tasks: readonly FlowTaskOut[], today: string): StripM
 
 // -- Runways: the Flows view --------------------------------------------------
 
-/** The Flows view shows this many days before and after today. */
-export const RUNWAY_PAST_DAYS = 14;
-export const RUNWAY_FUTURE_DAYS = 21;
+/** The Flows track spans this many days before and after today; it scrolls sideways. */
+export const RUNWAY_PAST_DAYS = 42;
+export const RUNWAY_FUTURE_DAYS = 84;
+/** One day's width on the Flows track, in px (the track is wider than the view). */
+export const RUNWAY_DAY_PX = 16;
+/** The whole track's width, in px. */
+export const RUNWAY_TRACK_PX = (RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS) * RUNWAY_DAY_PX;
 /** Where today sits across the track (0..1). */
 export const RUNWAY_NOW_X = RUNWAY_PAST_DAYS / (RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS);
 /** How far past today an undated task's open-ended runway is drawn. */
@@ -376,10 +384,10 @@ export function runwayOf(task: FlowTaskOut, today: string): Runway {
   };
 }
 
-/** A bar narrower than this share of the track cannot hold its title: it goes beside the bar. */
-export const RUNWAY_NARROW = 0.24;
+/** A bar narrower than this many px cannot hold its title: it goes beside the bar. */
+export const RUNWAY_NARROW_PX = 120;
 /** The same for a subtask's thinner bar, whose title is shorter and smaller. */
-export const SUB_RUNWAY_NARROW = 0.1;
+export const SUB_RUNWAY_NARROW_PX = 48;
 
 /** Where a runway's words go: inside the bar, after it, or before it. */
 export function runwayLabelSide(runway: Runway): "after" | "before" | "inside" {
