@@ -120,7 +120,9 @@ describe("pickLocale", () => {
 });
 
 import {
+  RUNWAY_FUTURE_DAYS,
   RUNWAY_NOW_X,
+  RUNWAY_PAST_DAYS,
   calendarDays,
   nowItems,
   runwayLabelSide,
@@ -135,8 +137,9 @@ describe("runwayOf", () => {
       TODAY,
     );
     expect(r.state).toBe("open");
-    expect(r.x0).toBeCloseTo(7 / 35);
-    expect(r.x1).toBeCloseTo(21 / 35);
+    const span = RUNWAY_PAST_DAYS + RUNWAY_FUTURE_DAYS;
+    expect(r.x0).toBeCloseTo((RUNWAY_PAST_DAYS - 7) / span);
+    expect(r.x1).toBeCloseTo((RUNWAY_PAST_DAYS + 7) / span);
     expect(r.fill).toBeCloseTo(0.4);
     expect(r.over).toBeNull();
     expect(r.x0 < RUNWAY_NOW_X && RUNWAY_NOW_X < r.x1).toBe(true);
@@ -161,7 +164,7 @@ describe("runwayOf", () => {
   });
 
   it("clamps into the track and says which ends are cut off", () => {
-    const r = runwayOf(task({ start: "2026-09-01", dueDate: "2027-01-15" }), TODAY);
+    const r = runwayOf(task({ start: "2026-08-01", dueDate: "2027-04-15" }), TODAY);
     expect([r.x0, r.x1, r.clippedStart, r.clippedEnd]).toEqual([0, 1, true, true]);
   });
 
@@ -185,15 +188,19 @@ describe("runwayOf", () => {
 describe("runwayLabelSide", () => {
   it("puts the words after the bar, before it near the right edge, inside a full-width one", () => {
     expect(runwayLabelSide(runwayOf(task({ start: "2026-11-03", dueDate: "2026-11-12" }), TODAY))).toBe("after");
-    expect(runwayLabelSide(runwayOf(task({ start: "2026-11-20", dueDate: "2026-11-30" }), TODAY))).toBe("before");
-    expect(runwayLabelSide(runwayOf(task({ start: "2026-09-01", dueDate: "2026-12-20" }), TODAY))).toBe("inside");
+    expect(runwayLabelSide(runwayOf(task({ start: "2027-01-10", dueDate: "2027-01-30" }), TODAY))).toBe("before");
+    expect(runwayLabelSide(runwayOf(task({ start: "2026-08-01", dueDate: "2027-01-30" }), TODAY))).toBe("inside");
   });
 });
 
 describe("runwayTicks", () => {
   it("labels Mondays, but none under the Now pill or at the cut-off right edge", () => {
     const ticks = runwayTicks(TODAY, "en");
-    expect(ticks.map((t) => t.label)).toEqual(["2 Nov", "16 Nov", "23 Nov"]);
+    const labels = ticks.map((t) => t.label);
+    expect(labels).toContain("2 Nov");
+    expect(labels).not.toContain("9 Nov"); // under the Now pill
+    expect(labels).toContain("16 Nov");
+    expect(labels).toHaveLength(16); // every Monday across the 18-week track, less the one under Now
     expect(ticks.every((t) => t.x > 0 && t.x < 0.95)).toBe(true);
   });
 });
