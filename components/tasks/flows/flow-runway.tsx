@@ -15,6 +15,10 @@ import type { Runway } from "@/lib/tasks/flows-runway";
 
 const DOTS = "2 2.5"; // the calendar's "pencilled in / not yet real" dash
 
+/** A padlock on a 16×16 grid: the "waits for another task" mark. */
+export const LOCK_PATH =
+  "M5 7V5a3 3 0 0 1 6 0v2h.5A1.5 1.5 0 0 1 13 8.5v5A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5v-5A1.5 1.5 0 0 1 4.5 7H5Zm1.5 0h3V5a1.5 1.5 0 0 0-3 0v2Z";
+
 /** Tint strengths over the card for the empty runway, a planned one, and a done bar. */
 const TINT = 0.16;
 const PLANNED_TINT = 0.07;
@@ -78,6 +82,7 @@ export function RunwayBar({
   short,
   small,
   viewLeft = 0,
+  blocked,
 }: {
   /** unique, url-safe id prefix for this bar's clip/mask defs */
   uid: string;
@@ -98,6 +103,8 @@ export function RunwayBar({
   small?: boolean;
   /** the canvas's scroll offset: the title holds at the visible left edge */
   viewLeft?: number;
+  /** waits on an unfinished task: a padlock leads the bar (never colour alone) */
+  blocked?: boolean;
 }) {
   const { x1, x2, reach } = runwayExtent(r, x, h);
   const top = cy - h / 2;
@@ -123,7 +130,10 @@ export function RunwayBar({
   const textEnd = r.openEnded ? x2 + 4000 : x2 - pad - checkRoom;
   // Hold the title at the visible left edge while the bar's start is scrolled
   // off, but never push it past the point where it would no longer fit.
-  const tx = Math.min(Math.max(x1, viewLeft) + pad, Math.max(x1 + pad, x2 - pad - 80));
+  const lockSize = small ? 9 : 11;
+  const lockRoom = blocked ? lockSize + 4 : 0;
+  const lead = Math.min(Math.max(x1, viewLeft) + pad, Math.max(x1 + pad, x2 - pad - 80));
+  const tx = lead + lockRoom;
   const showTitle = !!title && textEnd - tx > 18;
   // White title over the solid fill, ink over the tint; a done bar is all tint.
   const split = done ? x1 : x1 + fillW;
@@ -259,6 +269,15 @@ export function RunwayBar({
             {title}
           </text>
         </>
+      )}
+
+      {/* blocked: a padlock at the bar's visible start, ahead of the title */}
+      {blocked && (
+        <path
+          d={LOCK_PATH}
+          fill={split > lead + lockSize ? "#ffffff" : "var(--runway-ink)"}
+          transform={`translate(${Math.min(lead, x2 - lockSize - 2) - (small ? 2 : 3)} ${cy - lockSize / 2}) scale(${lockSize / 16})`}
+        />
       )}
 
       {/* done: a check at the bar's end, a second, colour-free signal */}

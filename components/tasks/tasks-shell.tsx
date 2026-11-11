@@ -37,7 +37,9 @@ import {
 import { collectTags } from "@/lib/tasks/tags";
 import { resolveTaskColor } from "@/lib/tasks/colors";
 import { groupByParent, indexById, progressDeep, subtreeIds } from "@/lib/tasks/tree";
-import { dependencyBlockedIds } from "@/lib/tasks/blocking";
+import { dependencyBlockedIds, openBlockersOf } from "@/lib/tasks/blocking";
+import { toast } from "sonner";
+import { useUiStore } from "@/stores/ui-store";
 import { positionBetween } from "@/lib/tasks/ordering";
 import { combineDateTime } from "@/lib/datetime/local";
 import { useViewerTimeZone } from "@/lib/datetime/timezone-context";
@@ -457,12 +459,37 @@ export function TasksShell({
     [editorInActive, childrenByParent, editorTasks],
   );
 
+  // Completing a task that still waits on an unfinished blocker is allowed (a
+  // soft block, the calm stance), with a quiet note of what it was waiting for.
+  // Read from the live task set, not the deferred blocked set, so the note is
+  // right on the very click. Titles stay hidden while they're masked.
+  const maskTitles = useUiStore((s) => s.maskTitles);
+  const toggleDone = (task: TaskRow) => {
+    if (task.completedAt == null) {
+      const open = openBlockersOf(task.id, dependencies, indexById(tasks));
+      if (open.length > 0) {
+        toast(
+          maskTitles
+            ? t("dependencies.stillWaitingForCount", { count: open.length })
+            : t("dependencies.stillWaitingFor", {
+                titles: open
+                  .slice(0, 3)
+                  .map((tk) => tk.title)
+                  .join(", "),
+                more: Math.max(0, open.length - 3),
+              }),
+        );
+      }
+    }
+    void mutations.toggleDone(task);
+  };
+
   // One grouped prop for the views instead of a six-way handler drill.
   const actions: TaskActions = {
     // Click a task → its read-only details panel (mirrors the calendar's
     // event-click → EventDetails). "Edit" inside the panel opens the full editor.
     open: (t) => dialogs.openDetails(t.id),
-    toggleDone: (t) => void mutations.toggleDone(t),
+    toggleDone,
     move: (t, boardId, position) => void mutations.move(t, boardId, position),
     reorderFlow: (t, flowPos) => void mutations.reorderFlow(t, flowPos),
     create: (boardId) => dialogs.openCreate(boardId),
@@ -595,6 +622,8 @@ export function TasksShell({
                     savedStreams={savedStreams}
                     expandLane={expandLane}
                     loading={eventsLoading || blocksLoading}
+                    dependencies={dependencies}
+                    blockedIds={dependencyBlocked}
                   />
                 ) : view === "board" ? (
                   <TaskBoard
@@ -605,6 +634,7 @@ export function TasksShell({
                     colorOf={colorOf}
                     members={memberMap}
                     progressOf={progressFor}
+                    blockedIds={dependencyBlocked}
                     treeById={collectionById}
                     treeByParent={childrenByParent}
                     actions={actions}
@@ -616,6 +646,7 @@ export function TasksShell({
                     colorOf={colorOf}
                     members={memberMap}
                     progressOf={progressFor}
+                    blockedIds={dependencyBlocked}
                     treeById={collectionById}
                     treeByParent={childrenByParent}
                     actions={actions}
@@ -728,7 +759,7 @@ export function TasksShell({
           scheduledBlocks={blocksByTask.get(detailsTask.id) ?? []}
           onEdit={() => dialogs.editFromDetails(detailsTask.id)}
           onDelete={() => dialogs.deleteFromDetails(detailsTask)}
-          onToggleDone={() => void mutations.toggleDone(detailsTask)}
+          onToggleDone={() => toggleDone(detailsTask)}
           onSchedule={() => dialogs.scheduleFromDetails(detailsTask)}
           onAddSubtask={() => {
             dialogs.openCreate(undefined, detailsTask.id);
@@ -761,7 +792,7 @@ export function TasksShell({
             void mutations.move(detailsTask, boardId, positionBetween(last, null));
           }}
           onOpenSubtask={(id) => dialogs.openDetails(id)}
-          onToggleSubtaskDone={(st) => void mutations.toggleDone(st)}
+          onToggleSubtaskDone={(st) => toggleDone(st)}
         />
       )}
 

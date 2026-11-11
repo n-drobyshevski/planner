@@ -70,6 +70,8 @@ export function SortableCard(props: {
   progress: { done: number; total: number } | null;
   /** another card is hovering this one's centre, about to nest under it */
   nesting?: boolean;
+  /** waiting on an unfinished dependency */
+  blocked?: boolean;
   onOpen: () => void;
   onToggleDone: () => void;
   onChangeColor: (color: string | null) => void;
@@ -100,6 +102,7 @@ export function SortableCard(props: {
         assignee={props.assignee}
         progress={props.progress}
         nesting={props.nesting}
+        blocked={props.blocked}
         onOpen={props.onOpen}
         onToggleDone={props.onToggleDone}
         dragging={isDragging}

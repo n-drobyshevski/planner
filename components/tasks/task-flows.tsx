@@ -52,6 +52,7 @@ import {
   type StreamRow,
 } from "@/lib/tasks/flows-layout";
 import { progressDeep, type ById } from "@/lib/tasks/tree";
+import { depLinksOf, type DepEdgeIn } from "@/lib/tasks/flows-deps";
 import { runwayDueLabel, type Runway } from "@/lib/tasks/flows-runway";
 import {
   filterLanes,
@@ -130,6 +131,10 @@ export interface TaskFlowsProps {
   loading?: boolean;
   /** stream keys open on first render (the dev preview presets one) */
   initialExpandedStreams?: string[];
+  /** every waits-for edge in scope: drawn as arrows for the hovered / focused runway */
+  dependencies?: readonly DepEdgeIn[];
+  /** tasks waiting on an unfinished dependency (padlock on their bars) */
+  blockedIds?: ReadonlySet<string>;
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -156,6 +161,8 @@ export function TaskFlows({
   expandLane,
   loading,
   initialExpandedStreams,
+  dependencies,
+  blockedIds,
 }: TaskFlowsProps) {
   const t = useTranslations("tasks");
   const locale = useLocale();
@@ -618,6 +625,18 @@ export function TaskFlows({
         t("flows.runway.subtasks", { done: r.subtasks.done, total: r.subtasks.total }),
       );
     }
+    // Its links in words, so the arrows are never the only way to know them.
+    if (dependencies && dependencies.length > 0) {
+      const { blockers, holds } = depLinksOf(seg.task.id, dependencies);
+      const open = blockers
+        .map((id) => treeById.get(id))
+        .filter((b) => b && b.completedAt == null)
+        .map((b) => b!.title);
+      if (blockedIds?.has(seg.task.id) && open.length > 0) {
+        parts.push(t("flows.runway.waitsFor", { titles: open.join(", ") }));
+      }
+      if (holds.length > 0) parts.push(t("flows.runway.holds", { count: holds.length }));
+    }
     return `${seg.task.title}: ${parts.join(", ")}`;
   }
 
@@ -901,6 +920,8 @@ export function TaskFlows({
             runwayShort={runwayShort}
             streamLabel={streamRunwayLabel}
             moreShort={(count) => t("flows.runway.more", { count })}
+            deps={dependencies}
+            blockedIds={blockedIds}
           />
         </div>
       </div>

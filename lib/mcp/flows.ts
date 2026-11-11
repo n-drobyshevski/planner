@@ -1,5 +1,5 @@
 import "server-only";
-import type { Board, Category, Collection, Member, TaskRow } from "@/lib/types";
+import type { Board, Category, Collection, Member, TaskDependency, TaskRow } from "@/lib/types";
 import type { AttentionMode } from "@/lib/tasks/attention";
 import { buildFlowLanes } from "@/lib/tasks/flows-layout";
 import {
@@ -13,7 +13,8 @@ import {
 } from "@/lib/tasks/flows-display";
 import { buildStreams, rankStreams } from "@/lib/tasks/flows-streams";
 import { laneAttention } from "@/lib/tasks/attention";
-import { groupByParent, progressDeep } from "@/lib/tasks/tree";
+import { MAX_DEPTH, flattenTree, groupByParent, progressDeep, subtreeIds } from "@/lib/tasks/tree";
+import { blockedIds, openBlockersOf } from "@/lib/tasks/blocking";
 import { clipTitle } from "./projection";
 
 /** The groupings `get_flows` offers ("none" is the web app's headerless mode, not a stream split). */
@@ -30,6 +31,19 @@ export const MCP_FLOWS_GROUP_BYS = [
 /** Streams returned at most; more than this and the output is cut to the top-ranked. */
 export const MAX_STREAMS = 30;
 
+/** A task another one waits for, as `waitingOn` names it. */
+export interface FlowBlockerOut {
+  id: string;
+  title: string;
+}
+
+/** Open blockers named per task at most (`waitingOn`). */
+export const MAX_WAITING_ON = 3;
+/** Subtasks `show_flows` hands its view per top-level task at most. */
+export const MAX_FLOW_SUBTASKS = 100;
+/** Dependency ids `show_flows` hands its view per task at most (`blockedBy`). */
+export const MAX_FLOW_BLOCKED_BY = 50;
+
 export interface FlowTaskOut {
   id: string;
   title: string;
@@ -42,6 +56,43 @@ export interface FlowTaskOut {
   score: number;
   overdue: boolean;
   tags?: string[];
+  /** set only while the task waits for an unfinished dependency */
+  blocked?: true;
+  /** its unfinished blockers, most pressing (earliest due) first, at most MAX_WAITING_ON */
+  waitingOn?: FlowBlockerOut[];
+  /** how many open tasks wait for this one; absent when none */
+  holds?: number;
+  /**
+   * `show_flows`' view only (FlowsInput.withSubtasks): the ids of every task
+   * it waits for, open or done, at most MAX_FLOW_BLOCKED_BY; absent when none.
+   * The view draws its links from this; `waitingOn` stays the labels.
+   */
+  blockedBy?: string[];
+  /**
+   * `show_flows`' view only (FlowsInput.withSubtasks): the whole subtask tree,
+   * flattened pre-order, done ones included, at most MAX_FLOW_SUBTASKS.
+   */
+  subtasks?: FlowSubtaskOut[];
+}
+
+/** One subtask of a Flows task, for the view. */
+export interface FlowSubtaskOut {
+  id: string;
+  title: string;
+  parentId: string;
+  /** 1 = a direct child of the top-level task (never more than MAX_DEPTH) */
+  depth: number;
+  done: boolean;
+  /** planned start, "yyyy-MM-dd" */
+  start?: string;
+  /** due date, "yyyy-MM-dd" */
+  due?: string;
+  /** set only while open and waiting: on an unfinished dependency, or on an earlier sibling under a "do in order" parent */
+  blocked?: true;
+  /** its unfinished dependency blockers, most pressing first, at most MAX_WAITING_ON */
+  waitingOn?: FlowBlockerOut[];
+  /** every task it waits for, open or done, at most MAX_FLOW_BLOCKED_BY (as FlowTaskOut.blockedBy) */
+  blockedBy?: string[];
 }
 
 export interface FlowStreamOut {
@@ -86,6 +137,10 @@ export interface FlowsInput {
   filter?: FlowsFilter;
   /** echoed back as `stream` */
   streamName?: string;
+  /** every blocks/blocked-by edge the caller can see (RLS-scoped) */
+  dependencies: TaskDependency[];
+  /** add each task's flattened subtask tree (`show_flows`' view); default false */
+  withSubtasks?: boolean;
 }
 
 /** Plain English: this output is read by a machine/LLM, not localized. */
@@ -106,6 +161,104 @@ function progressOf(
 ): Pick<FlowTaskOut, "progress"> {
   const { done, total } = progressDeep(taskId, byParent);
   return total > 0 ? { progress: { done, total } } : {};
+}
+
+/** Dependency lookups shared by the Flows and task-detail projections. */
+interface DepIndex {
+  byId: Map<string, TaskRow>;
+  deps: readonly TaskDependency[];
+  /** blocker id -> ids of the tasks waiting for it */
+  waiters: Map<string, string[]>;
+}
+
+function indexDeps(tasks: readonly TaskRow[], deps: readonly TaskDependency[]): DepIndex {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const waiters = new Map<string, string[]>();
+  for (const d of deps) {
+    const arr = waiters.get(d.dependsOnTaskId);
+    if (arr) {
+      if (!arr.includes(d.taskId)) arr.push(d.taskId);
+    } else waiters.set(d.dependsOnTaskId, [d.taskId]);
+  }
+  return { byId, deps, waiters };
+}
+
+/** `blocked` / `waitingOn` from the task's unfinished dependency blockers (nothing once done). */
+function waitingOf(t: TaskRow, ix: DepIndex): { blocked?: true; waitingOn?: FlowBlockerOut[] } {
+  if (t.completedAt != null) return {};
+  const open = openBlockersOf(t.id, ix.deps, ix.byId);
+  if (open.length === 0) return {};
+  return {
+    blocked: true,
+    waitingOn: open.slice(0, MAX_WAITING_ON).map((b) => ({ id: b.id, title: clipTitle(b.title) })),
+  };
+}
+
+/** For the view: every visible task `t` waits for, open or done, capped. */
+function blockedByOf(t: TaskRow, ix: DepIndex): { blockedBy?: string[] } {
+  const ids: string[] = [];
+  for (const d of ix.deps) {
+    if (d.taskId !== t.id || ids.includes(d.dependsOnTaskId) || !ix.byId.has(d.dependsOnTaskId)) continue;
+    ids.push(d.dependsOnTaskId);
+    if (ids.length >= MAX_FLOW_BLOCKED_BY) break;
+  }
+  return ids.length > 0 ? { blockedBy: ids } : {};
+}
+
+/** Open tasks (visible to the caller) that wait for `t`. */
+function holdsOf(t: TaskRow, ix: DepIndex): number {
+  let n = 0;
+  for (const id of ix.waiters.get(t.id) ?? []) {
+    const w = ix.byId.get(id);
+    if (w && w.completedAt == null) n++;
+  }
+  return n;
+}
+
+/** Ids blocked by sequential order among each parent's children ("do in order"). */
+function sequentialBlocked(
+  rootId: string,
+  byParent: Map<string | null, TaskRow[]>,
+  byId: ReadonlyMap<string, TaskRow>,
+): Set<string> {
+  const out = new Set<string>();
+  for (const id of subtreeIds(rootId, byParent)) {
+    const parent = byId.get(id);
+    if (!parent?.sequential) continue;
+    for (const b of blockedIds(byParent.get(id) ?? [], true)) out.add(b);
+  }
+  return out;
+}
+
+/** A top-level task's subtree for the view: pre-order, depth ≤ MAX_DEPTH, capped. */
+function flowSubtasks(
+  root: TaskRow,
+  byParent: Map<string | null, TaskRow[]>,
+  ix: DepIndex,
+): FlowSubtaskOut[] {
+  const nodes = flattenTree(root.id, byParent, subtreeIds(root.id, byParent));
+  const seqBlocked = sequentialBlocked(root.id, byParent, ix.byId);
+  const out: FlowSubtaskOut[] = [];
+  for (const { task: s, depth: d0 } of nodes) {
+    const depth = d0 + 1;
+    if (depth > MAX_DEPTH) continue;
+    if (out.length >= MAX_FLOW_SUBTASKS) break;
+    const done = s.completedAt != null;
+    const wait = waitingOf(s, ix);
+    out.push({
+      id: s.id,
+      title: clipTitle(s.title),
+      parentId: s.parentId ?? root.id,
+      depth,
+      done,
+      ...(s.startDate ? { start: s.startDate } : {}),
+      ...(s.dueDate ? { due: s.dueDate } : {}),
+      ...(!done && (wait.blocked || seqBlocked.has(s.id)) ? { blocked: true as const } : {}),
+      ...(wait.waitingOn ? { waitingOn: wait.waitingOn } : {}),
+      ...blockedByOf(s, ix),
+    });
+  }
+  return out;
 }
 
 /**
@@ -139,6 +292,7 @@ export function projectFlows(input: FlowsInput): FlowsOut {
   const { date, groupBy, attention, nowMs } = input;
 
   const byParent = groupByParent(input.tasks);
+  const ix = indexDeps(input.tasks, input.dependencies);
   const topLevel = (byParent.get(null) ?? []).filter(
     (t) => !input.mine || t.ownerId === input.memberId || t.assigneeId === input.memberId,
   );
@@ -184,6 +338,7 @@ export function projectFlows(input: FlowsInput): FlowsOut {
       .slice(0, input.limit)
       .map(({ lane, info }): FlowTaskOut => {
         const t = lane.task;
+        const holds = holdsOf(t, ix);
         return {
           id: t.id,
           title: clipTitle(t.title),
@@ -194,6 +349,9 @@ export function projectFlows(input: FlowsInput): FlowsOut {
           score: round2(info.score),
           overdue: info.overdue,
           ...(t.tags.length > 0 ? { tags: t.tags } : {}),
+          ...waitingOf(t, ix),
+          ...(holds > 0 ? { holds } : {}),
+          ...(input.withSubtasks ? { ...blockedByOf(t, ix), subtasks: flowSubtasks(t, byParent, ix) } : {}),
         };
       });
     return {
@@ -227,6 +385,23 @@ export interface TaskDetailSubtask {
   done: boolean;
   /** 1 = a direct child */
   depth: number;
+  /** its own subtasks are "do in order" */
+  sequential: boolean;
+  /** open and waiting: on an unfinished dependency, or on an earlier sibling under a "do in order" parent */
+  blocked: boolean;
+  /** planned start, "yyyy-MM-dd" */
+  start?: string;
+  /** due date, "yyyy-MM-dd" */
+  due?: string;
+  /** ids of the tasks it waits for (done or not); absent when none */
+  blockedBy?: string[];
+}
+
+/** A task on either end of a dependency, as `get_task` lists it. */
+export interface TaskDetailLink {
+  id: string;
+  title: string;
+  done: boolean;
 }
 
 export interface TaskDetailOut {
@@ -239,6 +414,12 @@ export interface TaskDetailOut {
   /** absent = the task is in no collection */
   collectionId?: string;
   tags: string[];
+  /** its subtasks are "do in order" */
+  sequential: boolean;
+  /** the tasks this one waits for (done or not) */
+  blockedBy: TaskDetailLink[];
+  /** the tasks waiting for this one (done or not) */
+  blocks: TaskDetailLink[];
   /** the whole subtree, parent before child, siblings in their stored order */
   subtasks: TaskDetailSubtask[];
 }
@@ -251,17 +432,48 @@ const DETAIL_MAX_SUBTASKS = 100;
  * `get_task`'s output: the fields the Flows app edits, and the subtask tree
  * flattened pre-order. Pure. Never reads a description.
  */
-export function projectTaskDetail(task: TaskRow, all: TaskRow[]): TaskDetailOut {
+export function projectTaskDetail(
+  task: TaskRow,
+  all: TaskRow[],
+  dependencies: readonly TaskDependency[] = [],
+): TaskDetailOut {
   const byParent = groupByParent(all);
+  const ix = indexDeps(all, dependencies);
+  const link = (t: TaskRow): TaskDetailLink => ({
+    id: t.id,
+    title: clipTitle(t.title),
+    done: t.completedAt != null,
+  });
+  const blockersOf = (id: string): TaskRow[] => {
+    const out: TaskRow[] = [];
+    for (const d of dependencies) {
+      const b = d.taskId === id ? ix.byId.get(d.dependsOnTaskId) : undefined;
+      if (b && !out.includes(b)) out.push(b);
+    }
+    return out;
+  };
   const subtasks: TaskDetailSubtask[] = [];
   const seen = new Set<string>([task.id]);
   const walk = (parentId: string, depth: number) => {
     if (depth > DETAIL_MAX_DEPTH) return;
     const kids = [...(byParent.get(parentId) ?? [])].sort((a, b) => a.position - b.position);
+    const seqBlocked = blockedIds(kids, ix.byId.get(parentId)?.sequential ?? false);
     for (const kid of kids) {
       if (seen.has(kid.id) || subtasks.length >= DETAIL_MAX_SUBTASKS) continue;
       seen.add(kid.id);
-      subtasks.push({ id: kid.id, title: clipTitle(kid.title), done: kid.completedAt != null, depth });
+      const done = kid.completedAt != null;
+      const blockers = blockersOf(kid.id);
+      subtasks.push({
+        id: kid.id,
+        title: clipTitle(kid.title),
+        done,
+        depth,
+        sequential: kid.sequential,
+        blocked: !done && (seqBlocked.has(kid.id) || blockers.some((b) => b.completedAt == null)),
+        ...(kid.startDate ? { start: kid.startDate } : {}),
+        ...(kid.dueDate ? { due: kid.dueDate } : {}),
+        ...(blockers.length > 0 ? { blockedBy: blockers.map((b) => b.id) } : {}),
+      });
       walk(kid.id, depth + 1);
     }
   };
@@ -275,6 +487,12 @@ export function projectTaskDetail(task: TaskRow, all: TaskRow[]): TaskDetailOut 
     ...(task.priority != null ? { priority: task.priority } : {}),
     ...(task.collectionId ? { collectionId: task.collectionId } : {}),
     tags: task.tags,
+    sequential: task.sequential,
+    blockedBy: blockersOf(task.id).map(link),
+    blocks: (ix.waiters.get(task.id) ?? [])
+      .map((id) => ix.byId.get(id))
+      .filter((t): t is TaskRow => t != null)
+      .map(link),
     subtasks,
   };
 }

@@ -21,17 +21,30 @@ import {
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
 
-import type { FlowsOut, FlowTaskOut, TaskDetailOut, TaskDetailSubtask } from "@/lib/mcp/flows";
+import type { FlowsOut, FlowSubtaskOut, FlowTaskOut, TaskDetailOut, TaskDetailSubtask } from "@/lib/mcp/flows";
 import {
   EMPTY_DRAFT,
   RUNWAY_NARROW,
   RUNWAY_NOW_X,
+  SUB_RUNWAY_NARROW,
   STRINGS,
   attentionLevel,
+  blockedByPatch,
   calendarDays,
   createArgs,
+  dependencyArrows,
+  dependencyEdges,
+  dimmedRows,
   draftOf,
+  flowItems,
+  hasChildren,
+  laneRows,
   nowItems,
+  offscreenBlockers,
+  subtaskRunway,
+  subtaskWaitTitle,
+  subtreeProgress,
+  waitCandidates,
   pickLocale,
   runwayLabel,
   runwayLabelSide,
@@ -41,6 +54,8 @@ import {
   taskDetail,
   updateArgs,
   type CalendarEventIn,
+  type LaneRow,
+  type Runway,
   type Strings,
   type TaskDraft,
   type ViewLocale,
@@ -75,6 +90,8 @@ interface State {
   expanded: Set<string>;
   /** the one stream the Flows view shows; null = the most pressing one */
   focus: string | null;
+  /** tasks and subtasks whose subtasks are shown in the lane */
+  unfolded: Set<string>;
 }
 
 /** Rows a stream shows before "and N more". */
@@ -93,6 +110,10 @@ interface Editor {
   /** the id whose delete button was pressed once and waits for a second press */
   confirmDelete: string | null;
   busy: boolean;
+  /** what it waits for, as chosen here; null until the task loads (edit) */
+  waits: { id: string; title: string }[] | null;
+  /** the "Waits for" search, as typed */
+  waitQuery: string;
 }
 
 const state: State = {
@@ -112,6 +133,7 @@ const state: State = {
   collections: null,
   expanded: new Set(),
   focus: null,
+  unfolded: new Set(),
 };
 
 const app = new App({ name: "Planner flows", version: "1.1.0" });
@@ -165,6 +187,16 @@ function findTask(id: string): FlowTaskOut | undefined {
   for (const stream of state.data?.streams ?? []) {
     const task = stream.tasks.find((t) => t.id === id);
     if (task) return task;
+  }
+  return undefined;
+}
+
+function findSubtask(id: string): FlowSubtaskOut | undefined {
+  for (const stream of state.data?.streams ?? []) {
+    for (const task of stream.tasks) {
+      const sub = task.subtasks?.find((t) => t.id === id);
+      if (sub) return sub;
+    }
   }
   return undefined;
 }
@@ -244,11 +276,15 @@ function complete(task: FlowTaskOut) {
 
 // -- editing -----------------------------------------------------------------------
 
+/** A tool that answered with an error: its message is meant for the member (a refused loop, say). */
+class ToolError extends Error {}
+
 /** Call one of this server's tools through the host; its JSON result, or a throw. */
 async function call(name: string, args: Record<string, unknown>): Promise<unknown> {
   const result = await app.callServerTool({ name, arguments: args });
   const first = result.content?.[0];
-  if (result.isError || !first || first.type !== "text") throw new Error("tool failed");
+  if (result.isError) throw new ToolError(first && first.type === "text" ? first.text : "");
+  if (!first || first.type !== "text") throw new Error("tool failed");
   return JSON.parse(first.text);
 }
 
@@ -289,6 +325,9 @@ async function loadDetail(id: string, keepDraft = false) {
     if (!isDetail(detail)) throw new Error("bad task");
     editor.detail = detail;
     editor.failed = false;
+    if (!keepDraft || editor.waits === null) {
+      editor.waits = (detail.blockedBy ?? []).map((b) => ({ id: b.id, title: b.title }));
+    }
     if (!keepDraft) editor.draft = draftOf(detail);
     // Kept drafts were made before the task loaded: they do not know its collection yet.
     else if (editor.draft.collection === "" && detail.collectionId && !editor.collectionTouched) {
@@ -300,11 +339,27 @@ async function loadDetail(id: string, keepDraft = false) {
   render();
 }
 
+const newEditor = (mode: Editor["mode"], draft: TaskDraft = { ...EMPTY_DRAFT }): Editor => ({
+  mode,
+  detail: null,
+  failed: false,
+  draft,
+  newSubtask: "",
+  collectionTouched: false,
+  confirmDelete: null,
+  busy: false,
+  waits: mode === "create" ? [] : null,
+  waitQuery: "",
+});
+
 function openEditor(id: string) {
   state.selected = id;
-  state.editor = { mode: "edit", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", collectionTouched: false, confirmDelete: null, busy: false };
+  state.notice = null;
+  state.editor = newEditor("edit");
   const known = findTask(id);
-  if (known) state.editor.draft = draftOf({ ...known, tags: known.tags ?? [] });
+  const sub = known ? undefined : findSubtask(id);
+  if (known) state.editor.draft = draftOf({ ...known, startDate: known.start, tags: known.tags ?? [] });
+  else if (sub) state.editor.draft = draftOf({ title: sub.title, dueDate: sub.due, startDate: sub.start, tags: [] });
   render();
   void loadCollections();
   void loadDetail(id);
@@ -312,7 +367,8 @@ function openEditor(id: string) {
 
 function openCreate() {
   state.selected = null;
-  state.editor = { mode: "create", detail: null, failed: false, draft: { ...EMPTY_DRAFT }, newSubtask: "", collectionTouched: false, confirmDelete: null, busy: false };
+  state.notice = null;
+  state.editor = newEditor("create");
   if (state.collections?.[0]) state.editor.draft.collection = state.collections[0].id;
   render();
   void loadCollections();
@@ -344,8 +400,9 @@ async function mutate(work: () => Promise<string | null>, said: string) {
     const noticed = await work();
     state.notice = noticed;
     tellModel(said);
-  } catch {
-    state.notice = s.actionFailed;
+  } catch (err) {
+    // A refusal the tool explains (a loop, say) is shown as it is.
+    state.notice = err instanceof ToolError && err.message ? err.message : s.actionFailed;
     if (editor) editor.busy = false;
     render();
     return;
@@ -363,7 +420,9 @@ async function saveEditor() {
   const editor = state.editor;
   if (!editor) return;
   if (editor.mode === "create") {
-    const args = createArgs(editor.draft);
+    const made0 = createArgs(editor.draft);
+    const waits = (editor.waits ?? []).map((w) => w.id);
+    const args = made0 && waits.length ? { ...made0, blockedBy: waits } : made0;
     if (!args) {
       state.notice = s.titleNeeded;
       render();
@@ -374,7 +433,7 @@ async function saveEditor() {
       state.editor = null;
       if (typeof made.id === "string") {
         state.selected = made.id;
-        state.editor = { mode: "edit", detail: null, failed: false, draft: { ...editor.draft }, newSubtask: "", collectionTouched: false, confirmDelete: null, busy: false };
+        state.editor = newEditor("edit", { ...editor.draft });
       }
       return s.created(String(args.title));
     }, `The user created the task "${String(args.title)}" in the Flows view.`);
@@ -388,6 +447,13 @@ async function saveEditor() {
     render();
     return;
   }
+  const blockedBy = editor.waits
+    ? blockedByPatch(
+        (detail.blockedBy ?? []).map((b) => b.id),
+        editor.waits.map((w) => w.id),
+      )
+    : undefined;
+  if (blockedBy) patch.blockedBy = blockedBy;
   if (Object.keys(patch).length === 0) {
     state.notice = s.saved;
     render();
@@ -395,6 +461,8 @@ async function saveEditor() {
   }
   await mutate(async () => {
     await call("update_task", { id: detail.id, ...patch });
+    // Saved: the next load takes what it waits for from the server again.
+    editor.waits = null;
     return s.saved;
   }, `The user edited the task "${detail.title}" (id ${detail.id}) in the Flows view: changed ${Object.keys(patch).join(", ")}.`);
 }
@@ -514,53 +582,151 @@ function toolbar(s: Strings): HTMLElement {
 
 const pct = (x: number) => `${x * 100}%`;
 
-/** One task as a runway: a bar from its start to its deadline. */
-function runwayRow(task: FlowTaskOut, today: string, s: Strings): HTMLElement {
-  const row = el("div", "run");
-  const runway = runwayOf(task, today);
-  const label = runwayLabel(task, today, state.locale);
-  const detail = [label ?? s.noDeadline, task.progress ? s.subtasks(task.progress.done, task.progress.total) : ""]
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** The padlock every waiting bar carries, so "blocked" never rests on colour alone. */
+function lockIcon(): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "lock");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("fill", "currentColor");
+  path.setAttribute(
+    "d",
+    "M5 7V5a3 3 0 0 1 6 0v2h.5A1.5 1.5 0 0 1 13 8.5v5A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5v-5A1.5 1.5 0 0 1 4.5 7H5Zm1.5 0h3V5a1.5 1.5 0 0 0-3 0v2Z",
+  );
+  svg.append(path);
+  return svg;
+}
+
+/** About how wide the lane is, in px: the board's width less its name column (gone on a phone). */
+function laneWidth(): number {
+  const board = Math.min(880, document.documentElement.clientWidth) - 30;
+  return board <= 490 ? board : board - Math.min(150, Math.max(96, board * 0.2));
+}
+
+/** A lane row's bar: a task's own runway, or a subtask's on its dates. */
+function rowRunway(row: LaneRow, today: string): Runway {
+  return row.kind === "task" ? runwayOf(row.task, today) : subtaskRunway(row.sub, row.task, today);
+}
+
+interface RowContext {
+  today: string;
+  dim: boolean;
+  /** a connector leaves or enters this row: its words keep clear of the line's turn */
+  linked: boolean;
+  /** the selected row only: its blockers that are not on screen */
+  offscreen: { id: string; title: string }[];
+}
+
+function toggleSelect(id: string) {
+  if (state.selected === id) closeEditor();
+  else openEditor(id);
+}
+
+/** One lane row: a task's runway, or (thinner) a subtask's. */
+function runwayRow(row: LaneRow, ctx: RowContext, s: Strings): HTMLElement {
+  const isSub = row.kind === "sub";
+  const el0 = el("div", isSub ? `run run-sub depth-${row.sub.depth}` : "run");
+  if (ctx.dim) el0.classList.add("dim");
+  if (row.kind === "sub" && row.sub.done) el0.classList.add("run-done");
+  const runway = rowRunway(row, ctx.today);
+  const title = isSub ? row.sub.title : row.task.title;
+  const blocked = isSub ? row.sub.blocked === true : row.task.blocked === true;
+  const done = isSub && row.sub.done;
+  const progress = isSub ? subtreeProgress(row.task.subtasks ?? [], row.id) : (row.task.progress ?? null);
+  const label = isSub
+    ? row.sub.due && !done
+      ? runwayLabel({ ...row.task, dueDate: row.sub.due }, ctx.today, state.locale)
+      : null
+    : runwayLabel(row.task, ctx.today, state.locale);
+  const waitTitles = isSub
+    ? [subtaskWaitTitle(row.sub, row.task.subtasks ?? [])].filter((t): t is string => !!t)
+    : (row.task.waitingOn ?? []).map((w) => w.title);
+  const detail = [
+    label ?? (isSub ? "" : s.noDeadline),
+    progress ? s.subtasks(progress.done, progress.total) : "",
+    blocked ? (waitTitles.length ? s.waitsDetail(waitTitles.join(", ")) : s.waiting) : "",
+    done ? s.doneShort : "",
+  ]
     .filter(Boolean)
     .join(", ");
 
+  const selected = state.selected === row.id;
   const bar = el("button", `bar bar-${runway.state}`);
   bar.type = "button";
   bar.style.left = pct(runway.x0);
   bar.style.width = pct(runway.x1 - runway.x0);
   if (runway.clippedStart) bar.classList.add("clip-start");
   if (runway.clippedEnd) bar.classList.add("clip-end");
-  if (state.selected === task.id) bar.classList.add("bar-selected");
-  if (attentionLevel(task.score) === "now") bar.classList.add("bar-urgent");
-  bar.setAttribute("aria-pressed", String(state.selected === task.id));
-  bar.setAttribute("aria-label", s.runway(task.title, detail));
-  bar.title = s.runway(task.title, detail);
-  bar.addEventListener("click", () => {
-    if (state.selected === task.id) closeEditor();
-    else openEditor(task.id);
-  });
-  if (runway.fill > 0) {
+  if (selected) bar.classList.add("bar-selected");
+  if (blocked) bar.classList.add("bar-blocked");
+  if (done) bar.classList.add("bar-done");
+  if (!isSub && attentionLevel(row.task.score) === "now") bar.classList.add("bar-urgent");
+  bar.setAttribute("aria-pressed", String(selected));
+  bar.setAttribute("aria-label", s.runway(title, detail));
+  bar.title = s.runway(title, detail);
+  bar.addEventListener("click", () => toggleSelect(row.id));
+  if (runway.fill > 0 || (progress && progress.done > 0)) {
+    const share = runway.fill > 0 ? runway.fill : progress ? progress.done / progress.total : 0;
     const fill = el("i", "fill");
-    fill.style.width = pct(runway.fill);
+    fill.style.width = pct(share);
     bar.append(fill);
   }
+  const expandable = hasChildren(row);
+  if (expandable) bar.classList.add("bar-has-chev");
   // A short runway cannot hold its title: it goes beside the bar instead.
-  const narrow = runway.x1 - runway.x0 < RUNWAY_NARROW;
-  if (!narrow) bar.append(el("span", "bar-title", task.title));
-  row.append(bar);
+  // A subtask's title is short: it stays inside while the bar can hold it
+  // whole (by an estimate of the lane's width), else it goes beside the bar.
+  const narrow = isSub
+    ? runway.x1 - runway.x0 < SUB_RUNWAY_NARROW ||
+      (runway.x1 - runway.x0) * laneWidth() < title.length * 7 + 14 + (blocked ? 16 : 0) + (hasChildren(row) ? 22 : 0)
+    : runway.x1 - runway.x0 < RUNWAY_NARROW;
+  const inner = el("span", "bar-title");
+  if (blocked) inner.append(lockIcon());
+  if (!narrow) inner.append(el("span", "bar-text", title));
+  if (inner.childNodes.length) bar.append(inner);
+  el0.append(bar);
+
+  if (expandable) {
+    const open = state.unfolded.has(row.id);
+    const chev = el("button", "chev", open ? "▾" : "▸");
+    chev.type = "button";
+    chev.style.left = pct(runway.x0);
+    chev.setAttribute("aria-expanded", String(open));
+    chev.setAttribute("aria-label", open ? s.collapse(title) : s.expand(title));
+    chev.addEventListener("click", () => {
+      if (open) state.unfolded.delete(row.id);
+      else state.unfolded.add(row.id);
+      render();
+    });
+    el0.append(chev);
+  }
 
   if (runway.over) {
     const over = el("div", "over");
     over.style.left = pct(runway.over.x0);
     over.style.width = pct(Math.max(0.012, runway.over.x1 - runway.over.x0));
-    row.append(over);
+    el0.append(over);
   }
-  // The deadline leads, so it is what survives when the words are cut short.
-  const words = [label ?? "", narrow ? task.title : ""].filter(Boolean).join(" · ");
+  // The count, then the deadline: what survives when the words are cut short.
+  const words = [
+    progress ? `${progress.done}/${progress.total}` : "",
+    label ?? "",
+    narrow ? title : "",
+    isSub && blocked && waitTitles[0] ? s.after(waitTitles[0]) : "",
+    ctx.offscreen.length ? s.waits(ctx.offscreen.map((b) => b.title).join(", ")) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   if (words) {
     // The words follow whatever ends last: the bar, or the overrun.
     const end = Math.max(runway.x1, runway.over?.x1 ?? 0);
     const side = runwayLabelSide(runway);
     const tag = el("span", runway.state === "late" ? "tag late" : "tag", words);
+    tag.setAttribute("aria-hidden", "true");
+    if (ctx.linked) tag.classList.add("tag-clear");
     if (side === "after") tag.style.left = pct(end);
     else if (side === "before") {
       tag.classList.add("tag-before");
@@ -568,9 +734,57 @@ function runwayRow(task: FlowTaskOut, today: string, s: Strings): HTMLElement {
     } else {
       tag.classList.add("tag-inside");
     }
-    row.append(tag);
+    el0.append(tag);
   }
-  return row;
+  return el0;
+}
+
+/** The faint guide down the side of an unfolded task's subtasks. */
+function guides(rows: readonly LaneRow[], today: string): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  rows.forEach((row, i) => {
+    if (!state.unfolded.has(row.id) || !hasChildren(row)) return;
+    const depth = row.kind === "sub" ? row.sub.depth : 0;
+    let last = i;
+    for (let j = i + 1; j < rows.length; j++) {
+      const r = rows[j];
+      if (r.kind !== "sub" || r.task.id !== (row.kind === "sub" ? row.task.id : row.id) || r.sub.depth <= depth) break;
+      last = j;
+    }
+    if (last === i) return;
+    const guide = el("div", "guide");
+    guide.setAttribute("aria-hidden", "true");
+    guide.style.left = `calc(${pct(rowRunway(row, today).x0)} + 3px)`;
+    guide.style.top = `${row.top + row.height}px`;
+    guide.style.height = `${rows[last].top + rows[last].height / 2 - row.top - row.height}px`;
+    out.push(guide);
+  });
+  return out;
+}
+
+/** The selected row's connectors, drawn over the lane (A1). */
+function linksOverlay(rows: readonly LaneRow[], today: string, height: number): Element[] {
+  const items = flowItems(state.data?.streams ?? []);
+  const arrows = dependencyArrows(rows, state.selected, dependencyEdges(items), (row) => rowRunway(row, today));
+  if (arrows.length === 0) return [];
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "links");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("viewBox", `0 0 100 ${height}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.height = `${height}px`;
+  const heads: HTMLElement[] = [];
+  for (const arrow of arrows) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", arrow.d);
+    svg.append(path);
+    const head = el("i", "head");
+    head.setAttribute("aria-hidden", "true");
+    head.style.left = pct(arrow.head.x / 100);
+    head.style.top = `${arrow.head.y}px`;
+    heads.push(head);
+  }
+  return [svg, ...heads];
 }
 
 function ruler(today: string, s: Strings): HTMLElement {
@@ -623,7 +837,19 @@ function flowsView(data: FlowsOut, s: Strings): HTMLElement {
     lane.append(nowLine);
     const open = state.expanded.has(stream.key);
     const shown = open ? stream.tasks : stream.tasks.slice(0, COLLAPSED_TASKS);
-    for (const task of shown) lane.append(runwayRow(task, data.date, s));
+    const rows = laneRows(shown, state.unfolded);
+    const items = flowItems(data.streams);
+    const dim = dimmedRows(rows, state.selected, dependencyEdges(items));
+    const offscreen = offscreenBlockers(rows, state.selected, items);
+    const linked = state.selected && rows.some((r) => r.id === state.selected) ? new Set(rows.filter((r) => !dim.has(r.id)).map((r) => r.id)) : new Set<string>();
+    lane.append(...guides(rows, data.date));
+    for (const row of rows) {
+      lane.append(
+        runwayRow(row, { today: data.date, dim: dim.has(row.id), linked: linked.has(row.id), offscreen: row.id === state.selected ? offscreen : [] }, s),
+      );
+    }
+    const last = rows[rows.length - 1];
+    if (last) lane.append(...linksOverlay(rows, data.date, last.top + last.height + 8));
     const folded = stream.tasks.length - shown.length;
     // Past what the server sent (a very long stream): a count, not a button.
     const unsent = stream.open - stream.tasks.length;
@@ -698,6 +924,150 @@ function subtaskRow(sub: TaskDetailSubtask, editor: Editor, s: Strings): HTMLEle
   del.addEventListener("click", () => void removeTask(sub.id, sub.title, true));
   row.append(box, title, del);
   return row;
+}
+
+/** Add a task to what the edited one waits for, and give the search its focus back. */
+function addWait(editor: Editor, id: string, title: string) {
+  if (!editor.waits || editor.waits.some((w) => w.id === id)) return;
+  editor.waits.push({ id, title });
+  editor.waitQuery = "";
+  render();
+  document.getElementById("f-wait")?.focus();
+}
+
+/** C1: "Waits for" chips with a search over every loaded task, and the read-only "Holds" list. */
+function waitsSection(editor: Editor, s: Strings): HTMLElement | null {
+  const waits = editor.waits;
+  if (!waits) return null;
+  const detail = editor.detail;
+  const section = el("div", "subs waits");
+  const label = el("label", "subs-title", s.waitsFor);
+  label.setAttribute("for", "f-wait");
+  section.append(label);
+  const box = el("div", "wait-field");
+  const chips = el("ul", "chips");
+  chips.setAttribute("aria-label", s.waitsFor);
+  for (const w of waits) {
+    const chip = el("li", "chip");
+    chip.append(lockIcon(), el("span", "chip-text", w.title));
+    const x = el("button", "chip-x", "×");
+    x.type = "button";
+    x.disabled = editor.busy;
+    x.setAttribute("aria-label", s.unwait(w.title));
+    x.addEventListener("click", () => {
+      editor.waits = (editor.waits ?? []).filter((v) => v.id !== w.id);
+      render();
+      document.getElementById("f-wait")?.focus();
+    });
+    chip.append(x);
+    chips.append(chip);
+  }
+  if (waits.length) box.append(chips);
+  const input = el("input");
+  input.type = "text";
+  input.id = "f-wait";
+  input.value = editor.waitQuery;
+  input.placeholder = s.findTask;
+  input.autocomplete = "off";
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("aria-controls", "f-wait-list");
+  box.append(input);
+  section.append(box);
+  if (waits.length === 0) section.append(el("p", "hint sr-only", s.waitsNone));
+
+  const list = el("ul", "wait-menu");
+  list.id = "f-wait-list";
+  list.setAttribute("role", "listbox");
+  list.setAttribute("aria-label", s.findTask);
+  const items = flowItems(state.data?.streams ?? []);
+  const fill = (show: boolean) => {
+    const found = waitCandidates(
+      detail?.id ?? null,
+      items,
+      waits.map((w) => w.id),
+      (detail?.blocks ?? []).map((b) => b.id),
+      editor.waitQuery,
+    );
+    list.replaceChildren();
+    list.hidden = !show;
+    input.setAttribute("aria-expanded", String(show));
+    if (!show) return;
+    if (found.length === 0) list.append(el("li", "wait-none", s.noMatch));
+    for (const c of found) {
+      const li = el("li");
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-disabled", String(c.disabled !== null));
+      const opt = el("button", "wait-opt");
+      opt.type = "button";
+      opt.disabled = c.disabled !== null || editor.busy;
+      // Keep the search's focus through the press, so the list does not close under it.
+      opt.addEventListener("mousedown", (e) => e.preventDefault());
+      opt.addEventListener("click", () => addWait(editor, c.id, c.title));
+      const why = c.disabled === "added" ? s.alreadyAdded : c.disabled === "loop" ? s.wouldLoop : c.context;
+      opt.append(el("span", "wait-title", c.title), el("span", "wait-why", why));
+      li.append(opt);
+      list.append(li);
+    }
+  };
+  fill(editor.waitQuery.trim() !== "");
+  input.addEventListener("input", () => {
+    editor.waitQuery = input.value;
+    fill(true);
+  });
+  input.addEventListener("focus", () => fill(true));
+  input.addEventListener("blur", () => {
+    // Moving into the list (by Tab or arrow) keeps it open.
+    setTimeout(() => {
+      if (!list.contains(document.activeElement) && document.activeElement !== input) fill(editor.waitQuery.trim() !== "");
+    }, 120);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      (list.querySelector("button:not(:disabled)") as HTMLButtonElement | null)?.focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      (list.querySelector("button:not(:disabled)") as HTMLButtonElement | null)?.click();
+    } else if (e.key === "Escape" && !list.hidden) {
+      e.preventDefault();
+      editor.waitQuery = "";
+      input.value = "";
+      fill(false);
+    }
+  });
+  list.addEventListener("keydown", (e) => {
+    const options = [...list.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+    const i = options.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown" && i >= 0) {
+      e.preventDefault();
+      options[Math.min(options.length - 1, i + 1)]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (i <= 0) input.focus();
+      else options[i - 1]?.focus();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      input.focus();
+    }
+  });
+  section.append(list);
+
+  if (editor.mode === "edit" && detail) {
+    section.append(el("div", "subs-title", s.holds));
+    const blocks = detail.blocks ?? [];
+    if (blocks.length === 0) section.append(el("p", "hint", s.holdsNone));
+    else {
+      const holds = el("ul", "hold-list");
+      for (const b of blocks) {
+        const li = el("li", b.done ? "sub-done" : undefined, b.title);
+        if (b.done) li.append(el("span", "wait-why", ` · ${s.doneShort}`));
+        holds.append(li);
+      }
+      section.append(holds);
+    }
+  }
+  return section;
 }
 
 /** The editor for the selected task, or for a new one; null when neither. */
@@ -790,6 +1160,14 @@ function editorPanel(s: Strings): HTMLElement | null {
       section.append(add);
     }
     panel.append(section);
+  }
+  const waits = waitsSection(editor, s);
+  if (waits) panel.append(waits);
+  if (state.notice) {
+    // Inside the editor, where the press was: a refused loop reads right here.
+    const said = el("p", "notice editor-notice", state.notice);
+    said.setAttribute("role", "status");
+    panel.append(said);
   }
 
   const actions = el("div", "editor-actions");
@@ -918,7 +1296,7 @@ function render() {
   const s = STRINGS[state.locale];
   document.documentElement.lang = state.locale;
   root.replaceChildren(toolbar(s));
-  const live = el("p", "notice", state.notice ?? "");
+  const live = el("p", "notice", state.editor ? "" : (state.notice ?? ""));
   live.setAttribute("role", "status");
   root.append(live);
   if (state.status === "error") {

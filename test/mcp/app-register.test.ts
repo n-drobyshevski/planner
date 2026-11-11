@@ -7,6 +7,7 @@ vi.mock("@/lib/supabase/queries", () => ({
   fetchWindow: vi.fn(),
   fetchTasks: vi.fn(async () => []),
   fetchTaskStreams: vi.fn(async () => []),
+  fetchTaskDependencies: vi.fn(async () => []),
   fetchSleepLogs: vi.fn(),
 }));
 vi.mock("@/lib/supabase/mutations", () => ({
@@ -16,6 +17,8 @@ vi.mock("@/lib/supabase/mutations", () => ({
   createTask: vi.fn(),
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
+  addDependency: vi.fn(),
+  removeDependency: vi.fn(async () => undefined),
   StaleWriteError: class StaleWriteError extends Error {},
 }));
 vi.mock("@/lib/recurrence/expand", () => ({ expandEvents: vi.fn(() => []) }));
@@ -24,7 +27,7 @@ vi.mock("@/lib/mcp/auth", () => ({
 }));
 
 import { registerTools } from "@/lib/mcp/tools";
-import { fetchTasks } from "@/lib/supabase/queries";
+import { fetchTaskDependencies, fetchTasks } from "@/lib/supabase/queries";
 import { FLOWS_APP_URI } from "@/lib/mcp/app/register";
 import { FLOWS_APP_HTML } from "@/lib/mcp/app/flows-app.generated";
 
@@ -103,6 +106,50 @@ describe("the Flows MCP App", () => {
     expect(view.streams[0].tasks).toHaveLength(12);
     const text = JSON.parse(result.content[0].text) as typeof view;
     expect(text.streams[0].tasks).toHaveLength(3);
+  });
+
+  it("gives the view each task's subtasks, and keeps them out of the model's text", async () => {
+    const base = {
+      workspaceId: "w1", ownerId: "m1", assigneeId: null, collectionId: null, categoryId: null,
+      description: null, isPrivate: false, color: null, boardId: null, priority: null, dueDate: null,
+      startDate: null, isMilestone: false, sequential: false, completedAt: null, attributes: {},
+      createdAt: 1, updatedAt: 1, updatedBy: null,
+    };
+    vi.mocked(fetchTasks).mockResolvedValueOnce([
+      { ...base, id: "p", parentId: null, position: 0, tags: ["work"], title: "Parent" },
+      { ...base, id: "c", parentId: "p", position: 0, tags: [], title: "Child" },
+    ] as never);
+    const { tools } = collect();
+    const result = await tools.get("show_flows")!.cb({ date: "2026-11-10" }, {});
+    const view = result.structuredContent as { streams: { tasks: { id: string; subtasks?: unknown[] }[] }[] };
+    expect(view.streams[0].tasks[0].subtasks).toEqual([
+      { id: "c", title: "Child", parentId: "p", depth: 1, done: false },
+    ]);
+    const text = JSON.parse(result.content[0].text) as typeof view;
+    expect(text.streams[0].tasks[0].id).toBe("p");
+    expect(text.streams[0].tasks[0]).not.toHaveProperty("subtasks");
+    expect(result.content[0].text).not.toContain("Child");
+  });
+
+  it("gives the view every dependency id, and keeps them out of the model's text", async () => {
+    const base = {
+      workspaceId: "w1", ownerId: "m1", assigneeId: null, collectionId: null, categoryId: null,
+      description: null, isPrivate: false, color: null, boardId: null, priority: null, dueDate: null,
+      startDate: null, isMilestone: false, sequential: false, completedAt: null, attributes: {},
+      createdAt: 1, updatedAt: 1, updatedBy: null, parentId: null, tags: ["work"],
+    };
+    vi.mocked(fetchTasks).mockResolvedValueOnce([
+      { ...base, id: "w", position: 0, title: "Waiting" },
+      { ...base, id: "d", position: 1, title: "Done blocker", completedAt: 5 },
+    ] as never);
+    vi.mocked(fetchTaskDependencies).mockResolvedValueOnce([
+      { id: "e", workspaceId: "w1", taskId: "w", dependsOnTaskId: "d", createdAt: 1 },
+    ] as never);
+    const { tools } = collect();
+    const result = await tools.get("show_flows")!.cb({ date: "2026-11-10" }, {});
+    const view = result.structuredContent as { streams: { tasks: { id: string; blockedBy?: string[] }[] }[] };
+    expect(view.streams[0].tasks.find((t) => t.id === "w")?.blockedBy).toEqual(["d"]);
+    expect(result.content[0].text).not.toContain("blockedBy");
   });
 
   it("answers an unknown saved stream with an error and no structured content", async () => {

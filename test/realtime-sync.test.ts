@@ -138,6 +138,8 @@ function mockClient(memberId: string | null = ME, { holdRemovals = false } = {})
     {
       opts: unknown;
       broadcast: Handler[];
+      /** postgres_changes bindings: table -> filter */
+      changes: Map<string, string | undefined>;
       onStatus: ((status: string) => void) | null;
       removed: boolean;
     }
@@ -149,14 +151,16 @@ function mockClient(memberId: string | null = ME, { holdRemovals = false } = {})
       const record = channels.get(topic) ?? {
         opts,
         broadcast: [] as Handler[],
+        changes: new Map<string, string | undefined>(),
         onStatus: null as ((status: string) => void) | null,
         removed: false,
       };
       channels.set(topic, record);
       const ch = {
         topic,
-        on: (type: string, filter: { event?: string }, handler: Handler) => {
+        on: (type: string, filter: { event?: string; table?: string; filter?: string }, handler: Handler) => {
           if (type === "broadcast" && filter.event === "row_gone") record.broadcast.push(handler);
+          if (type === "postgres_changes" && filter.table) record.changes.set(filter.table, filter.filter);
           return ch;
         },
         subscribe: (cb: (status: string) => void) => {
@@ -219,6 +223,33 @@ describe("subscribeWorkspace — sync channel", () => {
     expect(b).toMatchObject([{ eventType: "DELETE", table: "events", old: { id: "e1" } }]);
     leaveA();
     leaveB();
+  });
+
+  it("listens to task_dependencies changes, scoped to the workspace", async () => {
+    const { sb, channels } = mockClient();
+    const leave = subscribeWorkspace(sb, WS, () => {}, "task-dependencies");
+    await flush();
+
+    const main = channels.get(`workspace:${WS}:task-dependencies`)!;
+    expect(main.changes.get("task_dependencies")).toBe(`workspace_id=eq.${WS}`);
+    leave();
+  });
+
+  it("routes a dependency delete (owner from the blocked task, or null after a cascade)", async () => {
+    const { sb, send } = mockClient();
+    const seen: WorkspaceChange[] = [];
+    const leave = subscribeWorkspace(sb, WS, (c) => seen.push(c), "task-dependencies");
+    await flush();
+
+    send({ payload: { table: "task_dependencies", id: "d1", kind: "delete", owner_id: PARTNER, actor: PARTNER } });
+    send({ payload: { table: "task_dependencies", id: "d2", kind: "delete", owner_id: null, actor: ME } });
+
+    expect(seen).toMatchObject([
+      { eventType: "DELETE", table: "task_dependencies", old: { id: "d1" } },
+      { eventType: "DELETE", table: "task_dependencies", old: { id: "d2" } },
+    ]);
+    expect(seen.every((c) => !isHiddenChange(c))).toBe(true);
+    leave();
   });
 
   it("drops the partner's row turned private, keeps the viewer's own", async () => {

@@ -216,6 +216,8 @@
       "noDeadline": "no deadline",
       "subtasks": "{done} of {total, plural, one {# subtask} other {# subtasks}} done",
       "more": "+{count}",
+      "waitsFor": "waits for {titles}",
+      "holds": "{count, plural, one {# task waits} other {# tasks wait}} for it",
       "moreLabel": "{count, plural, one {# more task} other {# more tasks}}"
     }
   },
@@ -439,13 +441,15 @@
     }
   },
   "dependencies": {
-    "blockedByLabel": "Blocked by",
+    "blockedByLabel": "Waits for",
     "addLabel": "Add a blocker",
     "addPlaceholder": "Add a task that blocks this…",
     "emptyHint": "Not blocked by anything.",
     "remove": "Remove blocker {title}",
     "unknownTask": "Another task",
     "blocked": "Blocked",
-    "blockedTitle": "Waiting on another task"
+    "blockedTitle": "Waiting on another task",
+    "stillWaitingFor": "Still waiting for: {titles}{more, plural, =0 {} one { and # more} other { and # more}}",
+    "stillWaitingForCount": "Still waiting for {count, plural, one {# task} other {# tasks}}"
   }
 }

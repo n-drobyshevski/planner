@@ -4,10 +4,14 @@ import {
   projectTaskDetail,
   resolveFlowOptions,
   MAX_STREAMS,
+  MAX_FLOW_SUBTASKS,
+  MAX_FLOW_BLOCKED_BY,
+  MAX_WAITING_ON,
   type FlowsInput,
+  type FlowSubtaskOut,
 } from "@/lib/mcp/flows";
 import { DEFAULT_FLOWS_DISPLAY, DEFAULT_FLOWS_FILTER } from "@/lib/tasks/flows-display";
-import type { TaskRow } from "@/lib/types";
+import type { TaskDependency, TaskRow } from "@/lib/types";
 
 const ME = "m-me";
 const PARTNER = "m-partner";
@@ -45,6 +49,11 @@ function task(p: Partial<TaskRow> & { title: string }): TaskRow {
   };
 }
 
+/** `taskId` waits for `dependsOnTaskId`. */
+function dep(taskId: string, dependsOnTaskId: string): TaskDependency {
+  return { id: `d-${taskId}-${dependsOnTaskId}`, workspaceId: "w1", taskId, dependsOnTaskId, createdAt: 1 };
+}
+
 function input(tasks: TaskRow[], over: Partial<FlowsInput> = {}): FlowsInput {
   return {
     tasks,
@@ -62,6 +71,7 @@ function input(tasks: TaskRow[], over: Partial<FlowsInput> = {}): FlowsInput {
     attention: "combined",
     mine: false,
     limit: 3,
+    dependencies: [],
     ...over,
   };
 }
@@ -287,7 +297,165 @@ describe("projectFlows", () => {
   });
 });
 
+describe("projectFlows — dependencies", () => {
+  it("marks a task waiting on open blockers, most pressing first, at most three, and counts what it holds", () => {
+    const tasks = [
+      task({ id: "w", title: "Waiting", tags: ["x"] }),
+      task({ id: "b-late", title: "Late", tags: ["y"], dueDate: "2026-07-30" }),
+      task({ id: "b-soon", title: "Soon", tags: ["y"], dueDate: "2026-07-12" }),
+      task({ id: "b-undated", title: "Undated", tags: ["y"] }),
+      task({ id: "b-mid", title: "Mid", tags: ["y"], dueDate: "2026-07-20" }),
+      task({ id: "b-done", title: "Finished", tags: ["y"], completedAt: NOW - 1 }),
+      task({ id: "w2", title: "Also waiting", tags: ["y"] }),
+      task({ id: "w-done", title: "Done waiter", tags: ["y"], completedAt: NOW - 1 }),
+    ];
+    const dependencies = [
+      dep("w", "b-late"),
+      dep("w", "b-soon"),
+      dep("w", "b-undated"),
+      dep("w", "b-mid"),
+      dep("w", "b-done"),
+      dep("w2", "b-soon"),
+      dep("w-done", "b-soon"),
+    ];
+    const out = projectFlows(input(tasks, { dependencies, limit: 10 }));
+    const all = out.streams.flatMap((s) => s.tasks);
+    const w = all.find((t) => t.id === "w")!;
+    expect(w.blocked).toBe(true);
+    expect(w.waitingOn).toEqual([
+      { id: "b-soon", title: "Soon" },
+      { id: "b-mid", title: "Mid" },
+      { id: "b-late", title: "Late" },
+    ]);
+    expect(w).not.toHaveProperty("holds");
+    // Two open tasks wait for "Soon"; the done waiter doesn't count.
+    expect(all.find((t) => t.id === "b-soon")!.holds).toBe(2);
+    expect(all.find((t) => t.id === "b-late")!.holds).toBe(1);
+    const free = all.find((t) => t.id === "b-mid")!;
+    expect(free).not.toHaveProperty("blocked");
+    expect(free).not.toHaveProperty("waitingOn");
+    // never in get_flows' default output
+    expect(all.some((t) => "subtasks" in t)).toBe(false);
+  });
+
+  it("is not blocked once every blocker is done", () => {
+    const tasks = [
+      task({ id: "w", title: "Waiting", tags: ["x"] }),
+      task({ id: "b", title: "Blocker", tags: ["x"], completedAt: NOW - 1 }),
+    ];
+    const out = projectFlows(input(tasks, { dependencies: [dep("w", "b")] }));
+    const w = out.streams[0].tasks.find((t) => t.id === "w")!;
+    expect(w).not.toHaveProperty("blocked");
+    expect(w).not.toHaveProperty("waitingOn");
+  });
+
+  it("gives the view every dependency id, open or done, uncapped up to MAX_FLOW_BLOCKED_BY", () => {
+    const blockers = Array.from({ length: MAX_FLOW_BLOCKED_BY + 5 }, (_, i) =>
+      task({ id: `b${i}`, title: `B${i}`, tags: ["y"], ...(i % 2 ? { completedAt: NOW - 1 } : {}) }),
+    );
+    const tasks = [
+      task({ id: "w", title: "Waiting", tags: ["x"] }),
+      task({ id: "s", title: "Sub", parentId: "w", position: 1 }),
+      ...blockers,
+    ];
+    const dependencies = [
+      ...blockers.map((b) => dep("w", b.id)),
+      dep("s", "b1"),
+      dep("w", "hidden"),
+    ];
+    const view = projectFlows(input(tasks, { dependencies, limit: 10, withSubtasks: true }));
+    const w = view.streams.flatMap((s) => s.tasks).find((t) => t.id === "w")!;
+    // waitingOn stays the few open ones, for labels; blockedBy is every link.
+    expect(w.waitingOn).toHaveLength(MAX_WAITING_ON);
+    expect(w.blockedBy).toEqual(blockers.slice(0, MAX_FLOW_BLOCKED_BY).map((b) => b.id));
+    // A done blocker is a link too.
+    expect(w.subtasks![0].blockedBy).toEqual(["b1"]);
+    expect(w.subtasks![0]).not.toHaveProperty("waitingOn");
+    // get_flows (no view) never carries it.
+    const plain = projectFlows(input(tasks, { dependencies, limit: 10 }));
+    expect(plain.streams.flatMap((s) => s.tasks).some((t) => "blockedBy" in t)).toBe(false);
+  });
+
+  it("gives the view each task's subtree, pre-order, done ones included, with blocked state", () => {
+    const tasks = [
+      task({ id: "p", title: "Parent", tags: ["x"], sequential: true }),
+      task({ id: "c1", title: "First", parentId: "p", position: 1, completedAt: NOW - 1 }),
+      task({ id: "c2", title: "Second", parentId: "p", position: 2, startDate: "2026-07-11", dueDate: "2026-07-15" }),
+      task({ id: "g1", title: "Grandchild", parentId: "c2", position: 1 }),
+      task({ id: "c3", title: "Third", parentId: "p", position: 3 }),
+      task({ id: "other", title: "Other", tags: ["y"] }),
+    ];
+    const out = projectFlows(
+      input(tasks, { dependencies: [dep("g1", "other")], withSubtasks: true }),
+    );
+    const p = out.streams.flatMap((s) => s.tasks).find((t) => t.id === "p")!;
+    expect(p.subtasks).toEqual<FlowSubtaskOut[]>([
+      { id: "c1", title: "First", parentId: "p", depth: 1, done: true },
+      { id: "c2", title: "Second", parentId: "p", depth: 1, done: false, start: "2026-07-11", due: "2026-07-15" },
+      {
+        id: "g1",
+        title: "Grandchild",
+        parentId: "c2",
+        depth: 2,
+        done: false,
+        blocked: true,
+        waitingOn: [{ id: "other", title: "Other" }],
+        blockedBy: ["other"],
+      },
+      // "do in order": the second open subtask waits for the first.
+      { id: "c3", title: "Third", parentId: "p", depth: 1, done: false, blocked: true },
+    ]);
+    expect(out.streams.flatMap((s) => s.tasks).find((t) => t.id === "other")!.subtasks).toEqual([]);
+    expect(JSON.stringify(out)).not.toContain("SECRET");
+  });
+
+  it("caps the subtasks per task and never goes deeper than MAX_DEPTH", () => {
+    const root = task({ id: "r", title: "Root", tags: ["x"] });
+    const kids = Array.from({ length: MAX_FLOW_SUBTASKS + 20 }, (_, i) =>
+      task({ id: `k${i}`, title: `Kid ${i}`, parentId: "r", position: i }),
+    );
+    const capped = projectFlows(input([root, ...kids], { withSubtasks: true }));
+    expect(capped.streams[0].tasks[0].subtasks).toHaveLength(MAX_FLOW_SUBTASKS);
+
+    // A chain one level deeper than the database allows (malformed data).
+    const chain = [
+      root,
+      task({ id: "d1", title: "1", parentId: "r" }),
+      task({ id: "d2", title: "2", parentId: "d1" }),
+      task({ id: "d3", title: "3", parentId: "d2" }),
+      task({ id: "d4", title: "4", parentId: "d3" }),
+    ];
+    const deep = projectFlows(input(chain, { withSubtasks: true }));
+    expect(deep.streams[0].tasks[0].subtasks!.map((s) => [s.id, s.depth])).toEqual([
+      ["d1", 1],
+      ["d2", 2],
+      ["d3", 3],
+    ]);
+  });
+});
+
 describe("projectTaskDetail", () => {
+  it("lists what the task waits for and what waits for it, and each subtask's blocked state", () => {
+    const root = task({ id: "r", title: "Root", sequential: true });
+    const all = [
+      root,
+      task({ id: "a", title: "A", parentId: "r", position: 1, sequential: true, dueDate: "2026-07-20" }),
+      task({ id: "b", title: "B", parentId: "r", position: 2, startDate: "2026-07-12" }),
+      task({ id: "up", title: "Upstream", completedAt: NOW }),
+      task({ id: "down", title: "Downstream" }),
+      task({ id: "ext", title: "External" }),
+    ];
+    const deps = [dep("r", "up"), dep("down", "r"), dep("a", "ext")];
+    const out = projectTaskDetail(root, all, deps);
+    expect(out.sequential).toBe(true);
+    expect(out.blockedBy).toEqual([{ id: "up", title: "Upstream", done: true }]);
+    expect(out.blocks).toEqual([{ id: "down", title: "Downstream", done: false }]);
+    expect(out.subtasks).toEqual([
+      { id: "a", title: "A", done: false, depth: 1, sequential: true, blocked: true, due: "2026-07-20", blockedBy: ["ext"] },
+      { id: "b", title: "B", done: false, depth: 1, sequential: false, blocked: true, start: "2026-07-12" },
+    ]);
+  });
+
   it("returns the editable fields and the subtree, parent before child, without descriptions", () => {
     const root = task({ id: "r", title: "Root", tags: ["t"], dueDate: "2026-07-20", priority: 2 });
     const all = [
@@ -301,10 +469,11 @@ describe("projectTaskDetail", () => {
     expect(out).toMatchObject({ id: "r", title: "Root", done: false, dueDate: "2026-07-20", priority: 2, tags: ["t"] });
     expect(out.startDate).toBeUndefined();
     expect(out.subtasks).toEqual([
-      { id: "a", title: "First", done: true, depth: 1 },
-      { id: "a1", title: "Nested", done: false, depth: 2 },
-      { id: "b", title: "Second", done: false, depth: 1 },
+      { id: "a", title: "First", done: true, depth: 1, sequential: false, blocked: false },
+      { id: "a1", title: "Nested", done: false, depth: 2, sequential: false, blocked: false },
+      { id: "b", title: "Second", done: false, depth: 1, sequential: false, blocked: false },
     ]);
+    expect(out).toMatchObject({ sequential: false, blockedBy: [], blocks: [] });
     expect(JSON.stringify(out)).not.toContain("SECRET");
   });
 

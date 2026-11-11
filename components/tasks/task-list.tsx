@@ -34,6 +34,8 @@ export interface TaskListProps {
   colorOf: (t: TaskRow) => string;
   members: Map<string, Member>;
   progressOf?: (t: TaskRow) => { done: number; total: number } | null;
+  /** Ids of tasks waiting on an unfinished dependency (the card's "Blocked" badge). */
+  blockedIds?: ReadonlySet<string>;
   /** Whole-tree maps (all collection tasks) for drag-to-nest cycle/depth checks. */
   treeById: ById;
   treeByParent: Map<string | null, TaskRow[]>;
@@ -46,6 +48,7 @@ export function TaskList({
   colorOf,
   members,
   progressOf,
+  blockedIds,
   treeById,
   treeByParent,
   actions,
@@ -121,6 +124,7 @@ export function TaskList({
                     color={colorOf(task)}
                     assignee={task.assigneeId ? members.get(task.assigneeId) ?? null : null}
                     progress={progressOf?.(task) ?? null}
+                    blocked={blockedIds?.has(task.id) ?? false}
                     dragging={activeId === task.id}
                     nesting={!!nestParentOf(overId) && overId === task.id}
                     actions={actions}
@@ -139,6 +143,7 @@ export function TaskList({
             color={colorOf(activeTask)}
             assignee={activeTask.assigneeId ? members.get(activeTask.assigneeId) ?? null : null}
             progress={progressOf?.(activeTask) ?? null}
+            blocked={blockedIds?.has(activeTask.id) ?? false}
             onOpen={() => {}}
             onToggleDone={() => {}}
             showHandle
@@ -158,6 +163,7 @@ function NestableRow({
   color,
   assignee,
   progress,
+  blocked,
   dragging,
   nesting,
   actions,
@@ -166,6 +172,7 @@ function NestableRow({
   color: string;
   assignee: Member | null;
   progress: { done: number; total: number } | null;
+  blocked: boolean;
   dragging: boolean;
   nesting: boolean;
   actions: TaskActions;
@@ -188,6 +195,7 @@ function NestableRow({
           color={color}
           assignee={assignee}
           progress={progress}
+          blocked={blocked}
           dragging={dragging}
           nesting={nesting}
           showHandle

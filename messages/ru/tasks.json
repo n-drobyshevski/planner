@@ -216,6 +216,8 @@
       "noDeadline": "без срока",
       "subtasks": "{total, plural, one {готово {done} из # подзадачи} other {готово {done} из # подзадач}}",
       "more": "+{count}",
+      "waitsFor": "ждёт: {titles}",
+      "holds": "её ждут: {count}",
       "moreLabel": "ещё {count, plural, one {# задача} few {# задачи} many {# задач} other {# задачи}}"
     }
   },
@@ -439,13 +441,15 @@
     }
   },
   "dependencies": {
-    "blockedByLabel": "Блокируется",
+    "blockedByLabel": "Ждёт",
     "addLabel": "Добавить блокер",
     "addPlaceholder": "Добавить задачу-блокер…",
     "emptyHint": "Ничем не блокируется.",
     "remove": "Убрать блокер {title}",
     "unknownTask": "Другая задача",
     "blocked": "Заблокировано",
-    "blockedTitle": "Ожидает другую задачу"
+    "blockedTitle": "Ожидает другую задачу",
+    "stillWaitingFor": "Ещё ждёт: {titles}{more, plural, =0 {} one { и ещё #} few { и ещё #} many { и ещё #} other { и ещё #}}",
+    "stillWaitingForCount": "Ещё ждёт {count, plural, one {# задачу} few {# задачи} many {# задач} other {# задачи}}"
   }
 }

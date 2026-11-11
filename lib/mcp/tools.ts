@@ -9,6 +9,7 @@ import {
   fetchWindow,
   fetchTasks,
   fetchTaskStreams,
+  fetchTaskDependencies,
   fetchSleepLogs,
 } from "@/lib/supabase/queries";
 import {
@@ -18,6 +19,8 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  addDependency,
+  removeDependency,
   StaleWriteError,
 } from "@/lib/supabase/mutations";
 import { expandEvents } from "@/lib/recurrence/expand";
@@ -37,11 +40,13 @@ import {
   projectTaskDetail,
   subtreeInOrder,
   type FlowsOut,
+  type FlowTaskOut,
   type McpFlowsGroupBy,
 } from "./flows";
 import { registerFlowsApp } from "./app/register";
 import { MAX_TAGS, MAX_TAG_LENGTH, collectTags, normalizeTag } from "@/lib/tasks/tags";
-import type { Board, TaskRow } from "@/lib/types";
+import type { Board, TaskDependency, TaskRow } from "@/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -120,6 +125,111 @@ async function guard(fn: () => Promise<CallToolResult>): Promise<CallToolResult>
   }
 }
 
+// --- dependencies (blocks / blocked-by) -----------------------------------
+
+/** Blockers one task may list at most, per call. */
+const MAX_BLOCKED_BY = 20;
+
+const blockedBySchema = z
+  .array(z.string().min(1))
+  .max(MAX_BLOCKED_BY);
+
+/**
+ * A path of "waits for" edges from `from` to `to` over the visible edges, or
+ * null. Breadth-first, so the loop named is the shortest one.
+ */
+function waitPath(from: string, to: string, deps: readonly TaskDependency[]): string[] | null {
+  const prev = new Map<string, string | null>([[from, null]]);
+  const queue = [from];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (cur === to) {
+      const path: string[] = [];
+      for (let at: string | null = cur; at !== null; at = prev.get(at) ?? null) path.unshift(at);
+      return path;
+    }
+    for (const d of deps) {
+      if (d.taskId !== cur || prev.has(d.dependsOnTaskId)) continue;
+      prev.set(d.dependsOnTaskId, cur);
+      queue.push(d.dependsOnTaskId);
+    }
+  }
+  return null;
+}
+
+const loopMessage = (titles: string[]): string =>
+  `That would make a dependency loop: ${titles.map((t) => `"${t}"`).join(" waits for ")}. ` +
+  "Remove one of those links first.";
+
+interface BlockedByPlan {
+  add: string[];
+  remove: TaskDependency[];
+  final: string[];
+}
+
+/**
+ * Plan replacing `taskId`'s blockers with `wanted`: what to add and remove.
+ * A string is the reason it can't be done (nothing is written then): an id
+ * that is not a visible task, the task itself, or a loop through the edges the
+ * caller can see (the database still guards loops through hidden ones).
+ */
+function planBlockedBy(
+  task: TaskRow,
+  wanted: readonly string[],
+  tasks: readonly TaskRow[],
+  deps: readonly TaskDependency[],
+): BlockedByPlan | string {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const final = [...new Set(wanted.map((id) => id.trim()))];
+  for (const id of final) {
+    if (id === task.id) return "A task can't wait for itself.";
+    if (!byId.has(id)) return `No task with id ${id} is visible to you.`;
+  }
+  const current = deps.filter((d) => d.taskId === task.id);
+  const have = new Set(current.map((d) => d.dependsOnTaskId));
+  const add = final.filter((id) => !have.has(id));
+  for (const id of add) {
+    // task waits for id: a loop when id already (transitively) waits for task.
+    const path = waitPath(id, task.id, deps);
+    if (path) return loopMessage([task.id, ...path].map((p) => byId.get(p)?.title ?? p));
+  }
+  return { add, remove: current.filter((d) => !final.includes(d.dependsOnTaskId)), final };
+}
+
+/** Whether a write failed on the database's loop guard (task_dep_check_acyclic). */
+const isLoopError = (err: unknown): boolean =>
+  err instanceof Error && /cycle/i.test(err.message);
+
+/**
+ * Apply a plan: adds first, then removals. A failed add undoes the adds made
+ * so far (best effort), so the set never ends up half-replaced, and comes
+ * back as a string. Returns the final blocker ids.
+ */
+async function applyBlockedBy(
+  sb: SupabaseClient,
+  workspaceId: string,
+  taskId: string,
+  plan: BlockedByPlan,
+): Promise<string[] | string> {
+  const added: TaskDependency[] = [];
+  for (const dependsOnTaskId of plan.add) {
+    try {
+      added.push(await addDependency(sb, { workspaceId, taskId, dependsOnTaskId }));
+    } catch (err) {
+      for (const row of added) await removeDependency(sb, row.id).catch(() => undefined);
+      if (isLoopError(err)) {
+        return (
+          "That would make a dependency loop: a task it would wait for already waits for it, " +
+          "possibly through tasks you can't see. Remove one of those links first."
+        );
+      }
+      throw err;
+    }
+  }
+  for (const d of plan.remove) await removeDependency(sb, d.id);
+  return plan.final;
+}
+
 /** `get_flows` / `show_flows` input: one shape, so the tool and its view agree. */
 const flowsInputShape = {
     date: z
@@ -152,6 +262,14 @@ const flowsInputShape = {
       .describe("Tasks returned per stream. Default: 3."),
 };
 
+/** A Flows task as the model reads it: the view's subtask tree and link ids left out. */
+function withoutViewFields(task: FlowTaskOut): FlowTaskOut {
+  const copy = { ...task };
+  delete copy.subtasks;
+  delete copy.blockedBy;
+  return copy;
+}
+
 /** Open tasks per stream `show_flows` hands its view (not the model). */
 const SHOW_FLOWS_TASKS = 50;
 
@@ -162,6 +280,8 @@ interface FlowsArgs {
   attention?: "deadline" | "priority" | "combined";
   mine?: boolean;
   limit?: number;
+  /** `show_flows`' view: each task's flattened subtask tree */
+  withSubtasks?: boolean;
 }
 
 /**
@@ -189,12 +309,15 @@ async function loadFlows(args: FlowsArgs, extra: Parameters<typeof mcpContext>[0
     },
     saved?.definition,
   );
-  const [bundle, tasks] = await Promise.all([
+  const [bundle, tasks, dependencies] = await Promise.all([
     fetchWorkspaceBundle(sb),
     fetchTasks(sb, workspaceId),
+    fetchTaskDependencies(sb, workspaceId),
   ]);
   return projectFlows({
     tasks,
+    dependencies,
+    withSubtasks: args.withSubtasks ?? false,
     boards: bundle.boards,
     categories: bundle.categories,
     collections: bundle.collections,
@@ -560,8 +683,9 @@ export function registerTools(server: McpServer): void {
       title: "List tasks",
       description:
         "List tasks (RLS-scoped). Optionally filter by collectionId, boardId, or " +
-        "completion or tag. Returns compact rows (with tags); use get_workspace " +
-        "to resolve board names.",
+        "completion or tag. Returns compact rows (with tags, `position` = order " +
+        "among siblings, and `blockedBy` = ids of the tasks it waits for, omitted " +
+        "when none); use get_workspace to resolve board names.",
       inputSchema: {
         collectionId: z.string().optional(),
         boardId: z.string().optional(),
@@ -587,7 +711,11 @@ export function registerTools(server: McpServer): void {
     (args, extra) =>
       guard(async () => {
         const { sb, workspaceId, memberId } = mcpContext(extra);
-        let tasks = await fetchTasks(sb, workspaceId);
+        const [all, deps] = await Promise.all([
+          fetchTasks(sb, workspaceId),
+          fetchTaskDependencies(sb, workspaceId),
+        ]);
+        let tasks = all;
         if (args.collectionId)
           tasks = tasks.filter((t) => t.collectionId === args.collectionId);
         if (args.boardId) tasks = tasks.filter((t) => t.boardId === args.boardId);
@@ -601,6 +729,12 @@ export function registerTools(server: McpServer): void {
         if (args.mine === true) tasks = tasks.filter((t) => t.ownerId === memberId);
         if (args.includeSubtasks === false)
           tasks = tasks.filter((t) => t.parentId == null);
+        const blockersById = new Map<string, string[]>();
+        for (const d of deps) {
+          const ids = blockersById.get(d.taskId);
+          if (ids) ids.push(d.dependsOnTaskId);
+          else blockersById.set(d.taskId, [d.dependsOnTaskId]);
+        }
         return ok({
           count: tasks.length,
           tasks: tasks.map((t) => ({
@@ -613,6 +747,8 @@ export function registerTools(server: McpServer): void {
             priority: t.priority ?? undefined,
             dueDate: t.dueDate ?? undefined,
             tags: t.tags?.length ? t.tags : undefined,
+            position: t.position,
+            blockedBy: blockersById.get(t.id),
           })),
         });
       }),
@@ -649,12 +785,17 @@ export function registerTools(server: McpServer): void {
   // stream, as get_flows would answer.
   registerFlowsApp(server, flowsInputShape, async (args, extra) => {
     try {
-      const flows = await loadFlows({ ...args, limit: SHOW_FLOWS_TASKS }, extra);
+      const flows = await loadFlows({ ...args, limit: SHOW_FLOWS_TASKS, withSubtasks: true }, extra);
       if (typeof flows === "string") return fail(flows);
       const perStream = args.limit ?? 3;
+      // The subtask trees and link ids are for the view to draw; the model's
+      // text stays as get_flows would answer.
       const forModel: FlowsOut = {
         ...flows,
-        streams: flows.streams.map((st) => ({ ...st, tasks: st.tasks.slice(0, perStream) })),
+        streams: flows.streams.map((st) => ({
+          ...st,
+          tasks: st.tasks.slice(0, perStream).map(withoutViewFields),
+        })),
       };
       return { ...ok(forModel), structuredContent: flows as unknown as Record<string, unknown> };
     } catch (err) {
@@ -667,8 +808,12 @@ export function registerTools(server: McpServer): void {
     {
       title: "Get task",
       description:
-        "One task by id with its editable fields and its whole subtask tree " +
-        "(flattened, parent before child, each with its depth). RLS-scoped. " +
+        "One task by id with its editable fields, whether its subtasks are 'do in " +
+        "order' (`sequential`), its dependencies (`blockedBy`: the tasks it waits " +
+        "for; `blocks`: the tasks waiting for it; each {id, title, done}) and its " +
+        "whole subtask tree (flattened, parent before child, each with its depth, " +
+        "`sequential`, `blocked` = waiting on an unfinished dependency or an " +
+        "earlier sibling, start/due dates and `blockedBy` ids). RLS-scoped. " +
         "Never returns descriptions.",
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -676,10 +821,13 @@ export function registerTools(server: McpServer): void {
     (args, extra) =>
       guard(async () => {
         const { sb, workspaceId } = mcpContext(extra);
-        const tasks = await fetchTasks(sb, workspaceId);
+        const [tasks, deps] = await Promise.all([
+          fetchTasks(sb, workspaceId),
+          fetchTaskDependencies(sb, workspaceId),
+        ]);
         const task = tasks.find((t) => t.id === args.id);
         if (!task) return fail(`No task with id ${args.id} is visible to you.`);
-        return ok(projectTaskDetail(task, tasks));
+        return ok(projectTaskDetail(task, tasks, deps));
       }),
   );
 
@@ -690,7 +838,8 @@ export function registerTools(server: McpServer): void {
       title: "Create task",
       description:
         "Create a task you own. Optionally place it in a collection/board and set " +
-        "a due date (yyyy-MM-dd), priority (0-3), or parent (for a subtask).",
+        "a due date (yyyy-MM-dd), priority (0-3), parent (for a subtask), or " +
+        "`blockedBy` (ids of tasks it waits for).",
       inputSchema: {
         title: z.string().min(1).max(500),
         description: z.string().max(5000).optional(),
@@ -714,6 +863,11 @@ export function registerTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe("Planned start, yyyy-MM-dd, or null for none."),
+        blockedBy: blockedBySchema
+          .optional()
+          .describe(
+            `Ids of tasks this one waits for (max ${MAX_BLOCKED_BY}); each must be a task you can see.`,
+          ),
         clientRequestId: z
           .string()
           .min(1)
@@ -732,9 +886,17 @@ export function registerTools(server: McpServer): void {
         // A subtask lives where its parent lives: same collection, same
         // privacy (the web app does the same), unless the caller says otherwise.
         let parent: TaskRow | undefined;
+        const wantsBlockers = args.blockedBy !== undefined && args.blockedBy.length > 0;
+        const visible = args.parentId || wantsBlockers ? await fetchTasks(sb, workspaceId) : [];
         if (args.parentId) {
-          parent = (await fetchTasks(sb, workspaceId)).find((t) => t.id === args.parentId);
+          parent = visible.find((t) => t.id === args.parentId);
           if (!parent) return fail(`No task with id ${args.parentId} is visible to you.`);
+        }
+        // Checked before anything is written. A new task has no dependents, so
+        // its blockers can't make a loop.
+        const blockerIds = [...new Set((args.blockedBy ?? []).map((id) => id.trim()))];
+        for (const id of blockerIds) {
+          if (!visible.some((t) => t.id === id)) return fail(`No task with id ${id} is visible to you.`);
         }
         // A task in a collection sits in one of its columns: without one named,
         // the first open column, as when the web app creates it.
@@ -765,7 +927,17 @@ export function registerTools(server: McpServer): void {
           clientRequestId: args.clientRequestId,
         };
         const row = await createTask(sb, input);
-        return ok({ id: row.id, title: row.title });
+        if (args.blockedBy === undefined) return ok({ id: row.id, title: row.title });
+        // A retried create (same clientRequestId) hands back the existing task:
+        // its blockers may already be there.
+        const deps = blockerIds.length > 0 ? await fetchTaskDependencies(sb, workspaceId) : [];
+        const plan = planBlockedBy(row, blockerIds, [...visible, row], deps.filter((d) => d.taskId === row.id));
+        if (typeof plan === "string") return fail(plan);
+        const applied = await applyBlockedBy(sb, workspaceId, row.id, { ...plan, remove: [] });
+        if (typeof applied === "string") {
+          return fail(`Created the task (id ${row.id}), but couldn't set what it waits for. ${applied}`);
+        }
+        return ok({ id: row.id, title: row.title, blockedBy: applied });
       }),
   );
 
@@ -775,7 +947,10 @@ export function registerTools(server: McpServer): void {
       title: "Update task",
       description:
         "Update fields of a task by id. Only provided fields change. To complete " +
-        "a task prefer complete_task (it also moves it to the done board).",
+        "a task prefer complete_task (it also moves it to the done board). " +
+        "`blockedBy` replaces the set of tasks it waits for ([] clears it); a " +
+        "dependency loop is refused, and then nothing else in the call is changed " +
+        "either. Only the task's owner can change it.",
       inputSchema: {
         id: z.string(),
         title: z.string().min(1).max(500).optional(),
@@ -798,6 +973,12 @@ export function registerTools(server: McpServer): void {
           .max(MAX_TAGS * 2)
           .optional()
           .describe("Replace the task's tags (normalized). [] clears them."),
+        blockedBy: blockedBySchema
+          .optional()
+          .describe(
+            `Replace the ids of the tasks this one waits for (max ${MAX_BLOCKED_BY}; [] clears). ` +
+              "The result returns the final `blockedBy`.",
+          ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
@@ -812,11 +993,51 @@ export function registerTools(server: McpServer): void {
         if (args.dueDate !== undefined) patch.dueDate = args.dueDate;
         if (args.startDate !== undefined) patch.startDate = args.startDate;
         if (args.tags !== undefined) patch.tags = args.tags;
+
+        // Dependencies: validated (and a loop refused) before anything is written.
+        let plan: BlockedByPlan | undefined;
+        let loaded: { tasks: TaskRow[]; task: TaskRow } | undefined;
+        if (args.blockedBy !== undefined) {
+          const { workspaceId, memberId } = mcpContext(extra);
+          const [tasks, deps] = await Promise.all([
+            fetchTasks(sb, workspaceId),
+            fetchTaskDependencies(sb, workspaceId),
+          ]);
+          const task = tasks.find((t) => t.id === args.id);
+          if (!task) return fail(`No task with id ${args.id} is visible to you.`);
+          if (task.ownerId !== memberId)
+            return fail("Only the task's owner can change what it waits for.");
+          const planned = planBlockedBy(task, args.blockedBy, tasks, deps);
+          if (typeof planned === "string") return fail(planned);
+          plan = planned;
+          loaded = { tasks, task };
+        }
+        // Dependencies are written before any field, so a set the database
+        // refuses (a loop through tasks the caller can't see) leaves the task
+        // exactly as it was: never "fields saved, but the call failed".
+        // `applyBlockedBy` takes back its own partial adds on that refusal.
+        let applied: string[] | undefined;
+        const depsFirst = async (): Promise<CallToolResult | undefined> => {
+          if (!plan) return undefined;
+          const { workspaceId } = mcpContext(extra);
+          const result = await applyBlockedBy(sb, workspaceId, args.id, plan);
+          if (typeof result === "string") return fail(result);
+          applied = result;
+          return undefined;
+        };
+        const done = (result: Record<string, unknown>): CallToolResult =>
+          ok(applied === undefined ? result : { ...result, blockedBy: applied });
+
         if (args.collectionId === undefined) {
-          if (Object.keys(patch).length === 0)
-            return fail("Provide at least one field to update.");
+          if (Object.keys(patch).length === 0) {
+            if (!loaded) return fail("Provide at least one field to update.");
+            const { task } = loaded;
+            return (await depsFirst()) ?? done({ id: task.id, title: task.title });
+          }
+          const refused = await depsFirst();
+          if (refused) return refused;
           const row = await updateTask(sb, args.id, patch);
-          return ok({ id: row.id, title: row.title });
+          return done({ id: row.id, title: row.title });
         }
 
         // A move. Subtasks live where their parent lives, and a column belongs
@@ -825,7 +1046,10 @@ export function registerTools(server: McpServer): void {
         // in order, so a "do in order" parent never sees a later subtask land
         // in a done column before an earlier one.
         const { workspaceId } = mcpContext(extra);
-        const [tasks, bundle] = await Promise.all([fetchTasks(sb, workspaceId), fetchWorkspaceBundle(sb)]);
+        const [tasks, bundle] = await Promise.all([
+          loaded ? Promise.resolve(loaded.tasks) : fetchTasks(sb, workspaceId),
+          fetchWorkspaceBundle(sb),
+        ]);
         const task = tasks.find((t) => t.id === args.id);
         if (!task) return fail(`No task with id ${args.id} is visible to you.`);
         const target = args.collectionId;
@@ -833,10 +1057,12 @@ export function registerTools(server: McpServer): void {
           return fail(`No collection with id ${target} is visible to you.`);
         if (task.parentId && target !== task.collectionId)
           return fail("A subtask stays in its parent's collection. Move the parent instead.");
+        const refused = await depsFirst();
+        if (refused) return refused;
         if (target === task.collectionId) {
-          if (Object.keys(patch).length === 0) return ok({ id: task.id, title: task.title, moved: 0 });
+          if (Object.keys(patch).length === 0) return done({ id: task.id, title: task.title, moved: 0 });
           const row = await updateTask(sb, args.id, patch);
-          return ok({ id: row.id, title: row.title, moved: 0 });
+          return done({ id: row.id, title: row.title, moved: 0 });
         }
         const moving = subtreeInOrder(task, tasks);
         let moved = 0;
@@ -851,7 +1077,7 @@ export function registerTools(server: McpServer): void {
           if (item.id === task.id) title = row.title;
           moved++;
         }
-        return ok({ id: task.id, title, moved });
+        return done({ id: task.id, title, moved });
       }),
   );
 
