@@ -47,7 +47,7 @@ page) → Supabase issues the token.
 
 Read (`list_tasks` takes `tag` and `mine`): `show_flows` (the same streams as `get_flows`, with a view: see [The Flows app](#the-flows-app-mcp-app)), `get_workspace`, `list_events`, `list_tasks`, `get_task` (one task with its editable fields and its subtask tree), `get_sleep_summary`,
 `get_agenda`, `get_flows`. Write: `create_event`, `update_event`, `create_task`,
-`update_task`, `complete_task`. Destructive (`delete_event`, `delete_task`)
+`update_task`, `complete_task`, `create_collection`. Destructive (`delete_event`, `delete_task`)
 require `confirm: true` — called without it they return a preview of what
 would be removed. RLS is the backstop for all of them.
 
@@ -56,6 +56,30 @@ optional `tag` filter; `create_task` and `update_task` accept `tags: string[]`
 (normalized server-side; `update_task` with `tags: []` clears them);
 `get_workspace` also returns every tag in use (`tags`) and the caller's saved
 streams (`streams`, id and name only).
+
+Collections and columns: `get_workspace` returns each collection as `{ id,
+name, columns }`, its columns left to right, each `{ id, name, done,
+position }` (`done` = the done column); the flat `boards` list stays as it was.
+`create_collection` makes a collection the caller owns (personal, the web's
+first colour, last in the order) with the columns given:
+
+```
+input:  { name: string (1..80),
+          columns: [{ name: string (1..60), done: boolean }] (2..12, left to right) }
+output: { id, name, created: boolean,
+          columns: [{ id, name, done, position }] }
+```
+
+Exactly one column must be `done: true`, and column names must differ
+case-insensitively (names are trimmed); otherwise nothing is written. It is
+idempotent by name: when the caller already owns a collection with that name
+(case-insensitive), that one comes back unchanged with its own columns and
+`created: false` (its columns are not changed to match the call); a shared or
+the partner's collection of that name does not count. Two calls racing can
+still both create one (there is no unique index). The collection and its
+columns are two inserts; if the columns are refused the collection is taken
+back. Echo uses it to give each Obsidian board one collection, with one column
+per lane.
 
 Dependencies (blocks / blocked-by, the `task_dependencies` table): a task can
 wait for other tasks. `list_tasks` rows carry `position` (order among
@@ -88,9 +112,34 @@ column (lowest position) with that role in its collection: `done` completes it
 the way `complete_task` does (done column, completion time), and leaving
 `done` reopens it like `complete_task` with `done: false`. A task already in
 that state stays where it is. A collection with no column of that role is
-refused ("This collection has no in-progress column."), as is a task in no
-collection, `state` together with `boardId`, and `state` together with a move
-to another collection; nothing is written then. The result carries `state`.
+refused ("This collection has no in-progress column."), as is `wip` for a
+task in no collection (see below for `done` and `planned` there), `state`
+together with `boardId`, and `state` together with a move to another
+collection (unless `column` names a column there); nothing is written then. The result carries `state`.
+`update_task` also takes `column`: the name of a column (case-insensitive) in
+the task's collection, or, together with `collectionId`, in the collection it
+moves to (the task itself enters that column after the move; its subtasks land
+as in any move). Entering the done column completes the task and leaving it
+reopens it, as `complete_task` does; a task already in that column stays put.
+With `state` too, the column's role must be that state, else the call is
+refused ("The column "Review" is wip, not done: …"). When no column has that
+name, `state` applies alone as above; without `state` the call is refused,
+naming the collection's columns. `column` with `boardId` is refused. The
+result carries `column` and its `state` (`column` is absent when `state` was
+applied alone). `list_tasks` rows and `get_task` carry `column`, the name of
+the task's column, omitted when it is in none.
+
+A task in no collection has no column, so its completion is its
+`completedAt` alone: `complete_task` and `update_task` with `state: "done"`
+set it, `done: false` and `state: "planned"` clear it, and `state: "wip"` is
+refused. `complete_task` on a task in a collection with no done column (or,
+reopening, no open column) is refused rather than written. Until the
+database keeps a completion outside a done column (the
+`tasks_normalize_completed_at` trigger clears `completed_at` on every write to
+a task whose board is not a done board, a missing board included), such a
+completion is not kept, and the tool says so ("The database did not record
+the completion: …") instead of reporting success.
+
 `get_task` returns `state` and `phases`: the task's states over time, oldest
 first, at most 20 (the most recent), each `{ state, from }` with `from` in UTC
 as `yyyy-MM-ddTHH:mm`. Phases come from the `task_status_events` history (one
