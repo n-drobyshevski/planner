@@ -69,3 +69,33 @@ export function registerFlowsApp(
     }),
   );
 }
+
+type SyncBoardsHandler = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  args: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extra: any,
+) => Promise<CallToolResult>;
+
+/**
+ * Register `sync_boards`, the Flows view's "Sync with Obsidian" button: Echo
+ * runs one board-sync pass now (lib/mcp/echo-sync.ts). App-only
+ * (`visibility: ["app"]`): the host lets the view call it but does not offer it
+ * to the model, so a sync starts from the member's own tap.
+ */
+export function registerSyncBoards(server: McpServer, handler: SyncBoardsHandler): void {
+  registerAppTool(
+    server,
+    "sync_boards",
+    {
+      title: "Sync with Obsidian",
+      description:
+        "Ask Echo to sync the Obsidian task boards with the planner now, and " +
+        "report what changed (counts only). Called by the Flows view's button.",
+      inputSchema: {},
+      annotations: { readOnlyHint: false, openWorldHint: true },
+      _meta: { ui: { resourceUri: FLOWS_APP_URI, visibility: ["app"] } },
+    },
+    handler,
+  );
+}
