@@ -85,6 +85,7 @@ export const STRINGS = {
     refresh: "Refresh",
     groupBy: "Group by",
     stream: "Stream",
+    allStreams: "All",
     attention: "Attention",
     mine: "Only mine",
     open: (n: number) => `${n} open`,
@@ -186,6 +187,7 @@ export const STRINGS = {
     refresh: "Обновить",
     groupBy: "Группировка",
     stream: "Направление",
+    allStreams: "Все",
     attention: "Внимание",
     mine: "Только мои",
     open: (n: number) => `открыто: ${n}`,
@@ -314,6 +316,23 @@ export function stripMarks(tasks: readonly FlowTaskOut[], today: string): StripM
     else byDay.set(clamped, { x: (clamped + STRIP_PAST_DAYS) / span, overdue: days < 0, count: 1 });
   }
   return [...byDay.values()].sort((a, b) => a.x - b.x);
+}
+
+// -- Which streams the Flows view shows -------------------------------------
+
+/** The stream picker's "All" choice. */
+export const ALL_STREAMS = "*";
+
+/**
+ * The streams the Flows view draws: every stream with open tasks for "All",
+ * else the chosen one, falling back to the most pressing when the choice is
+ * gone (regrouped, all done). Streams come most pressing first.
+ */
+export function visibleStreams<T extends { key: string; open: number }>(streams: readonly T[], focus: string | null): T[] {
+  const open = streams.filter((st) => st.open > 0);
+  if (focus === ALL_STREAMS) return open;
+  const current = open.find((st) => st.key === focus) ?? open[0];
+  return current ? [current] : [];
 }
 
 // -- Runways: the Flows view --------------------------------------------------
